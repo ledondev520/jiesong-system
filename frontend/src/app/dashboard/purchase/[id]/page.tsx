@@ -6,23 +6,35 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { BusinessWrite, useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
-import { useState, useEffect, use, useCallback, useMemo } from 'react';
-import { PurchaseContract, PurchaseItem, PurchaseStatus } from '@/types';
-import { purchaseService } from '@/services/purchase.service';
-import { contractDocService } from '@/services/contractDoc.service';
-import { listContractFiles, type ContractFile } from '@/services/contractFile.service';
-import { useRouter } from 'next/navigation';
-import { ErrorState } from '@/components/ui/data-state';
-import { invalidateCache } from '@/lib/api-cache';
-import { Button } from '@/components/ui/button';
-import { MobileListCard } from '@/components/mobile';
-import { useMobile } from '@/lib/hooks/useMobile';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  BusinessWrite,
+  useBusinessReadOnly,
+} from "@/lib/hooks/useBusinessReadOnly";
+import { useState, useEffect, use, useCallback, useMemo } from "react";
+import { PurchaseContract, PurchaseItem, PurchaseStatus } from "@/types";
+import { purchaseService } from "@/services/purchase.service";
+import { contractDocService } from "@/services/contractDoc.service";
+import {
+  listContractFiles,
+  type ContractFile,
+} from "@/services/contractFile.service";
+import { useRouter } from "next/navigation";
+import { ErrorState } from "@/components/ui/data-state";
+import { invalidateCache } from "@/lib/api-cache";
+import { Button } from "@/components/ui/button";
+import { MobileListCard } from "@/components/mobile";
+import { useMobile } from "@/lib/hooks/useMobile";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -30,17 +42,17 @@ import {
   TableHeader,
   TableRow,
   TableHead,
-} from '@/components/ui/table';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { useTableSort } from '@/lib/hooks/useTableSort';
+} from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useTableSort } from "@/lib/hooks/useTableSort";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Progress } from '@/components/ui/progress';
+} from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 import {
   Package,
   DollarSign,
@@ -66,27 +78,44 @@ import {
   Stamp,
   ArrowRight,
   AlertTriangle,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { PageHeader } from '@/components/layout/PageHeader';
-import ContractFiles from '@/components/contract/ContractFiles';
-import { PurchaseReceiptPanel } from './components/PurchaseReceiptPanel';
-import { PurchaseFlowPanel } from './components/PurchaseFlowPanel';
-import { PurchaseProductionPanel } from './components/PurchaseProductionPanel';
-import { configService } from '@/services/config.service';
-import { cn } from '@/lib/utils';
-import { calculatePurchaseLineAmounts, summarizePurchaseAmounts } from '@/lib/purchase-amount';
+} from "lucide-react";
+import { toast } from "sonner";
+import { format } from "date-fns";
+import { PageHeader } from "@/components/layout/PageHeader";
+import ContractFiles from "@/components/contract/ContractFiles";
+import { PurchaseReceiptPanel } from "./components/PurchaseReceiptPanel";
+import { PurchaseFlowPanel } from "./components/PurchaseFlowPanel";
+import { PurchaseProductionPanel } from "./components/PurchaseProductionPanel";
+import { configService } from "@/services/config.service";
+import { cn } from "@/lib/utils";
+import {
+  calculatePurchaseLineAmounts,
+  summarizePurchaseAmounts,
+} from "@/lib/purchase-amount";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-const PURCHASE_NEXT_ACTIONS: Partial<Record<PurchaseStatus, { status: PurchaseStatus; label: string }>> = {
-  [PurchaseStatus.DRAFT]: { status: PurchaseStatus.SIGNED, label: '确认已签约' },
-  [PurchaseStatus.SIGNED]: { status: PurchaseStatus.READY, label: '登记完工资料' },
-  [PurchaseStatus.PRODUCING]: { status: PurchaseStatus.READY, label: '登记完工资料' },
-  [PurchaseStatus.READY]: { status: PurchaseStatus.SHIPPED, label: '确认供应商已发货' },
+const PURCHASE_NEXT_ACTIONS: Partial<
+  Record<PurchaseStatus, { status: PurchaseStatus; label: string }>
+> = {
+  [PurchaseStatus.DRAFT]: {
+    status: PurchaseStatus.SIGNED,
+    label: "确认已签约",
+  },
+  [PurchaseStatus.SIGNED]: {
+    status: PurchaseStatus.READY,
+    label: "登记完工资料",
+  },
+  [PurchaseStatus.PRODUCING]: {
+    status: PurchaseStatus.READY,
+    label: "登记完工资料",
+  },
+  [PurchaseStatus.READY]: {
+    status: PurchaseStatus.SHIPPED,
+    label: "确认供应商已发货",
+  },
 };
 
 /**
@@ -98,44 +127,52 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
     { label: string; icon: React.ReactNode; className: string }
   > = {
     [PurchaseStatus.DRAFT]: {
-      label: '草稿',
+      label: "草稿",
       icon: <Circle className="h-3 w-3 fill-current" />,
-      className: 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800',
+      className:
+        "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800",
     },
     [PurchaseStatus.SIGNED]: {
-      label: '已确认',
+      label: "已确认",
       icon: <CheckCircle2 className="h-3 w-3" />,
-      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800',
+      className:
+        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
     },
     [PurchaseStatus.PRODUCING]: {
-      label: '生产中',
+      label: "生产中",
       icon: <Loader2 className="h-3 w-3 animate-spin" />,
-      className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800',
+      className:
+        "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
     },
     [PurchaseStatus.READY]: {
-      label: '生产完成',
+      label: "生产完成",
       icon: <PackageCheck className="h-3 w-3" />,
-      className: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-400 dark:border-cyan-800',
+      className:
+        "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-400 dark:border-cyan-800",
     },
     [PurchaseStatus.SHIPPED]: {
-      label: '已发货',
+      label: "已发货",
       icon: <Truck className="h-3 w-3" />,
-      className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800',
+      className:
+        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
     },
     [PurchaseStatus.RECEIVED]: {
-      label: '已收货',
+      label: "已收货",
       icon: <PackageCheck className="h-3 w-3" />,
-      className: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-400 dark:border-violet-800',
+      className:
+        "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-400 dark:border-violet-800",
     },
     [PurchaseStatus.COMPLETED]: {
-      label: '已完成',
+      label: "已完成",
       icon: <CheckCircle2 className="h-3 w-3" />,
-      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800',
+      className:
+        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
     },
     [PurchaseStatus.CANCELLED]: {
-      label: '已取消',
+      label: "已取消",
       icon: <X className="h-3 w-3" />,
-      className: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800',
+      className:
+        "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
     },
   };
 
@@ -144,8 +181,8 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap',
-        c.className
+        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap",
+        c.className,
       )}
     >
       {c.icon}
@@ -155,13 +192,13 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
 }
 
 const PURCHASE_TIMELINE_STEPS = [
-  { status: PurchaseStatus.DRAFT, label: '草稿', icon: FileText },
-  { status: PurchaseStatus.SIGNED, label: '已确认', icon: CheckCircle2 },
-  { status: PurchaseStatus.PRODUCING, label: '生产中', icon: Loader2 },
-  { status: PurchaseStatus.READY, label: '生产完成', icon: PackageCheck },
-  { status: PurchaseStatus.SHIPPED, label: '已发货', icon: Truck },
-  { status: PurchaseStatus.RECEIVED, label: '已收货', icon: PackageCheck },
-  { status: PurchaseStatus.COMPLETED, label: '已完成', icon: CheckCircle2 },
+  { status: PurchaseStatus.DRAFT, label: "草稿", icon: FileText },
+  { status: PurchaseStatus.SIGNED, label: "已确认", icon: CheckCircle2 },
+  { status: PurchaseStatus.PRODUCING, label: "生产中", icon: Loader2 },
+  { status: PurchaseStatus.READY, label: "生产完成", icon: PackageCheck },
+  { status: PurchaseStatus.SHIPPED, label: "已发货", icon: Truck },
+  { status: PurchaseStatus.RECEIVED, label: "已收货", icon: PackageCheck },
+  { status: PurchaseStatus.COMPLETED, label: "已完成", icon: CheckCircle2 },
 ] as const;
 
 function PurchaseTimelineStep({
@@ -181,12 +218,12 @@ function PurchaseTimelineStep({
     <li className="relative flex flex-1 flex-col items-center gap-2">
       <div
         className={cn(
-          'z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors',
+          "z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors",
           isCurrent
-            ? 'border-primary bg-primary text-primary-foreground'
+            ? "border-primary bg-primary text-primary-foreground"
             : isCompleted
-              ? 'border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-950'
-              : 'border-border bg-muted text-muted-foreground'
+              ? "border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-950"
+              : "border-border bg-muted text-muted-foreground",
         )}
       >
         {isCompleted && !isCurrent ? (
@@ -197,8 +234,12 @@ function PurchaseTimelineStep({
       </div>
       <span
         className={cn(
-          'text-[11px] font-medium',
-          isCurrent ? 'text-primary' : isCompleted ? 'text-foreground' : 'text-muted-foreground'
+          "text-[11px] font-medium",
+          isCurrent
+            ? "text-primary"
+            : isCompleted
+              ? "text-foreground"
+              : "text-muted-foreground",
         )}
       >
         {step.label}
@@ -207,8 +248,8 @@ function PurchaseTimelineStep({
         <span
           aria-hidden="true"
           className={cn(
-            'absolute left-[calc(50%+1rem)] top-4 h-[2px] w-[calc(100%-2rem)]',
-            index < currentIndex ? 'bg-emerald-500' : 'bg-border'
+            "absolute left-[calc(50%+1rem)] top-4 h-[2px] w-[calc(100%-2rem)]",
+            index < currentIndex ? "bg-emerald-500" : "bg-border",
           )}
         />
       ) : null}
@@ -220,8 +261,14 @@ function PurchaseTimelineStep({
  * 职责：合同状态时间线
  * 思路：按标准流程展示各状态节点，当前状态高亮，已完成节点打勾
  */
-function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) {
-  const currentIndex = PURCHASE_TIMELINE_STEPS.findIndex((step) => step.status === currentStatus);
+function ContractTimeline({
+  currentStatus,
+}: {
+  currentStatus: PurchaseStatus;
+}) {
+  const currentIndex = PURCHASE_TIMELINE_STEPS.findIndex(
+    (step) => step.status === currentStatus,
+  );
   const isCancelled = currentStatus === PurchaseStatus.CANCELLED;
 
   return (
@@ -233,7 +280,10 @@ function ContractTimeline({ currentStatus }: { currentStatus: PurchaseStatus }) 
           该合同已取消
         </div>
       ) : (
-        <ol className="flex items-start justify-between" aria-label="采购合同进度">
+        <ol
+          className="flex items-start justify-between"
+          aria-label="采购合同进度"
+        >
           {PURCHASE_TIMELINE_STEPS.map((step, index) => (
             <PurchaseTimelineStep
               key={step.status}
@@ -262,10 +312,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generateLoading, setGenerateLoading] = useState(false);
   const [generateForm, setGenerateForm] = useState({
-    storeName: '',
-    deliveryAddress: '',
-    deliveryContact: '',
-    depositRate: '30',
+    storeName: "",
+    deliveryAddress: "",
+    deliveryContact: "",
+    depositRate: "30",
   });
 
   // PDF预览状态
@@ -278,8 +328,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [productionEditorOpen, setProductionEditorOpen] = useState(false);
 
   // 系统配置：线上盖章平台链接 + 我方开票抬头（选填）
-  const [stampPlatformUrl, setStampPlatformUrl] = useState('');
-  const [invoiceTitleInfo, setInvoiceTitleInfo] = useState('');
+  const [stampPlatformUrl, setStampPlatformUrl] = useState("");
+  const [invoiceTitleInfo, setInvoiceTitleInfo] = useState("");
 
   /**
    * 职责：加载采购合同详情 + 附件列表
@@ -293,14 +343,20 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       setContract(contractRes.data || null);
       setNotFound(!contractRes.data);
       try {
-        const filesRes = await listContractFiles(id, 'PURCHASE');
+        const filesRes = await listContractFiles(id, "PURCHASE");
         if (filesRes.data) setContractFiles(filesRes.data);
-      } catch { toast.error('附件读取失败，请重试刷新详情'); }
+      } catch {
+        toast.error("附件读取失败，请重试刷新详情");
+      }
     } catch (error) {
-      const missing = typeof error === 'object' && error !== null && 'code' in error && error.code === 404;
+      const missing =
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === 404;
       setNotFound(missing);
       setLoadError(!missing);
-      if (!missing) toast.error('加载合同详情失败');
+      if (!missing) toast.error("加载合同详情失败");
     } finally {
       setLoading(false);
     }
@@ -317,8 +373,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       try {
         const response = await configService.getSystemConfig();
         const configs = response.data as Record<string, unknown> | undefined;
-        if (typeof configs?.stampPlatformUrl === 'string') setStampPlatformUrl(configs.stampPlatformUrl);
-        if (typeof configs?.invoiceTitleInfo === 'string') setInvoiceTitleInfo(configs.invoiceTitleInfo);
+        if (typeof configs?.stampPlatformUrl === "string")
+          setStampPlatformUrl(configs.stampPlatformUrl);
+        if (typeof configs?.invoiceTitleInfo === "string")
+          setInvoiceTitleInfo(configs.invoiceTitleInfo);
       } catch {
         // 配置读取失败时保持默认，不影响详情页
       }
@@ -333,10 +391,14 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const handleOpenStampPlatform = () => {
     const url = stampPlatformUrl.trim();
     if (!url) {
-      toast.info('尚未配置线上盖章平台链接，请到「设置 → 系统配置」中填写');
+      toast.info("尚未配置线上盖章平台链接，请到「设置 → 系统配置」中填写");
       return;
     }
-    window.open(url.startsWith('http') ? url : `https://${url}`, '_blank', 'noopener,noreferrer');
+    window.open(
+      url.startsWith("http") ? url : `https://${url}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
 
   /**
@@ -347,17 +409,21 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
     setGenerateLoading(true);
     try {
-      const blob = await contractDocService.generateFromPurchase(contract.id, generateForm);
+      const blob = await contractDocService.generateFromPurchase(
+        contract.id,
+        generateForm,
+      );
 
       // 下载文件
-      const filename = `购销合同${contract.contractNo?.replace('PO', 'CG') || ''}.docx`;
+      const filename = `购销合同${contract.contractNo?.replace("PO", "CG") || ""}.docx`;
       contractDocService.downloadDocument(blob, filename);
 
-      toast.success('合同文档已生成');
+      toast.success("合同文档已生成");
       setGenerateOpen(false);
       await loadData();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '生成合同文档失败';
+      const message =
+        error instanceof Error ? error.message : "生成合同文档失败";
       toast.error(message);
     } finally {
       setGenerateLoading(false);
@@ -379,7 +445,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         setPdfUrl(url);
         setPdfDialogOpen(true);
       } else {
-        toast.info('暂无合同文档，请先生成');
+        toast.info("暂无合同文档，请先生成");
       }
     } catch {
       toast.info('暂无合同文档，请点击"生成购销合同"创建');
@@ -396,11 +462,14 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
     setExportingPdf(true);
     try {
-      await contractDocService.exportPurchasePdf(contract.id, contract.contractNo);
-      toast.success('合同 PDF 已下载');
+      await contractDocService.exportPurchasePdf(
+        contract.id,
+        contract.contractNo,
+      );
+      toast.success("合同 PDF 已下载");
       await loadData();
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '导出 PDF 失败';
+      const message = error instanceof Error ? error.message : "导出 PDF 失败";
       toast.error(message);
     } finally {
       setExportingPdf(false);
@@ -413,67 +482,102 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     const nextAction = PURCHASE_NEXT_ACTIONS[contract.status];
     if (!nextAction) return;
 
-    if ([PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING].includes(contract.status)) {
+    if (
+      [PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING].includes(
+        contract.status,
+      )
+    ) {
       setProductionEditorOpen(true);
       return;
     }
     setStatusUpdating(true);
     try {
       await purchaseService.updateStatus(contract.id, nextAction.status);
-      invalidateCache('purchase-contracts-list');
-      invalidateCache('inventory-list');
+      invalidateCache("purchase-contracts-list");
+      invalidateCache("inventory-list");
       toast.success(`已推进到「${nextAction.label}」阶段`);
       await loadData();
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : '状态推进失败');
+      toast.error(error instanceof Error ? error.message : "状态推进失败");
     } finally {
       setStatusUpdating(false);
     }
   };
 
   const handleCancel = async () => {
-    if (!contract || !window.confirm('取消这份未履行采购合同？取消后不能再推进或恢复，请确认尚未生产、付款或关联出口。')) return;
+    if (
+      !contract ||
+      !window.confirm(
+        "取消这份未履行采购合同？取消后不能再推进或恢复，请确认尚未生产、付款或关联出口。",
+      )
+    )
+      return;
     setStatusUpdating(true);
     try {
       await purchaseService.updateStatus(contract.id, PurchaseStatus.CANCELLED);
-      invalidateCache('purchase-contracts-list');
-      toast.success('采购合同已取消');
+      invalidateCache("purchase-contracts-list");
+      toast.success("采购合同已取消");
       await loadData();
     } catch (error) {
-      toast.error(typeof error === 'object' && error !== null && 'message' in error ? String(error.message) : '取消失败');
-    } finally { setStatusUpdating(false); }
+      toast.error(
+        typeof error === "object" && error !== null && "message" in error
+          ? String(error.message)
+          : "取消失败",
+      );
+    } finally {
+      setStatusUpdating(false);
+    }
   };
 
-  const purchaseLineItems = useMemo(() => contract?.items ?? [], [contract?.items]);
+  const purchaseLineItems = useMemo(
+    () => contract?.items ?? [],
+    [contract?.items],
+  );
 
   /**
    * 职责：采购明细行排序取值（名称、规格、数量、单价、小计）
    */
-  const purchaseLineAccessor = useCallback((item: PurchaseItem, key: string) => {
-    switch (key) {
-      case 'productName':
-        return item.product?.customsName ?? '';
-      case 'spec':
-        return item.specification || item.product?.specification || '';
-      case 'quantity':
-        return item.quantity;
-      case 'unitPrice':
-        return Number(item.unitPrice) || 0;
-      case 'lineTotal':
-        return calculatePurchaseLineAmounts(item, contract?.taxRate).grossAmount;
-      default:
-        return null;
-    }
-  }, [contract?.taxRate]);
+  const purchaseLineAccessor = useCallback(
+    (item: PurchaseItem, key: string) => {
+      switch (key) {
+        case "productName":
+          return item.product?.customsName ?? "";
+        case "spec":
+          return item.specification || item.product?.specification || "";
+        case "quantity":
+          return item.quantity;
+        case "unitPrice":
+          return Number(item.unitPrice) || 0;
+        case "lineTotal":
+          return calculatePurchaseLineAmounts(item, contract?.taxRate)
+            .grossAmount;
+        default:
+          return null;
+      }
+    },
+    [contract?.taxRate],
+  );
 
-  const purchaseLineSort = useTableSort(purchaseLineItems, purchaseLineAccessor);
+  const purchaseLineSort = useTableSort(
+    purchaseLineItems,
+    purchaseLineAccessor,
+  );
 
   if (loading) {
-    return <div className="flex h-64 items-center justify-center">加载中...</div>;
+    return (
+      <div className="flex h-64 items-center justify-center">加载中...</div>
+    );
   }
 
-  if (loadError) return <ErrorState title="采购合同读取失败" action={<Button onClick={() => void loadData()}>重试</Button>} />;
-  if (notFound || !contract) return <div className="py-10 text-center">合同不存在</div>;
+  if (loadError)
+    return (
+      <ErrorState
+        title="采购合同读取失败"
+        action={<Button onClick={() => void loadData()}>重试</Button>}
+      />
+    );
+  if (notFound || !contract)
+    return <div className="py-10 text-center">合同不存在</div>;
 
   // 计算付款进度
   const amountSummary = summarizePurchaseAmounts({
@@ -482,12 +586,17 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     totalAmount: contract.totalAmount,
     paidAmount: contract.paidAmount,
   });
-  const paidPercent = amountSummary.grossAmount > 0
-    ? Math.min((amountSummary.paidAmount / amountSummary.grossAmount) * 100, 100)
-    : 0;
+  const paidPercent =
+    amountSummary.grossAmount > 0
+      ? Math.min(
+          (amountSummary.paidAmount / amountSummary.grossAmount) * 100,
+          100,
+        )
+      : 0;
   const nextPurchaseAction = PURCHASE_NEXT_ACTIONS[contract.status];
-  const productionCompletionBlocked = contract.status === PurchaseStatus.READY
-    && contract.productionReadiness?.ready === false;
+  const productionCompletionBlocked =
+    contract.status === PurchaseStatus.READY &&
+    contract.productionReadiness?.ready === false;
   const productionStageVisible = [
     PurchaseStatus.SIGNED,
     PurchaseStatus.PRODUCING,
@@ -496,63 +605,126 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     PurchaseStatus.RECEIVED,
     PurchaseStatus.COMPLETED,
   ].includes(contract.status);
-  const productionPhotoFiles = contractFiles.filter((file) => file.category === 'PRODUCTION_PHOTO');
-  const generalContractFiles = contractFiles.filter((file) => file.category !== 'PRODUCTION_PHOTO');
+  const productionPhotoFiles = contractFiles.filter(
+    (file) => file.category === "PRODUCTION_PHOTO",
+  );
+  const generalContractFiles = contractFiles.filter(
+    (file) => file.category !== "PRODUCTION_PHOTO",
+  );
 
   return (
     <div className="space-y-6 pb-10">
       {/* 页头 */}
       <PageHeader
         title={contract.contractNo}
-        description={`供应商: ${contract.supplier?.name || '未知'} | 签订日期: ${contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '-'}`}
+        description={`供应商: ${contract.supplier?.name || "未知"} | 签订日期: ${contract.signedAt ? format(new Date(contract.signedAt), "yyyy-MM-dd") : "-"}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={contract.status} />
-            {contract.status === PurchaseStatus.DRAFT && contract.paidAmount === 0 && !(contract.payments?.length) && !contract.invoiceNo && contractFiles.length === 0 && (
-              <BusinessWrite><Button variant="outline" onClick={() => router.push(`/dashboard/purchase/create?editId=${contract.id}`)}>更正草稿</Button></BusinessWrite>
-            )}
-            {[PurchaseStatus.DRAFT, PurchaseStatus.SIGNED].includes(contract.status) && contract.paidAmount === 0 && !(contract.payments?.length) && !contract.invoiceNo && (
-              <BusinessWrite><Button variant="outline" onClick={handleCancel} disabled={statusUpdating}>取消合同</Button></BusinessWrite>
-            )}
+            {contract.status === PurchaseStatus.DRAFT &&
+              contract.paidAmount === 0 &&
+              !contract.payments?.length &&
+              !contract.invoiceNo &&
+              contractFiles.length === 0 && (
+                <BusinessWrite>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/purchase/create?editId=${contract.id}`,
+                      )
+                    }
+                  >
+                    更正草稿
+                  </Button>
+                </BusinessWrite>
+              )}
+            {[PurchaseStatus.DRAFT, PurchaseStatus.SIGNED].includes(
+              contract.status,
+            ) &&
+              contract.paidAmount === 0 &&
+              !contract.payments?.length &&
+              !contract.invoiceNo && (
+                <BusinessWrite>
+                  <Button
+                    variant="outline"
+                    onClick={handleCancel}
+                    disabled={statusUpdating}
+                  >
+                    取消合同
+                  </Button>
+                </BusinessWrite>
+              )}
             {nextPurchaseAction && (
-              <BusinessWrite><Button
+              <BusinessWrite>
+                <Button
+                  className="h-9 rounded-md text-xs"
+                  onClick={handleAdvanceStatus}
+                  disabled={statusUpdating || productionCompletionBlocked}
+                  title={
+                    productionCompletionBlocked
+                      ? "请先补齐所有商品的规格、箱数、毛净重和体积"
+                      : undefined
+                  }
+                >
+                  {statusUpdating ? (
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ArrowRight className="mr-1.5 h-3.5 w-3.5" />
+                  )}
+                  {nextPurchaseAction.label}
+                </Button>
+              </BusinessWrite>
+            )}
+            <BusinessWrite>
+              <Button
+                variant="outline"
                 className="h-9 rounded-md text-xs"
-                onClick={handleAdvanceStatus}
-                disabled={statusUpdating || productionCompletionBlocked}
-                title={productionCompletionBlocked ? '请先补齐所有商品的规格、箱数、毛净重和体积' : undefined}
+                onClick={handleExportPdf}
+                disabled={exportingPdf}
               >
-                {statusUpdating ? (
+                {exportingPdf ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <ArrowRight className="mr-1.5 h-3.5 w-3.5" />
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
                 )}
-                {nextPurchaseAction.label}
-              </Button></BusinessWrite>
-            )}
-            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleExportPdf} disabled={exportingPdf}>
-              {exportingPdf ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Download className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              导出 PDF
-            </Button></BusinessWrite>
-            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={viewContractPdf} disabled={pdfLoading}>
-              {pdfLoading ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Eye className="mr-1.5 h-3.5 w-3.5" />
-              )}
-              查看合同
-            </Button></BusinessWrite>
-            <BusinessWrite><Button variant="outline" className="h-9 rounded-md text-xs" onClick={handleOpenStampPlatform}>
-              <Stamp className="mr-1.5 h-3.5 w-3.5" />
-              在线盖章
-            </Button></BusinessWrite>
-            <BusinessWrite><Button className="h-9 rounded-md text-xs" onClick={() => setGenerateOpen(true)}>
-              <FileDown className="mr-1.5 h-3.5 w-3.5" />
-              生成购销合同
-            </Button></BusinessWrite>
+                导出 PDF
+              </Button>
+            </BusinessWrite>
+            <BusinessWrite>
+              <Button
+                variant="outline"
+                className="h-9 rounded-md text-xs"
+                onClick={viewContractPdf}
+                disabled={pdfLoading}
+              >
+                {pdfLoading ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Eye className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                查看合同
+              </Button>
+            </BusinessWrite>
+            <BusinessWrite>
+              <Button
+                variant="outline"
+                className="h-9 rounded-md text-xs"
+                onClick={handleOpenStampPlatform}
+              >
+                <Stamp className="mr-1.5 h-3.5 w-3.5" />
+                在线盖章
+              </Button>
+            </BusinessWrite>
+            <BusinessWrite>
+              <Button
+                className="h-9 rounded-md text-xs"
+                onClick={() => setGenerateOpen(true)}
+              >
+                <FileDown className="mr-1.5 h-3.5 w-3.5" />
+                生成购销合同
+              </Button>
+            </BusinessWrite>
           </div>
         }
       />
@@ -566,7 +738,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 <DollarSign className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <div className="text-xl font-bold tabular-nums">¥{amountSummary.grossAmount.toLocaleString()}</div>
+                <div className="text-xl font-bold tabular-nums">
+                  ¥{amountSummary.grossAmount.toLocaleString()}
+                </div>
                 <p className="text-xs text-muted-foreground">合同含税金额</p>
               </div>
             </div>
@@ -579,7 +753,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 <Receipt className="h-4 w-4 text-emerald-600" />
               </div>
               <div className="flex-1">
-                <div className="text-xl font-bold tabular-nums">¥{contract.paidAmount.toLocaleString()}</div>
+                <div className="text-xl font-bold tabular-nums">
+                  ¥{contract.paidAmount.toLocaleString()}
+                </div>
                 <p className="text-xs text-muted-foreground">已付金额</p>
                 <Progress value={paidPercent} className="mt-2 h-1.5" />
               </div>
@@ -608,8 +784,11 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 <Building2 className="h-4 w-4 text-sky-600" />
               </div>
               <div className="min-w-0">
-                <div className="truncate text-lg font-medium" title={contract.supplier?.name}>
-                  {contract.supplier?.name || '-'}
+                <div
+                  className="truncate text-lg font-medium"
+                  title={contract.supplier?.name}
+                >
+                  {contract.supplier?.name || "-"}
                 </div>
                 <p className="text-xs text-muted-foreground">供应商</p>
               </div>
@@ -619,13 +798,18 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       </div>
 
       {amountSummary.issues.length > 0 && (
-        <div role="alert" className="rounded-lg border border-amber-300/70 bg-amber-50/70 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+        <div
+          role="alert"
+          className="rounded-lg border border-amber-300/70 bg-amber-50/70 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+        >
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
               <p className="font-medium">金额数据需要复核</p>
               <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
-                {amountSummary.issues.map((issue) => <li key={issue.code}>{issue.message}</li>)}
+                {amountSummary.issues.map((issue) => (
+                  <li key={issue.code}>{issue.message}</li>
+                ))}
               </ul>
             </div>
           </div>
@@ -634,13 +818,29 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
       {/* 时间线 */}
       <ContractTimeline currentStatus={contract.status} />
-      {contract.status === PurchaseStatus.SHIPPED && <p className="text-sm text-muted-foreground">请在下方分批到货与验货区域处理；到齐并合格后自动收货，付款结清后自动完成。</p>}
-      {contract.status === PurchaseStatus.RECEIVED && <p className="text-sm text-muted-foreground">已收货，付款记录结清后自动完成采购，无需再确认完成。</p>}
+      {contract.status === PurchaseStatus.SHIPPED && (
+        <p className="text-sm text-muted-foreground">
+          请在下方分批到货与验货区域处理；到齐并合格后自动收货，付款结清后自动完成。
+        </p>
+      )}
+      {contract.status === PurchaseStatus.RECEIVED && (
+        <p className="text-sm text-muted-foreground">
+          已收货，付款记录结清后自动完成采购，无需再确认完成。
+        </p>
+      )}
 
-      <PurchaseReceiptPanel purchaseContractId={id} readOnly={readOnly} onChanged={loadData} />
+      <PurchaseReceiptPanel
+        purchaseContractId={id}
+        readOnly={readOnly}
+        onChanged={loadData}
+      />
 
       {/* 付款与发票（复制汇款信息 / 登记付款 / 催开发票） */}
-      <PurchaseFlowPanel contract={contract} onUpdated={loadData} invoiceTitleInfo={invoiceTitleInfo} />
+      <PurchaseFlowPanel
+        contract={contract}
+        onUpdated={loadData}
+        invoiceTitleInfo={invoiceTitleInfo}
+      />
 
       {productionStageVisible ? (
         <PurchaseProductionPanel
@@ -648,10 +848,12 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           editorOpen={productionEditorOpen}
           onEditorOpenChange={setProductionEditorOpen}
           photoFiles={productionPhotoFiles}
-          onPhotoFilesChange={(files) => setContractFiles((current) => [
-            ...files,
-            ...current.filter((file) => file.category !== 'PRODUCTION_PHOTO'),
-          ])}
+          onPhotoFilesChange={(files) =>
+            setContractFiles((current) => [
+              ...files,
+              ...current.filter((file) => file.category !== "PRODUCTION_PHOTO"),
+            ])
+          }
           onUpdated={loadData}
         />
       ) : null}
@@ -668,7 +870,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">合同编号</p>
-                <p className="font-mono text-sm font-medium">{contract.contractNo}</p>
+                <p className="font-mono text-sm font-medium">
+                  {contract.contractNo}
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -676,19 +880,28 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <div>
                 <p className="text-xs text-muted-foreground">签订日期</p>
                 <p className="text-sm">
-                  {contract.signedAt ? format(new Date(contract.signedAt), 'yyyy-MM-dd') : '—'}
+                  {contract.signedAt
+                    ? format(new Date(contract.signedAt), "yyyy-MM-dd")
+                    : "—"}
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <div><p className="text-xs text-muted-foreground">预计交期</p><p className="text-sm">{contract.expectedDate ? format(new Date(contract.expectedDate), 'yyyy-MM-dd') : '未填写'}</p></div>
+              <div>
+                <p className="text-xs text-muted-foreground">预计交期</p>
+                <p className="text-sm">
+                  {contract.expectedDate
+                    ? format(new Date(contract.expectedDate), "yyyy-MM-dd")
+                    : "未填写"}
+                </p>
+              </div>
             </div>
             <div className="flex items-start gap-3">
               <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">发货店铺</p>
-                <p className="text-sm">{contract.storeName || '—'}</p>
+                <p className="text-sm">{contract.storeName || "—"}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -717,39 +930,54 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">公司名称</p>
-                <p className="text-sm font-medium">{contract.supplier?.name || '—'}</p>
+                <p className="text-sm font-medium">
+                  {contract.supplier?.name || "—"}
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">联系人</p>
-                <p className="text-sm">{contract.supplier?.contactName || '—'}</p>
+                <p className="text-sm">
+                  {contract.supplier?.contactName || "—"}
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">联系电话</p>
-                <p className="text-sm">{contract.supplier?.contactPhone || '—'}</p>
+                <p className="text-sm">
+                  {contract.supplier?.contactPhone || "—"}
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">公司地址</p>
-                <p className="text-sm">{contract.supplier?.address || '—'}</p>
+                <p className="text-sm">{contract.supplier?.address || "—"}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">收款账户</p>
-                <p className="text-sm">户名：{contract.supplier?.bankAccountName || contract.supplier?.name || '—'}</p>
-                <p className="text-xs text-muted-foreground">
-                  {contract.supplier?.bankName || '—'} · {contract.supplier?.bankBranch || '—'} · 联行号 {contract.supplier?.bankCode || '—'}
+                <p className="text-sm">
+                  户名：
+                  {contract.supplier?.bankAccountName ||
+                    contract.supplier?.name ||
+                    "—"}
                 </p>
-                <p className="font-mono text-xs">账号 {contract.supplier?.bankAccount || '—'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {contract.supplier?.bankName || "—"} ·{" "}
+                  {contract.supplier?.bankBranch || "—"} · 联行号{" "}
+                  {contract.supplier?.bankCode || "—"}
+                </p>
+                <p className="font-mono text-xs">
+                  账号 {contract.supplier?.bankAccount || "—"}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -764,30 +992,60 @@ export default function PurchaseDetailPage({ params }: PageProps) {
             商品明细
           </CardTitle>
           <CardDescription>
-            共 {purchaseLineItems.length} 项商品 · 不含税单价 · 发票税率 {amountSummary.taxRate}%
+            共 {purchaseLineItems.length} 项商品 · 不含税单价 · 发票税率{" "}
+            {amountSummary.taxRate}%
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!purchaseLineSort.sortedData.length ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">暂无商品明细</div>
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              暂无商品明细
+            </div>
           ) : isMobile ? (
             <div className="space-y-3">
               {purchaseLineSort.sortedData.map((item: PurchaseItem) => (
                 <MobileListCard
                   key={item.id}
-                  title={item.product?.customsName || '未知商品'}
-                  subtitle={item.specification || item.product?.specification || '-'}
+                  title={item.product?.customsName || "未知商品"}
+                  subtitle={
+                    item.specification || item.product?.specification || "-"
+                  }
                   fields={[
-                    { label: '数量', value: `${item.quantity} ${item.unit || item.product?.unit || ''}` },
-                    { label: '不含税单价', value: `¥${(Number(item.unitPrice) || 0).toLocaleString()}` },
+                    {
+                      label: "数量",
+                      value: `${item.quantity} ${item.unit || item.product?.unit || ""}`,
+                    },
+                    {
+                      label: "不含税单价",
+                      value: `¥${(Number(item.unitPrice) || 0).toLocaleString()}`,
+                    },
                   ]}
-                  amount={{ label: '含税小计', value: `¥${calculatePurchaseLineAmounts(item, amountSummary.taxRate).grossAmount.toLocaleString()}`, emphasis: 'success' }}
+                  amount={{
+                    label: "含税小计",
+                    value: `¥${calculatePurchaseLineAmounts(item, amountSummary.taxRate).grossAmount.toLocaleString()}`,
+                    emphasis: "success",
+                  }}
                 />
               ))}
               <dl className="space-y-2 rounded-lg bg-muted/40 p-4 text-sm">
-                <div className="flex flex-wrap justify-between gap-2"><dt>不含税合计</dt><dd className="font-mono">¥{amountSummary.netAmount.toLocaleString()}</dd></div>
-                <div className="flex flex-wrap justify-between gap-2"><dt>其中税额 ({amountSummary.taxRate}%)</dt><dd className="font-mono">¥{amountSummary.taxAmount.toLocaleString()}</dd></div>
-                <div className="flex flex-wrap justify-between gap-2 font-semibold"><dt>含税合计</dt><dd className="font-mono">¥{amountSummary.lineGrossAmount.toLocaleString()}</dd></div>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt>不含税合计</dt>
+                  <dd className="font-mono">
+                    ¥{amountSummary.netAmount.toLocaleString()}
+                  </dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt>其中税额 ({amountSummary.taxRate}%)</dt>
+                  <dd className="font-mono">
+                    ¥{amountSummary.taxAmount.toLocaleString()}
+                  </dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-2 font-semibold">
+                  <dt>含税合计</dt>
+                  <dd className="font-mono">
+                    ¥{amountSummary.lineGrossAmount.toLocaleString()}
+                  </dd>
+                </div>
               </dl>
             </div>
           ) : (
@@ -795,7 +1053,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-border/60 bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="w-10 text-center text-xs">#</TableHead>
+                    <TableHead className="w-10 text-center text-xs">
+                      #
+                    </TableHead>
                     <SortableTableHead
                       sortKey="productName"
                       currentSortKey={purchaseLineSort.sortKey}
@@ -844,30 +1104,45 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {purchaseLineSort.sortedData.map((item: PurchaseItem, idx: number) => (
-                    <TableRow key={item.id} className="border-b border-border/30">
-                      <TableCell className="text-center text-xs text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="text-sm font-medium">
-                        {item.product?.customsName || '未知商品'}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {item.specification || item.product?.specification || '-'}
-                      </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">
-                        {item.quantity} {item.unit || item.product?.unit}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm tabular-nums">
-                        ¥{(Number(item.unitPrice) || 0).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
-                        ¥
-                        {calculatePurchaseLineAmounts(item, amountSummary.taxRate).grossAmount.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {purchaseLineSort.sortedData.map(
+                    (item: PurchaseItem, idx: number) => (
+                      <TableRow
+                        key={item.id}
+                        className="border-b border-border/30"
+                      >
+                        <TableCell className="text-center text-xs text-muted-foreground">
+                          {idx + 1}
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">
+                          {item.product?.customsName || "未知商品"}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {item.specification ||
+                            item.product?.specification ||
+                            "-"}
+                        </TableCell>
+                        <TableCell className="text-right text-sm tabular-nums">
+                          {item.quantity} {item.unit || item.product?.unit}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm tabular-nums">
+                          ¥{(Number(item.unitPrice) || 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
+                          ¥
+                          {calculatePurchaseLineAmounts(
+                            item,
+                            amountSummary.taxRate,
+                          ).grossAmount.toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  )}
                   {/* 合计行 */}
                   <TableRow className="border-b-0 bg-muted/30 font-medium">
-                    <TableCell colSpan={5} className="text-right text-xs text-muted-foreground">
+                    <TableCell
+                      colSpan={5}
+                      className="text-right text-xs text-muted-foreground"
+                    >
                       不含税合计
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm tabular-nums text-emerald-600">
@@ -875,7 +1150,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                     </TableCell>
                   </TableRow>
                   <TableRow className="border-b-0 bg-muted/30">
-                    <TableCell colSpan={5} className="text-right text-xs text-muted-foreground">
+                    <TableCell
+                      colSpan={5}
+                      className="text-right text-xs text-muted-foreground"
+                    >
                       其中税额 ({amountSummary.taxRate}%)
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
@@ -883,7 +1161,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                     </TableCell>
                   </TableRow>
                   <TableRow className="border-b-0 bg-muted/40">
-                    <TableCell colSpan={5} className="text-right text-sm font-medium">
+                    <TableCell
+                      colSpan={5}
+                      className="text-right text-sm font-medium"
+                    >
                       含税合计
                     </TableCell>
                     <TableCell className="text-right font-mono text-base font-bold tabular-nums text-emerald-600">
@@ -902,17 +1183,19 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         contractId={id}
         contractType="PURCHASE"
         files={generalContractFiles}
-        onChange={(files) => setContractFiles((current) => [
-          ...files,
-          ...current.filter((file) => file.category === 'PRODUCTION_PHOTO'),
-        ])}
+        onChange={(files) =>
+          setContractFiles((current) => [
+            ...files,
+            ...current.filter((file) => file.category === "PRODUCTION_PHOTO"),
+          ])
+        }
         title="合同附件"
         description="支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB，用于归档原始合同或补充文件"
         emptyHint="暂无附件，点击「上传附件」归档合同文件"
         categoryOptions={[
-          { value: 'SIGNED_CONTRACT', label: '供应商盖章件' },
-          { value: 'SUPPLIER_INVOICE', label: '供应商发票' },
-          { value: 'OTHER', label: '其他附件' },
+          { value: "SIGNED_CONTRACT", label: "供应商盖章件" },
+          { value: "SUPPLIER_INVOICE", label: "供应商发票" },
+          { value: "OTHER", label: "其他附件" },
         ]}
       />
 
@@ -924,7 +1207,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <FileDown className="h-5 w-5 text-primary" />
               生成购销合同
             </DialogTitle>
-            <DialogDescription>填写收货信息后，系统将自动生成标准购销合同文档</DialogDescription>
+            <DialogDescription>
+              填写收货信息后，系统将自动生成标准购销合同文档
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -935,7 +1220,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 placeholder="例如：米尔皮塔"
                 value={generateForm.storeName}
                 onChange={(e) =>
-                  setGenerateForm((prev) => ({ ...prev, storeName: e.target.value }))
+                  setGenerateForm((prev) => ({
+                    ...prev,
+                    storeName: e.target.value,
+                  }))
                 }
               />
             </div>
@@ -947,7 +1235,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 placeholder="完整收货地址"
                 value={generateForm.deliveryAddress}
                 onChange={(e) =>
-                  setGenerateForm((prev) => ({ ...prev, deliveryAddress: e.target.value }))
+                  setGenerateForm((prev) => ({
+                    ...prev,
+                    deliveryAddress: e.target.value,
+                  }))
                 }
               />
             </div>
@@ -959,7 +1250,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 placeholder="联系人及电话"
                 value={generateForm.deliveryContact}
                 onChange={(e) =>
-                  setGenerateForm((prev) => ({ ...prev, deliveryContact: e.target.value }))
+                  setGenerateForm((prev) => ({
+                    ...prev,
+                    deliveryContact: e.target.value,
+                  }))
                 }
               />
             </div>
@@ -974,7 +1268,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 placeholder="默认30%"
                 value={generateForm.depositRate}
                 onChange={(e) =>
-                  setGenerateForm((prev) => ({ ...prev, depositRate: e.target.value }))
+                  setGenerateForm((prev) => ({
+                    ...prev,
+                    depositRate: e.target.value,
+                  }))
                 }
               />
               <p className="text-xs text-muted-foreground">
@@ -1021,7 +1318,11 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           </DialogHeader>
           <div className="h-full flex-1">
             {pdfUrl ? (
-              <iframe src={pdfUrl} className="h-full w-full rounded border" title="合同预览" />
+              <iframe
+                src={pdfUrl}
+                className="h-full w-full rounded border"
+                title="合同预览"
+              />
             ) : (
               <div className="flex h-full items-center justify-center text-muted-foreground">
                 暂无合同文档
