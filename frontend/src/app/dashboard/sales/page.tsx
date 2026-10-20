@@ -17,6 +17,7 @@ import {
   Suspense,
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
 } from "react";
@@ -24,6 +25,7 @@ import { SalesContract, SalesStatus } from "@/types";
 import { salesService } from "@/services/sales.service";
 import { evaluateShippingReadiness } from "@/lib/binPacking";
 import { clearApiGetCache } from "@/lib/axios";
+import { runAwait } from "@/lib/run-await";
 import { useTabSync } from "@/lib/tab-sync";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -148,13 +150,8 @@ export default function SalesPage() {
   const urlKeyword = searchParams.get("q") ?? searchParams.get("keyword") ?? "";
 
   // 仅在URL实际改变时同步，避免每次本地输入被旧URL覆盖。
-  useEffect(() => {
-    setCurrentPage(Math.max(1, Number.parseInt(urlPage || "1", 10) || 1));
-    setPageSize(
-      [20, 50, 100].includes(Number(urlPageSize)) ? Number(urlPageSize) : 20,
-    );
-    setSearchQuery(urlKeyword);
-  }, [
+  // 渲染期按 URL 变化调整状态（替代 effect 内 setState）；初值 null 使首次渲染也按原挂载 effect 同步一次。
+  const urlSyncKey = JSON.stringify([
     urlPage,
     urlPageSize,
     urlKeyword,
@@ -164,34 +161,53 @@ export default function SalesPage() {
     shippedTo,
     storeId,
   ]);
+  const [prevUrlSyncKey, setPrevUrlSyncKey] = useState<string | null>(null);
+  if (prevUrlSyncKey !== urlSyncKey) {
+    setPrevUrlSyncKey(urlSyncKey);
+    setCurrentPage(Math.max(1, Number.parseInt(urlPage || "1", 10) || 1));
+    setPageSize(
+      [20, 50, 100].includes(Number(urlPageSize)) ? Number(urlPageSize) : 20,
+    );
+    setSearchQuery(urlKeyword);
+  }
 
-  const loadContracts = useCallback(async () => {
+  // 被动 effect 尚未发起新请求前，旧响应不得改写渲染期刚重置的 loading/error
+  // （与原先 effect 内同步重置覆盖旧响应的结果一致；旧响应的数据与提示照常写入）。
+  const resetPendingRef = useRef(false);
+
+  // 仅在请求结果回调中写状态，供 effect 调用；事件中用 loadContracts 先重置再请求。
+  // runAwait 与原 async try/await 时序一致。
+  const requestContracts = useCallback(() => {
     const currentRequest = ++requestId.current;
-    setLoading(true);
-    setError(false);
-    try {
-      const response = await salesService.getAll({
-        page: currentPage,
-        pageSize,
-        lite: true,
-        keyword: searchQuery.trim() || undefined,
-        status: statusFilter ? (statusFilter as SalesStatus) : undefined,
-        storeId: storeId || undefined,
-        shipped: shipped || undefined,
-        shippedFrom: shippedFrom || undefined,
-        shippedTo: shippedTo || undefined,
-      });
-      if (currentRequest !== requestId.current) return;
-      const items = response.data?.items || [];
-      setContracts(items);
-      setTotal(response.data?.pagination?.total ?? items.length);
-    } catch {
-      if (currentRequest !== requestId.current) return;
-      setError(true);
-      toast.error("加载出口合同失败");
-    } finally {
-      if (currentRequest === requestId.current) setLoading(false);
-    }
+    return runAwait(
+      () =>
+        salesService.getAll({
+          page: currentPage,
+          pageSize,
+          lite: true,
+          keyword: searchQuery.trim() || undefined,
+          status: statusFilter ? (statusFilter as SalesStatus) : undefined,
+          storeId: storeId || undefined,
+          shipped: shipped || undefined,
+          shippedFrom: shippedFrom || undefined,
+          shippedTo: shippedTo || undefined,
+        }),
+      (response) => {
+        if (currentRequest !== requestId.current) return;
+        const items = response.data?.items || [];
+        setContracts(items);
+        setTotal(response.data?.pagination?.total ?? items.length);
+      },
+      () => {
+        if (currentRequest !== requestId.current) return;
+        if (!resetPendingRef.current) setError(true);
+        toast.error("加载出口合同失败");
+      },
+      () => {
+        if (currentRequest === requestId.current && !resetPendingRef.current)
+          setLoading(false);
+      },
+    );
   }, [
     currentPage,
     pageSize,
@@ -203,9 +219,36 @@ export default function SalesPage() {
     shippedTo,
   ]);
 
+  const loadContracts = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    return requestContracts();
+  }, [requestContracts]);
+
+  // 请求参数变化时在渲染期进入加载态（原 effect 内同步重置），effect 只发请求。
+  const requestKey = JSON.stringify([
+    currentPage,
+    pageSize,
+    searchQuery,
+    statusFilter,
+    storeId,
+    shipped,
+    shippedFrom,
+    shippedTo,
+  ]);
+  const [prevRequestKey, setPrevRequestKey] = useState(requestKey);
+  if (prevRequestKey !== requestKey) {
+    setPrevRequestKey(requestKey);
+    setLoading(true);
+    setError(false);
+  }
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [requestContracts]);
   useEffect(() => {
-    void loadContracts();
-  }, [loadContracts]);
+    resetPendingRef.current = false;
+    void requestContracts();
+  }, [requestContracts]);
   const refreshContracts = useCallback(() => {
     clearApiGetCache();
     void loadContracts();

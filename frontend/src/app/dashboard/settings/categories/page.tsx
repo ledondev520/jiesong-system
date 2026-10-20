@@ -6,7 +6,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getSystemCategories,
   createSystemCategory,
@@ -19,6 +19,7 @@ import { Plus, Pencil, Trash2, Tag, Search, X } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { toast } from "sonner";
+import { runAwait } from "@/lib/run-await";
 import { Input } from "@/components/ui/input";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,21 +58,34 @@ export default function CategoriesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
+  // 仅在请求结果回调中写状态，供挂载 effect 调用；事件中用 loadCategories 先进入加载态再请求。
+  // runAwait 与原 async try/await 时序一致。
+  const requestCategories = useCallback(
+    () =>
+      runAwait(
+        () => getSystemCategories({ page: 1, pageSize: 100 }),
+        (response) => {
+          setCategories(response.data?.items || []);
+        },
+        () => {
+          toast.error("加载商品分类失败");
+        },
+        () => {
+          setLoading(false);
+        },
+      ),
+    [],
+  );
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(() => {
     setLoading(true);
-    try {
-      const response = await getSystemCategories({ page: 1, pageSize: 100 });
-      setCategories(response.data?.items || []);
-    } catch {
-      toast.error("加载商品分类失败");
-    } finally {
-      setLoading(false);
-    }
-  };
+    return requestCategories();
+  }, [requestCategories]);
+
+  // loading 初值为 true，挂载时原先的 setLoading(true) 不改变状态，effect 只需发请求。
+  useEffect(() => {
+    void requestCategories();
+  }, [requestCategories]);
 
   const handleCreate = () => {
     setEditingCategory(null);

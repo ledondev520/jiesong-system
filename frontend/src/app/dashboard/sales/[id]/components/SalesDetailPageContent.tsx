@@ -760,11 +760,14 @@ export default function SalesDetailPage({ params }: PageProps) {
     return timeline;
   }, [contract]);
 
+  // 先取出装箱明细，使 useMemo 依赖与回调实际读取的值一致（React Compiler 可保留手动 memo）
+  const packingItems = contract?.packingItems;
+
   /**
    * 职责：提取报关 HS 编码列表
    */
   const hsCodeList = useMemo(() => {
-    if (!contract?.packingItems) return [];
+    if (!packingItems) return [];
     const map = new Map<
       string,
       {
@@ -774,7 +777,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         totalPrice: number;
       }
     >();
-    for (const item of contract.packingItems) {
+    for (const item of packingItems) {
       const hs = item.product?.hsCode;
       if (!hs) continue;
       const productName = item.product?.customsName || "未知商品";
@@ -793,14 +796,14 @@ export default function SalesDetailPage({ params }: PageProps) {
       }
     }
     return Array.from(map.values());
-  }, [contract?.packingItems]);
+  }, [packingItems]);
 
   const missingHsItems = useMemo(() => {
-    if (!contract?.packingItems) return [];
-    return contract.packingItems
+    if (!packingItems) return [];
+    return packingItems
       .filter((item) => !item.product?.hsCode)
       .map((item) => item.product?.customsName || "未知商品");
-  }, [contract?.packingItems]);
+  }, [packingItems]);
 
   if (loading) {
     return (

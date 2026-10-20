@@ -7,7 +7,13 @@
 "use client";
 
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertCircle,
   ArrowDownLeft,
@@ -27,6 +33,7 @@ import {
 } from "@/services/sales.service";
 import { financeService } from "@/services/finance.service";
 import { formatDate } from "@/lib/date-format";
+import { runAwait } from "@/lib/run-await";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,22 +88,50 @@ export function SalesFinancePanel({
   const [loadError, setLoadError] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
 
-  const loadSummary = useCallback(async () => {
+  // 被动 effect 尚未发起新请求前，旧响应不得改写渲染期刚重置的 loading/error
+  // （与原先 effect 内同步重置覆盖旧响应的结果一致；旧响应的数据照常写入）。
+  const resetPendingRef = useRef(false);
+
+  // 仅在请求结果回调中写状态，供 effect 调用；事件中用 loadSummary 先重置再请求。
+  // runAwait 与原 async try/await 时序一致。
+  const requestSummary = useCallback(
+    () =>
+      runAwait(
+        () => salesService.getFinanceSummary(salesContractId),
+        (response) => {
+          setSummary(response.data);
+        },
+        () => {
+          if (!resetPendingRef.current) setLoadError(true);
+        },
+        () => {
+          if (!resetPendingRef.current) setLoading(false);
+        },
+      ),
+    [salesContractId],
+  );
+
+  const loadSummary = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    try {
-      const response = await salesService.getFinanceSummary(salesContractId);
-      setSummary(response.data);
-    } catch {
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [salesContractId]);
+    return requestSummary();
+  }, [requestSummary]);
 
+  // 合同切换时在渲染期进入加载态（原 effect 内同步重置），effect 只发请求。
+  const [prevSalesContractId, setPrevSalesContractId] =
+    useState(salesContractId);
+  if (prevSalesContractId !== salesContractId) {
+    setPrevSalesContractId(salesContractId);
+    setLoading(true);
+    setLoadError(false);
+  }
+  useLayoutEffect(() => {
+    resetPendingRef.current = true;
+  }, [requestSummary]);
   useEffect(() => {
-    void loadSummary();
-  }, [loadSummary]);
+    resetPendingRef.current = false;
+    void requestSummary();
+  }, [requestSummary]);
 
   const handleReceipt = async (data: PaymentSubmitData) => {
     await financeService.createPayment({
