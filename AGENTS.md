@@ -166,7 +166,7 @@ Backup CLI `backend/scripts/db-backup.js` preserves explicit space or equals opt
 
 `tabularImport.js` streams ZIP entries before ExcelJS parsing: at most 256 entries and 32 MiB actual expanded bytes. JSZip is declared directly at the already locked version; no files are extracted.
 
-Legacy `/api/v1/import` uses the same 10 MiB in-memory CSV/xlsx filter as preview; `importService.js` accepts only in-memory bytes and rejects filesystem paths, including traversal, absolute paths and symlinks. HTTP never retains raw uploads.
+Legacy `/api/v1/import` and `/api/v1/system/import` share `tabularUpload` from `tabularImport.js` (the same 10 MiB in-memory CSV/xlsx filter as preview; `/system/import` previously used disk storage and left rejected uploads under `UPLOAD_DIR`); `importService.js` accepts only in-memory bytes and rejects filesystem paths, including traversal, absolute paths and symlinks. The client filename is only an import-record label (control/NUL characters stripped, last `/` or `\` segment, at most 255 characters) and never a filesystem path. HTTP never retains raw uploads.
 
 `db-backup.js` preserves literal percent sequences in Prisma SQLite DATABASE_URL paths; URI decoding could silently select a different database.
 

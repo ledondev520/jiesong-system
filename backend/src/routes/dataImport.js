@@ -1,6 +1,6 @@
 /**
- * Input: dataImportController、multer中间件
- * Output: CSV/xlsx 数据导入API路由
+ * Input: dataImportController、tabularImport 共享内存上传中间件
+ * Output: CSV/xlsx 数据导入API路由；上传仅在内存中解析，不落盘
  * Pos: 数据导入路由定义
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
