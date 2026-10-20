@@ -23,6 +23,7 @@ function sandbox(t) {
 }
 
 const resolveWith = (box, env) => resolvePerfUploadDir({ repoRoot: box.repoRoot, cwd: box.cwd, env });
+const validatedRoot = (box) => resolveWith(box, { API_PERF_UPLOAD_DIR: box.testUploads });
 
 test('resolvePerfUploadDir: 必须显式提供存在的绝对目录，不回退 backend/.env 或默认目录', (t) => {
   const box = sandbox(t);
@@ -76,8 +77,11 @@ test('resolvePerfUploadDir: 独立测试目录返回其真实路径', (t) => {
   const box = sandbox(t);
   const link = path.join(box.dir, 'link-to-test');
   fs.symlinkSync(box.testUploads, link);
-  assert.equal(resolveWith(box, { API_PERF_UPLOAD_DIR: box.testUploads }), box.testUploads);
-  assert.equal(resolveWith(box, { API_PERF_UPLOAD_DIR: link }), box.testUploads);
+  const rootStats = fs.statSync(box.testUploads);
+  const expected = { root: box.testUploads, dev: rootStats.dev, ino: rootStats.ino };
+  assert.deepEqual({ ...resolveWith(box, { API_PERF_UPLOAD_DIR: box.testUploads }) }, expected);
+  assert.deepEqual({ ...resolveWith(box, { API_PERF_UPLOAD_DIR: link }) }, expected);
+  assert.equal(Object.isFrozen(resolveWith(box, { API_PERF_UPLOAD_DIR: box.testUploads })), true);
 });
 
 test('removeUploadedFileWithin: 删除测试目录内的相对/绝对普通文件，文件不存在时静默返回', (t) => {
@@ -85,17 +89,17 @@ test('removeUploadedFileWithin: 删除测试目录内的相对/绝对普通文�
   fs.mkdirSync(path.join(box.testUploads, '2026-10'));
   const relative = path.join('2026-10', 'perf-a.pdf');
   fs.writeFileSync(path.join(box.testUploads, relative), 'a');
-  removeUploadedFileWithin(box.testUploads, relative);
+  removeUploadedFileWithin(validatedRoot(box), relative);
   assert.equal(fs.existsSync(path.join(box.testUploads, relative)), false);
 
   const absolute = path.join(box.testUploads, '2026-10', 'perf-b.pdf');
   fs.writeFileSync(absolute, 'b');
-  removeUploadedFileWithin(box.testUploads, absolute);
+  removeUploadedFileWithin(validatedRoot(box), absolute);
   assert.equal(fs.existsSync(absolute), false);
 
-  removeUploadedFileWithin(box.testUploads, path.join('2026-10', 'missing.pdf'));
-  removeUploadedFileWithin(box.testUploads, '');
-  removeUploadedFileWithin(box.testUploads, null);
+  removeUploadedFileWithin(validatedRoot(box), path.join('2026-10', 'missing.pdf'));
+  removeUploadedFileWithin(validatedRoot(box), '');
+  removeUploadedFileWithin(validatedRoot(box), null);
 });
 
 test('removeUploadedFileWithin: 拒绝测试目录外的相对穿越与绝对路径，外部文件保持不变', (t) => {
@@ -104,9 +108,9 @@ test('removeUploadedFileWithin: 拒绝测试目录外的相对穿越与绝对路
   fs.writeFileSync(outside, 'real');
   const traversal = path.relative(box.testUploads, outside);
   assert.ok(traversal.startsWith('..'));
-  assert.throws(() => removeUploadedFileWithin(box.testUploads, traversal), /outside API_PERF_UPLOAD_DIR/);
-  assert.throws(() => removeUploadedFileWithin(box.testUploads, outside), /outside API_PERF_UPLOAD_DIR/);
-  assert.throws(() => removeUploadedFileWithin(box.testUploads, '.'), /outside API_PERF_UPLOAD_DIR/);
+  assert.throws(() => removeUploadedFileWithin(validatedRoot(box), traversal), /outside API_PERF_UPLOAD_DIR/);
+  assert.throws(() => removeUploadedFileWithin(validatedRoot(box), outside), /outside API_PERF_UPLOAD_DIR/);
+  assert.throws(() => removeUploadedFileWithin(validatedRoot(box), '.'), /outside API_PERF_UPLOAD_DIR/);
   assert.equal(fs.readFileSync(outside, 'utf8'), 'real');
 });
 
@@ -115,14 +119,75 @@ test('removeUploadedFileWithin: 拒绝经符号链接目录逃逸、符号链接
   const outside = path.join(box.defaultUploads, 'real.pdf');
   fs.writeFileSync(outside, 'real');
   fs.symlinkSync(box.defaultUploads, path.join(box.testUploads, 'escape'));
-  assert.throws(() => removeUploadedFileWithin(box.testUploads, path.join('escape', 'real.pdf')), /outside API_PERF_UPLOAD_DIR/);
+  assert.throws(() => removeUploadedFileWithin(validatedRoot(box), path.join('escape', 'real.pdf')), /outside API_PERF_UPLOAD_DIR/);
   fs.symlinkSync(outside, path.join(box.testUploads, 'link.pdf'));
-  assert.throws(() => removeUploadedFileWithin(box.testUploads, 'link.pdf'), /non-regular file/);
+  assert.throws(() => removeUploadedFileWithin(validatedRoot(box), 'link.pdf'), /non-regular file/);
   fs.mkdirSync(path.join(box.testUploads, 'subdir'));
-  assert.throws(() => removeUploadedFileWithin(box.testUploads, 'subdir'), /non-regular file/);
+  assert.throws(() => removeUploadedFileWithin(validatedRoot(box), 'subdir'), /non-regular file/);
   assert.equal(fs.readFileSync(outside, 'utf8'), 'real');
   assert.equal(fs.existsSync(path.join(box.testUploads, 'link.pdf')), true);
   assert.equal(fs.existsSync(path.join(box.testUploads, 'subdir')), true);
+});
+
+test('removeUploadedFileWithin: 未校验的根或非字符串 filePath 拒绝', (t) => {
+  const box = sandbox(t);
+  fs.writeFileSync(path.join(box.testUploads, 'a.pdf'), 'a');
+  assert.throws(() => removeUploadedFileWithin(box.testUploads, 'a.pdf'), /was not validated/);
+  assert.throws(() => removeUploadedFileWithin(null, 'a.pdf'), /was not validated/);
+  assert.throws(() => removeUploadedFileWithin(validatedRoot(box), ['a.pdf']), /filePath must be a string/);
+  assert.equal(fs.existsSync(path.join(box.testUploads, 'a.pdf')), true);
+});
+
+test('removeUploadedFileWithin: 校验后根目录被替换为指向受保护目录的符号链接或新目录时拒绝', (t) => {
+  const box = sandbox(t);
+  const validated = validatedRoot(box);
+  const victim = path.join(box.defaultUploads, 'victim.pdf');
+  fs.writeFileSync(victim, 'real');
+  fs.renameSync(box.testUploads, `${box.testUploads}-original`);
+  fs.symlinkSync(box.defaultUploads, box.testUploads);
+  assert.throws(() => removeUploadedFileWithin(validated, 'victim.pdf'), /replaced after validation/);
+  assert.equal(fs.readFileSync(victim, 'utf8'), 'real');
+
+  fs.unlinkSync(box.testUploads);
+  fs.mkdirSync(box.testUploads);
+  fs.writeFileSync(path.join(box.testUploads, 'new.pdf'), 'n');
+  assert.throws(() => removeUploadedFileWithin(validated, 'new.pdf'), /replaced after validation/);
+  assert.equal(fs.existsSync(path.join(box.testUploads, 'new.pdf')), true);
+});
+
+test('resolvePerfUploadDir: 尚不存在的受保护目录经符号链接祖先位于测试目录内时拒绝', (t) => {
+  const box = sandbox(t);
+  const alias = path.join(box.dir, 'protected-alias');
+  fs.symlinkSync(box.testUploads, alias);
+  const future = path.join(alias, 'future-real-uploads');
+  fs.writeFileSync(path.join(box.repoRoot, 'backend', '.env'), `UPLOAD_DIR=${future}\n`, { mode: 0o600 });
+  assert.throws(() => resolveWith(box, { API_PERF_UPLOAD_DIR: box.testUploads }), /overlaps protected upload directory/);
+});
+
+test('removeUploadedFileWithin: 经外部符号链接别名给出的绝对路径不在测试根内，拒绝且文件保持不变', (t) => {
+  const box = sandbox(t);
+  const validated = validatedRoot(box);
+  const alias = path.join(box.dir, 'outside-alias');
+  fs.symlinkSync(box.testUploads, alias);
+  const victim = path.join(box.testUploads, 'victim.pdf');
+  fs.writeFileSync(victim, 'v');
+  assert.throws(() => removeUploadedFileWithin(validated, path.join(alias, 'victim.pdf')), /outside API_PERF_UPLOAD_DIR/);
+  assert.throws(() => removeUploadedFileWithin(validated, path.join(box.dir, 'missing-outside.pdf')), /outside API_PERF_UPLOAD_DIR/);
+  assert.equal(fs.readFileSync(victim, 'utf8'), 'v');
+});
+
+test('removeUploadedFileWithin: 以 .. 开头的合法文件夹名不被误判为越界', (t) => {
+  const box = sandbox(t);
+  const validated = validatedRoot(box);
+  fs.mkdirSync(path.join(box.testUploads, '..valid'));
+  const relative = path.join('..valid', 'perf.pdf');
+  fs.writeFileSync(path.join(box.testUploads, relative), 'x');
+  removeUploadedFileWithin(validated, relative);
+  assert.equal(fs.existsSync(path.join(box.testUploads, relative)), false);
+  const absolute = path.join(box.testUploads, '..valid', 'perf-abs.pdf');
+  fs.writeFileSync(absolute, 'y');
+  removeUploadedFileWithin(validated, absolute);
+  assert.equal(fs.existsSync(absolute), false);
 });
 
 test('压测脚本不再硬编码 backend/uploads，并在发出任何请求前校验测试上传目录', () => {
