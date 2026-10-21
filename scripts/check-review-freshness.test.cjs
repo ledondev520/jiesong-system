@@ -1,6 +1,6 @@
 /**
  * Input: 临时合成 Git 仓库与合成 PR 评论，不依赖网络、gh 或前端依赖
- * Output: 标记信任、历史完整性、重命名及复核过期的真实回归结果
+ * Output: 标记信任、历史完整性、重命名、交叉合并及复核过期的真实回归结果
  * Pos: 本地与 CI 的 Node 工具测试，不修改全局 Git 配置，结束后清理
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -311,6 +311,45 @@ test('当前 base 的 merge-base 可补充原始 PR diff 中没有的文件', (t
   assert.equal(result.ok, false);
   assert.equal(result.rule, 'd');
   assert.deepEqual(result.intersection, ['shared.txt']);
+});
+
+test('criss-cross 的所有最佳共同祖先都须纳入 PR 文件集合', (t) => {
+  const f = fixture(t);
+  let serial = 0;
+  const commit = (files, parents = []) => {
+    // 独立构造每个树及父提交顺序，避免 Git 自动解决合并而改变测试历史。
+    f.git('read-tree', '--empty');
+    for (const [file, content] of Object.entries(files)) f.write(file, content);
+    f.git('add', '--', ...Object.keys(files));
+    const date = `2026-01-01T00:00:${String(++serial).padStart(2, '0')}Z`;
+    return execFileSync('git', [
+      'commit-tree', f.git('write-tree'), '-m', 'Synthetic criss-cross',
+      ...parents.flatMap((parent) => ['-p', parent]),
+    ], {
+      cwd: f.root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Synthetic CI test', GIT_AUTHOR_EMAIL: 'ci@example.invalid',
+        GIT_COMMITTER_NAME: 'Synthetic CI test', GIT_COMMITTER_EMAIL: 'ci@example.invalid',
+        GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date,
+      },
+    }).trim();
+  };
+  const initial = commit({ 'shared.txt': 'initial\n' });
+  const y = commit({ 'shared.txt': 'changed\n' }, [initial]);
+  const base = commit({ 'shared.txt': 'initial\n', 'x.txt': 'x\n' }, [initial]);
+  const head = commit({ 'shared.txt': 'initial\n', 'x.txt': 'x\n', 'pr.txt': 'pr\n' }, [y, base]);
+  const currentBase = commit({ 'shared.txt': 'changed\n', 'x.txt': 'x\n', 'main.txt': 'main\n' }, [base, y]);
+  assert.equal(f.git('merge-base', '--all', base, head), base);
+  assert.deepEqual(f.git('merge-base', '--all', currentBase, head).split('\n').sort(), [base, y].sort());
+  assert.equal(f.git('diff', '--name-only', base, head), 'pr.txt');
+  const result = checkReviewFreshness({
+    root: f.root, author: 'synthetic-author', owner: 'synthetic-owner', head, currentBase,
+    comments: [comment(marker(head, base))],
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.rule, 'd');
+  assert.ok(result.intersection.includes('shared.txt'));
 });
 
 test('CLI --help 无需 gh；参数错误以 1 退出', (t) => {

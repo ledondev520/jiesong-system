@@ -158,7 +158,7 @@
     }
   ],
   "reviewControls": [
-    "scripts/check-review-freshness.cjs 仅信任 PR 作者或仓库 owner 的最新标记评论；head 变化、base 后续文件交集或历史/API 信息不足均拒绝。.github/workflows/review-freshness.yml 仅使用 contents/pull-requests/issues read 权限，不记录凭据或评论全文；main 前进不会撤回已绿检查，合并前必须本地执行同一 CLI，远端拦截需将该 job 配为必过检查。",
+    "scripts/check-review-freshness.cjs 仅信任 PR 作者或仓库 owner 的最新标记评论；PR 文件集合取 B0/H、B1/H 两对所有最佳共同祖先（merge-base --all）到 H 的 diff 文件并集，避免交叉合并漏掉文件；head 变化、base 后续文件交集或历史/API 信息不足（含任一对没有共同祖先、Git 命令失败）均拒绝。.github/workflows/review-freshness.yml 仅使用 contents/pull-requests/issues read 权限，不记录凭据或评论全文；main 前进不会撤回已绿检查，合并前必须本地执行同一 CLI，远端拦截需将该 job 配为必过检查。",
     "Export pricing requires finite positive spot rates and positive adjusted rates rounded to six decimals; positive policy adjustments cannot validate missing or invalid spot rates.",
     "Backup CLI explicit space/equals source and destination options take precedence over environment/defaults.",
     "bootstrapAdmin.js validates bootstrap passwords only before a password write, preserving secure accounts.",

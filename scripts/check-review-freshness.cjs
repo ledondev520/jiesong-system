@@ -1,6 +1,6 @@
 /**
  * Input: GitHub PR 元数据与全部 issue 评论、origin 的完整 Git 历史
- * Output: 复核仍有效时退出 0，否则退出 1 并说明规则、SHA 与交集文件
+ * Output: 基于所有最佳共同祖先判定复核时效；有效退出 0，否则退出 1 并说明规则、SHA 与交集文件
  * Pos: 本地合并前与 CI 共用的复核时效门禁；Node 20，无第三方依赖
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -98,7 +98,7 @@ function assertCommit(root, sha) {
 }
 
 /**
- * 端点 diff 加每个 first-parent 提交，保留被撤销的改动；PR 取两个 merge-base 的并集。
+ * 端点 diff 加每个 first-parent 提交，保留被撤销的改动；PR 取 B0/H、B1/H 所有最佳共同祖先到 H 的 diff 文件并集。
  * @param {string} root 完整历史仓库
  * @param {string} base 标记 base（B0）
  * @param {string} currentBase 当前 base（B1）
@@ -119,8 +119,12 @@ function changedFileSets(root, base, currentBase, head) {
   }
   const prFiles = new Set();
   for (const tip of [base, currentBase]) {
-    const ancestor = git(root, ['merge-base', tip, head]).trim();
-    for (const file of diff(ancestor, head)) prFiles.add(file);
+    // 交叉合并可能有多个最佳共同祖先，默认任选一个会漏掉 PR 文件。
+    const ancestors = git(root, ['merge-base', '--all', tip, head]).trim().split('\n');
+    if (!ancestors.every((ancestor) => SHA.test(ancestor))) throw new Error('缺少有效的最佳共同祖先');
+    for (const ancestor of ancestors) {
+      for (const file of diff(ancestor, head)) prFiles.add(file);
+    }
   }
   return { baseFiles, prFiles };
 }
