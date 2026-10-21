@@ -4,6 +4,8 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 
 ## 5-Layer Defense Architecture
 
+复核时效由 `scripts/check-review-freshness.cjs` 检查：仅信任 PR 作者或仓库 owner 创建的最新标记评论；head 改变、base 后续文件交集、无效标记或历史/API 信息不足均拒绝，以避免过期复核被沿用。`.github/workflows/review-freshness.yml` 仅使用 contents、pull-requests、issues 的 read 权限；合并前必须本地运行同一 CLI，因为 main 前进不会自动撤回已绿的检查。GitHub 强制拦截还需管理员将 `review-freshness` 设为必过检查。
+
 ### 1) 访问控制与身份层（Identity & Access）
 - `frontend/src/lib/auth-session.ts` distinguishes absent credentials from expired sessions. Unchecked-login JWTs remain tab-scoped; optional persistent browser sessions use HttpOnly credentials and live server validation.
 - Enforce explicit身份校验 (JWT + role checks) for all sensitive routes.

@@ -23,6 +23,15 @@
 
 <!-- 实际跑过的检查及结果(命令、退出码);未跑的不要写成通过 -->
 
+## 复核标记
+
+<!-- 独立复核通过后，由 PR 作者或仓库 owner 在 PR 评论中单独写一行（不要把占位符当作有效标记）：
+review-freshness/v1 pass head=<40位小写hex> base=<40位小写hex>
+head 为复核时 PR head，base 为复核使用的 origin/main SHA。最新标记评论格式错误或写 review-freshness/v1 revoke 即撤销。
+新标记后在 Actions re-run review-freshness job；head 变化或 main 后续改动碰到 PR 文件时，更新分支、重跑 CI、重新独立复核并写新标记。
+合并前必须本地运行 node scripts/check-review-freshness.cjs --repo <owner/name> --pr <N> 并确认退出码 0；已绿的 GitHub 检查不会因 main 前进自动变红。
+-->
+
 ## 部署交接(合并后需要部署时填写)
 
 - [ ] 基线 = 生产环境当前实际运行的 commit(在服务器上核对,不用"上次说没问题"的 commit):`<生产 sha>..<待部署 sha>`
