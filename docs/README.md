@@ -81,3 +81,5 @@
 - 以 `plans/2026-04-04-universal-agent-runtime-v2-design.md` 为下一阶段 Agent 主线：统一到一个对外通用主 Agent，并扩工具面与内部路由
 - 先按 `2026-03-28-ceo-roadmap-upgrade.md` 推进路线图整理与 shell/workspace 升级，再把 `FE-COV-98` 作为护栏继续收口
 - 先按 `coverage-98-ci-plan.md` 处理 coverage 稳定性与门禁切换，再按 `coverage-98-master-plan.md` 执行 FE-COV-98 的 M1-M6
+
+<!-- review-freshness 必过检查实测用,不合并 -->
