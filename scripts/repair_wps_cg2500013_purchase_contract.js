@@ -186,7 +186,7 @@ async function buildPlan(options) {
 
   const sourceUpload = contract.files.find((file) => file.fileName === '购销合同 CG2500013 釉面砖.pdf');
   if (!sourceUpload) throw new Error(`${CONTRACT_NO} 缺少已上传 PDF 附件记录`);
-  const uploadedPath = path.join(uploadRoot, sourceUpload.filePath.replace(/^contracts\//, 'contracts/'));
+  const uploadedPath = path.join(uploadRoot, sourceUpload.filePath);
   const uploadedSha1 = sha1(uploadedPath);
   if (uploadedSha1 !== sourceSha1) throw new Error(`上传附件与 WPS 源 PDF SHA1 不一致: ${uploadedSha1}`);
 
