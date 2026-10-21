@@ -12,6 +12,7 @@ GitHub Actions 工作流配置，实现完整的自动化开发循环。
 | **Test And Acceptance** | `test-and-acceptance.yml` | PR / Push | 后端、前端单测/coverage及hosted Playwright验收 |
 | **QA & Health** | `qa.yml` | Daily / Push | 自动化测试 + 健康度检查 |
 | **PR Review** | `pr-review.yml` | PR | 类型、ESLint、锁定 Prettier 的 PR 源码检查与 Actions 摘要 |
+| **Review Freshness** | `review-freshness.yml` | 指向 main 的 PR opened / synchronize / reopened / edited | 只读检查复核标记与 base 后续改动，过期或信息不足则失败 |
 | **Security** | `security.yml` | PR / Weekly | 安全扫描 |
 | **Weekly Retro** | `weekly-retro.yml` | Weekly | 每周工程回顾 |
 | **Deploy** | `deploy.yml` | main Push / Tag / Manual | 部署并核对 PM2 运行目录与公网构建 |
@@ -45,6 +46,26 @@ GitHub Actions 工作流配置，实现完整的自动化开发循环。
 ```
 
 ## 🚀 使用说明
+
+### 复核标记与合并前检查
+
+独立复核通过后，由 PR 作者或仓库 owner 在 PR 的 issue 评论中单独写一行标记（两处 SHA 必须是 40 位小写十六进制）：
+
+```text
+review-freshness/v1 pass head=<复核时的 PR head SHA> base=<复核使用的 origin/main SHA>
+```
+
+仅这两类作者的评论有效；以创建时间最新的标记评论为准，普通说明评论不覆盖标记。行首尾允许空白；以 `review-freshness/` 开头的行按不区分大小写识别，但合法格式必须严格匹配上式。最新标记评论中必须恰好有一行合法标记；格式错误、多行标记或 `review-freshness/v1 revoke` 均撤销旧标记，不会回退到旧的 pass。
+
+没有有效标记、PR head 变化、标记 base 不是当前 base 的祖先、历史缺失或浅克隆、API/Git 失败都会作废。PR 文件集合取 B0/H、B1/H 两对所有最佳共同祖先（`merge-base --all`）到 H 的 diff 文件并集；任一对没有共同祖先则按信息不足作废。base 自复核后改动的文件只要与 PR 文件有交集也会作废：包括重命名/复制的旧新路径、删除，以及 main 改过又改回的文件。作废后应更新分支、重跑 CI、新的独立复核，再写新标记。检查器只验证标记和历史，独立复核仍由流程保证。
+
+新标记评论不会自动触发此工作流，写完后须在 Actions 中 re-run `review-freshness` job。仓库管理员需将 `review-freshness` 设置为 main 的必过检查才能由 GitHub 阻止合并；本次工作流文件不会自动修改远端分支保护。GitHub 上已绿的检查不会因 main 前进自动变红，因此**合并前本地检查是必做步骤**：在完整历史仓库中，确保已安装并认证 `gh`，且 `origin` 指向目标仓库，再运行：
+
+```bash
+node scripts/check-review-freshness.cjs --repo <owner/name> --pr <N>
+```
+
+CLI 分页获取全部 issue 评论、读取实时 PR head 和 base 分支 tip，并通过 `git fetch --no-tags origin` 获取两个 tip 所需历史。退出码必须为 0；检查后如 head/base 又前进，必须再运行检查。该命令会更新本地 Git 获取历史，不修改业务文件。
 
 ### 手动触发
 

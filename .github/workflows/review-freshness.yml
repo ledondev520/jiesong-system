@@ -1,0 +1,36 @@
+# 复核时效检查：仅使用只读 GitHub 权限，无需安装 npm 依赖。
+name: Review Freshness
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  review-freshness:
+    name: review-freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20.19.0'
+
+      - name: Test review freshness
+        run: node --test scripts/check-review-freshness.test.cjs
+
+      - name: Check review freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_REPO: ${{ github.repository }}
+          REVIEW_PR: ${{ github.event.pull_request.number }}
+        run: node scripts/check-review-freshness.cjs --repo "$REVIEW_REPO" --pr "$REVIEW_PR"
