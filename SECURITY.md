@@ -18,7 +18,7 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 - Disable默认凭证 and rotate all secrets periodically.
 
 ### 2) 运行时与执行环境层（Host & Runtime）
-- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); production PM2 uses `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64`. `.github/workflows/deploy.yml` and `deploy.sh` source `scripts/require-node-runtime.sh` before npm/npx/build/verification to prevent use of an older system Node: prepend `NODE_RUNTIME/bin` (defaulting to that runtime), require an executable node, matching command resolution and version >=22.23.4, and fail without fallback. The workflow passes configuration via environment variables and base64-encoded SSH arguments to a quoted remote script, preventing shell interpretation of configured values; runtime provisioning remains an operator prerequisite.
+- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); production PM2 uses `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64`. `.github/workflows/deploy.yml` and `deploy.sh` source `scripts/require-node-runtime.sh` before npm/npx/build/verification to prevent use of an older system Node: prepend `NODE_RUNTIME/bin` (defaulting to that runtime), require an executable node, matching command resolution and version >=22.23.4, and fail without fallback. The workflow passes configuration via environment variables and base64-encoded SSH arguments to a quoted remote script, preventing shell interpretation of configured values; runtime provisioning remains an operator prerequisite. The SSH step sources the guard from the existing checkout before pricing backup or any Git command; a missing guard also stops deployment before those mutations.
 - Keep `.env` permissions tight; warn in非生产 and block in生产 for misconfigured permissions.
 - Run Node进程 with最小权限 (non-root, locked-down directories) and mount config with read-only policy where possible.
 - Keep upload/storage directories explicitly created and scoped to应用用户.
@@ -30,6 +30,7 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 - Add startup checks for config file accessibility and permission drift.
 
 ### 3) 网络与应用边界层（Application & Network）
+- `.github/workflows/deploy.yml` explicitly exits non-zero when `sudo nginx -t` fails, before Nginx reload or runtime verification; `set -e` alone does not stop on the left side of an `&&` list.
 - Apply CORS whitelist (`CORS_ORIGIN`) and avoid `*` in生产 environments.
 - Enforce request size limits, rate limiting at API网关 (or reverse proxy), and strict MIME/type checks on uploads.
 - AI requests in `backend/src/services/aiService.js` and `anthropicCompatService.js` use the same full-response deadline, disable SDK automatic retry/logging, and obtain usage from the response stream; `KIMI_REQUEST_TIMEOUT_MS` defaults to 30000ms (explicit 500–30000ms), while greetings retain a separate 300ms budget via `KIMI_GREETING_TIMEOUT_MS`.
