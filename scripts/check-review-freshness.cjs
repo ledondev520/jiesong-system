@@ -1,7 +1,7 @@
 /**
  * Input: GitHub PR 元数据与全部 issue 评论、origin 的完整 Git 历史
  * Output: 基于所有最佳共同祖先判定复核时效；有效退出 0，否则退出 1 并说明规则、SHA 与交集文件
- * Pos: 本地合并前与 CI 共用的复核时效门禁；Node 20，无第三方依赖
+ * Pos: 本地合并前与 CI 共用的复核时效门禁；Node 22.23.4+，无第三方依赖
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const { execFileSync } = require('node:child_process');

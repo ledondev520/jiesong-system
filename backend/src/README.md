@@ -9,7 +9,7 @@
 存放后端 API 所有源代码文件，实现进销存系统的完整业务逻辑。
 
 `integration/application-audit-readback.integration.js` 以真实 Express/认证角色、已提交迁移的私有合成 SQLite 与独立 SQL 字面资料/只读全表快照，验证日志关键词/IP、日期/分页、完整记录与12列 CSV 内容，以及现有 ADMIN-only 边界和真实分类生成审计的重复读取。`controllers/system/notificationController.js` 的共享筛选仅使用 SQLite 支持的 `contains`，不传 PostgreSQL 的 `mode`；保留日期、过滤、导出上限与现有权限。只验收应用合成记录，不访问生产、OS日志或真实执行历史；页面没有独立详情路由，此套不声称浏览器通过。由 `npm run test:db` 执行。
-`integration/email-registration-http.integration.js` 用已提交迁移、0700/0600 私有合成 SQLite 和真实 localhost HTTP 验证邮箱发码 200、注册 201 与同码重放 400。只模拟 `mail.isConfigured/sendRegistrationCode`，保留控制器、校验、bcrypt、事务及原全局/注册限流；独立只读 SQL 仅查询 username/email/name/role/isActive，确认只有一个未激活 SALES 账号。显式环境白名单、环境文件拒绝和本机源 fetch 防护隔离真实数据库及外部发信，不读取凭据/挑战表、激活、登录或声称浏览器验收。由 `npm run test:db` 执行，需要 Node 20.19、Python 3 与现有 Prisma client。
+`integration/email-registration-http.integration.js` 用已提交迁移、0700/0600 私有合成 SQLite 和真实 localhost HTTP 验证邮箱发码 200、注册 201 与同码重放 400。只模拟 `mail.isConfigured/sendRegistrationCode`，保留控制器、校验、bcrypt、事务及原全局/注册限流；独立只读 SQL 仅查询 username/email/name/role/isActive，确认只有一个未激活 SALES 账号。显式环境白名单、环境文件拒绝和本机源 fetch 防护隔离真实数据库及外部发信，不读取凭据/挑战表、激活、登录或声称浏览器验收。由 `npm run test:db` 执行，需要 Node.js 22.23.4+、Python 3 与现有 Prisma client。
 
 `integration/notification-state-lifecycle.integration.js` 只用一个当前合成用户、真实认证 HTTP 与迁移后的 0700/0600 私有 SQLite，验证单条已读及重复完成、重新读取/未读筛选/计数，和全部已读重试；独立只读连接比较全部通知字段，确认只改变已读状态，不新增通知。由 `npm run test:db` 执行，不访问生产或测试其他用户。
 
@@ -19,7 +19,7 @@
 
 `integration/financial-snapshot-readbacks.integration.js` 用已提交迁移和独立写入/只读回查的 0700/0600 合成 SQLite，通过真实认证 HTTP 验证四类财务读取：跨年账期的独立月度/YTD 报表快照；有序、可空/零/负值及汇总行证据与现有财务/老板边界；全历史人民币供应商差异和分组总计；当前名称搜索下钻的来源 ID、批次元数据、分类与重复读取不改已关联/忽略状态。名称搜索是发现链接，可能包含重叠名称；银行下钻默认 CNY，发票模型无币种字段。不访问真实文件、上传、正式申报或生产数据，不改变报表/对账口径。
 
-`integration/overview-source-readbacks.integration.js` 在已提交迁移构建的 0700/0600 私有合成 SQLite 中，以实际 Express、数据库角色和原全局限流验证三类概览来源：上海发运日闭区间的 CNY 自有收入/已售成本/商品毛利/净现金与相同销售下钻；当前应收应付的正式/派生所有权、取消排除和合同表头已收事实；固定 UTC 日期的 30/90 天收付趋势、原币与类型排除。合成收款流水特意不同于表头余额，分别保留经营执行优先逐笔 USD 流水与财务概览采用表头余额的既有口径。独立 SQL 字面插入与全表只读快照确认期间筛选不改变当前资金/库存、所有成功/拒绝读取不改任何持久字段；当前库存只断言夹具的 1 个活跃商品、2 个 SHIPPED 在途合同和 0 个低库存预警，不涉及估值。不读取生产、不上传、不改变逾期或汇率规则。由 `npm run test:db` 执行，已在当前 CI Node 20.19.0 验证，Date/object-form mock timers 最低需 20.11。
+`integration/overview-source-readbacks.integration.js` 在已提交迁移构建的 0700/0600 私有合成 SQLite 中，以实际 Express、数据库角色和原全局限流验证三类概览来源：上海发运日闭区间的 CNY 自有收入/已售成本/商品毛利/净现金与相同销售下钻；当前应收应付的正式/派生所有权、取消排除和合同表头已收事实；固定 UTC 日期的 30/90 天收付趋势、原币与类型排除。合成收款流水特意不同于表头余额，分别保留经营执行优先逐笔 USD 流水与财务概览采用表头余额的既有口径。独立 SQL 字面插入与全表只读快照确认期间筛选不改变当前资金/库存、所有成功/拒绝读取不改任何持久字段；当前库存只断言夹具的 1 个活跃商品、2 个 SHIPPED 在途合同和 0 个低库存预警，不涉及估值。不读取生产、不上传、不改变逾期或汇率规则。由 `npm run test:db` 执行，当前 CI 与本地测试统一要求 Node.js 22.23.4+（支持 Date/object-form mock timers）。
 
 `integration/financial-workbook-import.integration.js` 以真实认证 multipart、内存合成 XLSX 和已提交迁移创建的私有 SQLite 验证十类财务导入：数字公式缓存（含0/负数/小数）、可区分的无缓存及错误/非金额缓存、合法字面量与空值兼容、字符串类型无缓存的已知残余边界、单文件预览凭证/覆盖、三文件现金流/证据/来源回读、整期替换、阻塞输入不写库、晚期 SQLite 失败完整回滚和原请求重试、既有角色/停用/匿名边界。成功写入及覆盖还通过独立只读SQL直接与夹具字面量比较资产、月度/YTD、0、负数、合法空值和现金流/证据金额；三来源类型、文件名、Sheet和计数与固定期望比较，字节数/哈希与原合成文件独立比较，避免HTTP读取服务掩盖错误。金额只读已有缓存；ExcelJS 的 `cell.result` 保留缓存0，仅undefined时惰性查询已使用的SheetJS。两库均不能区分字符串类型缺 `<v>` 与合法空字符串缓存，继续按旧空值兼容，不声称全部缺缓存可检测。由 `npm run test:db` 执行；原文件不归档，不访问生产、浏览器或外部服务。
 

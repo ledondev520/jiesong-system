@@ -13,7 +13,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
-// Requires Node 20.19, Python 3 sqlite3 and the existing generated Prisma client.
+// Requires Node 22.23.4+, Python 3 sqlite3 and the existing generated Prisma client.
 // Credentials below are generated only in memory for this synthetic test.
 test('HTTP/SQLite: email registration creates one inactive SALES account and rejects replay', async t => {
   // 0. Fail before loading configuration if a real environment file is present.

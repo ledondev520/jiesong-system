@@ -18,6 +18,7 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 - Disable默认凭证 and rotate all secrets periodically.
 
 ### 2) 运行时与执行环境层（Host & Runtime）
+- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); the production PM2 runtime switch is a separate approved step.
 - Keep `.env` permissions tight; warn in非生产 and block in生产 for misconfigured permissions.
 - Run Node进程 with最小权限 (non-root, locked-down directories) and mount config with read-only policy where possible.
 - Keep upload/storage directories explicitly created and scoped to应用用户.
