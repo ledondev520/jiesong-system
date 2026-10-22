@@ -32,7 +32,7 @@
 - 自定义组件必须基于 shadcn/ui 的设计规范扩展.
 
 ## Security rules
-- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); the production PM2 runtime switch is a separate approved step.
+- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); production PM2 uses `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64`. `.github/workflows/deploy.yml` and `deploy.sh` source `scripts/require-node-runtime.sh` to prepend `NODE_RUNTIME/bin` (defaulting to that runtime) before npm/npx/build/verification; missing executables, mismatched node resolution or older versions stop deployment without system-node fallback.
 - 出货退税清单确认及含票面核验行的导出仅供 ADMIN/FINANCE；`backend/src/routes/taxRefunds.js` 校验入口，`backend/src/controllers/fileController.js` 同步限制确认附件下载/删除，避免绕过行级权限。生成文件继续通过 `fileService.js` 的 0700/0600 归档，确认不等于正式申报。
 - 附件财务边界由 `backend/src/services/fileService.js` 的 `assertFileAccess` 共用，通用及旧采购/销售下载与删除入口必须调用；普通附件角色权限不增加所有者限制。`createFile` 失败只清理本次新上传文件，不触碰既有/生成附件；清理自身失败保留原错误且不日志记录路径。旧采购删除保留现有物理归档。
 - `backend/src/utils/upload.js` 的 Multer destination 在启动磁盘文件流前以 0700 创建/收紧日期目录，失败经回调拒绝存储；不改变上传根目录共享策略。0600 文件收紧仍在 `fileService.createFile` 的首次异步查询前执行，不声称覆盖完整上传流阶段。
@@ -123,6 +123,7 @@
 ## VPS 运行目录与发布验证
 - `celerada.link` 的 PM2 进程 `jiesong-backend`、`jiesong-frontend` 必须分别运行 `/opt/jiesong-system/backend`、`/opt/jiesong-system/frontend`，与 Git 部署构建目录一致；仅重启旧发布目录不算发布成功。
 - `.github/workflows/deploy.yml` 遇错停止，使用触发提交 SHA；发布末尾运行 `scripts/verify-vps-runtime.cjs` 校验 PM2 目录、后端健康、公网 BUILD_ID 和未登录 API 的 401。
+- `.github/workflows/deploy.yml` 的 SSH 远端脚本整体以 `{ ...; } </dev/null` 执行，防止子命令读取 `bash -s` 的脚本流并跳过发布验证；`scripts/deploy-ssh.test.cjs` 在 pre-deploy 中使用实际 run 块和本地 SSH/命令桩回归验证。
 - 运行目录迁移沿用原有绝对 DATABASE_URL、UPLOAD_DIR 和私密环境配置；切换前的数据库与配置备份放在受保护目录（0700/0600），不得输出完整 PM2 环境或凭据。
 
 ## 邮箱注册边界

@@ -42,7 +42,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Verify deployment check behavior
-        run: node --test scripts/verify-vps-runtime.test.cjs
+        run: node --test scripts/verify-vps-runtime.test.cjs scripts/deploy-ssh.test.cjs
 
       - name: Install frontend dependencies
         working-directory: ./frontend
@@ -106,37 +106,56 @@ jobs:
           ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy to Production via SSH
+        env:
+          NODE_RUNTIME: ${{ vars.NODE_RUNTIME || '/opt/jiesong_system/runtime/node-v22.23.4-linux-x64' }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          DEPLOY_REF: ${{ github.ref_name }}
+          DEPLOY_SHA: ${{ github.sha }}
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL || 'https://jiesong-system.com' }}
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} -p ${{ secrets.SSH_PORT || '22' }} '
-            set -eu
-            cd /opt/jiesong-system || exit 1
-            PRICING_BACKUP=""
-            if [ -f config/pricing.json ]; then
-              PRICING_BACKUP="$(mktemp)"
-              cp -p config/pricing.json "$PRICING_BACKUP"
-              git checkout -- config/pricing.json 2>/dev/null || true
-            fi
-            git fetch origin
-            git checkout ${{ github.ref_name }}
-            git reset --hard ${{ github.sha }}
-            if [ -n "$PRICING_BACKUP" ]; then
-              cp -p "$PRICING_BACKUP" config/pricing.json
-              rm -f "$PRICING_BACKUP"
-              echo "Preserved runtime pricing config across deploy"
-            fi
-            cd backend
-            npm ci --production
-            npx prisma generate
-            npx prisma migrate deploy
-            cd ../frontend
-            npm ci
-            npm run build
-            pm2 restart jiesong-backend || pm2 start ecosystem.config.js --only jiesong-backend
-            pm2 restart jiesong-frontend || pm2 start ecosystem.config.js --only jiesong-frontend
-            pm2 save
-            sudo nginx -t && sudo systemctl reload nginx
-            node /opt/jiesong-system/scripts/verify-vps-runtime.cjs "${{ vars.PRODUCTION_URL || 'https://jiesong-system.com' }}"
-          '
+          # Only base64 alphabet enters the remote command; decoded values stay quoted data.
+          encode() { printf '%s' "$1" | base64 -w0; }
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "bash -s -- $(encode "$NODE_RUNTIME") $(encode "$DEPLOY_REF") $(encode "$DEPLOY_SHA") $(encode "$PRODUCTION_URL")" <<'REMOTE'
+            # Children must not read the bash -s program stream.
+            {
+              set -eu
+              NODE_RUNTIME=$(printf '%s' "$1" | base64 --decode)
+              DEPLOY_REF=$(printf '%s' "$2" | base64 --decode)
+              DEPLOY_SHA=$(printf '%s' "$3" | base64 --decode)
+              PRODUCTION_URL=$(printf '%s' "$4" | base64 --decode)
+              cd /opt/jiesong-system || exit 1
+              PRICING_BACKUP=""
+              if [ -f config/pricing.json ]; then
+                PRICING_BACKUP="$(mktemp)"
+                cp -p config/pricing.json "$PRICING_BACKUP"
+                git checkout -- config/pricing.json 2>/dev/null || true
+              fi
+              git fetch origin
+              git checkout "$DEPLOY_REF"
+              git reset --hard "$DEPLOY_SHA"
+              if [ -n "$PRICING_BACKUP" ]; then
+                cp -p "$PRICING_BACKUP" config/pricing.json
+                rm -f "$PRICING_BACKUP"
+                echo "Preserved runtime pricing config across deploy"
+              fi
+              . scripts/require-node-runtime.sh
+              cd backend
+              npm ci --production
+              npx prisma generate
+              npx prisma migrate deploy
+              cd ../frontend
+              npm ci
+              npm run build
+              pm2 restart jiesong-backend || pm2 start ecosystem.config.js --only jiesong-backend
+              pm2 restart jiesong-frontend || pm2 start ecosystem.config.js --only jiesong-frontend
+              pm2 save
+              sudo nginx -t && sudo systemctl reload nginx
+              node /opt/jiesong-system/scripts/verify-vps-runtime.cjs "$PRODUCTION_URL"
+            } </dev/null
+          REMOTE
 
       - name: Notify deployment status
         uses: actions/github-script@v9

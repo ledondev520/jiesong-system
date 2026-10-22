@@ -6,6 +6,10 @@
 
 Git 构建目录为 `/opt/jiesong-system`。PM2 的 `jiesong-backend` 和 `jiesong-frontend` 必须分别使用该目录内的 `backend`、`frontend`，不能继续指向 `/opt/jiesong_system/releases/` 中的旧代码。PM2 重启不会自动纠正旧脚本路径；首次切换需要备份配置、使用正确路径重新创建这两个进程，并保留回滚配置。
 
+服务器 Node.js 基线为 **>=22.23.4**，生产 PM2 已使用 `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64`。SSH 部署及 `deploy.sh` 共用 `scripts/require-node-runtime.sh`，在 npm/npx、Prisma、构建和部署验证前将 `NODE_RUNTIME/bin` 放在 PATH 首位，并校验 node 可执行、`command -v node` 与指定路径一致及版本达标；失败立即退出，不回退系统 Node。专用运行时须提前安装；`deploy.sh` 不再安装系统 Node。
+
+`NODE_RUNTIME` 默认使用上述目录；Actions 可通过仓库变量 `NODE_RUNTIME` 覆盖，手动执行 `deploy.sh` 时通过环境变量传入。值须为不含冒号的绝对目录；SSH 以编码参数传递后作为引用数据读取，不拼接为可执行代码。手动运行 `scripts/verify-vps-runtime.cjs` 前也应先在仓库根目录执行 `. scripts/require-node-runtime.sh`。
+
 生产数据库和附件沿用 `/opt/jiesong_system/current/backend/` 下既有数据位置，环境配置中的 DATABASE_URL 与 UPLOAD_DIR 使用绝对路径。迁移时复制现用的私密配置并设为 0600，不使用构建目录里另一份数据库代替生产数据；先创建一致的数据库备份。
 
 每次发布后执行 `node scripts/verify-vps-runtime.cjs https://celerada.link`。它核对 PM2 运行目录、后端健康、公网登录页 BUILD_ID、手机缩放和 API 认证边界；GitHub Actions 已调用此检查。首次切换还应从 VPS 核对根域名及 www 的 DNS、HTTPS 证书、HTTP 跳转，再在手机尺寸下检查公网登录页。

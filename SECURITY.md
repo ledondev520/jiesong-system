@@ -18,7 +18,7 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 - Disable默认凭证 and rotate all secrets periodically.
 
 ### 2) 运行时与执行环境层（Host & Runtime）
-- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); the production PM2 runtime switch is a separate approved step.
+- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); production PM2 uses `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64`. `.github/workflows/deploy.yml` and `deploy.sh` source `scripts/require-node-runtime.sh` before npm/npx/build/verification to prevent use of an older system Node: prepend `NODE_RUNTIME/bin` (defaulting to that runtime), require an executable node, matching command resolution and version >=22.23.4, and fail without fallback. The workflow passes configuration via environment variables and base64-encoded SSH arguments to a quoted remote script, preventing shell interpretation of configured values; runtime provisioning remains an operator prerequisite.
 - Keep `.env` permissions tight; warn in非生产 and block in生产 for misconfigured permissions.
 - Run Node进程 with最小权限 (non-root, locked-down directories) and mount config with read-only policy where possible.
 - Keep upload/storage directories explicitly created and scoped to应用用户.
@@ -87,6 +87,7 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 
 ### VPS 发布验证
 - `.github/workflows/deploy.yml` 在 SSH 内启用失败即停止，并固定触发提交 SHA，防止失败被后续命令掩盖或发布版本漂移。
+- `.github/workflows/deploy.yml` 将整个 SSH 远端脚本放入重定向自 `/dev/null` 的复合命令，防止 npm/Prisma/PM2/sudo 等子命令吞掉 `bash -s` 的剩余程序并跳过验证。`scripts/deploy-ssh.test.cjs` 在 pre-deploy 中执行实际 SSH run 块，覆盖读取 stdin、验证失败和运行时缺失；保留 base64 参数传递与运行时守卫。
 - `scripts/verify-vps-runtime.cjs` 只输出校验结论，拒绝 PM2 仍指向旧目录、公网 BUILD_ID 不匹配、后端健康失败或未认证 API 返回非 401；不得记录完整 PM2 环境、响应正文或凭据。
 - VPS 运行目录迁移保留现有数据库与附件的绝对路径；`/opt/jiesong_system/deploy-backups/` 中的环境配置和 SQLite 快照属于 Restricted，目录 0700、文件 0600。
 

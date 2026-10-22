@@ -1,4 +1,4 @@
-// VPS requires Node.js >=20, PM2 and an already-built frontend; no credentials are printed.
+// VPS requires dedicated Node.js >=22.23.4, PM2 and an already-built frontend; no credentials are printed.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
