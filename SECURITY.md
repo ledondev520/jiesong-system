@@ -18,7 +18,7 @@ PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GI
 - Disable默认凭证 and rotate all secrets periodically.
 
 ### 2) 运行时与执行环境层（Host & Runtime）
-- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); the production PM2 runtime switch is a separate approved step.
+- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); production PM2 uses `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64`. `.github/workflows/deploy.yml` and `deploy.sh` source `scripts/require-node-runtime.sh` before npm/npx/build/verification to prevent use of an older system Node: prepend `NODE_RUNTIME/bin` (defaulting to that runtime), require an executable node, matching command resolution and version >=22.23.4, and fail without fallback. The workflow passes configuration via environment variables and base64-encoded SSH arguments to a quoted remote script, preventing shell interpretation of configured values; runtime provisioning remains an operator prerequisite.
 - Keep `.env` permissions tight; warn in非生产 and block in生产 for misconfigured permissions.
 - Run Node进程 with最小权限 (non-root, locked-down directories) and mount config with read-only policy where possible.
 - Keep upload/storage directories explicitly created and scoped to应用用户.

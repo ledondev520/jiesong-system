@@ -32,7 +32,7 @@
 - 自定义组件必须基于 shadcn/ui 的设计规范扩展.
 
 ## Security rules
-- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); the production PM2 runtime switch is a separate approved step.
+- Node.js >=22.23.4 is the runtime baseline (CVE-2026-111497); production PM2 uses `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64`. `.github/workflows/deploy.yml` and `deploy.sh` source `scripts/require-node-runtime.sh` to prepend `NODE_RUNTIME/bin` (defaulting to that runtime) before npm/npx/build/verification; missing executables, mismatched node resolution or older versions stop deployment without system-node fallback.
 - 出货退税清单确认及含票面核验行的导出仅供 ADMIN/FINANCE；`backend/src/routes/taxRefunds.js` 校验入口，`backend/src/controllers/fileController.js` 同步限制确认附件下载/删除，避免绕过行级权限。生成文件继续通过 `fileService.js` 的 0700/0600 归档，确认不等于正式申报。
 - 附件财务边界由 `backend/src/services/fileService.js` 的 `assertFileAccess` 共用，通用及旧采购/销售下载与删除入口必须调用；普通附件角色权限不增加所有者限制。`createFile` 失败只清理本次新上传文件，不触碰既有/生成附件；清理自身失败保留原错误且不日志记录路径。旧采购删除保留现有物理归档。
 - `backend/src/utils/upload.js` 的 Multer destination 在启动磁盘文件流前以 0700 创建/收紧日期目录，失败经回调拒绝存储；不改变上传根目录共享策略。0600 文件收紧仍在 `fileService.createFile` 的首次异步查询前执行，不声称覆盖完整上传流阶段。
