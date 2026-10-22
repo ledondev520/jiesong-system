@@ -11,6 +11,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const XLSX = require('xlsx');
+const { execFileSync } = require('node:child_process');
 const { createSources, applyMigrations, runImport, readDatabase } = require('../testHelpers/financial-library-data');
 
 test('HTTP/SQLite: financial library ingests existing synthetic sources and preserves restricted row readbacks', async t => {
@@ -146,6 +148,82 @@ test('HTTP/SQLite: financial library ingests existing synthetic sources and pres
     }
     assert.deepEqual(snapshot(), original);
     assert.deepEqual(unrelated(), before);
+    assert.deepEqual(fs.readdirSync(process.env.UPLOAD_DIR), []);
+  });
+
+  await t.test('snapshot CLI adds monthly reports and cumulative ledger without changing old records; revisions append and failures roll back', async () => {
+    const service = require('../services/financialEvidenceService');
+    const create = (sheets) => {
+      const book = XLSX.utils.book_new();
+      for (const [name, rows] of Object.entries(sheets)) XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet(rows), name);
+      return XLSX.write(book, { type: 'buffer', bookType: 'xlsx' });
+    };
+    const buffers = [
+      create(Object.fromEntries(['资产负债表', '利润表', '现金流量表'].map(name => [name, [[name], ['企业名称：合成企业', '2026-10'], ['项目', '金额'], ['合成金额', 123.45]]]))),
+      create({ 科目余额表: [['科目余额表'], ['核算单位：合成企业', null, null, '期间：2026年10月-2026年10月'], ['科目编码', '科目名称', '余额'], ['1001', '现金', 123.45]] }),
+      create({ 明细账: [['明细账'], ['编制单位：合成企业', null, null, '期间：2026年1月-2026年9月'], ['科目编码', '科目名称', '日期', '凭证号', '摘要', '借方', '贷方', '方向', '余额'], ['1001', '现金', '2026-01-02', '合成-1', '合成业务', 100, 0, '借', 100], ['1001', '现金', '2026-09-30', '合成-2', '合成业务', 0, 10, '借', 90]] }),
+    ];
+    const files = buffers.map((buffer, index) => {
+      const file = path.join(directory, `synthetic-snapshot-${index}.xlsx`);
+      fs.writeFileSync(file, buffer, { mode: 0o600 });
+      return file;
+    });
+    const run = confirm => execFileSync(process.execPath, [path.resolve(__dirname, '../../scripts/retain-financial-snapshots.js'), ...files, ...(confirm ? ['--confirm'] : [])], {
+      env: { ...process.env, DATABASE_URL: `file:${path.join(directory, 'synthetic.db')}` }, encoding: 'utf8', timeout: 30000,
+    });
+    const old = snapshot();
+    assert.match(run(false), /"mode":"preview"/);
+    assert.deepEqual(snapshot(), old);
+    assert.match(run(true), /"imported":3,"skipped":0,"replaced":0/);
+    const added = snapshot();
+    assert.deepEqual(unrelated(), before);
+    for (const table of libraryTables) {
+      const oldIds = new Set(old[table].map(row => row.id));
+      assert.deepEqual(added[table].filter(row => oldIds.has(row.id)), old[table]);
+    }
+    const cumulativeList = await get('/documents', { category: 'GENERAL_LEDGER_CUMULATIVE_SNAPSHOT', year: 2026 });
+    assert.equal(cumulativeList.total, 1);
+    const cumulative = cumulativeList.items[0];
+    assert.equal(cumulative.periodMonth, null);
+    assert.equal(cumulative.periodId, null);
+    assert.match(cumulative.categoryLabel, /2026年1—9月累计/);
+    const detail = await get(`/documents/${cumulative.id}`);
+    assert.deepEqual(detail.rows.slice(3).map(row => row.values.slice(2)), [
+      ['2026-01-02', '合成-1', '合成业务', 100, 0, '借', 100],
+      ['2026-09-30', '合成-2', '合成业务', 0, 10, '借', 90],
+    ]);
+    assert.equal((await get('/documents', { category: cumulative.category, year: 2026, month: 9 })).total, 0);
+    const monthly = await get('/documents', { category: 'MONTHLY_STATEMENT_SNAPSHOT', year: 2026, month: 10 });
+    assert.equal(monthly.items[0].periodId, period.id);
+    assert.equal(monthly.items[0].importedSheetCount, 3);
+    assert.equal(monthly.items[0].contentSha256, crypto.createHash('sha256').update(buffers[0]).digest('hex'));
+    await get(`/documents/${cumulative.id}`, {}, 'BOSS', 403);
+    assert.match(run(true), /"imported":0,"skipped":3,"replaced":0/);
+    assert.deepEqual(snapshot(), added);
+
+    const revised = XLSX.read(buffers[2], { type: 'buffer' });
+    revised.Sheets['明细账'].F4.v = 101;
+    const revision = service.parseFinancialEvidenceSnapshot({ buffer: XLSX.write(revised, { type: 'buffer', bookType: 'xlsx' }), fileName: path.basename(files[2]) });
+    assert.equal((await service.appendFinancialEvidenceSnapshots([revision], db)).imported, 1);
+    const revisedState = snapshot();
+    for (const table of libraryTables) {
+      const addedIds = new Set(added[table].map(row => row.id));
+      assert.deepEqual(revisedState[table].filter(row => addedIds.has(row.id)), added[table]);
+    }
+    assert.deepEqual(unrelated(), before);
+
+    await assert.rejects(service.appendFinancialEvidenceSnapshots([{ ...revision, contentSha256: 'synthetic-conflict' }], db), /拒绝覆盖/);
+    assert.deepEqual(snapshot(), revisedState);
+    await db.$executeRawUnsafe(`CREATE TRIGGER synthetic_snapshot_failure BEFORE INSERT ON financial_evidence_rows WHEN NEW.searchText LIKE '%FAIL-ARCHIVE%' BEGIN SELECT RAISE(ABORT, 'synthetic archive rollback'); END`);
+    const nextBook = XLSX.read(buffers[0], { type: 'buffer' });
+    nextBook.Sheets['利润表'].B4.v = 456;
+    const next = service.parseFinancialEvidenceSnapshot({ buffer: XLSX.write(nextBook, { type: 'buffer', bookType: 'xlsx' }), fileName: 'synthetic-next.xlsx' });
+    const failing = structuredClone(revision);
+    failing.sourceKey = 'synthetic-late-failure';
+    failing.sheets[0].rows.at(-1).searchText = 'FAIL-ARCHIVE';
+    await assert.rejects(service.appendFinancialEvidenceSnapshots([next, failing], db));
+    assert.deepEqual(snapshot(), revisedState, '晚期插入失败时前一文档也必须回滚');
+    await db.$executeRawUnsafe('DROP TRIGGER synthetic_snapshot_failure');
     assert.deepEqual(fs.readdirSync(process.env.UPLOAD_DIR), []);
   });
 });

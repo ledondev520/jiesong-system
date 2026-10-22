@@ -1,7 +1,7 @@
 /**
  * Input: 财务工作簿/PDF buffer、来源文件名/相对路径、Prisma Adapter 与查询筛选
- * Output: 分类后的脱敏结构化文档、幂等导入结果、资料库摘要与行级下钻
- * Pos: 财务与税务证据分析库深 Module；原始文件不落盘，个人敏感字段在持久化前脱敏
+ * Output: 脱敏结构化文档、普通幂等导入、仅新增报表快照、资料库摘要与行级下钻
+ * Pos: 财务证据库；快照区分单月与累计区间、不替换业务账期，原始文件不归档
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -263,6 +263,10 @@ function parseFinancialEvidenceSource({ buffer, fileName, relativePath }) {
     throw new Error(`${fileName}: 工作簿解析失败（${error.message}）`);
   }
 
+  return buildWorkbookDocument({ buffer, fileName, relativePath, workbook, classification });
+}
+
+function buildWorkbookDocument({ buffer, fileName, relativePath, workbook, classification, explicitPeriod }) {
   const safeRelativePath = normalizeRelativePath(relativePath, fileName);
   const pathPeriod = detectPeriod(safeRelativePath, fileName);
   const contentSha256 = sha256(buffer);
@@ -273,7 +277,7 @@ function parseFinancialEvidenceSource({ buffer, fileName, relativePath }) {
   if (sheets.length === 0) throw new Error(`${fileName}: 没有可利用的非空 Sheet`);
 
   const inferredPeriod = inferPeriodFromSheets(sheets);
-  const period = pathPeriod.periodYear ? pathPeriod : inferredPeriod;
+  const period = explicitPeriod || (pathPeriod.periodYear ? pathPeriod : inferredPeriod);
   const sourceKey = sha256([
     classification.category,
     period.periodYear || '',
@@ -299,6 +303,98 @@ function parseFinancialEvidenceSource({ buffer, fileName, relativePath }) {
     originalArchived: false,
     sheets,
   };
+}
+
+/**
+ * 显式资料留存入口：从表内标题识别期间，累计账不关联到任一单月。
+ * 原金额/行号沿用资料库脱敏解析；快照不进入月报指标或业务账簿。
+ */
+function parseFinancialEvidenceSnapshot({ buffer, fileName }) {
+  if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error('财务快照文件为空');
+  let workbook;
+  try {
+    workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true, cellFormula: true });
+  } catch {
+    throw new Error('无法解析财务快照');
+  }
+  const statementNames = ['资产负债表', '利润表', '现金流量表'];
+  const isStatement = statementNames.slice(0, 2).every(name => workbook.SheetNames.includes(name));
+  const isBalance = workbook.SheetNames.includes('科目余额表');
+  const isLedger = workbook.SheetNames.includes('明细账');
+  if ([isStatement, isBalance, isLedger].filter(Boolean).length !== 1) {
+    throw new Error('财务快照类型不明确：只接受会计报表、科目余额或明细账');
+  }
+  const names = isStatement ? statementNames.filter(name => workbook.SheetNames.includes(name))
+    : [isBalance ? '科目余额表' : '明细账'];
+  const sheetRows = name => XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: null, blankrows: true });
+  const periods = names.map(name => sheetRows(name).slice(0, 3).flat()
+    .flatMap(value => [...String(value instanceof Date ? value.toISOString() : value ?? '')
+      .matchAll(/(20\d{2})[年-](\d{1,2})(?=月|-|$)/g)]
+      .map(match => ({ year: Number(match[1]), month: Number(match[2]) }))));
+  if (periods.some(values => !values.length) || periods.flat().some(p => p.month < 1 || p.month > 12)) {
+    throw new Error('无法从财务快照表内识别有效账期');
+  }
+  const start = periods[0][0];
+  const end = periods[0].at(-1);
+  if (isLedger) {
+    if (periods[0].length !== 2 || start.year !== end.year || start.month > end.month) {
+      throw new Error('明细账累计区间无效；须为同一年度内的起止月份');
+    }
+    for (const row of sheetRows('明细账').slice(3)) {
+      if (!row[3]) continue; // 期初/本期/累计汇总没有凭证号，不参与日期检查。
+      const date = row[2] instanceof Date ? row[2].toISOString().slice(0, 10) : String(row[2] ?? '');
+      if (!/^20\d{2}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date))
+        || new Date(date).toISOString().slice(0, 10) !== date
+        || Number(date.slice(0, 4)) !== start.year
+        || Number(date.slice(5, 7)) < start.month || Number(date.slice(5, 7)) > end.month) {
+        throw new Error('明细账凭证日期超出声明区间或日期无效');
+      }
+    }
+  } else if (periods.flat().some(p => p.year !== start.year || p.month !== start.month)) {
+    throw new Error('会计报表或科目余额表内账期不一致');
+  }
+  const cumulative = isLedger && start.month !== end.month;
+  const classification = {
+    category: isStatement ? 'MONTHLY_STATEMENT_SNAPSHOT' : isBalance ? 'ACCOUNT_BALANCE_SNAPSHOT'
+      : cumulative ? 'GENERAL_LEDGER_CUMULATIVE_SNAPSHOT' : 'GENERAL_LEDGER_MONTHLY_SNAPSHOT',
+    categoryLabel: isStatement ? '会计报表（留存快照）' : isBalance ? '科目余额（留存快照）'
+      : `明细账（${start.year}年${start.month}${cumulative ? `—${end.month}月累计` : '月'}快照）`,
+    analysisScope: isStatement ? 'STATEMENT' : 'LEDGER',
+  };
+  const rangeLabel = `${start.year}-${String(start.month).padStart(2, '0')}至${end.year}-${String(end.month).padStart(2, '0')}`;
+  const document = buildWorkbookDocument({
+    buffer, fileName, relativePath: `报表留存/${rangeLabel}/${fileName}`, workbook, classification,
+    explicitPeriod: { periodYear: start.year, periodMonth: cumulative ? null : start.month },
+  });
+  document.parseVersion = 'financial-snapshot-v1';
+  // 以内容和真实期间标识快照：改名仍跳过，内容修订新增版本，永不覆盖旧来源。
+  document.sourceKey = sha256([document.parseVersion, classification.category, rangeLabel, document.contentSha256].join('|'));
+  return document;
+}
+
+/** 全批次仅 create 或幂等跳过；冲突/晚期错误回滚，不能走普通资料的替换分支。 */
+async function appendFinancialEvidenceSnapshots(documents, db = prisma) {
+  if (documents.some(document => document.parseVersion !== 'financial-snapshot-v1')) {
+    throw new Error('仅接受已验证的财务留存快照');
+  }
+  return db.$transaction(async tx => {
+    const result = { imported: 0, skipped: 0, documents: [] };
+    for (const document of documents) {
+      const existing = await tx.financialEvidenceDocument.findUnique({ where: { sourceKey: document.sourceKey } });
+      if (existing) {
+        if (existing.contentSha256 !== document.contentSha256 || existing.parseVersion !== document.parseVersion) {
+          throw new Error('财务快照身份冲突，拒绝覆盖已有数据');
+        }
+        result.skipped += 1;
+        result.documents.push({ id: existing.id, action: 'SKIPPED' });
+      } else {
+        const stored = await persistDocument(document, null, tx);
+        result.imported += 1;
+        result.documents.push({ id: stored.id, action: 'IMPORTED' });
+      }
+    }
+    return result;
+  }, { timeout: 60000 });
 }
 
 function normalizePdfText(items) {
@@ -589,6 +685,8 @@ module.exports = {
   REDACTED_VALUE,
   classifyFinancialEvidenceFile,
   parseFinancialEvidenceSource,
+  parseFinancialEvidenceSnapshot,
+  appendFinancialEvidenceSnapshots,
   parseFinancialEvidencePdfSource,
   importFinancialEvidenceDocuments,
   getFinancialEvidenceSummary,

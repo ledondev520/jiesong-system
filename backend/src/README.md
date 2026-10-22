@@ -84,7 +84,7 @@
 | invoiceRecordService.js | 发票分页、筛选后有效/红冲分类统计、销方汇总及完整发票号码批量精确查询 |
 | invoiceVerificationService.js | 出口退税候选发票的销方、价税合计、品名、状态只读一致性核验 |
 | financialStatementsService.js | 会计报表数字公式缓存/既有空值兼容与明确错误指引、科目余额/明细账同账期校验，单事务写入与下钻查询 |
-| financialEvidenceService.js | 工资、税务、凭证与日记账等资料的分类、脱敏、幂等导入与受限查询 |
+| financialEvidenceService.js | 财务资料分类、脱敏与受限查询；普通幂等导入与单月/累计报表快照仅新增留存分离，快照不替换已有账期 |
 | ai/contextService.js | 按当前销售合同港口关联构造美元上下文；局部查询失败保留其他资料并提示不可用，解析汇率后继续拼接财务概况 |
 | aiService.js | DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量 |
 | anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |

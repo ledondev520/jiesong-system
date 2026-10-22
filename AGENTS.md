@@ -22,6 +22,7 @@
 - Store only reusable technical memory. Do not put secrets, credentials, customer financial data, contract values, or personal/user-profile memory in `.brv/context-tree/`.
 - Monthly financial statements, account balances, general-ledger rows, and their source filenames/hashes are Confidential; raw workbooks must not be committed, logged, or copied into ordinary attachment storage.
 - Payroll, social-security, tax-return, voucher, and journal evidence rows are Confidential; redact personal identifiers before persistence, never archive source workbooks, and allow row-level reads only to ADMIN/FINANCE.
+- 报表仅新增留存使用 `backend/scripts/retain-financial-snapshots.js`：表内期间决定单月/累计，跨月明细账保留完整区间且不关联单月；`financialEvidenceService.appendFinancialEvidenceSnapshots` 整批仅新增或重复跳过，修订内容另存版本，不替换已有资料、业务账期或月度指标。确认前对实际 SQLite 做受保护在线备份，原文件不归档，来源和行级数据仍仅 ADMIN/FINANCE 可读。
 
 - 商品档案在 `frontend/src/components/layout/navigation.config.ts` 归采购模块，使已有权限的采购员可达现有页面；后端 `backend/src/routes/products.js` 继续执行读写角色校验，导航不授予额外 API 权限。
 

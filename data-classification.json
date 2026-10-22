@@ -106,6 +106,7 @@
           "Procurement-template reads require authentication at backend/src/routes/procurementTemplate.js before historical data is loaded",
           "Monthly financial source files are parsed in memory; persist structured rows plus filename, size, and SHA-256 only",
           "Financial evidence workbooks are never archived; sensitive personal identifiers are redacted before persistence and row-level reads require ADMIN or FINANCE",
+          "backend/scripts/retain-financial-snapshots.js uses financialEvidenceService.appendFinancialEvidenceSnapshots for atomic append-only source snapshots after explicit confirmation and protected online backup; cumulative ledger intervals are preserved without a single-month link, revisions never replace old evidence, and existing ADMIN/FINANCE read restrictions remain",
           "Shipment invoice-row preparations and exports require ADMIN/FINANCE; generated confirmation attachments keep the same download/delete restriction and use protected contract storage",
           "Automatic internal draft creation in openAgentService.js retains per-tool roles and execution/replay records; physical, financial and configuration writes still require confirmation",
           "Product navigation belongs to procurement at frontend/src/components/layout/navigation.config.ts; backend/src/routes/products.js remains the authority for read/write role checks",
