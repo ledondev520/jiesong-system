@@ -127,6 +127,8 @@ jobs:
               DEPLOY_SHA=$(printf '%s' "$3" | base64 --decode)
               PRODUCTION_URL=$(printf '%s' "$4" | base64 --decode)
               cd /opt/jiesong-system || exit 1
+              # The guard must already exist in this checkout; fail before backup or git mutation.
+              . scripts/require-node-runtime.sh
               PRICING_BACKUP=""
               if [ -f config/pricing.json ]; then
                 PRICING_BACKUP="$(mktemp)"
@@ -141,7 +143,6 @@ jobs:
                 rm -f "$PRICING_BACKUP"
                 echo "Preserved runtime pricing config across deploy"
               fi
-              . scripts/require-node-runtime.sh
               cd backend
               npm ci --production
               npx prisma generate
@@ -152,7 +153,8 @@ jobs:
               pm2 restart jiesong-backend || pm2 start ecosystem.config.js --only jiesong-backend
               pm2 restart jiesong-frontend || pm2 start ecosystem.config.js --only jiesong-frontend
               pm2 save
-              sudo nginx -t && sudo systemctl reload nginx
+              sudo nginx -t || exit 1
+              sudo systemctl reload nginx
               node /opt/jiesong-system/scripts/verify-vps-runtime.cjs "$PRODUCTION_URL"
             } </dev/null
           REMOTE

@@ -12,15 +12,19 @@ const step = workflow.match(/^      - name: Deploy to Production via SSH\n[\s\S]
 assert.ok(step, 'cannot extract the production SSH run block');
 const runBlock = step[1].replace(/^          /gm, '');
 
-function runDeployment(t, { missingRuntime = false, verifierStatus = 0 } = {}) {
+function runDeployment(t, { missingRuntime = false, nginxTestStatus = 0, verifierStatus = 0 } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'deploy-ssh-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const checkout = path.join(root, 'checkout');
   const bin = path.join(root, 'bin');
   const runtime = path.join(root, "node runtime ' $literal");
-  for (const dir of [bin, path.join(runtime, 'bin'), ...['backend', 'frontend', 'scripts'].map(part => path.join(checkout, part))]) {
+  for (const dir of [bin, path.join(runtime, 'bin'), ...['backend', 'frontend', 'scripts', 'config'].map(part => path.join(checkout, part))]) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
+  // Synthetic runtime pricing must exist so early failures exercise the backup branch.
+  const pricing = '{"syntheticRuntimePricing":true}\n';
+  writeFileSync(path.join(checkout, 'config/pricing.json'), pricing, { mode: 0o600 });
+  writeFileSync(path.join(root, 'events'), '');
   copyFileSync(path.join(repo, 'scripts/require-node-runtime.sh'), path.join(checkout, 'scripts/require-node-runtime.sh'));
   const executable = (filename, body) => writeFileSync(filename, `#!/bin/bash\nset -eu\n${body}\n`, { mode: 0o700 });
 
@@ -45,9 +49,24 @@ exec /bin/bash -c "$4"`);
   executable(path.join(bin, 'npm'), `
 printf 'npm\\n' >> "$TEST_EVENTS"
 cat >> "$TEST_NPM_STDIN"`);
-  for (const command of ['git', 'npx', 'pm2', 'sudo']) {
+  for (const command of ['git', 'npx', 'pm2']) {
     executable(path.join(bin, command), `printf '${command}\\n' >> "$TEST_EVENTS"`);
   }
+  // Trace pricing backup/copies as well as git; no real checkout is mutated.
+  for (const command of ['mktemp', 'cp']) {
+    executable(path.join(bin, command), `
+printf '${command}\\n' >> "$TEST_EVENTS"
+exec /usr/bin/${command} "$@"`);
+  }
+  executable(path.join(bin, 'sudo'), `
+case "$*" in
+  'nginx -t')
+    printf 'nginx-test\\n' >> "$TEST_EVENTS"
+    exit "$TEST_NGINX_STATUS"
+    ;;
+  'systemctl reload nginx') printf 'nginx-reload\\n' >> "$TEST_EVENTS" ;;
+  *) exit 99 ;;
+esac`);
   if (!missingRuntime) {
     executable(path.join(runtime, 'bin/node'), `
 if [ "\${1-}" = -e ]; then
@@ -80,6 +99,8 @@ exit "$TEST_VERIFIER_STATUS"`);
       TEST_NPM_STDIN: path.join(root, 'npm-stdin'),
       TEST_VERIFIER_URL: path.join(root, 'verifier-url'),
       TEST_VERIFIER_STATUS: String(verifierStatus),
+      TEST_NGINX_STATUS: String(nginxTestStatus),
+      TMPDIR: root,
     },
     input: '',
     encoding: 'utf8',
@@ -91,7 +112,8 @@ exit "$TEST_VERIFIER_STATUS"`);
     ...result,
     root,
     publicUrl,
-    events: readFileSync(path.join(root, 'events'), 'utf8').trim().split('\n'),
+    pricing,
+    events: readFileSync(path.join(root, 'events'), 'utf8').trim().split('\n').filter(Boolean),
   };
 }
 
@@ -99,6 +121,7 @@ test('stdin-reading npm cannot consume the SSH program or skip verification', t 
   const result = runDeployment(t);
   assert.equal(result.status, 0, result.stderr);
   assert.ok(result.events.includes('npm'), 'npm must actually run');
+  assert.ok(result.events.includes('nginx-reload'), 'valid nginx config must be reloaded');
   assert.equal(result.events.at(-1), 'verifier', 'verification must run after deployment');
   assert.equal(readFileSync(path.join(result.root, 'npm-stdin'), 'utf8'), '');
   assert.equal(readFileSync(path.join(result.root, 'verifier-url'), 'utf8'), result.publicUrl);
@@ -116,4 +139,22 @@ test('a missing dedicated runtime fails before npm', t => {
   assert.match(result.stderr, /NODE_RUNTIME\/bin\/node is missing or not executable/);
   assert.ok(!result.events.includes('npm'));
   assert.ok(!result.events.includes('verifier'));
+});
+
+test('a failing nginx config test fails the SSH step before reload and verification', t => {
+  const result = runDeployment(t, { nginxTestStatus: 23 });
+  assert.ok(result.events.includes('nginx-test'), 'nginx config test must actually run');
+  assert.notEqual(result.status, 0, result.stderr);
+  assert.ok(!result.events.includes('nginx-reload'), 'invalid config must not be reloaded');
+  assert.ok(!result.events.includes('verifier'), 'verification must not follow a failed config test');
+});
+
+test('a missing runtime aborts before git or any pricing backup/change', t => {
+  const result = runDeployment(t, { missingRuntime: true });
+  assert.notEqual(result.status, 0, result.stderr);
+  assert.match(result.stderr, /NODE_RUNTIME\/bin\/node is missing or not executable/);
+  assert.ok(!result.events.includes('git'), 'no git command may run before runtime validation');
+  assert.ok(!result.events.includes('mktemp'), 'pricing backup must not be created');
+  assert.ok(!result.events.includes('cp'), 'pricing must not be copied or restored');
+  assert.equal(readFileSync(path.join(result.root, 'checkout/config/pricing.json'), 'utf8'), result.pricing);
 });
