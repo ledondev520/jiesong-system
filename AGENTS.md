@@ -123,6 +123,7 @@
 ## VPS 运行目录与发布验证
 - `celerada.link` 的 PM2 进程 `jiesong-backend`、`jiesong-frontend` 必须分别运行 `/opt/jiesong-system/backend`、`/opt/jiesong-system/frontend`，与 Git 部署构建目录一致；仅重启旧发布目录不算发布成功。
 - `.github/workflows/deploy.yml` 遇错停止，使用触发提交 SHA；发布末尾运行 `scripts/verify-vps-runtime.cjs` 校验 PM2 目录、后端健康、公网 BUILD_ID 和未登录 API 的 401。
+- `.github/workflows/deploy.yml` 的 SSH 远端脚本整体以 `{ ...; } </dev/null` 执行，防止子命令读取 `bash -s` 的脚本流并跳过发布验证；`scripts/deploy-ssh.test.cjs` 在 pre-deploy 中使用实际 run 块和本地 SSH/命令桩回归验证。
 - 运行目录迁移沿用原有绝对 DATABASE_URL、UPLOAD_DIR 和私密环境配置；切换前的数据库与配置备份放在受保护目录（0700/0600），不得输出完整 PM2 环境或凭据。
 
 ## 邮箱注册边界
