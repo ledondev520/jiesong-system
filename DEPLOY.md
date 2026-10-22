@@ -12,7 +12,9 @@ Git 构建目录为 `/opt/jiesong-system`。PM2 的 `jiesong-backend` 和 `jieso
 
 生产数据库和附件沿用 `/opt/jiesong_system/current/backend/` 下既有数据位置，环境配置中的 DATABASE_URL 与 UPLOAD_DIR 使用绝对路径。迁移时复制现用的私密配置并设为 0600，不使用构建目录里另一份数据库代替生产数据；先创建一致的数据库备份。
 
-每次发布后执行 `node scripts/verify-vps-runtime.cjs https://celerada.link`。它核对 PM2 运行目录、后端健康、公网登录页 BUILD_ID、手机缩放和 API 认证边界；GitHub Actions 在 `sudo nginx -t` 成功并重载 Nginx 后调用此检查；配置测试失败会显式以非零退出，跳过重载和发布验证。首次切换还应从 VPS 核对根域名及 www 的 DNS、HTTPS 证书、HTTP 跳转，再在手机尺寸下检查公网登录页。
+每次发布后执行 `node scripts/verify-vps-runtime.cjs https://celerada.link`。它核对 PM2 运行目录、后端健康、公网登录页 BUILD_ID、手机缩放和 API 认证边界；GitHub Actions 已调用此检查。首次切换还应从 VPS 核对根域名及 www 的 DNS、HTTPS 证书、HTTP 跳转，再在手机尺寸下检查公网登录页。
+
+GitHub Actions 在 `sudo nginx -t` 成功并重载 Nginx 后才调用此检查；配置测试失败会显式以非零退出，跳过重载和发布验证。
 
 以下保留其他部署方案供参考。
 
