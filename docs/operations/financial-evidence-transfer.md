@@ -4,9 +4,9 @@
 
 ## 前提
 
-- 源机和目标机均有已审查的 `backend/scripts/financial-evidence-transfer.js`、`backend/src/services/financialEvidenceTransferService.js`、现有后端依赖和已迁移的SQLite库。无需新增表结构。
+- 源机和目标机均有已审查的 `backend/scripts/financial-evidence-transfer.js`、`financial-evidence-readonly.js`、`financial-evidence-readonly.py`、`backend/src/services/financialEvidenceTransferService.js`、现有后端依赖和已迁移的SQLite库。无需新增表结构。
 - 在目标机核实后端实际 `DATABASE_URL`，不要使用构建目录下另一份数据库。工具将其与当前Prisma连接的真实路径比对；文件不存在、权限过宽或目标非SQLite时拒绝。
-- 导入需要Python3标准库sqlite3。确认阶段自动对实际目标做在线一致性备份并执行 `integrity_check`，支持WAL。备份失败不会执行插入。
+- 预检和导入需要Python3标准库sqlite3。确认阶段自动对实际目标做在线一致性备份并执行 `integrity_check`，支持WAL。备份失败不会执行插入。
 - `.env`、数据库文件及迁移文件须私有；迁移目录、备份目录0700，JSON及备份0600。工具拒绝输入符号链接、多硬链接及覆盖已有输出文件。
 - 工具不替代账号权限管理。只由获授权的运维/财务管理员在主机运行；网页读取仍走ADMIN/FINANCE资料库接口。
 
@@ -40,7 +40,7 @@ node backend/scripts/financial-evidence-transfer.js preview \
   --plan /private/financial-transfer/target-plan.json
 ```
 
-预检只写本地计划文件，不写数据库。计划逐项列出CREATE或SKIP、类别、期间、Sheet/行数以及完整性标识。
+预检只写本地计划文件，不写数据库。它通过 `financial-evidence-readonly.py` 以SQLite `mode=ro`、`query_only` 和只读authorizer打开实际目标，在同一读取事务内仅查询候选资料及已有账期；不创建Prisma写连接。Python3因此也是预检的前提。计划逐项列出CREATE或SKIP、类别、期间、Sheet/行数以及完整性标识。
 
 - **完全相同**：SKIP，不改时间戳、行、索引或关联。
 - **同标识但任意结构化内容/元数据不同**，或相同来源内容已有不同记录：拒绝整个批次，不提供强制覆盖选项。

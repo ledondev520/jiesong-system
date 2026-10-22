@@ -24,6 +24,7 @@
 - Payroll, social-security, tax-return, voucher, and journal evidence rows are Confidential; redact personal identifiers before persistence, never archive source workbooks, and allow row-level reads only to ADMIN/FINANCE.
 - 报表仅新增留存使用 `backend/scripts/retain-financial-snapshots.js`：表内期间决定单月/累计，跨月明细账保留完整区间且不关联单月；`financialEvidenceService.appendFinancialEvidenceSnapshots` 整批仅新增或重复跳过，修订内容另存版本，不替换已有资料、业务账期或月度指标。确认前对实际 SQLite 做受保护在线备份，原文件不归档，来源和行级数据仍仅 ADMIN/FINANCE 可读。
 - 跨机财务资料迁移使用 `backend/scripts/financial-evidence-transfer.js` 的 export/preview/import：仅导出显式资料ID，不带本机关系ID、原工作簿或凭据。包、目标计划、回执及备份为私有0700/0600；目标机重新预检，确认导入自动备份实际SQLite并检查完整性。`financialEvidenceTransferService.js` 校验结构/计数/完整性、重新映射已有账期，事务内复核目标计划，仅create或跳过；同源标识/内容冲突整批拒绝，禁止update/delete/upsert及整库覆盖。哈希用于完整性检测而非签名，跨机传输须使用可信SSH；默认不传输、不发布。
+- 财务迁移 `preview` 使用 `backend/scripts/financial-evidence-readonly.py` 的 SQLite `mode=ro`、`query_only` 与只读 authorizer，在同一读取快照内仅取候选来源及其账期；`financial-evidence-readonly.js` 只读 Adapter 生成与导入兼容的目标计划，不加载Prisma写连接。远端核验可将该读取器经可信SSH执行，数据只流入本地私有管道，不能打印原行或复制整库。
 
 - 商品档案在 `frontend/src/components/layout/navigation.config.ts` 归采购模块，使已有权限的采购员可达现有页面；后端 `backend/src/routes/products.js` 继续执行读写角色校验，导航不授予额外 API 权限。
 

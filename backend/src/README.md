@@ -204,3 +204,5 @@
 - `services/purchaseImportExportService.test.js` 使用内存合成工作簿保持原断言，并验证路径/编码/NUL/磁盘对象输入400、零文件读取及零数据库访问。
 - `routes/purchases.import-upload.test.js` 验证 XLS/XLSX、穿越形标签、大小/扩展名及先鉴权后解析；对采购导入、dataImport、system/import 和 files.js 磁盘附件四类真实 localhost HTTP 入口发送 NUL multipart，均400且临时沙箱无文件残留。`routes/system.import-upload.test.js` 同步加强 NUL 状态为严格400。
 - `utils/purchaseExcelUpload.test.js` 不监听端口，使用真实 Multer/Busboy 和合成 multipart 流验证内存字节、扩展名、配置大小与 NUL400，确认专用模块连上传目录也不创建；不替代 HTTP 验收。
+
+财务迁移预检由 `scripts/financial-evidence-readonly.py` 使用SQLite只读URI、query_only及只读authorizer读取同一快照，`scripts/financial-evidence-readonly.js` 用内存只读Adapter生成正常目标计划；不创建Prisma写连接。隔离集成还注入DDL以验证读取连接确实拒绝写入。

@@ -116,6 +116,14 @@ async function main(args = process.argv.slice(2)) {
   process.env.SECURITY_STRICT_CONFIG_PERMS = 'true';
   require('../src/config');
   const configured = configuredDatabase();
+  if (command === 'preview') {
+    const bundle = service.validateBundle(readPrivateJson(options.bundle));
+    const { readSnapshot, planFromSnapshot } = require('./financial-evidence-readonly');
+    const plan = await planFromSnapshot(bundle, readSnapshot(bundle, configured));
+    savePrivateJson(options.plan, plan);
+    console.log(JSON.stringify({ mode: 'preview', ...service.summarize(bundle, plan), readOnlyConnection: true }));
+    return;
+  }
   const db = require('../src/utils/prisma');
   let receiptFd, committed = false;
   try {
@@ -128,11 +136,6 @@ async function main(args = process.argv.slice(2)) {
     }
     const bundle = service.validateBundle(readPrivateJson(options.bundle));
     const current = await service.previewBundle(bundle, db, target.fingerprint);
-    if (command === 'preview') {
-      savePrivateJson(options.plan, current);
-      console.log(JSON.stringify({ mode: 'preview', ...service.summarize(bundle, current) }));
-      return;
-    }
     const approved = readPrivateJson(options.plan);
     service.validatePlan(approved);
     if (approved.planSha256 !== current.planSha256) {

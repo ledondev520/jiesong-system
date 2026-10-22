@@ -80,12 +80,39 @@ test('SQLite/CLI: selected financial evidence transfers append-only with actual-
 
   await t.test('preview does not write; import requires confirm and a plan made against this exact target', () => {
     const preview = ok(cli(targetPath, ['preview', '--bundle', bundleFile, '--plan', planFile]));
+    assert.equal(preview.readOnlyConnection, true);
     assert.equal(preview.toCreate, 4); assert.equal(preview.toSkip, 0);
     assert.deepEqual(readDatabase(targetDir), targetBefore);
     assert.notEqual(cli(targetPath, ['import', '--bundle', bundleFile, '--plan', planFile, '--backup-dir', backupDir, '--receipt', path.join(root, 'no-confirm.json')]).status, 0);
     const wrongPlan = path.join(root, 'source-plan.json');
     ok(cli(sourcePath, ['preview', '--bundle', bundleFile, '--plan', wrongPlan]));
     assert.notEqual(cli(targetPath, ['import', '--bundle', bundleFile, '--plan', wrongPlan, '--backup-dir', backupDir, '--receipt', path.join(root, 'wrong-target.json'), '--confirm']).status, 0);
+    assert.deepEqual(readDatabase(targetDir), targetBefore);
+  });
+
+  await t.test('readonly preflight connection rejects an injected write at the SQLite layer', () => {
+    const probe = `import importlib.util,sqlite3,sys,json
+sys.dont_write_bytecode=True
+spec=importlib.util.spec_from_file_location('reader',sys.argv[1]);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+original=sqlite3.connect
+blocked=[]
+class Probe(sqlite3.Connection):
+ def execute(self,sql,*args):
+  result=super().execute(sql,*args)
+  if sql=='BEGIN':
+   try: super().execute('CREATE TABLE must_not_write(value TEXT)')
+   except sqlite3.DatabaseError: blocked.append(True)
+   else: raise AssertionError('Readonly connection accepted a write')
+  return result
+sqlite3.connect=lambda *args,**kwargs: original(*args,**kwargs,factory=Probe)
+result=module.read_snapshot(sys.argv[2],json.loads(sys.stdin.read()))
+assert blocked==[True] and result['readOnly'] is True
+print('SQLite write rejected')
+`;
+    const output = execFileSync('python3', ['-c', probe, path.resolve(__dirname, '../../scripts/financial-evidence-readonly.py'), targetPath], {
+      input: JSON.stringify(bundle.documents.map(({ sourceKey, contentSha256, category }) => ({ sourceKey, contentSha256, category }))), encoding: 'utf8',
+    });
+    assert.match(output, /SQLite write rejected/);
     assert.deepEqual(readDatabase(targetDir), targetBefore);
   });
 
