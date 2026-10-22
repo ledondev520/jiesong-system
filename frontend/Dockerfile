@@ -2,7 +2,7 @@
 # 捷淞进销存系统 - 前端 Dockerfile
 # =============================================================================
 
-FROM node:20-alpine AS base
+FROM node:22.23.4-alpine AS base
 
 # 安装必要的系统依赖
 RUN apk add --no-cache python3 make g++

@@ -20,7 +20,7 @@ on:
           - production
 
 env:
-  NODE_VERSION: '20.19.0'
+  NODE_VERSION: '22.23.4'
 
 # 默认最小权限;需要写 commit status 的 job 单独声明
 permissions:

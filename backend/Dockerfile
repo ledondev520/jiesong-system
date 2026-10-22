@@ -2,7 +2,7 @@
 # 构建: docker build -t jiesong-backend .
 # 运行: docker run -p 3001:3001 --env-file .env jiesong-backend
 
-FROM node:20-alpine
+FROM node:22.23.4-alpine
 
 WORKDIR /app
 
