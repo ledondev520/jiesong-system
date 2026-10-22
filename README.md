@@ -73,7 +73,7 @@ jiesong_system/
 
 ## 快速开始
 
-需要 Node.js 20.19 或更新的兼容版本、npm 和 Python 3。测试通过 Python 标准库创建隔离 SQLite，不需要系统 sqlite3 CLI。
+需要 Node.js 22.23.4 或更新的兼容版本、npm 和 Python 3。测试通过 Python 标准库创建隔离 SQLite，不需要系统 sqlite3 CLI。
 
 1. 在后端运行 `npm ci` 和 `npm run db:generate`。
 2. 在运行环境设置 `DATABASE_URL`，例如 `file:./dev.db`。Prisma 的相对文件路径基于 `backend/prisma/`。设置至少 32 字符的私有 `JWT_SECRET`。不要将真实密钥或数据库提交到 Git。

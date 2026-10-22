@@ -40,14 +40,19 @@ apt-get install -y \
   postgresql-contrib
 
 # =============================================================================
-# 2. 安装 Node.js (LTS 版本)
+# 2. 安装 Node.js (22.23.4+)
 # =============================================================================
 log_info "正在安装 Node.js..."
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 
 # 验证 Node.js 版本
 NODE_VERSION=$(node -v)
+# NodeSource 22.x 包仍须满足最低安全版本，旧包不得继续部署。
+if ! node -e 'const [major, minor, patch] = process.versions.node.split(".").map(Number); process.exit(major > 22 || (major === 22 && (minor > 23 || (minor === 23 && patch >= 4))) ? 0 : 1)'; then
+  log_error "需要 Node.js >=22.23.4，当前版本为 $NODE_VERSION"
+  exit 1
+fi
 NPM_VERSION=$(npm -v)
 log_info "已安装 Node.js $NODE_VERSION, npm $NPM_VERSION"
 
