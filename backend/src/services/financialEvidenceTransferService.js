@@ -90,11 +90,17 @@ function validateDocument(doc) {
   }
   if (cumulative) {
     const ledger = doc.sheets.find(sheet => sheet.sheetName === '明细账');
-    const header = ledger?.rows.find(row => row.sourceRow === 2)?.values[3];
-    const match = typeof header === 'string' && header.match(/期间[：:]\s*(20\d{2})年(\d{1,2})月-(20\d{2})年(\d{1,2})月/);
-    requireThat(match && Number(match[1]) === doc.periodYear && match[1] === match[3]
-      && integer(Number(match[2]), 1, 12) && integer(Number(match[4]), 1, 12) && Number(match[2]) < Number(match[4]), '累计区间缺失或无效');
-    requireThat(doc.categoryLabel.includes(`${doc.periodYear}年${Number(match[2])}—${Number(match[4])}月累计`), '累计标签与来源区间不符');
+    // 与留存解析的 sheet_to_json(...).slice(0, 3) 一致；空行不持久化，须按原范围的物理行定位。
+    const firstRow = Number(ledger?.sourceRange?.match(/^[A-Z]+([1-9]\d*)(?::[A-Z]+[1-9]\d*)?$/)?.[1]);
+    requireThat(integer(firstRow, 1), '累计区间缺失或无效');
+    const periods = ledger.rows.filter(row => row.sourceRow >= firstRow && row.sourceRow < firstRow + 3)
+      .flatMap(row => row.values).flatMap(value => [...String(value ?? '')
+        .matchAll(/(20\d{2})[年-](\d{1,2})(?=月|-|$)/g)]
+        .map(match => ({ year: Number(match[1]), month: Number(match[2]) })));
+    const [start, end] = periods;
+    requireThat(periods.length === 2 && start.year === doc.periodYear && end.year === doc.periodYear
+      && integer(start.month, 1, 12) && integer(end.month, 1, 12) && start.month < end.month, '累计区间缺失或无效');
+    requireThat(doc.categoryLabel.includes(`${doc.periodYear}年${start.month}—${end.month}月累计`), '累计标签与来源区间不符');
   }
   return doc;
 }
@@ -111,6 +117,7 @@ function createBundle(documents) {
   requireThat(Array.isArray(documents) && documents.length > 0 && documents.length <= 100, '资料数量无效');
   documents.forEach(validateDocument);
   requireThat(new Set(documents.map(doc => doc.sourceKey)).size === documents.length, '迁移包内来源重复');
+  requireThat(new Set(documents.map(doc => `${doc.category}|${doc.contentSha256}`)).size === documents.length, '迁移包内同类来源内容重复');
   requireThat(documents.reduce((sum, doc) => sum + doc.rowCount, 0) <= 200000, '迁移包行数超限');
   const payload = { format: FORMAT, documents: [...documents].sort((a, b) => a.sourceKey.localeCompare(b.sourceKey)) };
   return { ...payload, payloadSha256: digest(payload) };

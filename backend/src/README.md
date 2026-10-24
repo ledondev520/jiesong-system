@@ -206,3 +206,5 @@
 - `utils/purchaseExcelUpload.test.js` 不监听端口，使用真实 Multer/Busboy 和合成 multipart 流验证内存字节、扩展名、配置大小与 NUL400，确认专用模块连上传目录也不创建；不替代 HTTP 验收。
 
 财务迁移预检由 `scripts/financial-evidence-readonly.py` 使用SQLite只读URI、query_only及只读authorizer读取同一快照，`scripts/financial-evidence-readonly.js` 用内存只读Adapter生成正常目标计划；不创建Prisma写连接。隔离集成还注入DDL以验证读取连接确实拒绝写入。
+
+迁移包在访问目标前同时校验 sourceKey 与 category/contentSha256 的批内唯一性；累计期间按源范围起点的前三个物理行读取，支持表头换列及空行，不固定D2。单元与真实CLI回归覆盖合法B2期间导出和同源不同标识整批拒绝。

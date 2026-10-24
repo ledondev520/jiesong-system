@@ -35,7 +35,7 @@ test('SQLite/CLI: selected financial evidence transfers append-only with actual-
   const docs = [
     makeBook(Object.fromEntries(['资产负债表', '利润表', '现金流量表'].map(name => [name, [[name], ['合成单位', '2026-09'], ['项目', '金额'], ['合成额', 0]]]))),
     makeBook({ 科目余额表: [['科目余额表'], ['合成单位', null, null, '期间：2026年9月-2026年9月'], ['科目', '余额'], ['1001', -12.34]] }),
-    makeBook({ 明细账: [['明细账'], ['合成单位', null, null, '期间：2026年1月-2026年9月'], ['科目编码', '科目名称', '日期', '凭证号', '摘要', '借方', '贷方', '方向', '余额'], ['1001', '现金', '2026-01-02', 'TEST-1', '合成交易', 100, null, '借', 100], ['1001', '现金', '2026-09-30', 'TEST-2', '合成交易', null, 25.5, '借', 74.5]] }),
+    makeBook({ 明细账: [['明细账'], ['合成单位', '期间：2026年1月-2026年9月'], ['科目编码', '科目名称', '日期', '凭证号', '摘要', '借方', '贷方', '方向', '余额'], ['1001', '现金', '2026-01-02', 'TEST-1', '合成交易', 100, null, '借', 100], ['1001', '现金', '2026-09-30', 'TEST-2', '合成交易', null, 25.5, '借', 74.5]] }),
   ].map((buffer, index) => evidence.parseFinancialEvidenceSnapshot({ buffer, fileName: `合成${index}.xlsx` }));
   const taxDoc = () => ({
     sourceKey: 'a'.repeat(64), contentSha256: 'b'.repeat(64), parseVersion: 'manual-tax-reconciliation-v1',
@@ -114,6 +114,26 @@ print('SQLite write rejected')
     });
     assert.match(output, /SQLite write rejected/);
     assert.deepEqual(readDatabase(targetDir), targetBefore);
+  });
+
+  await t.test('same-category content duplicated under another source key is rejected before any target write', () => {
+    const canonical = value => Array.isArray(value) ? `[${value.map(canonical).join(',')}]`
+      : value && typeof value === 'object' ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
+        : JSON.stringify(value);
+    const documents = [bundle.documents[0], { ...bundle.documents[0], sourceKey: 'f'.repeat(64) }];
+    const payload = { format: bundle.format, documents };
+    const duplicateFile = save('duplicate-content.json', { ...payload,
+      payloadSha256: require('node:crypto').createHash('sha256').update(canonical(payload)).digest('hex') });
+    const duplicatePlan = path.join(root, 'duplicate-plan.json');
+    const receipt = path.join(root, 'duplicate-receipt.json');
+    const before = readDatabase(targetDir);
+    assert.notEqual(cli(targetPath, ['preview', '--bundle', duplicateFile, '--plan', duplicatePlan]).status, 0);
+    assert.notEqual(cli(targetPath, ['import', '--bundle', duplicateFile, '--plan', planFile,
+      '--backup-dir', backupDir, '--receipt', receipt, '--confirm']).status, 0);
+    assert.equal(fs.existsSync(duplicatePlan), false);
+    assert.equal(fs.existsSync(receipt), false);
+    assert.deepEqual(fs.readdirSync(backupDir), []);
+    assert.deepEqual(readDatabase(targetDir), before);
   });
 
   await t.test('confirmed import creates a verified online backup and only appends evidence, mapping monthly links to target IDs', async () => {
