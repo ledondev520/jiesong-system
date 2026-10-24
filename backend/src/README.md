@@ -2,6 +2,8 @@
 
 > 若本文件夹结构或内容变化，请更新本文件。
 
+CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportService.js` 的八类通用导出及其 system 兼容入口、操作日志、退税下载和 catalog 模板均保留原有列与数据，使用 `text/csv; charset=utf-8`。JSON 与 Excel 响应不变。
+
 `testHelpers/dashboard-source-seed.js` 与 `role-browser-dashboard.test.js` 增加当前工作台的已提交迁移/真实角色 HTTP 验收：独立 SQL 已知例题核对 KPI、原资金定义、最近六笔之外的历史风险/阻塞、已完成单排除和 PURCHASE/BOSS 实际详情200，并逐表确认业务事实不变。商品追踪仅为额外兼容 API 证据，当前页面未挂载该组件。运行与边界见 `testHelpers/README.md`；不覆盖经营执行/报表或声称浏览器通过。
 
 ## 目的

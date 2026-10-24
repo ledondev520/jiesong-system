@@ -1,6 +1,6 @@
 /**
  * Input: taxRefundService、taxRefundWorkbenchService
- * Output: 退税单 HTTP 响应
+ * Output: 退税单 HTTP 响应，CSV 下载幂等添加 UTF-8 BOM
  * Pos: 税退模块控制器，负责退税单 CRUD
  */
 
@@ -11,6 +11,7 @@ const taxRefundWorkbenchService = require('../services/taxRefundWorkbenchService
 const taxRefundShipmentService = require('../services/taxRefundShipmentService');
 const { createCrudController } = require('./shared/createCrudController');
 const { success, error } = require('../utils/response');
+const { withUtf8Bom } = require('../utils/csvExport');
 
 const controller = createCrudController({
   listMethod: (...args) => taxRefundService.listTaxRefunds(...args),
@@ -95,7 +96,7 @@ module.exports = {
         const fileName = `出口退税申报明细-${new Date().toISOString().slice(0, 10)}.csv`;
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
-        res.status(200).send(`\uFEFF${result.csv}`);
+        res.status(200).send(withUtf8Bom(result.csv));
         return;
       }
       success(res, result, '退税导出成功');

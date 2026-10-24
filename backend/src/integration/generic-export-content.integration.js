@@ -17,6 +17,7 @@ const HEADERS = {
   products: ['ID', '报关名', '描述', '规格', '单位', '分类'],
   purchases: ['合同号', '供应商', '总金额', '已付金额', '未付金额', '状态', '签订日期', '预计交货', '发票号'],
   sales: ['合同号', '总金额(USD)', '已收金额', '未收金额', '汇率', '状态', '签订日期'],
+  containers: ['货柜编号', '港口', '状态', '总箱数', '毛重', '净重', '体积', '发运日期', '预计到达', '报关公司', '是否熏蒸', '是否退税'],
   inventory: ['ID', '商品', '数量', '单位', '状态', '货柜', '入库时间', '出库时间'],
   payments: ['ID', '类型', '金额', '币种', '付款方式', '付款日期', '关联合同', '备注'],
 };
@@ -91,6 +92,8 @@ test('HTTP/SQLite: generic CSV exports retain existing fields and leave business
     });
     const bytes = Buffer.from(await response.arrayBuffer());
     assert.equal(response.status, 200, `${type} export response must succeed`);
+    assert.deepEqual([...bytes.subarray(0, 3)], [0xEF, 0xBB, 0xBF]);
+    assert.notEqual(bytes.toString('utf8')[1], '\uFEFF', 'CSV must not have a duplicate BOM');
     assert.equal(response.headers.get('content-type'), 'text/csv; charset=utf-8');
     assert.match(response.headers.get('content-disposition'), new RegExp(`^attachment; filename="${type}_\\d{4}-\\d{2}-\\d{2}\\.csv"$`));
     if (audited) auditRequests.add(requestId);
@@ -192,6 +195,10 @@ test('HTTP/SQLite: generic CSV exports retain existing fields and leave business
       [sales.contractNo, '300.75', '100.5', '200.25', '7.25', 'SHIPPED', '2026-09-30'],
       ['SYN-EXP-EMPTY', '0', '0', '0', '7', 'DRAFT', ''],
     ];
+    expectedRows.containers = [
+      [sales.contractNo, text, 'SHIPPED', '0', '0', '0', '0', '', '', '', '否', '否'],
+      ['SYN-EXP-EMPTY', '', 'DRAFT', '0', '0', '0', '0', '', '', '', '否', '否'],
+    ];
     expectedRows.inventory = [
       ['syn-inventory-a', product.customsName, '3.5', '件', 'OUTBOUND', sales.contractNo, '2026-10-01', '2026-10-02'],
       ['syn-inventory-b', product.customsName, '0', '', 'PRODUCING', '', '', ''],
@@ -230,5 +237,50 @@ test('HTTP/SQLite: generic CSV exports retain existing fields and leave business
     assert.deepEqual(snapshot(), before, 'repeated exports must preserve every non-audit table including timestamps');
     assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
     assert.equal(fs.statSync(database).mode & 0o777, 0o600);
+  });
+
+  await t.test('catalog CSV templates retain exact headers with one BOM', async () => {
+    const templates = {
+      products: ['报关名', '规格', '单位', 'HS编码', '描述'],
+      suppliers: ['名称', '简称', '联系人', '电话', '邮箱', '地址'],
+      stores: ['名称', '港口代码', '联系人', '电话', '邮箱', '地址'],
+      'opening-inventory': ['期初编号', '商品ID', '数量', '单位', '期初日期', '备注'],
+    };
+    for (const [kind, headers] of Object.entries(templates)) {
+      const response = await fetch(`${base}/import/templates/${kind}?format=csv`, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('content-type'), 'text/csv; charset=utf-8');
+      const bytes = Buffer.from(await response.arrayBuffer());
+      assert.deepEqual([...bytes.subarray(0, 3)], [0xEF, 0xBB, 0xBF]);
+      assert.notEqual(bytes.toString('utf8')[1], '\uFEFF');
+      assert.equal(bytes.toString('utf8'), `\uFEFF${headers.join(',')}\r\n`);
+    }
+  });
+
+  await t.test('tax refund CSV downloads add a BOM only when absent', async () => {
+    const service = require('../services/taxRefundExportService');
+    const csv = '合同号,商品\r\nSYN-EXP-001,"中文,商品"\r\n';
+    let result;
+    const stub = t.mock.method(service, 'exportTaxRefunds', async () => result);
+    try {
+      for (const source of [csv, `\uFEFF${csv}`]) {
+        result = { blocked: false, csv: source };
+        const response = await fetch(`${base}/tax-refunds/export?download=1`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+          body: '{}',
+        });
+        assert.equal(response.status, 200);
+        assert.equal(response.headers.get('content-type'), 'text/csv; charset=utf-8');
+        const bytes = Buffer.from(await response.arrayBuffer());
+        assert.deepEqual([...bytes.subarray(0, 3)], [0xEF, 0xBB, 0xBF]);
+        assert.equal(bytes.toString('utf8'), `\uFEFF${csv}`);
+        assert.equal(result.csv, source, 'download must preserve the service result');
+      }
+    } finally {
+      stub.mock.restore();
+    }
   });
 });
