@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync, existsSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
@@ -54,9 +54,12 @@ cat >> "$TEST_NPM_STDIN"`);
   }
   // Trace pricing backup/copies as well as git; no real checkout is mutated.
   for (const command of ['mktemp', 'cp']) {
+    // macOS keeps cp in /bin; Ubuntu usually provides it in /usr/bin.
+    const systemCommand = [`/usr/bin/${command}`, `/bin/${command}`].find(existsSync);
+    assert.ok(systemCommand, `system ${command} is required for the deployment fixture`);
     executable(path.join(bin, command), `
 printf '${command}\\n' >> "$TEST_EVENTS"
-exec /usr/bin/${command} "$@"`);
+exec "${systemCommand}" "$@"`);
   }
   executable(path.join(bin, 'sudo'), `
 case "$*" in

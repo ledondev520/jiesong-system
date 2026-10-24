@@ -9,6 +9,62 @@ const test = require('node:test');
 const XLSX = require('xlsx');
 const PDFDocument = require('pdfkit');
 
+const snapshotBuffer = (type, options = {}) => {
+  const book = XLSX.utils.book_new();
+  const period = options.period || '2026年1月-2026年9月';
+  if (type === 'ledger') {
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+      ['明细账'], ['编制单位：合成企业', null, null, `期间：${period}`],
+      ['科目编码', '科目名称', '日期', '凭证号', '摘要', '借方', '贷方', '方向', '余额'],
+      ['1001', '现金', options.date || '2026-01-02', '测试-1', '合成业务', 100, 0, '借', 100],
+      ['1001', '现金', '2026-09-30', '测试-2', '13800000000', 0, 10, '借', 90],
+    ]), '明细账');
+  } else if (type === 'balance') {
+    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+      ['科目余额表'], ['核算单位：合成企业', null, null, '期间：2026年09月-2026年09月'],
+      ['科目编码', '科目名称', '期初余额'], ['1001', '现金', 100],
+    ]), '科目余额表');
+  } else {
+    for (const name of ['资产负债表', '利润表', '现金流量表']) {
+      XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+        [name], ['企业名称：合成企业', name === '利润表' && options.conflict ? '2026-08' : '2026-09'],
+        ['项目', '金额'], ['合成值', options.amount ?? 0],
+      ]), name);
+    }
+  }
+  return XLSX.write(book, { type: 'buffer', bookType: type === 'balance' ? 'biff8' : 'xlsx' });
+};
+
+test('财务快照：累计明细账按表内完整区间保留，不冒充单月且不依赖文件名', () => {
+  const { parseFinancialEvidenceSnapshot: parse } = require('./financialEvidenceService');
+  const buffer = snapshotBuffer('ledger');
+  const doc = parse({ buffer, fileName: '合成_2026年1账期至2026年9账期_明细账.xlsx' });
+  assert.equal(doc.category, 'GENERAL_LEDGER_CUMULATIVE_SNAPSHOT');
+  assert.equal(doc.periodYear, 2026);
+  assert.equal(doc.periodMonth, null);
+  assert.match(doc.categoryLabel, /2026年1—9月累计/);
+  assert.equal(doc.rowCount, 5);
+  assert.deepEqual(JSON.parse(doc.sheets[0].rows[3].valuesJson).slice(2), ['2026-01-02', '测试-1', '合成业务', 100, 0, '借', 100]);
+  assert.equal(JSON.parse(doc.sheets[0].rows[4].valuesJson)[4], '<已脱敏>');
+  assert.equal(parse({ buffer, fileName: '改名.xlsx' }).sourceKey, doc.sourceKey);
+  assert.throws(() => parse({ buffer: snapshotBuffer('ledger', { date: '2026-10-01' }), fileName: '越界.xlsx' }), /区间/);
+  assert.throws(() => parse({ buffer: snapshotBuffer('ledger', { period: '2026年9月-2026年1月' }), fileName: '逆序.xlsx' }), /区间/);
+});
+
+test('财务快照：三张会计报表和XLS科目余额保留9月；冲突账期拒绝', () => {
+  const { parseFinancialEvidenceSnapshot: parse } = require('./financialEvidenceService');
+  const statement = parse({ buffer: snapshotBuffer('statement'), fileName: '合成会计报表.xlsx' });
+  assert.equal(statement.category, 'MONTHLY_STATEMENT_SNAPSHOT');
+  assert.equal(statement.periodMonth, 9);
+  assert.equal(statement.importedSheetCount, 3);
+  assert.equal(JSON.parse(statement.sheets[0].rows[3].valuesJson)[1], 0);
+  const balance = parse({ buffer: snapshotBuffer('balance'), fileName: '合成科目余额.xls' });
+  assert.equal(balance.category, 'ACCOUNT_BALANCE_SNAPSHOT');
+  assert.equal(balance.periodMonth, 9);
+  assert.throws(() => parse({ buffer: snapshotBuffer('statement', { conflict: true }), fileName: '冲突.xlsx' }), /账期/);
+  assert.throws(() => parse({ buffer: createPayrollBuffer(), fileName: '伪装明细账.xlsx' }), /类型/);
+});
+
 const createPayrollBuffer = () => {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([

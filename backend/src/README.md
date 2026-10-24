@@ -27,6 +27,8 @@
 
 `integration/financial-library-source-readbacks.integration.js` 通过原有本地资料库CLI干跑/确认和真实ADMIN/FINANCE认证GET，在已提交迁移、0700/0600私有SQLite中验证两份合成XLS/XLSX来源、三Sheet和61行：专用月报/未知文件跳过、重复导入零写入、原始字节的哈希/大小和来源元数据、账期关联、物理行号/空行间隙、缓存/空值/零/负数/布尔值、分页、持久化前脱敏、分类账期筛选以及其他当前角色/停用/匿名拒绝。独立只读SQL核对固定字面量和全部无关表不变；普通附件目录保持空。随 `npm run test:db` 执行，不构成浏览器或生产验收；与月度工作簿上传入口独立。
 
+`integration/financial-evidence-transfer.integration.js` 使用独立来源/目标合成SQLite与真实CLI，验证指定资料导出、目标绑定只读预检、WAL在线备份、仅新增导入与账期ID重映射。比较全部既有行及无关表，覆盖重复跳过、内容冲突、过期/错误目标计划、备份拒绝、晚期回滚、篡改包、文件权限与不存在的目标库。操作说明见 `docs/operations/financial-evidence-transfer.md`；不执行SSH或发布。
+
 | 文件/目录 | 地位 | 功能 |
 |-----------|------|------|
 | app.js | 入口 | Express 应用初始化和启动（含定时任务启动） |
@@ -84,7 +86,8 @@
 | invoiceRecordService.js | 发票分页、筛选后有效/红冲分类统计、销方汇总及完整发票号码批量精确查询 |
 | invoiceVerificationService.js | 出口退税候选发票的销方、价税合计、品名、状态只读一致性核验 |
 | financialStatementsService.js | 会计报表数字公式缓存/既有空值兼容与明确错误指引、科目余额/明细账同账期校验，单事务写入与下钻查询 |
-| financialEvidenceService.js | 工资、税务、凭证与日记账等资料的分类、脱敏、幂等导入与受限查询 |
+| financialEvidenceService.js | 财务资料分类、脱敏与受限查询；普通幂等导入与单月/累计报表快照仅新增留存分离，快照不替换已有账期 |
+| financialEvidenceTransferService.js | 指定资料的版本化跨机迁移包、完整性及目标预检、冲突拒绝与事务内仅新增回读；由 financial-evidence-transfer.js 强制私有文件及实际SQLite在线备份 |
 | ai/contextService.js | 按当前销售合同港口关联构造美元上下文；局部查询失败保留其他资料并提示不可用，解析汇率后继续拼接财务概况 |
 | aiService.js | DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量 |
 | anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |
@@ -201,3 +204,7 @@
 - `services/purchaseImportExportService.test.js` 使用内存合成工作簿保持原断言，并验证路径/编码/NUL/磁盘对象输入400、零文件读取及零数据库访问。
 - `routes/purchases.import-upload.test.js` 验证 XLS/XLSX、穿越形标签、大小/扩展名及先鉴权后解析；对采购导入、dataImport、system/import 和 files.js 磁盘附件四类真实 localhost HTTP 入口发送 NUL multipart，均400且临时沙箱无文件残留。`routes/system.import-upload.test.js` 同步加强 NUL 状态为严格400。
 - `utils/purchaseExcelUpload.test.js` 不监听端口，使用真实 Multer/Busboy 和合成 multipart 流验证内存字节、扩展名、配置大小与 NUL400，确认专用模块连上传目录也不创建；不替代 HTTP 验收。
+
+财务迁移预检由 `scripts/financial-evidence-readonly.py` 使用SQLite只读URI、query_only及只读authorizer读取同一快照，`scripts/financial-evidence-readonly.js` 用内存只读Adapter生成正常目标计划；不创建Prisma写连接。隔离集成还注入DDL以验证读取连接确实拒绝写入。
+
+迁移包在访问目标前同时校验 sourceKey 与 category/contentSha256 的批内唯一性；累计期间按源范围起点的前三个物理行读取，支持表头换列及空行，不固定D2。单元与真实CLI回归覆盖合法B2期间导出和同源不同标识整批拒绝。
