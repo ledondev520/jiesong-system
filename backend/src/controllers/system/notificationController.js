@@ -1,6 +1,6 @@
 /**
  * Input: authenticated notification/application-audit queries and Prisma SQLite
- * Output: own notifications, ADMIN application-audit lists and CSV content
+ * Output: own notifications, ADMIN application-audit lists and UTF-8 BOM CSV content
  * Pos: system notification and audit-read controller; query/export share the same filters
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -9,6 +9,7 @@ const prisma = require('../../utils/prisma');
 const { success, paginated } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
 const { normalizePagination } = require('../../utils/pagination');
+const { withUtf8Bom } = require('../../utils/csvExport');
 
 const parseOptionalText = (value) => {
   if (value === undefined || value === null) {
@@ -228,7 +229,7 @@ const exportOperationLogsCsv = async (req, res, next) => {
       take: limit,
     });
 
-    const csv = `\uFEFF${buildOperationLogCsv(logs)}`;
+    const csv = withUtf8Bom(buildOperationLogCsv(logs));
     const now = new Date().toISOString().replace(/[:]/g, '-');
     const filename = `operation_logs_${now}.csv`;
 

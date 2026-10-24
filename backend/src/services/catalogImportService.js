@@ -1,10 +1,11 @@
 /**
  * Input: ADMIN CSV/xlsx catalog or opening-balance uploads
- * Output: read-only validation previews or atomic insert-only imports
+ * Output: BOM-prefixed CSV templates, read-only previews or atomic insert-only imports
  * Pos: migration boundary; opening stock never fabricates purchase/inspection evidence
  */
 const ExcelJS = require('exceljs');
 const Papa = require('papaparse');
+const { withUtf8Bom } = require('../utils/csvExport');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { parseTabularFile } = require('../utils/tabularImport');
@@ -39,7 +40,7 @@ async function template(kind, format = 'xlsx') {
   const spec = definition(kind);
   if (!['csv', 'xlsx'].includes(format)) throw createError('模板格式只支持 csv 或 xlsx', 400);
   const headers = Object.keys(spec.fields);
-  if (format === 'csv') return Buffer.from('\uFEFF' + Papa.unparse([headers]) + '\r\n');
+  if (format === 'csv') return Buffer.from(withUtf8Bom(Papa.unparse([headers]) + '\r\n'));
   const book = new ExcelJS.Workbook();
   const sheet = book.addWorksheet(spec.label);
   sheet.addRow(headers);
