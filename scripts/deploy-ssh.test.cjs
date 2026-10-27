@@ -139,7 +139,7 @@ test('a failing verifier fails the SSH step even when npm reads stdin', t => {
 });
 
 test('a missing dedicated runtime fails before npm', t => {
-  const result = runDeployment(t, { missingRuntime: true, missingGuard: true });
+  const result = runDeployment(t, { missingRuntime: true });
   assert.notEqual(result.status, 0, result.stderr);
   assert.match(result.stderr, /NODE_RUNTIME\/bin\/node is missing or not executable/);
   assert.ok(!result.events.includes('npm'));
@@ -155,7 +155,7 @@ test('a failing nginx config test fails the SSH step before reload and verificat
 });
 
 test('a missing runtime aborts before git or any pricing backup/change', t => {
-  const result = runDeployment(t, { missingRuntime: true, missingGuard: true });
+  const result = runDeployment(t, { missingRuntime: true });
   assert.notEqual(result.status, 0, result.stderr);
   assert.match(result.stderr, /NODE_RUNTIME\/bin\/node is missing or not executable/);
   assert.ok(!result.events.includes('git'), 'no git command may run before runtime validation');
@@ -169,4 +169,22 @@ test('target-commit guard deploys successfully when the old server checkout has 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.events[0], 'runtime-check');
   assert.equal(result.events.at(-1), 'verifier');
+});
+
+test('a missing dedicated runtime fails before npm when the server checkout has no guard', t => {
+  const result = runDeployment(t, { missingRuntime: true, missingGuard: true });
+  assert.notEqual(result.status, 0, result.stderr);
+  assert.match(result.stderr, /NODE_RUNTIME\/bin\/node is missing or not executable/);
+  assert.ok(!result.events.includes('npm'));
+  assert.ok(!result.events.includes('verifier'));
+});
+
+test('a missing runtime aborts before git or any pricing backup/change when the server checkout has no guard', t => {
+  const result = runDeployment(t, { missingRuntime: true, missingGuard: true });
+  assert.notEqual(result.status, 0, result.stderr);
+  assert.match(result.stderr, /NODE_RUNTIME\/bin\/node is missing or not executable/);
+  assert.ok(!result.events.includes('git'), 'no git command may run before runtime validation');
+  assert.ok(!result.events.includes('mktemp'), 'pricing backup must not be created');
+  assert.ok(!result.events.includes('cp'), 'pricing must not be copied or restored');
+  assert.equal(readFileSync(path.join(result.root, 'checkout/config/pricing.json'), 'utf8'), result.pricing);
 });
