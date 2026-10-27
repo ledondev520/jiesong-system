@@ -117,8 +117,11 @@ jobs:
         run: |
           # Only base64 alphabet enters the remote command; decoded values stay quoted data.
           encode() { printf '%s' "$1" | base64 -w0; }
+          # actions/checkout contains DEPLOY_SHA; do not depend on the server's old tree.
+          GUARD_BASE64=$(base64 -w0 < scripts/require-node-runtime.sh)
+          test -n "$GUARD_BASE64"
           ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
-            "bash -s -- $(encode "$NODE_RUNTIME") $(encode "$DEPLOY_REF") $(encode "$DEPLOY_SHA") $(encode "$PRODUCTION_URL")" <<'REMOTE'
+            "bash -s -- $(encode "$NODE_RUNTIME") $(encode "$DEPLOY_REF") $(encode "$DEPLOY_SHA") $(encode "$PRODUCTION_URL") $GUARD_BASE64" <<'REMOTE'
             # Children must not read the bash -s program stream.
             {
               set -eu
@@ -127,8 +130,10 @@ jobs:
               DEPLOY_SHA=$(printf '%s' "$3" | base64 --decode)
               PRODUCTION_URL=$(printf '%s' "$4" | base64 --decode)
               cd /opt/jiesong-system || exit 1
-              # The guard must already exist in this checkout; fail before backup or git mutation.
-              . scripts/require-node-runtime.sh
+              # Source target-commit bytes through a data pipe, never eval remote arguments.
+              GUARD_SCRIPT=$(printf '%s' "$5" | base64 --decode)
+              test -n "$GUARD_SCRIPT"
+              . <(printf '%s' "$GUARD_SCRIPT")
               PRICING_BACKUP=""
               if [ -f config/pricing.json ]; then
                 PRICING_BACKUP="$(mktemp)"

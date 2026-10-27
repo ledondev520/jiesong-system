@@ -16,6 +16,21 @@ def read_snapshot(database, selection):
     source = source.resolve(strict=True)
     if not isinstance(selection, list) or not 0 < len(selection) <= 100:
         raise ValueError("explicit bounded selection required")
+    # Never use immutable=1: live committed WAL pages must participate in the snapshot.
+    # mode=ro can create WAL coordination files. Refuse a dormant WAL database
+    # rather than creating them merely for a preview. Trusted operators must not
+    # concurrently remove/replace sidecars (SQLite may recreate them in that race).
+    with source.open("rb") as handle:
+        header = handle.read(100)
+    if len(header) != 100 or header[:16] != b"SQLite format 3\0":
+        raise ValueError("SQLite header required")
+    if header[18:20] == b"\x02\x02":
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(str(source) + suffix).lstat()
+            if not stat.S_ISREG(sidecar.st_mode) or sidecar.st_nlink != 1 or sidecar.st_mode & 0o077:
+                raise ValueError("existing private WAL coordination files required")
+    elif header[18:20] != b"\x01\x01":
+        raise ValueError("unsupported journal mode")
     connection = sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=15)
     connection.row_factory = sqlite3.Row
     try:
