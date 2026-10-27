@@ -16,6 +16,10 @@ Git 构建目录为 `/opt/jiesong-system`。PM2 的 `jiesong-backend` 和 `jieso
 
 GitHub Actions 在 `sudo nginx -t` 成功并重载 Nginx 后才调用此检查；配置测试失败会显式以非零退出，跳过重载和发布验证。
 
+手动部署使用 `gh workflow run deploy.yml --ref main -f environment=production`；必须指定 `--ref main`，因为远端脚本执行 `git checkout <ref>`，使用其他分支会切换到该分支。服务器必须预装 `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64` 专用运行时目录；#104 解决了运行时守卫来源问题，不负责安装运行时。
+
+生产回滚见 [VPS 生产回滚手册](docs/operations/production-rollback.md)。
+
 以下保留其他部署方案供参考。
 
 ## 方案概览
@@ -207,6 +211,7 @@ A: 迁移脚本使用 `skipDuplicates: true`，如果遇到冲突会跳过。迁
 ### Q: 如何回滚？
 
 A: 
+- **VPS 生产**：[VPS 生产回滚手册](docs/operations/production-rollback.md)。
 - **Render**: Dashboard → Manual Deploy → 选择之前的部署
 - **Fly.io**: `flyctl releases list` + `flyctl releases rollback <version>`
 - **Vercel**: Dashboard → Deployments → 选择之前的部署

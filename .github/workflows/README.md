@@ -71,6 +71,8 @@ CLI 分页获取全部 issue 评论、读取实时 PR head 和 base 分支 tip�
 
 进入 Actions 标签页，选择工作流，点击 "Run workflow"。
 
+生产手动部署使用 `gh workflow run deploy.yml --ref main -f environment=production`。必须指定 `--ref main`：远端脚本执行 `git checkout <ref>`，其他分支会使服务器切换到该分支。生产回滚及回滚后再部署见 [VPS 生产回滚手册](../../docs/operations/production-rollback.md)。
+
 ### 本地测试
 
 ```bash
