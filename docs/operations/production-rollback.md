@@ -8,8 +8,10 @@
 set -euo pipefail
 NODE_RUNTIME=/opt/jiesong_system/runtime/node-v22.23.4-linux-x64
 export PATH="$NODE_RUNTIME/bin:$PATH"
-test "$(command -v node)" = "$NODE_RUNTIME/bin/node"
-test "$(node -v)" = v22.23.4
+NODE_BIN=$(command -v node)
+test "$NODE_BIN" = "$NODE_RUNTIME/bin/node"
+NODE_VERSION=$(node -v)
+test "$NODE_VERSION" = v22.23.4
 umask 077
 CODE=/opt/jiesong-system
 TS=$(date +%Y%m%d-%H%M%S)
@@ -18,7 +20,8 @@ test -d "$B"
 test -f "$B/code-HEAD.txt"
 OLD=$(cat "$B/code-HEAD.txt")
 [[ "$OLD" =~ ^[[:xdigit:]]{40}$ ]]
-test "$(cat "$B/code-HEAD.txt")" = "$OLD"
+BACKUP_HEAD=$(cat "$B/code-HEAD.txt")
+test "$BACKUP_HEAD" = "$OLD"
 DB=/opt/jiesong_system/current/backend/prisma/dev.db
 : "${PRODUCTION_URL:?请设置生产 HTTPS 入口}"
 : "${UPLOAD_DIR:?请填写实际附件目录的绝对路径}"
@@ -87,7 +90,8 @@ find "$RECEIPT_DIR" -type f -print > "$B/financial-receipts-$TS"
 ```bash
 RESTORE_DB=yes
 pm2 stop "$BACKEND_NAME"
-test "$(pm2 jlist | node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>{const p=JSON.parse(s).filter(x=>x.name===process.argv[1]);if(p.length!==1)process.exit(1);process.stdout.write(p[0].pm2_env.status)})' "$BACKEND_NAME")" = stopped
+BACKEND_STATUS=$(pm2 jlist | node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>{const p=JSON.parse(s).filter(x=>x.name===process.argv[1]);if(p.length!==1)process.exit(1);process.stdout.write(p[0].pm2_env.status)})' "$BACKEND_NAME")
+test "$BACKEND_STATUS" = stopped
 DB_OWNER=$(stat -c '%u:%g' "$DB")
 DB_SAVED="$B/dev.db.pre-rollback-$TS"
 for suffix in '' -journal -wal -shm; do
@@ -98,13 +102,16 @@ for suffix in '' -journal -wal -shm; do
     chmod 600 "$DB_SAVED$suffix"
   fi
 done
-test "$(sqlite3 -readonly "$B/dev.db" "$SQL_INTEGRITY")" = ok
+BACKUP_INTEGRITY=$(sqlite3 -readonly "$B/dev.db" "$SQL_INTEGRITY")
+test "$BACKUP_INTEGRITY" = ok
 cp -p "$B/dev.db" "$DB"
 rm -f "$DB-journal" "$DB-wal" "$DB-shm"
 chown "$DB_OWNER" "$DB"
 chmod 600 "$DB"
-test "$(stat -c '%u:%g' "$DB")" = "$DB_OWNER"
-test "$(sqlite3 -readonly "$DB" "$SQL_INTEGRITY")" = ok
+RESTORED_DB_OWNER=$(stat -c '%u:%g' "$DB")
+test "$RESTORED_DB_OWNER" = "$DB_OWNER"
+DB_INTEGRITY=$(sqlite3 -readonly "$DB" "$SQL_INTEGRITY")
+test "$DB_INTEGRITY" = ok
 ```
 
 这是**停机后离线替换**，与仓库规则中的“禁止覆盖在线库、不要把旧 WAL/SHM 套到恢复文件上”一致。保存的整组旧文件只用于进一步故障回退，不能混用到恢复库上；移除的是目标路径残留的旧 sidecar。任何一步失败都保持停止，先核查备份与身份，不继续启动。常规恢复到新路径的流程见 [SQLite 备份与恢复](sqlite-backup-restore.md)。
@@ -123,13 +130,17 @@ if ! cmp -s "$ENV_FILE" "$B/backend.env"; then
   cp -p "$B/backend.env" "$ENV_FILE"
 fi
 chmod 600 "$ENV_FILE"
-cd "$CODE/backend" && npm ci --omit=dev && npx prisma generate
-cd "$CODE/frontend" && npm ci && npm run build
+cd "$CODE/backend"
+npm ci --omit=dev
+npx prisma generate
+cd "$CODE/frontend"
+npm ci
+npm run build
 ```
 
 这会把服务器本地 main 分支拨回 `$OLD`。下次部署时 `deploy.yml` 执行 `git checkout <ref>` 和 `git reset --hard <DEPLOY_SHA>`，会拨到新版本，不需额外恢复分支。不使用 `checkout --detach`：它会让 main 留在新版本而 HEAD 游离，且定价文件有差异时切换还可能被拒绝。其他本地改动必须提前审阅并私下保存，`reset --hard` 会丢弃受跟踪文件的未提交修改。
 
-依赖安装不用 `--production`，新版 npm 已改名，会警告；使用 `--omit=dev`。如果服务器 npm 是 11+，默认跳过部分依赖的安装脚本，随后单独运行的 `prisma generate` 覆盖 Prisma 生成，不影响此流程；仍需确认应用没有其他必需安装脚本被跳过。`deploy.yml` / `deploy.sh` 中仍使用 `--production`，属于代码改动，另开 PR 处理，本手册不修改它们。
+依赖安装不用 `--production`，新版 npm 已改名，会警告；使用 `--omit=dev`。新版 npm 可能默认跳过部分依赖的安装脚本；回滚前在服务器上核对 npm 版本和安装输出，若有安装脚本被跳过，确认 Prisma 已由随后单独的 `prisma generate` 生成、其他依赖可用，不能确认时停止回滚并报告。`deploy.yml` / `deploy.sh` 中仍使用 `--production`，属于代码改动，另开 PR 处理，本手册不修改它们。
 
 ## 重启并保存进程状态
 
@@ -150,7 +161,8 @@ pm2 save
 - HEAD 等于 `$OLD`；两个 PM2 进程 online，cwd 分别为 `$CODE/backend`、`$CODE/frontend`，`unstable_restarts=0`。观察几分钟，累计重启数也不再增加。只投影必要字段，不输出原始 `pm2 jlist`。
 
 ```bash
-test "$(git -C "$CODE" rev-parse HEAD)" = "$OLD"
+CURRENT_HEAD=$(git -C "$CODE" rev-parse HEAD)
+test "$CURRENT_HEAD" = "$OLD"
 pm2_snapshot() {
   pm2 jlist | node -e 'let s="";process.stdin.on("data",x=>s+=x);process.stdin.on("end",()=>{const all=JSON.parse(s);const names=process.argv.slice(2);const result=names.map((name,i)=>{const matches=all.filter(x=>x.name===name);if(matches.length!==1)throw Error("process count");const p=matches[0],e=p.pm2_env;if(e.status!=="online"||e.pm_cwd!==process.argv[1]+["/backend","/frontend"][i]||e.unstable_restarts!==0)throw Error("process state");return {name,status:e.status,cwd:e.pm_cwd,unstable_restarts:e.unstable_restarts,restarts:e.restart_time};});process.stdout.write(JSON.stringify(result)+"\n")})' "$CODE" "$BACKEND_NAME" "$FRONTEND_NAME"
 }
@@ -163,9 +175,13 @@ cmp -s "$B/pm2.before-$TS" "$B/pm2.after-$TS"
 - 数据库 `quick_check` 为 ok，`_prisma_migrations` 数量与备份一致。不恢复 DB 也要检查；若迁移数量不同，不能宣布成功，应重新评估兼容性。
 
 ```bash
-test "$(sqlite3 -readonly "$DB" "$SQL_QUICK")" = ok
-test "$(sqlite3 -readonly "$B/dev.db" "$SQL_MIGRATIONS")" = \
-     "$(sqlite3 -readonly "$DB" "$SQL_MIGRATIONS")"
+DB_QUICK=$(sqlite3 -readonly "$DB" "$SQL_QUICK")
+test "$DB_QUICK" = ok
+BACKUP_MIGRATIONS=$(sqlite3 -readonly "$B/dev.db" "$SQL_MIGRATIONS")
+CURRENT_MIGRATIONS=$(sqlite3 -readonly "$DB" "$SQL_MIGRATIONS")
+[[ "$BACKUP_MIGRATIONS" =~ ^[0-9]+$ ]]
+[[ "$CURRENT_MIGRATIONS" =~ ^[0-9]+$ ]]
+test "$BACKUP_MIGRATIONS" = "$CURRENT_MIGRATIONS"
 ```
 
 - **恢复了 DB 时，关键表行数必须等于备份库行数**，不能只验证非零。先查看目标版本 `backend/prisma/schema.prisma` 的 `@@map` 确认实际表名：本手册编写时 User、Product、SalesContract、PurchaseContract 分别映射为 `users`、`products`、`sales_contracts`、`purchase_contracts`；目标版本映射不同时先调整 `TABLES`。以下分别对备份与恢复库 count 后比对，业务验收再核查关键记录。
@@ -177,6 +193,8 @@ if [ "$RESTORE_DB" = yes ]; then
     COUNT_SQL="SELECT COUNT(*) FROM \"$table\";"
     BACKUP_COUNT=$(sqlite3 -readonly "$B/dev.db" "$COUNT_SQL")
     CURRENT_COUNT=$(sqlite3 -readonly "$DB" "$COUNT_SQL")
+    [[ "$BACKUP_COUNT" =~ ^[0-9]+$ ]]
+    [[ "$CURRENT_COUNT" =~ ^[0-9]+$ ]]
     printf '%s backup=%s restored=%s\n' "$table" "$BACKUP_COUNT" "$CURRENT_COUNT"
     test "$BACKUP_COUNT" = "$CURRENT_COUNT"
   done
@@ -186,12 +204,16 @@ fi
 - 定价 SHA-256 等于所选权威版；环境文件与部署前备份一致。健康检查 HTTP 200 且 JSON `status` 为 `ok`；公网首页 200，未登录 API 401。下列 `localhost` 指向本机回环接口。
 
 ```bash
-test "$(sha256sum "$PRICING" | cut -d ' ' -f 1)" = "$PRICING_SHA"
+CURRENT_PRICING_SHA=$(sha256sum "$PRICING" | cut -d ' ' -f 1)
+test "$CURRENT_PRICING_SHA" = "$PRICING_SHA"
 cmp -s "$ENV_FILE" "$B/backend.env"
-test "$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTH_URL")" = 200
+HEALTH_HTTP=$(curl -sS -o /dev/null -w '%{http_code}' "$HEALTH_URL")
+test "$HEALTH_HTTP" = 200
 curl -fsS "$HEALTH_URL" | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"] == "ok"'
-test "$(curl -sS -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/")" = 200
-test "$(curl -sS -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/api/v1/products")" = 401
+HOME_HTTP=$(curl -sS -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/")
+test "$HOME_HTTP" = 200
+PRODUCTS_HTTP=$(curl -sS -o /dev/null -w '%{http_code}' "$PRODUCTION_URL/api/v1/products")
+test "$PRODUCTS_HTTP" = 401
 if [ -f "$VERIFY" ]; then
   node "$VERIFY" "$PRODUCTION_URL"
 fi
@@ -203,7 +225,8 @@ fi
 ```bash
 : "${CSV_FILE:?请设置用于验收的合成数据导出文件}"
 : "${EXPECTED_CSV_PREFIX:?请设置旧版本预期前三字节的十六进制值}"
-test "$(head -c 3 "$CSV_FILE" | xxd -p)" = "$EXPECTED_CSV_PREFIX"
+CSV_PREFIX=$(head -c 3 "$CSV_FILE" | xxd -p)
+test "$CSV_PREFIX" = "$EXPECTED_CSV_PREFIX"
 ```
 
 - 回滚不触碰 `UPLOAD_DIR`；文件数和总字节数前后不变。保持业务写入隔离到核验结束，排除并发上传影响。
@@ -220,23 +243,34 @@ cmp -s "$B/uploads.before-$TS" "$B/uploads.after-$TS"
 
 ```bash
 SYSTEM_NODE=/usr/bin/node
-[[ "$("$SYSTEM_NODE" -v)" == v20.* ]]
-pm2 delete "$BACKEND_NAME" "$FRONTEND_NAME" && pm2 start "$NODE20_ECOSYSTEM" && pm2 save
+SYSTEM_NODE_VERSION=$("$SYSTEM_NODE" -v)
+[[ "$SYSTEM_NODE_VERSION" == v20.* ]]
+pm2 delete "$BACKEND_NAME" "$FRONTEND_NAME"
+pm2 start "$NODE20_ECOSYSTEM"
+pm2 save
 for process_name in "$BACKEND_NAME" "$FRONTEND_NAME"; do
   PROCESS_PID=$(pm2 pid "$process_name")
+  [[ "$PROCESS_PID" =~ ^[0-9]+$ ]]
   test "$PROCESS_PID" -gt 0
-  test "$(readlink -f "/proc/$PROCESS_PID/exe")" = "$(readlink -f "$SYSTEM_NODE")"
+  PROCESS_EXE=$(readlink -f "/proc/$PROCESS_PID/exe")
+  EXPECTED_EXE=$(readlink -f "$SYSTEM_NODE")
+  test "$PROCESS_EXE" = "$EXPECTED_EXE"
 done
 ```
 
 `SYSTEM_NODE` 须核实为服务器系统 Node 的实际路径，确认它是 Node 20，并重新执行全部验收。回退 Node 20 后，下次部署的 `pm2 restart` **不会自动换回 Node 22**。须按 runtime 目录内经核实的 Node 22 ecosystem 重新 start，并确认两个进程的实际可执行文件等于 `$NODE_RUNTIME/bin/node`，再执行全部验收。
 
 ```bash
-pm2 delete "$BACKEND_NAME" "$FRONTEND_NAME" && pm2 start "$NODE22_ECOSYSTEM" && pm2 save
+pm2 delete "$BACKEND_NAME" "$FRONTEND_NAME"
+pm2 start "$NODE22_ECOSYSTEM"
+pm2 save
 for process_name in "$BACKEND_NAME" "$FRONTEND_NAME"; do
   PROCESS_PID=$(pm2 pid "$process_name")
+  [[ "$PROCESS_PID" =~ ^[0-9]+$ ]]
   test "$PROCESS_PID" -gt 0
-  test "$(readlink -f "/proc/$PROCESS_PID/exe")" = "$(readlink -f "$NODE_RUNTIME/bin/node")"
+  PROCESS_EXE=$(readlink -f "/proc/$PROCESS_PID/exe")
+  EXPECTED_EXE=$(readlink -f "$NODE_RUNTIME/bin/node")
+  test "$PROCESS_EXE" = "$EXPECTED_EXE"
 done
 ```
 
