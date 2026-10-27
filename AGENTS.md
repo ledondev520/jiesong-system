@@ -125,6 +125,7 @@
 - `backend/src/utils/inventoryStateMachine.js` 拒绝手工修改采购/验货来源库存；普通、批量及 AI 确认执行均重新检查来源与当前状态。相同状态不改入出库时间；库存页面隐藏业务来源记录的重复手工流转入口。
 
 ## VPS 运行目录与发布验证
+- VPS 生产回滚与验收见 [生产回滚手册](docs/operations/production-rollback.md)。
 - `celerada.link` 的 PM2 进程 `jiesong-backend`、`jiesong-frontend` 必须分别运行 `/opt/jiesong-system/backend`、`/opt/jiesong-system/frontend`，与 Git 部署构建目录一致；仅重启旧发布目录不算发布成功。
 - `.github/workflows/deploy.yml` 从 runner 的目标提交检出读取运行时守卫，以 base64 参数传到远端、解码后 source，在定价配置备份及任何 Git 命令前校验；不依赖服务器旧检出，runner 守卫缺失或运行时不合格均立即失败；使用触发提交 SHA。`sudo nginx -t` 失败显式非零退出，不执行重载或发布验证；发布末尾运行 `scripts/verify-vps-runtime.cjs` 校验 PM2 目录、后端健康、公网 BUILD_ID 和未登录 API 的 401。
 - `.github/workflows/deploy.yml` 的 SSH 远端脚本整体以 `{ ...; } </dev/null` 执行，防止子命令读取 `bash -s` 的脚本流并跳过发布验证；`scripts/deploy-ssh.test.cjs` 在 pre-deploy 中使用实际 run 块和本地 SSH/命令桩回归验证。
