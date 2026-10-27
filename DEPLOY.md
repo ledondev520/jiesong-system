@@ -6,7 +6,7 @@
 
 Git 构建目录为 `/opt/jiesong-system`。PM2 的 `jiesong-backend` 和 `jiesong-frontend` 必须分别使用该目录内的 `backend`、`frontend`，不能继续指向 `/opt/jiesong_system/releases/` 中的旧代码。PM2 重启不会自动纠正旧脚本路径；首次切换需要备份配置、使用正确路径重新创建这两个进程，并保留回滚配置。
 
-服务器 Node.js 基线为 **>=22.23.4**，生产 PM2 已使用 `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64`。SSH 部署及 `deploy.sh` 共用 `scripts/require-node-runtime.sh`，在 npm/npx、Prisma、构建和部署验证前将 `NODE_RUNTIME/bin` 放在 PATH 首位，并校验 node 可执行、`command -v node` 与指定路径一致及版本达标；失败立即退出，不回退系统 Node。SSH 部署从当前检出加载守卫，在定价配置备份和任何 Git 命令前完成运行时校验；守卫缺失同样立即失败，不能先更新代码再寻找守卫。专用运行时须提前安装；`deploy.sh` 不再安装系统 Node。
+服务器 Node.js 基线为 **>=22.23.4**，生产 PM2 已使用 `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64`。SSH 部署及 `deploy.sh` 共用 `scripts/require-node-runtime.sh`，在 npm/npx、Prisma、构建和部署验证前将 `NODE_RUNTIME/bin` 放在 PATH 首位，并校验 node 可执行、`command -v node` 与指定路径一致及版本达标；失败立即退出，不回退系统 Node。SSH 部署从 runner 的目标提交（DEPLOY_SHA）检出读取守卫，以仅含 base64 字母表的参数传到远端，解码后 source，在定价配置备份和任何 Git 命令前完成运行时校验，不依赖服务器旧检出是否含守卫。runner 缺少/无法读取守卫立即失败。手动 deploy.sh 仍从自身目录加载守卫。专用运行时须提前安装；`deploy.sh` 不再安装系统 Node。
 
 `NODE_RUNTIME` 默认使用上述目录；Actions 可通过仓库变量 `NODE_RUNTIME` 覆盖，手动执行 `deploy.sh` 时通过环境变量传入。值须为不含冒号的绝对目录；SSH 以编码参数传递后作为引用数据读取，不拼接为可执行代码。手动运行 `scripts/verify-vps-runtime.cjs` 前也应先在仓库根目录执行 `. scripts/require-node-runtime.sh`。
 

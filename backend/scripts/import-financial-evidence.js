@@ -2,17 +2,13 @@
 /**
  * Input: 已解压财务资料目录，可选 --confirm
  * Output: 只读预检摘要，或脱敏结构化资料的幂等导入计数
- * Pos: 财务资料库本地导入 Adapter；不复制原文件、不输出工作簿行值或文件名
+ * Pos: 财务资料库本地导入 Adapter；共享检查先拒绝不存在/非私有目标，不复制原文件、不输出工作簿行值或文件名
  */
 
 const fs = require('fs');
 const path = require('path');
-const prisma = require('../src/utils/prisma');
-const {
-  classifyFinancialEvidenceFile,
-  parseFinancialEvidenceSource,
-  importFinancialEvidenceDocuments,
-} = require('../src/services/financialEvidenceService');
+let prisma;
+const { configuredDatabase } = require('./financial-sqlite-safety');
 
 function findWorkbookPaths(rootDir) {
   const entries = fs.readdirSync(rootDir, { withFileTypes: true });
@@ -24,6 +20,7 @@ function findWorkbookPaths(rootDir) {
 }
 
 function prepareDocuments(rootDir) {
+  const { classifyFinancialEvidenceFile, parseFinancialEvidenceSource } = require('../src/services/financialEvidenceService');
   const workbooks = findWorkbookPaths(rootDir);
   const ignored = { handledElsewhere: 0, unsupported: 0 };
   const documents = [];
@@ -75,21 +72,26 @@ async function main() {
   const rootDir = path.resolve(rootArg);
   if (!fs.statSync(rootDir).isDirectory()) throw new Error('输入路径不是目录');
 
+  // Load backend/.env before resolving SQLite; retain config's NODE_ENV/explicit strict-permission policy.
+  require('../src/config');
+  configuredDatabase();
   // 全部工作簿先完成解析和脱敏，任何一个失败都不会进入写库阶段。
   const { workbooks, documents, ignored } = prepareDocuments(rootDir);
   console.log(JSON.stringify({ mode: confirm ? 'confirm' : 'dry-run', ...summarize(documents, workbooks.length, ignored) }, null, 2));
   if (!confirm) return;
+  const { importFinancialEvidenceDocuments } = require('../src/services/financialEvidenceService');
+  prisma = require('../src/utils/prisma');
   const result = await importFinancialEvidenceDocuments(documents);
   console.log(JSON.stringify({ imported: result.imported, replaced: result.replaced, skipped: result.skipped }, null, 2));
 }
 
 if (require.main === module) {
   main()
-    .catch((error) => {
-      console.error(`[financial-evidence-import] ${error.message}`);
+    .catch(() => {
+      console.error('[financial-evidence-import] 导入失败：请核对现有私有数据库、参数及工作簿格式。');
       process.exitCode = 1;
     })
-    .finally(() => prisma.$disconnect());
+    .finally(() => prisma?.$disconnect());
 }
 
 module.exports = { findWorkbookPaths, prepareDocuments, summarize };

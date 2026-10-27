@@ -12,7 +12,7 @@ const step = workflow.match(/^      - name: Deploy to Production via SSH\n[\s\S]
 assert.ok(step, 'cannot extract the production SSH run block');
 const runBlock = step[1].replace(/^          /gm, '');
 
-function runDeployment(t, { missingRuntime = false, nginxTestStatus = 0, verifierStatus = 0 } = {}) {
+function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxTestStatus = 0, verifierStatus = 0 } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'deploy-ssh-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const checkout = path.join(root, 'checkout');
@@ -25,7 +25,9 @@ function runDeployment(t, { missingRuntime = false, nginxTestStatus = 0, verifie
   const pricing = '{"syntheticRuntimePricing":true}\n';
   writeFileSync(path.join(checkout, 'config/pricing.json'), pricing, { mode: 0o600 });
   writeFileSync(path.join(root, 'events'), '');
-  copyFileSync(path.join(repo, 'scripts/require-node-runtime.sh'), path.join(checkout, 'scripts/require-node-runtime.sh'));
+  mkdirSync(path.join(root, 'scripts'), { mode: 0o700 });
+  copyFileSync(path.join(repo, 'scripts/require-node-runtime.sh'), path.join(root, 'scripts/require-node-runtime.sh'));
+  if (!missingGuard) copyFileSync(path.join(repo, 'scripts/require-node-runtime.sh'), path.join(checkout, 'scripts/require-node-runtime.sh'));
   const executable = (filename, body) => writeFileSync(filename, `#!/bin/bash\nset -eu\n${body}\n`, { mode: 0o700 });
 
   // Map only the production checkout path; execute the extracted source unchanged.
@@ -43,7 +45,7 @@ test "$#" -eq 4
 test "$1" = -p
 test "$2" = 2222
 test "$3" = deploy@example.invalid
-[[ "$4" =~ ^bash\\ -s\\ --(\\ [A-Za-z0-9+/=]+){4}$ ]]
+[[ "$4" =~ ^bash\\ -s\\ --(\\ [A-Za-z0-9+/=]+){5}$ ]]
 # Like SSH, evaluate the remote command while preserving its script stdin.
 exec /bin/bash -c "$4"`);
   executable(path.join(bin, 'npm'), `
@@ -154,6 +156,31 @@ test('a failing nginx config test fails the SSH step before reload and verificat
 
 test('a missing runtime aborts before git or any pricing backup/change', t => {
   const result = runDeployment(t, { missingRuntime: true });
+  assert.notEqual(result.status, 0, result.stderr);
+  assert.match(result.stderr, /NODE_RUNTIME\/bin\/node is missing or not executable/);
+  assert.ok(!result.events.includes('git'), 'no git command may run before runtime validation');
+  assert.ok(!result.events.includes('mktemp'), 'pricing backup must not be created');
+  assert.ok(!result.events.includes('cp'), 'pricing must not be copied or restored');
+  assert.equal(readFileSync(path.join(result.root, 'checkout/config/pricing.json'), 'utf8'), result.pricing);
+});
+
+test('target-commit guard deploys successfully when the old server checkout has no guard', t => {
+  const result = runDeployment(t, { missingGuard: true });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.events[0], 'runtime-check');
+  assert.equal(result.events.at(-1), 'verifier');
+});
+
+test('a missing dedicated runtime fails before npm when the server checkout has no guard', t => {
+  const result = runDeployment(t, { missingRuntime: true, missingGuard: true });
+  assert.notEqual(result.status, 0, result.stderr);
+  assert.match(result.stderr, /NODE_RUNTIME\/bin\/node is missing or not executable/);
+  assert.ok(!result.events.includes('npm'));
+  assert.ok(!result.events.includes('verifier'));
+});
+
+test('a missing runtime aborts before git or any pricing backup/change when the server checkout has no guard', t => {
+  const result = runDeployment(t, { missingRuntime: true, missingGuard: true });
   assert.notEqual(result.status, 0, result.stderr);
   assert.match(result.stderr, /NODE_RUNTIME\/bin\/node is missing or not executable/);
   assert.ok(!result.events.includes('git'), 'no git command may run before runtime validation');

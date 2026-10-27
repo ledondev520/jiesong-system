@@ -4,7 +4,7 @@
 
 ## 前提
 
-- 源机和目标机均有已审查的 `backend/scripts/financial-evidence-transfer.js`、`financial-evidence-readonly.js`、`financial-evidence-readonly.py`、`backend/src/services/financialEvidenceTransferService.js`、现有后端依赖和已迁移的SQLite库。无需新增表结构。
+- 源机和目标机均有已审查的 `backend/scripts/financial-evidence-transfer.js`、`financial-evidence-readonly.js`、`financial-evidence-readonly.py`、`financial-sqlite-safety.js`、`backend/src/services/financialEvidenceTransferService.js`、现有后端依赖和已迁移的SQLite库。无需新增表结构。
 - 在目标机核实后端实际 `DATABASE_URL`，不要使用构建目录下另一份数据库。工具将其与当前Prisma连接的真实路径比对；文件不存在、权限过宽或目标非SQLite时拒绝。
 - 预检和导入需要Python3标准库sqlite3。确认阶段自动对实际目标做在线一致性备份并执行 `integrity_check`，支持WAL。备份失败不会执行插入。
 - `.env`、数据库文件及迁移文件须私有；迁移目录、备份目录0700，JSON及备份0600。工具拒绝输入符号链接、多硬链接及覆盖已有输出文件。
@@ -40,7 +40,7 @@ node backend/scripts/financial-evidence-transfer.js preview \
   --plan /private/financial-transfer/target-plan.json
 ```
 
-预检只写本地计划文件，不写数据库。它通过 `financial-evidence-readonly.py` 以SQLite `mode=ro`、`query_only` 和只读authorizer打开实际目标，在同一读取事务内仅查询候选资料及已有账期；不创建Prisma写连接。Python3因此也是预检的前提。计划逐项列出CREATE或SKIP、类别、期间、Sheet/行数以及完整性标识。
+预检只写本地计划文件，不写数据库。它通过 `financial-evidence-readonly.py` 以SQLite `mode=ro`、`query_only` 和只读authorizer打开实际目标，在同一读取事务内仅查询候选资料及已有账期；不创建Prisma写连接。rollback-journal 模式正常读取前后目录文件清单不变。WAL 模式必须已有私有、普通的 `-wal` 和 `-shm`，缺少任一个就在连接前拒绝（例如最后一个连接关闭后仅剩主库的情况）；先由正常后端连接建立协调文件，再预检，或由操作者停机并通过正常SQLite连接checkpoint/切换rollback模式后预检。不要手工创建空辅助文件。在线读取依赖原有锁和共享内存，能看到未checkpoint的已提交WAL；禁止使用会忽略WAL及锁的 `immutable=1`。这里“只读”指业务行/SQL不写，不承诺文件系统字节不变：SQLite可能更新共享内存协调内容。前置检查与连接间无法原子防止可信操作者移除辅助文件；并发移除可能让SQLite重建它们，因此目录必须由可信操作者管理，预检期间不得移除/替换辅助文件。Python3因此也是预检的前提。计划逐项列出CREATE或SKIP、类别、期间、Sheet/行数以及完整性标识。
 
 - **完全相同**：SKIP，不改时间戳、行、索引或关联。
 - **同标识但任意结构化内容/元数据不同**，或相同来源内容已有不同记录：拒绝整个批次，不提供强制覆盖选项。
@@ -73,3 +73,18 @@ node backend/scripts/financial-evidence-transfer.js import \
 4. 保留受保护备份、原包与回执。若需回退，先停止相关写入并制定基于本批新ID的核查方案；不直接用旧备份覆盖仍在产生新业务的线上库。当前工具没有自动删除或覆盖功能。
 
 自动化验证：`node --test backend/src/services/financialEvidenceTransferService.test.js backend/src/integration/financial-evidence-transfer.integration.js`。集成使用独立合成SQLite及真实CLI，覆盖旧记录不变、WAL备份、目标ID映射、重复跳过、同源内容冲突、错误目标、过期计划、备份失败、晚期回滚、包损坏与文件权限。正式上线前仍须在实际VPS重新预检；本地演练不证明线上冲突为零。
+
+## 本地报表仅新增留存
+
+`retain-financial-snapshots.js` 不带 `--confirm` 时只解析文件，不连接数据库；三个财务CLI（含旧 `import-financial-evidence.js`）均在输出执行模式前拒绝不存在或非私有的配置数据库，不会自动建空库。相对 `file:` 路径按 backend/prisma 解析，百分号保持字面含义。
+
+确认留存示例（路径均为占位符；预先创建0700输出目录，目标主库须为0600普通单链接文件）：
+
+```bash
+node backend/scripts/retain-financial-snapshots.js /private/input.xlsx \
+  --confirm --backup-dir /private/backups --receipt /private/new-receipt.json
+```
+
+确认必须显式提供备份目录与尚不存在的回执路径。未知/重复选项及 `--confirm=...` 被拒绝。共享 `financial-sqlite-safety.js` 核对配置真实路径与Prisma的 `PRAGMA database_list`，独占预留0600回执，调用SQLite在线backup API（包括已提交WAL）并执行 `integrity_check`，备份失败不写业务行；备份后重核目标指纹再调用整批事务追加。回执包含文档ID/sourceKey及新增/跳过动作、跳过数、备份路径、目标指纹和完成时间。即使整批重复，retain确认也强制备份；transfer全SKIP仍不备份。备份不包含原工作簿、附件或环境配置。
+
+提交后回执保存失败会单独提示“事务已提交”，须先只读核验。提交前失败可能留下空的预留回执或未完成备份，不能当作成功凭据，也不会覆盖旧文件；人工核验后使用新路径。目标目录及其父路径由可信本地操作者控制，不允许并发替换数据库路径。

@@ -168,7 +168,8 @@ test('HTTP/SQLite: financial library ingests existing synthetic sources and pres
       fs.writeFileSync(file, buffer, { mode: 0o600 });
       return file;
     });
-    const run = confirm => execFileSync(process.execPath, [path.resolve(__dirname, '../../scripts/retain-financial-snapshots.js'), ...files, ...(confirm ? ['--confirm'] : [])], {
+    let confirmation = 0;
+    const run = confirm => execFileSync(process.execPath, [path.resolve(__dirname, '../../scripts/retain-financial-snapshots.js'), ...files, ...(confirm ? ['--confirm', '--backup-dir', directory, '--receipt', path.join(directory, `snapshot-receipt-${++confirmation}.json`)] : [])], {
       env: { ...process.env, DATABASE_URL: `file:${path.join(directory, 'synthetic.db')}` }, encoding: 'utf8', timeout: 30000,
     });
     const old = snapshot();

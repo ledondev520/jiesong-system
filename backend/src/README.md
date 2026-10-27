@@ -210,3 +210,6 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 财务迁移预检由 `scripts/financial-evidence-readonly.py` 使用SQLite只读URI、query_only及只读authorizer读取同一快照，`scripts/financial-evidence-readonly.js` 用内存只读Adapter生成正常目标计划；不创建Prisma写连接。隔离集成还注入DDL以验证读取连接确实拒绝写入。
 
 迁移包在访问目标前同时校验 sourceKey 与 category/contentSha256 的批内唯一性；累计期间按源范围起点的前三个物理行读取，支持表头换列及空行，不固定D2。单元与真实CLI回归覆盖合法B2期间导出和同源不同标识整批拒绝。
+
+财务CLI共用 `scripts/financial-sqlite-safety.js`，连接前拒绝不存在/非私有SQLite，确认留存必须显式指定备份目录和独占0600回执；目标身份核验、在线backup API与完整性校验在事务追加之前执行。`integration/financial-cli-safety.integration.js` 已追加至 test:db，覆盖参数、空库拒绝、备份/回执失败、事务回滚及目标身份。
+只读预检在rollback-journal下不增加目录文件；WAL缺少现有私有普通-wal/-shm时拒绝，在线时保留锁/共享内存以读取未checkpoint的已提交数据，不使用immutable、不承诺文件系统字节零变更。辅助文件不能由操作者并发移除，详见 `docs/operations/financial-evidence-transfer.md`。

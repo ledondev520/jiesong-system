@@ -22,9 +22,9 @@
 - Store only reusable technical memory. Do not put secrets, credentials, customer financial data, contract values, or personal/user-profile memory in `.brv/context-tree/`.
 - Monthly financial statements, account balances, general-ledger rows, and their source filenames/hashes are Confidential; raw workbooks must not be committed, logged, or copied into ordinary attachment storage.
 - Payroll, social-security, tax-return, voucher, and journal evidence rows are Confidential; redact personal identifiers before persistence, never archive source workbooks, and allow row-level reads only to ADMIN/FINANCE.
-- 报表仅新增留存使用 `backend/scripts/retain-financial-snapshots.js`：表内期间决定单月/累计，跨月明细账保留完整区间且不关联单月；`financialEvidenceService.appendFinancialEvidenceSnapshots` 整批仅新增或重复跳过，修订内容另存版本，不替换已有资料、业务账期或月度指标。确认前对实际 SQLite 做受保护在线备份，原文件不归档，来源和行级数据仍仅 ADMIN/FINANCE 可读。
+- 报表仅新增留存使用 `backend/scripts/retain-financial-snapshots.js`：表内期间决定单月/累计，跨月明细账保留完整区间且不关联单月；`financialEvidenceService.appendFinancialEvidenceSnapshots` 整批仅新增或重复跳过，修订内容另存版本，不替换已有资料、业务账期或月度指标。确认必须显式指定 --backup-dir 与 --receipt；financial-sqlite-safety.js 在连接前拒绝不存在/非私有目标，核对配置真实路径与 PRAGMA database_list，强制在线备份（含已提交WAL）及完整性检查后重核身份，再事务追加；回执0600独占预留，含新增ID/sourceKey、跳过数、备份路径、目标指纹与完成时间，提交后回执失败须先核验。原文件不归档，来源和行级数据仍仅 ADMIN/FINANCE 可读。
 - 跨机财务资料迁移使用 `backend/scripts/financial-evidence-transfer.js` 的 export/preview/import：仅导出显式资料ID，不带本机关系ID、原工作簿或凭据。包、目标计划、回执及备份为私有0700/0600；目标机重新预检，确认导入自动备份实际SQLite并检查完整性。`financialEvidenceTransferService.js` 校验结构/计数/完整性、重新映射已有账期，事务内复核目标计划，仅create或跳过；同源标识/内容冲突整批拒绝，禁止update/delete/upsert及整库覆盖。哈希用于完整性检测而非签名，跨机传输须使用可信SSH；默认不传输、不发布。
-- 财务迁移 `preview` 使用 `backend/scripts/financial-evidence-readonly.py` 的 SQLite `mode=ro`、`query_only` 与只读 authorizer，在同一读取快照内仅取候选来源及其账期；`financial-evidence-readonly.js` 只读 Adapter 生成与导入兼容的目标计划，不加载Prisma写连接。远端核验可将该读取器经可信SSH执行，数据只流入本地私有管道，不能打印原行或复制整库。
+- 财务迁移 `preview` 使用 `backend/scripts/financial-evidence-readonly.py` 的 SQLite `mode=ro`、`query_only` 与只读 authorizer，在同一读取快照内仅取候选来源及其账期；`financial-evidence-readonly.js` 只读 Adapter 生成与导入兼容的目标计划，不加载Prisma写连接。rollback-journal 正常读取不新增目录文件；WAL 必须已有私有普通 -wal/-shm，缺失则在连接前拒绝，不使用忽略WAL的immutable。在线模式保留SQLite锁/共享内存协调，不承诺文件系统字节零变更；要求可信操作者不并发移除辅助文件。远端核验可将该读取器经可信SSH执行，数据只流入本地私有管道，不能打印原行或复制整库。
 - `financialEvidenceTransferService.js` 在查询目标前拒绝包内重复 sourceKey 或重复 category/contentSha256；累计期间与留存解析一致，按 sourceRange 起点的前三个物理行查找，不固定 D2，不将空行压缩后混入数据行。
 
 - 商品档案在 `frontend/src/components/layout/navigation.config.ts` 归采购模块，使已有权限的采购员可达现有页面；后端 `backend/src/routes/products.js` 继续执行读写角色校验，导航不授予额外 API 权限。
@@ -126,7 +126,7 @@
 
 ## VPS 运行目录与发布验证
 - `celerada.link` 的 PM2 进程 `jiesong-backend`、`jiesong-frontend` 必须分别运行 `/opt/jiesong-system/backend`、`/opt/jiesong-system/frontend`，与 Git 部署构建目录一致；仅重启旧发布目录不算发布成功。
-- `.github/workflows/deploy.yml` 在定价配置备份及任何 Git 命令前从当前检出加载运行时守卫，守卫缺失或运行时不合格均立即失败；使用触发提交 SHA。`sudo nginx -t` 失败显式非零退出，不执行重载或发布验证；发布末尾运行 `scripts/verify-vps-runtime.cjs` 校验 PM2 目录、后端健康、公网 BUILD_ID 和未登录 API 的 401。
+- `.github/workflows/deploy.yml` 从 runner 的目标提交检出读取运行时守卫，以 base64 参数传到远端、解码后 source，在定价配置备份及任何 Git 命令前校验；不依赖服务器旧检出，runner 守卫缺失或运行时不合格均立即失败；使用触发提交 SHA。`sudo nginx -t` 失败显式非零退出，不执行重载或发布验证；发布末尾运行 `scripts/verify-vps-runtime.cjs` 校验 PM2 目录、后端健康、公网 BUILD_ID 和未登录 API 的 401。
 - `.github/workflows/deploy.yml` 的 SSH 远端脚本整体以 `{ ...; } </dev/null` 执行，防止子命令读取 `bash -s` 的脚本流并跳过发布验证；`scripts/deploy-ssh.test.cjs` 在 pre-deploy 中使用实际 run 块和本地 SSH/命令桩回归验证。
 - 运行目录迁移沿用原有绝对 DATABASE_URL、UPLOAD_DIR 和私密环境配置；切换前的数据库与配置备份放在受保护目录（0700/0600），不得输出完整 PM2 环境或凭据。
 

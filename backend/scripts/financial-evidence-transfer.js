@@ -6,45 +6,10 @@
  * Prerequisite: 本机/目标机Node及现有后端依赖，确认导入另需Python3标准库sqlite3。
  */
 const fs = require('node:fs');
-const path = require('node:path');
-const os = require('node:os');
-const crypto = require('node:crypto');
-const { execFile } = require('node:child_process');
-const { promisify } = require('node:util');
 const service = require('../src/services/financialEvidenceTransferService');
-const run = promisify(execFile);
-const MAX_BYTES = 64 * 1024 * 1024;
+const { reject, readPrivateJson, savePrivateJson, configuredDatabase, targetIdentity,
+  reservePrivateFile, backupDatabase, writeJson } = require('./financial-sqlite-safety');
 
-function reject() { throw new Error('私有文件或参数检查失败'); }
-function privateDirectory(directory) {
-  const stat = fs.lstatSync(directory);
-  if (!stat.isDirectory() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0) reject();
-}
-function privateFileDescriptor(file) {
-  privateDirectory(path.dirname(path.resolve(file)));
-  const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
-  try {
-    const stat = fs.fstatSync(fd);
-    if (!stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0 || stat.size > MAX_BYTES) reject();
-    return fd;
-  } catch (error) { fs.closeSync(fd); throw error; }
-}
-function readPrivateJson(file) {
-  const fd = privateFileDescriptor(file);
-  try { return JSON.parse(fs.readFileSync(fd, 'utf8')); } finally { fs.closeSync(fd); }
-}
-function reservePrivateFile(file) {
-  privateDirectory(path.dirname(path.resolve(file)));
-  return fs.openSync(file, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY | fs.constants.O_NOFOLLOW, 0o600);
-}
-function writeJson(fd, value) {
-  fs.writeFileSync(fd, JSON.stringify(value, null, 2));
-  fs.fsyncSync(fd);
-}
-function savePrivateJson(file, value) {
-  const fd = reservePrivateFile(file);
-  try { writeJson(fd, value); } finally { fs.closeSync(fd); }
-}
 function parseArguments(args) {
   const [command, ...rest] = args;
   const specs = {
@@ -65,48 +30,6 @@ function parseArguments(args) {
   if (!specs[command].every(key => options[key])) reject();
   if (command === 'import' && !options.confirm) reject();
   return { command, options };
-}
-
-// Resolve Prisma's SQLite URL before connection so a typo cannot create a new empty target.
-function configuredDatabase() {
-  const url = process.env.DATABASE_URL;
-  if (!url?.startsWith('file:')) reject();
-  const configured = url.slice(5).split('?')[0];
-  if (!configured || configured === ':memory:') reject();
-  const file = path.isAbsolute(configured) ? configured : path.resolve(__dirname, '../prisma', configured);
-  const stat = fs.lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0) reject();
-  return fs.realpathSync(file);
-}
-async function targetIdentity(db, configured) {
-  const list = await db.$queryRawUnsafe('PRAGMA database_list');
-  const actual = list.find(item => item.name === 'main')?.file;
-  if (!actual || fs.realpathSync(actual) !== configured) reject();
-  const stat = fs.statSync(configured);
-  if ((stat.mode & 0o077) !== 0) reject();
-  return { file: configured, fingerprint: crypto.createHash('sha256')
-    .update(JSON.stringify([os.hostname(), configured, String(stat.dev), String(stat.ino)])).digest('hex') };
-}
-
-async function backupDatabase(target, directory) {
-  privateDirectory(directory);
-  const destination = path.join(path.resolve(directory), `before-financial-transfer-${new Date().toISOString().replace(/[:.]/g, '-')}.sqlite`);
-  // SQLite backup API includes committed WAL contents; never copy an active .db with fs.copyFile.
-  const code = `import os,sqlite3,sys
-from pathlib import Path
-os.umask(0o077)
-src,dst=sys.argv[1:]
-fd=os.open(dst,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600);os.close(fd)
-a=sqlite3.connect(Path(src).as_uri()+'?mode=ro',uri=True,timeout=15)
-assert os.path.realpath(a.execute('PRAGMA database_list').fetchone()[2])==src
-b=sqlite3.connect(dst)
-a.backup(b)
-assert b.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
-b.close();a.close()
-assert os.stat(dst).st_mode&0o777==0o600
-`;
-  await run('python3', ['-c', code, target.file, destination], { timeout: 60000, maxBuffer: 1024 * 1024 });
-  return destination;
 }
 
 async function main(args = process.argv.slice(2)) {
