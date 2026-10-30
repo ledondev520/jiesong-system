@@ -66,6 +66,8 @@ describe("DataTable", () => {
     await user.click(
       await screen.findByRole("menuitemcheckbox", { name: "数量" }),
     );
+    // 菜单打开时页面其余部分对无障碍树隐藏，关闭后再断言表头
+    await user.keyboard("{Escape}");
     expect(screen.queryByRole("columnheader", { name: /数量/ })).toBeNull();
     expect(
       screen.getByRole("columnheader", { name: /名称/ }),
