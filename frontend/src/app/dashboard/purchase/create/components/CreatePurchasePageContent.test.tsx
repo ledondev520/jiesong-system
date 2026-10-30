@@ -494,8 +494,6 @@ describe("purchase inline supplier editor sessions (synthetic fixtures)", () => 
       },
     } as never);
     render(<CreatePurchasePage />);
-    await user.click(screen.getByRole("combobox", { name: /商品/ }));
-    await user.click(await screen.findByRole("option", { name: "合成商品" }));
     await user.click(await screen.findByRole("button", { name: /比价/ }));
     await user.click(screen.getByRole("button", { name: "用此供应商" }));
     expect(screen.getByRole("spinbutton", { name: /单价/ })).toHaveValue(8);
