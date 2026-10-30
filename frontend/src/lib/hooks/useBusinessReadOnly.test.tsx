@@ -19,8 +19,8 @@ it('老板保留阅读与筛选，隐藏业务写操作；原操作角色保留�
   expect(screen.getByRole('button', { name: '保存合同' })).toBeInTheDocument();
 });
 
-it('老板导航覆盖四个业务方向和自身通知，排除AI与系统管理', () => {
-  expect(getVisibleModuleNavItems(Role.BOSS).map((item) => item.key)).toEqual(['operations', 'procurement', 'export', 'finance', 'notifications']);
+it('老板导航覆盖业务、资料与自身通知，排除AI与设置', () => {
+  expect(getVisibleModuleNavItems(Role.BOSS).map((item) => item.key)).toEqual(['home', 'quotes', 'orders', 'purchases', 'inventory', 'documents', 'finance', 'customers', 'suppliers', 'products', 'hs-codes', 'notifications']);
   for (const path of ['/dashboard/purchase/create', '/dashboard/sales/id/edit', '/dashboard/ai', '/dashboard/settings', '/dashboard/users']) expect(isBossRestrictedPath(path)).toBe(true);
   for (const path of ['/dashboard/purchase/id', '/dashboard/finance', '/dashboard/system/notifications', '/dashboard/profile']) expect(isBossRestrictedPath(path)).toBe(false);
 });

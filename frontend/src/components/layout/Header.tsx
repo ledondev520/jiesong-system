@@ -14,13 +14,13 @@ import { toast } from "sonner";
 
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Ship } from "lucide-react";
+import { Bot, Ship } from "lucide-react";
+import { Role } from "@/types";
+import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { getVisibleModuleNavItems } from "./navigation.config";
+import { Breadcrumbs } from "./Breadcrumbs";
 import { HeaderContextPills } from "./HeaderContextPills";
-import { HeaderMobileNav } from "./HeaderMobileNav";
 import { HeaderNotifications } from "./HeaderNotifications";
 import { HeaderSearch } from "./HeaderSearch";
 import { HeaderUserMenu } from "./HeaderUserMenu";
@@ -37,8 +37,6 @@ export function Header() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const updateProfile = useAuthStore((state) => state.updateProfile);
-  const pathname = usePathname();
-  const mobileNavItems = getVisibleModuleNavItems(user?.role);
   const todayLabel = useSyncExternalStore(
     subscribeNoop,
     () => headerDateFormatter.format(new Date()),
@@ -70,17 +68,6 @@ export function Header() {
         height: "calc(4rem + env(safe-area-inset-top))",
       }}
     >
-      {/* 汉堡菜单：移动端已有底部 TabBar，此处完全隐藏；仅保留 SSR 结构避免 hydration mismatch */}
-      <div className="hidden" aria-hidden="true">
-        <HeaderMobileNav
-          items={mobileNavItems}
-          pathname={pathname}
-          userName={user?.name}
-          username={user?.username}
-          onLogout={handleLogout}
-        />
-      </div>
-
       {/* 移动端品牌标识（仅移动端展示，桌面端侧边栏已有） */}
       <Link
         href="/dashboard"
@@ -93,8 +80,13 @@ export function Header() {
         <span className="truncate text-sm font-semibold">捷淞国际物流</span>
       </Link>
 
-      <div className="flex min-w-0 shrink-0 items-center gap-4 md:flex-1">
-        <div className="hidden md:block lg:hidden">
+      {/* 桌面端：面包屑 + 当前页标题（一行） */}
+      <div className="hidden min-w-0 flex-1 md:block">
+        <Breadcrumbs />
+      </div>
+
+      <div className="flex shrink-0 items-center gap-4">
+        <div className="hidden xl:block">
           <HeaderContextPills todayLabel={todayLabel} />
         </div>
 
@@ -104,6 +96,12 @@ export function Header() {
       <div className="flex shrink-0 items-center gap-1 md:gap-2">
         <ThemeToggle />
         <HeaderNotifications />
+        {/* AI 助手入口：BOSS 无权限；侧栏面板上线后改为切换面板 */}
+        {user?.role !== Role.BOSS && (
+          <Button asChild variant="ghost" size="icon" className="hidden md:inline-flex" aria-label="AI 助手">
+            <Link href="/dashboard/ai"><Bot className="h-4 w-4" /></Link>
+          </Button>
+        )}
         {/* 用户菜单：桌面端保留，移动端通过底部TabBar"更多"入口访问 */}
         <HeaderUserMenu
           displayName={user?.name}

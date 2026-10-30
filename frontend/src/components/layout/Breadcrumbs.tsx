@@ -12,7 +12,7 @@ import { ChevronRight, Home } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const routeLabelMap: Record<string, string> = {
-  dashboard: '工作台',
+  dashboard: '首页',
   reports: '经营执行',
   system: '系统管理',
   logs: '操作日志',
@@ -27,24 +27,24 @@ const routeLabelMap: Record<string, string> = {
   agents: 'Agent账号',
   allocation: '分配',
   logistics: '物流',
-  containers: '出口合同',
+  containers: '出口订单',
   categories: '商品分类',
   export: '出口设置',
   'customs-brokers': '报关行',
   payable: '应付账款',
   receivable: '应收账款',
-  contracts: '采购合同',
+  contracts: '采购',
   purchase: '采购',
-  sales: '出口合同',
+  sales: '出口订单',
   suppliers: '供应商',
-  products: '商品档案',
+  products: '商品',
   inventory: '库存',
-  'inventory-status': '库存状态',
+  'inventory-status': '库存',
   finance: '财务',
   payments: '收付管理',
   statements: '财务报表',
   'bank-flow': '银行流水',
-  'hs-codes': 'HS编码',
+  'hs-codes': 'HS 编码',
   'tax-refunds': '出口退税',
   'customs-declarations': '报关单',
   settings: '设置',
@@ -52,7 +52,7 @@ const routeLabelMap: Record<string, string> = {
   import: '导入记录',
   about: '关于',
   dev: '开发',
-  ai: 'AI助手',
+  ai: 'AI 助手',
   create: '创建',
   edit: '编辑',
   template: '模板',
@@ -94,11 +94,11 @@ export function Breadcrumbs({ className }: { className?: string }) {
     >
       <Link
         href="/dashboard"
-        aria-label="工作台"
+        aria-label="首页"
         className="flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground"
       >
         <Home className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">工作台</span>
+        <span className="hidden sm:inline">首页</span>
       </Link>
 
       {crumbs.map((crumb) => (
