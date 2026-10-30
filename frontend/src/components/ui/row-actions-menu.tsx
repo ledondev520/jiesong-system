@@ -6,10 +6,10 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useState, type ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,15 +19,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 
 interface RowActionsMenuProps {
   onEdit?: () => void;
@@ -48,11 +48,11 @@ interface RowActionsMenuProps {
 export function RowActionsMenu({
   onEdit,
   onDelete,
-  deleteLabel = '删除',
+  deleteLabel = "删除",
   confirmTitle,
-  confirmDescription = '此操作确认后立即生效。',
+  confirmDescription = "此操作确认后立即生效。",
   children,
-  ariaLabel = '更多操作',
+  ariaLabel = "更多操作",
 }: RowActionsMenuProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -84,8 +84,13 @@ export function RowActionsMenu({
             <ChevronDown className="h-3.5 w-3.5" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
-          {onEdit ? <DropdownMenuItem onSelect={onEdit}>编辑</DropdownMenuItem> : null}
+        <DropdownMenuContent
+          align="end"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {onEdit ? (
+            <DropdownMenuItem onSelect={onEdit}>编辑</DropdownMenuItem>
+          ) : null}
           {children}
           {onDelete ? (
             <>
@@ -101,11 +106,18 @@ export function RowActionsMenu({
         </DropdownMenuContent>
       </DropdownMenu>
       {onDelete ? (
-        <AlertDialog open={confirmOpen} onOpenChange={(open) => !pending && setConfirmOpen(open)}>
+        <AlertDialog
+          open={confirmOpen}
+          onOpenChange={(open) => !pending && setConfirmOpen(open)}
+        >
           <AlertDialogContent onClick={(event) => event.stopPropagation()}>
             <AlertDialogHeader>
-              <AlertDialogTitle>{confirmTitle ?? `确定要${deleteLabel}吗？`}</AlertDialogTitle>
-              <AlertDialogDescription>{confirmDescription}</AlertDialogDescription>
+              <AlertDialogTitle>
+                {confirmTitle ?? `确定要${deleteLabel}吗？`}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {confirmDescription}
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={pending}>取消</AlertDialogCancel>
@@ -118,7 +130,7 @@ export function RowActionsMenu({
                   void runDelete();
                 }}
               >
-                {pending ? '处理中...' : `确认${deleteLabel}`}
+                {pending ? "处理中..." : `确认${deleteLabel}`}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

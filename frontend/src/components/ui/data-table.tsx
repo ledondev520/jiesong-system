@@ -9,13 +9,13 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { Columns3, Search, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { TableStateRow } from '@/components/ui/data-state';
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { Columns3, Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TableStateRow } from "@/components/ui/data-state";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -23,13 +23,19 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { PageSizeSelect } from '@/components/ui/page-size-select';
-import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useTableSort } from '@/lib/hooks/useTableSort';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { PageSizeSelect } from "@/components/ui/page-size-select";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useTableSort } from "@/lib/hooks/useTableSort";
+import { cn } from "@/lib/utils";
 
 export interface DataTableColumn<T> {
   key: string;
@@ -76,11 +82,18 @@ export interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   /** 粘性右侧操作列内容，通常是 <RowActionsMenu /> */
   renderActions?: (row: T) => ReactNode;
-  search?: { value: string; onChange: (value: string) => void; placeholder?: string };
+  search?: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+  };
   filters?: DataTableFilterChip[];
   /** 工具栏右侧的额外控件（导入导出、新增按钮等） */
   toolbar?: ReactNode;
-  selection?: { selectedIds: Set<string>; onChange: (next: Set<string>) => void };
+  selection?: {
+    selectedIds: Set<string>;
+    onChange: (next: Set<string>) => void;
+  };
   pagination?: DataTablePagination;
   /** 表格区最大高度，粘性表头在此范围内滚动生效 */
   maxHeightClassName?: string;
@@ -93,9 +106,9 @@ export function DataTable<T>({
   rowKey,
   loading = false,
   error,
-  errorWhat = '数据加载失败',
+  errorWhat = "数据加载失败",
   onRetry,
-  emptyTitle = '暂无数据',
+  emptyTitle = "暂无数据",
   emptyDescription,
   emptyAction,
   onRowClick,
@@ -105,24 +118,35 @@ export function DataTable<T>({
   toolbar,
   selection,
   pagination,
-  maxHeightClassName = 'max-h-[70vh]',
+  maxHeightClassName = "max-h-[70vh]",
   className,
 }: DataTableProps<T>) {
   const [hidden, setHidden] = useState<Set<string>>(
     () => new Set(columns.filter((c) => c.defaultHidden).map((c) => c.key)),
   );
-  const visibleColumns = useMemo(() => columns.filter((c) => !hidden.has(c.key)), [columns, hidden]);
+  const visibleColumns = useMemo(
+    () => columns.filter((c) => !hidden.has(c.key)),
+    [columns, hidden],
+  );
   const hideableColumns = columns.filter((c) => c.hideable !== false);
 
   const sortAccessor = useCallback(
-    (row: T, key: string) => columns.find((c) => c.key === key)?.sortValue?.(row),
+    (row: T, key: string) =>
+      columns.find((c) => c.key === key)?.sortValue?.(row),
     [columns],
   );
-  const { sortedData, sortKey, sortDir, onSort } = useTableSort(data, sortAccessor);
+  const { sortedData, sortKey, sortDir, onSort } = useTableSort(
+    data,
+    sortAccessor,
+  );
 
   const hasError = Boolean(error);
-  const colSpan = visibleColumns.length + (selection ? 1 : 0) + (renderActions ? 1 : 0);
-  const allSelected = !!selection && data.length > 0 && data.every((row) => selection.selectedIds.has(rowKey(row)));
+  const colSpan =
+    visibleColumns.length + (selection ? 1 : 0) + (renderActions ? 1 : 0);
+  const allSelected =
+    !!selection &&
+    data.length > 0 &&
+    data.every((row) => selection.selectedIds.has(rowKey(row)));
 
   const toggleAll = () => {
     if (!selection) return;
@@ -136,11 +160,13 @@ export function DataTable<T>({
     selection.onChange(next);
   };
 
-  const totalPages = pagination ? Math.max(1, Math.ceil(pagination.total / pagination.pageSize)) : 1;
-  const headClass = 'sticky top-0 z-10 bg-card';
+  const totalPages = pagination
+    ? Math.max(1, Math.ceil(pagination.total / pagination.pageSize))
+    : 1;
+  const headClass = "sticky top-0 z-10 bg-card";
 
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn("space-y-3", className)}>
       {search || filters?.length || toolbar || hideableColumns.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           {search ? (
@@ -149,14 +175,20 @@ export function DataTable<T>({
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   aria-label="搜索"
-                  placeholder={search.placeholder ?? '搜索...'}
+                  placeholder={search.placeholder ?? "搜索..."}
                   value={search.value}
                   onChange={(event) => search.onChange(event.target.value)}
                   className="h-9 pl-9"
                 />
               </div>
               {search.value ? (
-                <Button type="button" variant="ghost" size="sm" className="h-9" onClick={() => search.onChange('')}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => search.onChange("")}
+                >
                   <X className="mr-1 h-4 w-4" />
                   重置
                 </Button>
@@ -168,7 +200,7 @@ export function DataTable<T>({
               key={chip.key}
               type="button"
               size="sm"
-              variant={chip.active ? 'secondary' : 'outline'}
+              variant={chip.active ? "secondary" : "outline"}
               aria-pressed={chip.active}
               className="h-8"
               onClick={chip.onToggle}
@@ -181,9 +213,13 @@ export function DataTable<T>({
             {hideableColumns.length > 0 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="outline" size="sm" className="h-9">
-                    <Columns3 className="mr-1.5 h-4 w-4" />
-                    列
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                  >
+                    <Columns3 className="mr-1.5 h-4 w-4" />列
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -204,7 +240,10 @@ export function DataTable<T>({
                         })
                       }
                     >
-                      {column.label ?? (typeof column.header === 'string' ? column.header : column.key)}
+                      {column.label ??
+                        (typeof column.header === "string"
+                          ? column.header
+                          : column.key)}
                     </DropdownMenuCheckboxItem>
                   ))}
                 </DropdownMenuContent>
@@ -214,13 +253,22 @@ export function DataTable<T>({
         </div>
       ) : null}
 
-      <div className={cn('overflow-auto rounded-xl border bg-card', maxHeightClassName)}>
+      <div
+        className={cn(
+          "overflow-auto rounded-xl border bg-card",
+          maxHeightClassName,
+        )}
+      >
         <table data-slot="table" className="w-full caption-bottom text-sm">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               {selection ? (
-                <TableHead className={cn(headClass, 'w-10')}>
-                  <Checkbox aria-label="全选" checked={allSelected} onCheckedChange={toggleAll} />
+                <TableHead className={cn(headClass, "w-10")}>
+                  <Checkbox
+                    aria-label="全选"
+                    checked={allSelected}
+                    onCheckedChange={toggleAll}
+                  />
                 </TableHead>
               ) : null}
               {visibleColumns.map((column) =>
@@ -236,13 +284,27 @@ export function DataTable<T>({
                     {column.header}
                   </SortableTableHead>
                 ) : (
-                  <TableHead key={column.key} className={cn(headClass, 'text-muted-foreground', column.className)}>
+                  <TableHead
+                    key={column.key}
+                    className={cn(
+                      headClass,
+                      "text-muted-foreground",
+                      column.className,
+                    )}
+                  >
                     {column.header}
                   </TableHead>
                 ),
               )}
               {renderActions ? (
-                <TableHead className={cn(headClass, 'right-0 w-24 text-muted-foreground')}>操作</TableHead>
+                <TableHead
+                  className={cn(
+                    headClass,
+                    "right-0 w-24 text-muted-foreground",
+                  )}
+                >
+                  操作
+                </TableHead>
               ) : null}
             </TableRow>
           </TableHeader>
@@ -250,7 +312,13 @@ export function DataTable<T>({
             {loading ? (
               <TableStateRow colSpan={colSpan} variant="loading" />
             ) : hasError ? (
-              <TableStateRow colSpan={colSpan} variant="error" what={errorWhat} error={error} onRetry={onRetry} />
+              <TableStateRow
+                colSpan={colSpan}
+                variant="error"
+                what={errorWhat}
+                error={error}
+                onRetry={onRetry}
+              />
             ) : sortedData.length === 0 ? (
               <TableStateRow
                 colSpan={colSpan}
@@ -265,8 +333,10 @@ export function DataTable<T>({
                 return (
                   <TableRow
                     key={id}
-                    className={cn('h-9', onRowClick && 'cursor-pointer')}
-                    data-state={selection?.selectedIds.has(id) ? 'selected' : undefined}
+                    className={cn("h-9", onRowClick && "cursor-pointer")}
+                    data-state={
+                      selection?.selectedIds.has(id) ? "selected" : undefined
+                    }
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                   >
                     {selection ? (
@@ -279,7 +349,10 @@ export function DataTable<T>({
                       </TableCell>
                     ) : null}
                     {visibleColumns.map((column) => (
-                      <TableCell key={column.key} className={cn('py-1.5', column.className)}>
+                      <TableCell
+                        key={column.key}
+                        className={cn("py-1.5", column.className)}
+                      >
                         {column.cell(row)}
                       </TableCell>
                     ))}
@@ -302,10 +375,14 @@ export function DataTable<T>({
       {pagination && !loading && !hasError ? (
         <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>
-            共 {pagination.total} 条{totalPages > 1 ? `，第 ${pagination.page}/${totalPages} 页` : ''}
+            共 {pagination.total} 条
+            {totalPages > 1 ? `，第 ${pagination.page}/${totalPages} 页` : ""}
           </span>
           <div className="flex flex-wrap items-center gap-2">
-            <PageSizeSelect value={pagination.pageSize} onChange={pagination.onPageSizeChange} />
+            <PageSizeSelect
+              value={pagination.pageSize}
+              onChange={pagination.onPageSizeChange}
+            />
             <Button
               type="button"
               variant="outline"
