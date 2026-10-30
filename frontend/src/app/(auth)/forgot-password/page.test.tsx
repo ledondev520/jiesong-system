@@ -47,6 +47,15 @@ describe("email password recovery", () => {
     expect(screen.queryByLabelText("绑定手机号")).not.toBeInTheDocument();
     expect(screen.getByText(/旧账号未绑定邮箱/)).toBeInTheDocument();
   });
+  it("has a single h1, brand header, and no byte jargon in the always-visible hint", () => {
+    render(<ForgotPasswordPage />);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 1, name: "找回密码" })).toBeInTheDocument();
+    expect(screen.getByText("捷淞国际物流")).toBeInTheDocument();
+    expect(screen.getByText("至少8位")).toBeInTheDocument();
+    expect(screen.getByLabelText("确认新密码")).toHaveAttribute("placeholder", "请再次输入新密码");
+    expect(screen.queryByText(/字节/)).not.toBeInTheDocument();
+  });
   it("sends a code, shows a generic notice and cooldown; email changes clear code", async () => {
     mocks.send.mockResolvedValue({ code: 200 });
     const user = userEvent.setup();

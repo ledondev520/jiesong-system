@@ -1,9 +1,9 @@
-'use client';
-
-import Link from 'next/link';
-import { Compass, Home, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import type { Metadata } from 'next';
+import { Compass } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { NotFoundActions } from './NotFoundActions';
+
+export const metadata: Metadata = { title: '页面不存在' };
 
 /**
  * Input: Next.js not-found boundary
@@ -19,23 +19,9 @@ export default function NotFoundPage() {
         <EmptyState
           icon={Compass}
           title="页面不存在"
+          titleAs="h1"
           description="你访问的页面可能已迁移、暂未开放，或链接地址有误。可先回到工作台继续处理业务。"
-          action={
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button asChild className="rounded-xl">
-                <Link href="/dashboard">
-                  <Home className="mr-2 h-4 w-4" />
-                  返回工作台
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="rounded-xl">
-                <Link href="/login">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  返回登录页
-                </Link>
-              </Button>
-            </div>
-          }
+          action={<NotFoundActions />}
         />
       </div>
     </main>

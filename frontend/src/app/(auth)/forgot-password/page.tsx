@@ -1,6 +1,7 @@
 /** Input: bound-email OTP API; Output: password recovery and explicit legacy-account support. */
 "use client";
 
+import { AuthShell } from "@/components/auth/AuthShell";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -18,7 +19,7 @@ import {
 import { toast } from "sonner";
 import { authService } from "@/services/auth.service";
 import { useAuthStore } from "@/store/auth.store";
-import { isValidPassword, PASSWORD_MESSAGE } from "@/lib/password-policy";
+import { isValidPassword, PASSWORD_HINT, PASSWORD_MESSAGE } from "@/lib/password-policy";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -101,10 +102,10 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="auth-shell">
+    <AuthShell>
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle>{done ? "密码重置成功！" : "找回密码"}</CardTitle>
+          <CardTitle role="heading" aria-level={1}>{done ? "密码重置成功！" : "找回密码"}</CardTitle>
           <CardDescription>
             {done
               ? "已有登录会话已失效，请使用新密码重新登录。"
@@ -180,10 +181,10 @@ export default function ForgotPasswordPage() {
                   disabled={busy}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="至少8个字符"
+                  placeholder="请输入新密码"
                 />
                 <p className="text-xs text-muted-foreground">
-                  {PASSWORD_MESSAGE}
+                  {PASSWORD_HINT}
                 </p>
               </div>
               <div className="space-y-2">
@@ -196,6 +197,7 @@ export default function ForgotPasswordPage() {
                   disabled={busy}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="请再次输入新密码"
                 />
               </div>
               {notice && (
@@ -225,6 +227,6 @@ export default function ForgotPasswordPage() {
           </CardFooter>
         )}
       </Card>
-    </div>
+    </AuthShell>
   );
 }

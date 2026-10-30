@@ -358,6 +358,15 @@
       radial-gradient(ellipse 70% 40% at 50% 0%, color-mix(in oklch, var(--primary) 5%, transparent), transparent);
   }
 
+  /* 注册/找回密码沿用登录页的圆角输入框与按钮 */
+  .auth-card [data-slot="input"],
+  .auth-card [data-slot="button"] {
+    @apply rounded-xl;
+  }
+  .auth-card [data-slot="input"] {
+    @apply h-11;
+  }
+
   .text-brand-emphasis {
     color: var(--brand-emphasis);
   }

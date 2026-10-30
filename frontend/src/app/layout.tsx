@@ -6,7 +6,7 @@ import { GlobalErrorBoundary } from "@/components/layout/GlobalErrorBoundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "捷淞国际物流",
+  title: { default: "捷淞国际物流", template: "%s · 捷淞" },
   description: "JIESONG",
   manifest: "/manifest.json",
   appleWebApp: {

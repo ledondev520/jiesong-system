@@ -333,7 +333,7 @@ function LoginFormClient() {
                             autoComplete="current-password"
                             disabled={checkingSession || isLoading}
                             aria-label="密码"
-                            placeholder="••••••"
+                            placeholder="请输入密码"
                             className="h-11 rounded-xl border-border/40 bg-background/50 pr-10 shadow-sm transition-all duration-200 focus:bg-background focus:shadow-md focus:ring-2 focus:ring-primary/15"
                             {...field}
                           />
@@ -374,7 +374,7 @@ function LoginFormClient() {
                     id="remember-login-description"
                     className="text-xs leading-relaxed text-muted-foreground"
                   >
-                    仅在此浏览器保留至本次会话到期；退出或修改密码后失效。共用设备请勿勾选。
+                    在本机保持登录（公用电脑请勿勾选）
                   </p>
                 </div>
                 {error && (

@@ -11,6 +11,13 @@ describe("邮箱注册", () => {
     vi.clearAllMocks();
     clearRegistrationReceipt();
   });
+  it("标题是唯一 h1，带品牌头部，密码提示不出现“字节”", () => {
+    render(<RegisterPage />);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole("heading", { level: 1, name: "邮箱注册" })).toBeInTheDocument();
+    expect(screen.getByText("捷淞国际物流")).toBeInTheDocument();
+    expect(screen.getByLabelText("密码")).toHaveAttribute("placeholder", "至少8位");
+  });
   it("发信失败可恢复；验证后提交待审核账号，不直接登录", async () => {
     vi.mocked(authService.sendEmailCode)
       .mockRejectedValueOnce({ message: "邮箱注册服务暂不可用" })

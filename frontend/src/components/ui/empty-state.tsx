@@ -16,6 +16,8 @@ interface EmptyStateAction {
 interface EmptyStateProps {
   icon?: ReactNode | ComponentType<{ className?: string }>;
   title: string;
+  /** 独立页面（如 404）用 h1；默认 h3 用于嵌入区块 */
+  titleAs?: 'h1' | 'h2' | 'h3';
   description?: string;
   action?: EmptyStateAction | ReactNode;
   className?: string;
@@ -40,7 +42,7 @@ function isReactComponent(icon: unknown): icon is ComponentType<{ className?: st
   );
 }
 
-export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({ icon, title, titleAs: Title = 'h3', description, action, className }: EmptyStateProps) {
   return (
     <div className={cn('flex flex-col items-center justify-center py-16 text-center', className)}>
       {icon && (
@@ -52,7 +54,7 @@ export function EmptyState({ icon, title, description, action, className }: Empt
           )}
         </div>
       )}
-      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+      <Title className="text-lg font-semibold text-foreground">{title}</Title>
       {description && (
         <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>
       )}
