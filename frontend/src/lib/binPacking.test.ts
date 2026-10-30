@@ -7,15 +7,32 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import containers from '../../../config/containers.json';
 import {
   CONTAINER_40HQ,
+  SHIPPING_READY_THRESHOLD_PCT,
   buildPackingBoxes,
+  countItemsMissingBoxes,
+  countItemsMissingDimensions,
   evaluateShippingReadiness,
   generateColor,
   inferBoxDimensions,
   mmToM,
   packBoxes,
 } from './binPacking';
+
+describe('容器规格镜像与 config/containers.json 一致（单一来源守卫）', () => {
+  it('40HQ 是配置默认柜型，尺寸与安全上限逐项相等', () => {
+    const spec = containers.types['40HQ'];
+    expect(containers.default).toBe(CONTAINER_40HQ.code);
+    expect(CONTAINER_40HQ.length).toBe(spec.innerMm.length);
+    expect(CONTAINER_40HQ.width).toBe(spec.innerMm.width);
+    expect(CONTAINER_40HQ.height).toBe(spec.innerMm.height);
+    expect(CONTAINER_40HQ.maxWeight).toBe(spec.safeGrossKg);
+    expect(CONTAINER_40HQ.maxVolume).toBe(spec.safeVolumeCbm);
+    expect(SHIPPING_READY_THRESHOLD_PCT).toBe(containers.readyThresholdPct);
+  });
+});
 
 describe('binPacking', () => {
   it('packBoxes: 可放置箱子时返回 placed 结果与利用率', () => {
@@ -71,7 +88,7 @@ describe('binPacking', () => {
 
 describe('inferBoxDimensions', () => {
   it('1 CBM 推算出合理的三边尺寸（接近标准纸箱比例）', () => {
-    const dims = inferBoxDimensions(1);
+    const dims = inferBoxDimensions(1)!;
     // 体积应接近 1 CBM = 1e9 mm³
     const volume = dims.length * dims.width * dims.height;
     expect(volume).toBeGreaterThan(0.8e9);
@@ -83,25 +100,21 @@ describe('inferBoxDimensions', () => {
     expect(dims.isEstimated).toBe(true);
   });
 
-  it('体积为 0 或无效时返回保底默认值', () => {
-    const a = inferBoxDimensions(0);
-    const b = inferBoxDimensions(-1);
-    expect(a.length).toBe(500);
-    expect(a.width).toBe(400);
-    expect(a.height).toBe(300);
-    expect(a.isEstimated).toBe(true);
-    expect(b.length).toBe(500);
+  it('体积为 0 或无效时无法推算，返回 null 而不是伪造 500×400×300', () => {
+    expect(inferBoxDimensions(0)).toBeNull();
+    expect(inferBoxDimensions(-1)).toBeNull();
+    expect(inferBoxDimensions(Number.NaN)).toBeNull();
   });
 
   it('小体积（0.01 CBM）三边不低于 100mm', () => {
-    const dims = inferBoxDimensions(0.01);
+    const dims = inferBoxDimensions(0.01)!;
     expect(dims.length).toBeGreaterThanOrEqual(100);
     expect(dims.width).toBeGreaterThanOrEqual(100);
     expect(dims.height).toBeGreaterThanOrEqual(100);
   });
 
   it('长宽高遵循 1.2:1:0.8 的近似比例', () => {
-    const dims = inferBoxDimensions(0.5);
+    const dims = inferBoxDimensions(0.5)!;
     // length 应约为 width 的 1.2 倍，height 约为 0.8 倍（允许1mm舍入误差）
     expect(dims.length / dims.width).toBeCloseTo(1.2, 0);
     expect(dims.height / dims.width).toBeCloseTo(0.8, 0);
@@ -152,6 +165,36 @@ describe('evaluateShippingReadiness', () => {
     expect(r.utilizationReady).toBe(true);
     expect(r.overloaded).toBe(true);
     expect(r.overloadReasons).toEqual(['weight']);
+    expect(r.ready).toBe(false);
+  });
+
+  it('利用率用未取整数值比较：79.9% 与 79.95% 不达标，80% 达标，100% 仍在上限内，100.1% 超限', () => {
+    const at = (pct: number) => evaluateShippingReadiness(0, (CONTAINER_40HQ.maxVolume * pct) / 100);
+    expect(at(79.9).ready).toBe(false);
+    expect(at(79.95).utilizationReady).toBe(false);
+    expect(at(80).ready).toBe(true);
+    expect(at(100).ready).toBe(true);
+    expect(at(100).overloaded).toBe(false);
+    const over = at(100.1);
+    expect(over.overloadReasons).toEqual(['volume']);
+    expect(over.ready).toBe(false);
+  });
+
+  it('存在未填箱数的明细时不可出柜（与后端 missing-box-count 一致）', () => {
+    const r = evaluateShippingReadiness(17600, 10, { missingBoxItemCount: 1 });
+    expect(r.utilizationReady).toBe(true);
+    expect(r.missingBoxItemCount).toBe(1);
+    expect(r.ready).toBe(false);
+  });
+
+  it('尚未录入任何装箱明细时不可出柜（与后端 missing-packing-items 一致）', () => {
+    expect(evaluateShippingReadiness(17600, 10, { packingItemCount: 0 }).ready).toBe(false);
+    expect(evaluateShippingReadiness(17600, 10, { packingItemCount: 1 }).ready).toBe(true);
+  });
+
+  it('存在既无箱规也无体积的明细时不可出柜（与后端 missing-dimensions 一致）', () => {
+    const r = evaluateShippingReadiness(17600, 10, { missingDimensionItemCount: 1 });
+    expect(r.physicalFit).toBe(false);
     expect(r.ready).toBe(false);
   });
 
@@ -207,5 +250,16 @@ describe('buildPackingBoxes', () => {
     expect(boxes[0].quantity).toBe(2);
     expect(boxes[0].isEstimated).toBe(true);
     expect(boxes[0].length * boxes[0].width * boxes[0].height).toBeGreaterThan(0.4e9);
+  });
+
+  it('既无尺寸也无体积的行不再伪造箱型，改由缺箱规计数体现', () => {
+    const items = [
+      { id: 'pk-3', productId: 'p-3', boxes: 2, quantity: 4, product: { id: 'p-3', customsName: '无规格' } },
+      { id: 'pk-4', productId: 'p-4', boxes: null, quantity: 1, volume: 1, length: 1, width: 1, height: 1 },
+    ];
+    expect(buildPackingBoxes(items)).toHaveLength(1);
+    expect(buildPackingBoxes(items.slice(0, 1))).toEqual([]);
+    expect(countItemsMissingDimensions(items)).toBe(1);
+    expect(countItemsMissingBoxes(items)).toBe(1);
   });
 });
