@@ -22,7 +22,11 @@ import {
   useRegistrationReceipt,
 } from "@/lib/registration-receipt";
 import { authService } from "@/services/auth.service";
-import { isValidPassword, PASSWORD_HINT, PASSWORD_MESSAGE } from "@/lib/password-policy";
+import {
+  isValidPassword,
+  PASSWORD_HINT,
+  PASSWORD_MESSAGE,
+} from "@/lib/password-policy";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -93,7 +97,9 @@ export default function RegisterPage() {
     <AuthShell>
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle role="heading" aria-level={1}>{done ? "注册申请已提交" : "邮箱注册"}</CardTitle>
+          <CardTitle role="heading" aria-level={1}>
+            {done ? "注册申请已提交" : "邮箱注册"}
+          </CardTitle>
           <CardDescription>
             {done
               ? "邮箱验证和账号申请已完成，请按下面步骤联系管理员开通。"

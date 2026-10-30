@@ -19,7 +19,11 @@ import {
 import { toast } from "sonner";
 import { authService } from "@/services/auth.service";
 import { useAuthStore } from "@/store/auth.store";
-import { isValidPassword, PASSWORD_HINT, PASSWORD_MESSAGE } from "@/lib/password-policy";
+import {
+  isValidPassword,
+  PASSWORD_HINT,
+  PASSWORD_MESSAGE,
+} from "@/lib/password-policy";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -105,7 +109,9 @@ export default function ForgotPasswordPage() {
     <AuthShell>
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle role="heading" aria-level={1}>{done ? "密码重置成功！" : "找回密码"}</CardTitle>
+          <CardTitle role="heading" aria-level={1}>
+            {done ? "密码重置成功！" : "找回密码"}
+          </CardTitle>
           <CardDescription>
             {done
               ? "已有登录会话已失效，请使用新密码重新登录。"

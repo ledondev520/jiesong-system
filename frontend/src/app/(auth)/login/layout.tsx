@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = { title: "登录" };
 
-export default function Layout({ children }: Readonly<{ children: ReactNode }>) {
+export default function Layout({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   return children;
 }

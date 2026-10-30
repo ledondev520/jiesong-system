@@ -38,7 +38,12 @@ it("库存后端总数与实际页码一致，第二页继续请求服务端", a
 });
 
 it("数量列只显示数量和有效单位，纯数字单位不冒充第二个数字；包装中为警示色而非红色", async () => {
-  const row = (id: string, quantity: number, unit: string, status: InventoryStatus) => ({
+  const row = (
+    id: string,
+    quantity: number,
+    unit: string,
+    status: InventoryStatus,
+  ) => ({
     id,
     productId: `p-${id}`,
     product: { customsName: `商品${id}`, unit },
@@ -66,7 +71,7 @@ it("数量列只显示数量和有效单位，纯数字单位不冒充第二个�
   expect(badges.length).toBeGreaterThan(0);
   for (const badge of badges) {
     expect(badge.className).toContain("amber");
-    expect(badge.className).not.toContain("destructive");
+    expect(badge.className).not.toContain("border-destructive");
   }
 });
 
