@@ -13,6 +13,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { purchaseService } from "@/services/purchase.service";
 import CreatePurchasePage from "./CreatePurchasePageContent";
 
 const mocks = vi.hoisted(() => ({
@@ -464,6 +465,44 @@ describe("purchase inline supplier editor sessions (synthetic fixtures)", () => 
     await user.click(screen.getByRole("combobox", { name: /供应商/ }));
     expect(screen.getByPlaceholderText("输入供应商名称搜索...")).toHaveValue(
       "",
+    );
+  });
+
+  it("比价弹层「用此供应商」同时填入供应商与不含税单价", async () => {
+    const user = userEvent.setup();
+    vi.mocked(purchaseService.getProductPriceHistory).mockResolvedValueOnce({
+      data: {
+        count: 2,
+        averagePrice: 9,
+        minPrice: 8,
+        maxPrice: 10,
+        history: [],
+        bySupplier: [
+          {
+            supplierId: "supplier-1",
+            supplierName: "合成供应商",
+            hasQualityIssue: false,
+            lastPrice: 8,
+            lastDate: "2026-09-01T00:00:00.000Z",
+            lastContractNo: "CG-A",
+            lastTaxRate: 13,
+            minPrice: 8,
+            averagePrice: 9,
+            count: 2,
+          },
+        ],
+      },
+    } as never);
+    render(<CreatePurchasePage />);
+    await user.click(screen.getByRole("combobox", { name: /商品/ }));
+    await user.click(await screen.findByRole("option", { name: "合成商品" }));
+    await user.click(await screen.findByRole("button", { name: /比价/ }));
+    await user.click(screen.getByRole("button", { name: "用此供应商" }));
+    expect(screen.getByRole("spinbutton", { name: /单价/ })).toHaveValue(8);
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "下一步：合同信息" }));
+    expect(screen.getByRole("combobox", { name: /供应商/ })).toHaveTextContent(
+      "合成供应商",
     );
   });
 });
