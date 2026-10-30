@@ -2,11 +2,12 @@
 
 | | |
 |---|---|
-| Status | Draft spec (Phase 1). This PR changes no code; it contains only this document. |
-| Date | 2026-10-30 |
+| Status | Draft spec **v2**. This PR changes no code; it contains only this document. |
+| Date | 2026-10-30 (v1), 2026-10-31 (v2) |
 | Owner | Stans (decisions in §1.2) |
 | Inputs | Code review, logged-in production walkthrough and public-page walkthrough of 2026-10-30 (kept outside the repo); `DESIGN.md`; `docs/IA_REDESIGN.md`; `AGENTS.md`; the current code at `origin/main` 8a09c93 |
-| Not yet read | The Seapot customer research (`seapot-customer-research.en.md`) was not available when this was written. Re-check §5, §6 and §13 against it when it arrives. |
+| v2 inputs | Owner decisions of 2026-10-30 (Stans); Seapot customer research of 2026-10-30 (public sources); the system's "three forms" sample workbook (sheets 外销合同 / 商业发票 / 装箱单); `backend/templates/购销合同模板.docx`; `docs/购销合同模板说明.md`; `docs/出口清单快速制单SOP.md`. All kept outside the repo except the last three. |
+| v2 changes | §1.2 owner decisions; §1.4 out of scope; FOB default (§4, §5); payables definition (§4.7); archiving (§4.11); store code / legal entity (§5.1); quote/PI layout from the three-forms workbook (§6); pricing ×1.3 / ×1.1 with whole-number round-up (§7); §13 answered vs open; §15 rows mapped to task cards J1–J32. |
 
 ---
 
@@ -16,20 +17,27 @@
 1. **The owner can run the whole business in the system:** quote → export order → purchase from a supplier → receiving and inventory → shipping and customs documents → invoices → finance → export tax refund (出口退税).
 2. **When buying, the system shows which supplier to buy from,** based on past purchase prices for that product.
 3. **One customer (Seapot), many stores.** The customer is chosen once per order. Each line says which Seapot store (门店) it is for, so every purchased, received and shipped quantity can be traced to a store.
-4. **One pricing rule in one place:** convert by the exchange rate, round up, 30% markup by default and 10% for special categories such as 瓷砖 (tiles). The exchange rate is set in settings.
+4. **One pricing rule in one place:** purchase cost × 1.3 (× 1.1 for special categories such as 瓷砖 tiles), convert by the exchange rate, round **up** to a whole number (whole yuan or whole USD is still open, Q5a). The exchange rate is set in settings.
 5. **An AI assistant on every page,** docked at the side so it never covers content.
 6. **A new visual design and information architecture,** simpler than today: fewer pages, one name per object, one primary action per screen.
 
 ### 1.2 Owner decisions this spec builds on
+Decisions 1–9 date from v1; 10–15 are the owner decisions of 2026-10-30 (Stans), which win over anything older in this document or in `docs/出口清单快速制单SOP.md`.
 1. Nobody uses the system in production yet, so screens can be replaced freely. Data and backend safety rules still apply.
-2. There is essentially one customer, Seapot, a hotpot chain in California (mainly Los Angeles). Each current 门店 is one of about 10 Seapot stores, i.e. a delivery destination.
-3. Base the quote/PI on the existing quote Excel if one exists. It does not exist in the repo (§7.1), so the quote/PI is designed from the export-contract fields and the existing export workbook.
-4. Pricing: exchange-rate conversion, round up, 30% normal, 10% for special categories (tiles). One rule, one config, settable rate.
+2. There is essentially one customer, Seapot (海中锅), a hotpot chain in California (mainly Los Angeles). Each current 门店 is one of about 10 Seapot stores, i.e. a delivery destination. The customer is set once per order; the store is set per line.
+3. Quote/PI, sales list and contract formats follow the system's existing documents: the "three forms" workbook (外销合同 / 商业发票 / 装箱单), `backend/templates/购销合同模板.docx`, `docs/购销合同模板说明.md` and `docs/出口清单快速制单SOP.md`. There is no separate quote Excel (§6.1).
+4. Pricing: one rule, one config place, editable exchange rate (§7). Details in decision 10.
 5. Simplify everything (删繁就简), but keep finance on real data and keep 出口退税.
-6. The AI assistant is available everywhere and must not cover content.
+6. The AI assistant is available on every page and must not cover content.
 7. Redesign the visuals and IA from scratch.
-8. Pure UI changes get a lightweight process (§14). This spec only *proposes* it; it changes no workflow, check or ruleset.
+8. Pure UI changes get a lightweight process (§14). **Approved by the owner;** implemented by task card JP. Rulesets and the 9 required checks stay as they are.
 9. Container loading (集装箱装货图) is a separate effort (§11).
+10. **Sell price = purchase cost (CNY) × 1.3** for normal goods (a markup on cost, not a margin on price) and **× 1.1** for special goods such as 瓷砖 (tiles). Convert by the configured exchange rate, then **round up to a whole number**. No rate buffer. Whether the whole number is whole USD (after conversion) or whole yuan is still open (Q5a); the round-up step is a config value (default 1) and the yuan/USD variant sits in one line of `priceFor()`, so either answer is a small change (§7.2).
+11. **Seapot buys FOB.** FOB is the default Incoterm on the Seapot customer, its quotes and its orders (§4.1, §5).
+12. **Draft purchase contracts are not payables (应付).** Only contracts that are in effect count, and every page computes payables with one shared function (§4.7).
+13. **Test data and suppliers marked 存疑 are archived, never hard-deleted** (§4.11).
+14. Finance stays on real data and 出口退税 stays (repeats decision 5).
+15. The AI assistant is available on every page (repeats decision 6).
 
 ### 1.3 Principles
 - **Backend safety stays intact.** Permissions (`roleAuth`, `bossReadOnly.js`), state machines (`inventoryStateMachine.js`, purchase/sales status services, `purchaseReceiptService.js`), file permissions (`fileService.js`), finance evidence and tax-refund rules are not loosened. The redesign changes screens and fills gaps in the data model. It does not rewrite business rules.
@@ -39,6 +47,13 @@
 - **Errors explain themselves.** Show the server's reason plus a retry, and never show zeros as if they were data.
 - **Reuse before building.** Reuse shadcn/ui (mandatory per `AGENTS.md`), existing services, `PurchaseItem` price history and the export workbook generator. The spec adds no new frontend dependency.
 - **Additive data changes.** New tables and nullable columns, backfill scripts with `--dry-run`, `npm run db:migrate` only (never `prisma db push`), and a backup before every migration.
+- **Archive, never hard-delete business data.** Records that should disappear from daily use (test data, doubtful suppliers) are archived and stay restorable (§4.11).
+
+### 1.4 Out of scope (from the Seapot research)
+The Seapot research (2026-10-30, public sources) suggests features this redesign does **not** build: new-store build-out projects with a generated bill of materials, recurring replenishment suggestions, an expansion-lead tracker, a full store master record (seats, rooms, conveyor counts, equipment specs), a customer-group / brand hierarchy, and certification flags (UL / ETL / NSF) on electrical products. They can be added later on top of `Customer` and `Store`. What the research does change in this spec:
+- Stores sit in several states (California Bay Area and Los Angeles/Orange County, plus Plano, Texas), so a store keeps its own destination port (`Store.portId`, existing) and the order shows a port per store.
+- Each Seapot store is run by its own legal entity (an LLC per store; possibly a group buying entity "Sp Food Trading LLC"). `Store` gets an optional legal entity name and a short code for shipping marks (§5.1). Who the buyer on the PI is stays open (Q16).
+- US floor-area units (sq ft) appear for tiles; the unit printed on PI lines comes from the product's unit and is not converted (Q18).
 
 ---
 
@@ -54,6 +69,7 @@
 | 外销合同 / 商业发票 / 装箱单 | Export documents (sheets of the export workbook) | generated by `exportPacketService.js` | 出口三单, 出口工作簿 (as button names) |
 | 采购合同 | Purchase contract | `PurchaseContract`, `PurchaseItem` | 购销合同 (only as the Word template name) |
 | 供应商 | Supplier | `Supplier` | — |
+| 归档 | Archive (hide from daily use, restorable; never a hard delete) | `isActive` / archive fields (§4.11) | 删除 for business records |
 | 采购价格 | Supplier price history | derived from `PurchaseItem` × `PurchaseContract` | — |
 | 商品 | Product | `Product` | 商品档案 (as a menu name) |
 | 收货验货 | Receipt and inspection | `PurchaseReceipt*` | 到货 |
@@ -150,12 +166,12 @@ Old URLs keep working through the existing stub pattern: a `page.tsx` that calls
 | `/dashboard/inventory-status` | Rewrite | `/dashboard/inventory` | The only inventory view. Quantity column becomes one number plus unit, with a store filter. |
 | `/dashboard/logistics` | Delete (stub) | → `/dashboard/inventory` | |
 | `/dashboard/products` | Rewrite | `/dashboard/products` (+ `/[id]` new) | Remove the 库存状态 tab. Table with a 「资料不全」 filter (weight/CBM/HS missing). Detail has a 采购价格 tab. |
-| `/dashboard/suppliers` | Rewrite | `/dashboard/suppliers` (+ `/[id]` new) | List plus detail, with a price history per product. No more empty create form as the main panel. |
+| `/dashboard/suppliers` | Rewrite | `/dashboard/suppliers` (+ `/[id]` new) | List plus detail, with a price history per product. No more empty create form as the main panel. 「已归档」 filter (§4.11). |
 | — | **New** | `/dashboard/customers`, `/[id]` | Customer with its stores and orders. |
 | `/dashboard/customs-declarations`, `/create`, `/[id]`, `/[id]/edit` | Keep content, move | `/dashboard/customs`, `/new`, `/[id]`, `/[id]/edit` | Gets its own tab instead of `tax-refunds?view=customs`. |
 | `/dashboard/tax-refunds`, `/create`, `/[id]`, `/[id]/edit` | Keep, restyle | `/dashboard/customs?tab=refunds`, `/dashboard/tax-refunds/[id]`… | Detail URLs stay. Blocking text wraps; zh-CN month picker. |
 | `/dashboard/hs-codes` | Keep | same | Default list = chapters the company actually uses. Remove developer wording; one length rule. |
-| `/dashboard/finance` | Rewrite | same | Money with 2 decimals; one payables definition (Q6). |
+| `/dashboard/finance` | Rewrite | same | Money with 2 decimals; one payables definition (§4.7). |
 | `/dashboard/payments` | Split | → `/dashboard/finance/receivable` (default); `?tab=payable` → `/payable` | Unallocated receipts become a filter, not a block above everything. |
 | `/dashboard/finance/receivable`, `/payable` | **New pages** at existing stub URLs | same | |
 | `/dashboard/finance/bank-flow`, `/invoices`, `/reconciliation` | Keep, restyle | same | Now visible as tabs. |
@@ -173,7 +189,7 @@ Old URLs keep working through the existing stub pattern: a `page.tsx` that calls
 
 ### 3.5 Settings (ADMIN)
 Settings is a left-nav page with these sections:
-- **报价规则** (§8)
+- **报价规则** (§7)
 - 公司信息 (invoice header; bank fields masked, §13 Q9)
 - 用户
 - 港口
@@ -192,10 +208,10 @@ The old 「基础参数」 rate and profit fields are deleted.
 ## 4. Key flows
 
 ### 4.1 Quote → export order
-1. **报价 → 新建报价.** The customer defaults to Seapot, the only active customer. Currency, Incoterm, payment terms, destination port and validity come from the customer's defaults.
+1. **报价 → 新建报价.** The customer defaults to Seapot, the only active customer. Currency (USD), Incoterm (**FOB**), payment terms, port of loading and validity come from the customer's defaults. Each store's destination port comes from the store.
 2. **Add products** with a server-side search picker (no more "first 100 only" limit). The line grid is **product × store**: one row per product, one quantity column per Seapot store, plus a total. Rows can be pasted from Excel as tab-separated text, parsed in the browser with no new dependency.
 3. **The system fills in the reference cost** (参考成本 ¥) for each product: the latest signed purchase price, labelled with supplier, date and contract number. The user can switch to another supplier's price from the comparison popover (§4.3).
-4. **The system calculates the selling price** with the pricing rule (§8), shown with the markup used (30% / 10%). A user may override a price. Overrides show a 「手动价」 badge and the realised markup.
+4. **The system calculates the selling price** with the pricing rule (§7), shown with the multiplier used (×1.3 / ×1.1). A user may override a price. Overrides show a 「手动价」 badge and the realised markup.
 5. **Save, then 导出报价单 (Excel), then 标记已发送.**
 6. **When the customer confirms, 标记已接受.** The same document now prints as **Proforma Invoice**.
 7. **转为出口订单** creates a `SalesContract` (DRAFT) in one transaction:
@@ -204,7 +220,7 @@ The old 「基础参数」 rate and profit fields are deleted.
    - the quote moves to CONVERTED.
 
 ### 4.2 Export order
-- **Header:** customer, currency, Incoterm, payment terms, port, exchange rate (a snapshot copied from 报价规则 at creation; editable while DRAFT), signing date, note.
+- **Header:** customer, currency, Incoterm (FOB by default), payment terms, port of loading, exchange rate (a snapshot copied from 报价规则 at creation; editable while DRAFT), signing date, note.
 - **Lines:** the same product × store grid as the quote.
 - **Detail page tabs:**
   - **概览:** status, money summary, next step, and a 「按门店」 table showing ordered / purchased / received / packed quantities per store.
@@ -227,7 +243,7 @@ The old 「基础参数」 rate and profit fields are deleted.
 ### 4.3 Purchasing with supplier price comparison
 **Comparison data (no new table).** Price history is derived from `PurchaseItem` joined with `PurchaseContract.supplierId`, the same source as the existing `GET /api/v1/purchases/price-history/:productId` (`purchaseController.getProductPriceHistory`). The endpoint is extended:
 - add a `bySupplier` grouping;
-- exclude DRAFT and CANCELLED contracts;
+- exclude DRAFT and CANCELLED contracts (the same "in effect" basis as payables, §4.7) and archived suppliers (§4.11);
 - keep the current role list.
 
 For each supplier the comparison shows:
@@ -246,7 +262,7 @@ The lowest latest price is highlighted. A note explains that a 13% VAT invoice i
 2. **采购 → 新建 / 编辑.** Choosing a product in a line opens the comparison popover, and 「用此供应商」 fills in supplier and price.
 3. **商品详情 → 采购价格** and **供应商详情 → 供货商品** show the same data, read-only.
 
-**Unchanged after creation:** signing, the Word contract (`contractDocService` with the `购销合同模板.docx` template), deposit and balance payments, production, staged receipts and inspection. The Word contract groups lines by product and lists the store split in the remarks column, matching the current 「具体店铺见后方报价单」 practice.
+**Unchanged after creation:** signing, the Word contract (`contractDocService` with the `购销合同模板.docx` template), deposit and balance payments, production, staged receipts and inspection. The template has a single 收货店铺 field (the sample says 米尔皮塔, i.e. Milpitas) and prices lines as 不含税单价 + 13% tax = 价税合计. When a contract covers one store, that store fills the field; when it covers several, the field says 「见明细」 and the Word contract groups lines by product with the store split in the remarks column, matching the current 「具体店铺见后方报价单」 practice. The template's text-replacement mechanism is not changed.
 
 ### 4.4 Receiving and inventory
 - `purchaseReceiptService.js` stays unchanged: staged arrivals, immutable inspection records, only accepted quantities enter stock, and the human-role restriction stays. The UI adds a store column, taken from `PurchaseItem.storeId`.
@@ -268,7 +284,12 @@ The lowest latest price is highlighted. A note explains that a 13% VAT invoice i
 - **银行流水:** import, with only a masked account suffix stored (unchanged).
 - **对账**, **报表** and **经营分析** stay.
 - **No new finance logic.** Statements, evidence retention and the bank-data rules stay as they are; only layout changes.
-- **One payables definition** across 首页, 概览 and 经营分析. Q6 asks which one.
+- **One payables definition (owner decision 12).** Today 首页 (`dashboardController.js`), 财务概览 (`financeService.js` stats) and 经营执行 compute 应付 differently, and some include draft contracts.
+  - **In effect** = purchase contract status SIGNED, PRODUCING, READY, SHIPPED, RECEIVED or COMPLETED. DRAFT and CANCELLED are never payables.
+  - **应付 (outstanding)** = Σ over contracts in effect of max(`totalAmount` − `paidAmount`, 0), in CNY. An overpaid contract counts as 0, not as a negative payable.
+  - **逾期应付** = the same sum restricted to contracts whose agreed payment date has passed (J8 maps the field actually used today and keeps it).
+  - **One backend function** computes these figures. 首页, 财务概览, 经营分析, the 付款 list, the to-dos endpoint (§4.9), AI context and exports all call it; frontends only display the result. Every figure shows its definition on hover.
+  - Phase item 2.3 (card J8). It changes reported numbers, so it takes the full process.
 
 ### 4.8 Export tax refund
 - The 单证与退税 → 出口退税 tab lists orders with readiness: 报关单, 进项发票, 收汇.
@@ -303,7 +324,15 @@ The store is visible and filterable at every step:
 | Packing | `PackingItem.storeId`, already present |
 | Shipping marks | from the packing line |
 
-The order's 「按门店」 table shows fulfilment per store.
+The order's 「按门店」 table shows fulfilment per store. Shipping marks print the store code (§5.1), falling back to the store name.
+
+### 4.11 Archiving instead of deleting (owner decision 13)
+- **What is archived:** suppliers marked 「(存疑)」 (and 「(文件损坏)」, after the owner confirms Q11) and clearly identifiable test data (for example `QA-…` records). The selection uses explicit, documented rules, never fuzzy guesses.
+- **What archiving does:** the record leaves pickers and default lists, appears under a 「已归档」 filter, and an ADMIN can restore it. History that references it (purchase contracts, payments, invoices, tax-refund evidence) stays intact and still displays it.
+- **Data model:** reuse the existing `isActive` flag where it exists (`Supplier`, `Store`, `Port`…). Only where no flag exists, add a nullable `archivedAt` (+ `archivedReason`) through `npm run db:migrate`, which is a one-way door.
+- **Script:** `backend/scripts/archive-test-data.js` with `--dry-run` (default), `--confirm`, `--backup-dir`, printing a receipt of IDs. Running it on production is a separate, backed-up step that needs owner approval; the PR never runs it.
+- **No hard delete in the UI** for business records: the 「更多」 menu offers 归档 / 恢复, not 删除. Deleting a DRAFT the user just created stays possible where the backend allows it today.
+- Phase item 2.4 (card J9).
 
 ---
 
@@ -316,16 +345,16 @@ All changes are additive: new tables and nullable columns. They go through `npm 
 model Customer {
   id                  String   @id @default(cuid())
   name                String   @unique          // "Seapot"
-  legalName           String?                   // name printed on PI / export docs
+  legalName           String?                   // buyer name printed on PI / export docs (Q16)
   country             String?                   // "US"
   address             String?
   contactName         String?                   // Confidential
   contactEmail        String?
   contactPhone        String?
   defaultCurrency     String   @default("USD")
-  defaultIncoterm     String?                   // FOB / CIF / CFR / EXW / DDP
+  defaultIncoterm     String   @default("FOB")  // Seapot buys FOB (owner decision 11)
   defaultPaymentTerms String?                   // e.g. "30% deposit, 70% before shipment"
-  defaultPortId       String?
+  defaultPortId       String?                   // port of loading for "FOB <port>" (Q7)
   note                String?
   isActive            Boolean  @default(true)
   createdAt           DateTime @default(now())
@@ -340,12 +369,15 @@ model Customer {
 }
 
 model Store {
-  // existing fields unchanged (name @unique, portId, contact*, address, isActive …)
+  // existing fields unchanged (name @unique, portId = destination port, contact*, address, isActive …)
   customerId String?   // nullable for the migration; the UI requires it for new stores
+  code       String?   @unique  // short store code for shipping marks and PI lines, e.g. "SAC" (Q17)
+  legalName  String?   // the store's operating entity, e.g. "Khp Sacramento LLC"; printed as ship-to (Q16)
   customer   Customer? @relation(fields: [customerId], references: [id])
   @@index([customerId])
 }
 ```
+- The research's other store fields (status pipeline/open, seats, rooms, equipment, receiving hours) are out of scope (§1.4). `Store.isActive` already covers closed stores.
 
 ### 5.2 Order-level fields on the export order
 ```prisma
@@ -353,7 +385,7 @@ model SalesContract {
   // existing fields unchanged (exchangeRate stays: it is the per-order snapshot)
   customerId   String?
   currency     String   @default("USD")
-  incoterm     String?
+  incoterm     String?  // new orders copy the customer default (FOB); null on old rows
   paymentTerms String?
   quoteId      String?  @unique
 
@@ -363,7 +395,7 @@ model SalesContract {
 }
 ```
 - `SalesItem.storeId` stays required. It records which store the line is for. The customer is never set per line.
-- **Currency is USD only in v1.** The column exists so the PI can print it; non-USD pricing is out of scope (Q7).
+- **Currency is USD only in v1.** Seapot is a US customer and the three-forms sample prints USD. The column exists so the PI can print it; non-USD pricing is out of scope.
 
 ### 5.3 Per-store purchasing
 ```prisma
@@ -390,12 +422,12 @@ model Quote {
   quoteNo         String    @unique            // QT + yyMM + seq, e.g. QT2611-003
   customerId      String
   currency        String    @default("USD")
-  incoterm        String?
+  incoterm        String    @default("FOB")
   paymentTerms    String?
-  portId          String?
+  portId          String?                      // port of loading
   validUntil      DateTime?
   exchangeRate    Float                        // snapshot of 报价规则 at creation
-  pricingRevision String                       // sha256 of pricing.json used (existing revision id)
+  pricingRevision String                       // sha256 of pricing.json used (existing revision id); also fixes the round-up step used
   status          String    @default("DRAFT")  // DRAFT / SENT / ACCEPTED / REJECTED / CONVERTED
   totalAmount     Float     @default(0)
   note            String?
@@ -425,7 +457,7 @@ model QuoteItem {
   unit          String?
   costCny       Float?                         // reference cost per unit (¥, tax incl.)
   costSupplierId String?                       // supplier the reference cost came from
-  markup        Float                          // 0.30 / 0.10 actually applied
+  markup        Float                          // 0.30 / 0.10 actually applied (multiplier − 1)
   formulaPrice  Float?                         // rule result (null if cost missing)
   unitPrice     Float                          // final price; may differ = manual override
   totalPrice    Float
@@ -447,15 +479,15 @@ model QuoteItem {
   - Edits are allowed in DRAFT and SENT. ACCEPTED and CONVERTED are locked.
   - **Expiry is computed** from `validUntil` and shown as a 已过期 badge. It is not a stored status.
   - **No versioning in v1.** 「复制为新报价」 creates a new number (Q3).
-- Money fields use `Float` like the rest of the schema. The service rounds to 2 decimals at write time.
+- Money fields use `Float` like the rest of the schema. `formulaPrice` is the already-rounded result of §7.2; totals are rounded to 2 decimals at write time.
 - **No new price-history table.** `PurchaseItem` is the source of truth for supplier prices. The existing `PriceHistory` and `ProductSupplier.price` tables, filled by manual entry in `productController.js`, are shown as 「供应商报价（未成交）」 next to real purchases. Whether to retire them is decided after v1.
 
 ### 5.5 Migration and backfill notes
-1. **Migration A** (Customer, Store.customerId, SalesContract order-level fields) and **migration B** (Quote, QuoteItem, PurchaseItem.storeId, PurchaseContract.salesContractId): new tables and nullable columns only. No data is rewritten in SQL.
+1. **Migration A** (Customer, Store.customerId / code / legalName, SalesContract order-level fields), **migration B1** (PurchaseItem.storeId, PurchaseContract.salesContractId) and **migration B2** (Quote, QuoteItem): new tables and nullable columns only. No data is rewritten in SQL. The exact schema diffs are frozen in `docs/redesign/DATA-MODEL-2026.md` (card J10). An archive migration (§4.11) is added only if no existing flag fits.
 2. **Backfill script** `backend/scripts/backfill-default-customer.js` (new). It:
    - takes `--database` and `--customer-name` explicitly, plus `--dry-run` (default) and `--confirm`;
    - creates the customer if missing;
-   - sets `customerId` on all stores and sales contracts that have none;
+   - sets `customerId` on all stores and sales contracts that have none (it does not rewrite the trade terms of old orders; a null `incoterm` displays the customer default);
    - is idempotent, runs in one transaction, and prints only counts.
    It follows the backup and SQLite-safety patterns of the existing backup scripts. **The production run happens only after `npm run db:backup -- --database <path>` and with owner approval.** That makes it a one-way door (§14.3).
 3. **`PurchaseContract.storeName` is not migrated** (today it is "—" on every row). A later cleanup PR may drop it.
@@ -483,39 +515,39 @@ Navigation never grants extra API permission. Every check stays on the server.
 
 ## 6. Quote / PI document
 
-### 6.1 Search result: no quote template in the repo
-Searched the current tree, git history (`git log --all --diff-filter=A` for office and pdf files), docs and code:
-- **The only spreadsheets ever committed:**
-  - `docs/20260101.xlsx` (HS-code master list, deleted in 4f28d11).
-  - Two WPS export workbooks, `docs/wps-import/2026-07/外销出口合同+发票+箱单+EXP26000{8,9} ….xlsx` (sheets: export contract / invoice / packing list / loading table). They were added in 74457e0 and deleted in 4f28d11. They are confidential business data and must not be restored into the repo.
-  - Several CSVs (出口合同明细/汇总, 申报要素, 供应商名录 …).
-- **Templates:** `backend/templates/购销合同模板.docx` is the *purchase* contract template.
-- **Code:** `aiService.js` only *parses* pasted supplier quotes for purchase entry (`docs/PRD.md` 「粘贴供应商发来的报价单」). `docs/mrd.md` mentions 「报价单 Excel」 as an attachment type. No code generates a customer quote or PI.
+### 6.1 Reference formats (owner decision 3)
+There is no customer quote Excel in the repo or its history (v1 search: the only spreadsheets ever committed were the HS master list, two confidential WPS export workbooks deleted in 4f28d11 that must not be restored, and some CSVs). The owner named these references instead:
 
-**Conclusion:** no customer quote/PI template exists in the repo. The design below is derived from the export-contract fields and the existing export workbook generator (`exportPacketService.js` sheets 外销合同 / 商业发票 / 装箱单). **Please send a sample quote Excel (Q2).**
+| Reference | What it is | Used for |
+|---|---|---|
+| "Three forms" workbook, generated by `exportPacketService.js` (sample `jiesong-sample-three-forms.xlsx`, kept outside the repo) | Sheets 外销合同 / 商业发票 / 装箱单. Each sheet: title row (A1:J1 merged, e.g. `SALES CONTRACT / 外销合同`), number row (A2:J2), a two-column header block in rows 4–7 (labels in A and F, values merged B:E and G:J: Seller / Buyer / Destination / Currency, Contract No. / Date / Trade Term / Package), the line table from row 9 and a `TOTAL / 合计` row. The sample prints Trade Term **FOB** and Currency **USD**. | Quote/PI layout (§6.2); the export order's documents stay as they are |
+| `backend/templates/购销合同模板.docx` + `docs/购销合同模板说明.md` | Purchase contract with a supplier, filled by text replacement: contract no., year, supplier name / tax id / address / bank / account / phone, 收货店铺, deposit %, product, quantity, unit price, amount, 13% tax, total, amount in Chinese words | Purchase contracts; unchanged (§4.3) |
+| `docs/出口清单快速制单SOP.md` | Manual SOP for one shipment's documents: data sources, checks, the old pricing rule, refund-rate lookup | Its data checks inform §4.5; its **pricing section is superseded by §7** and is rewritten in the pricing PR (§7.4) |
 
-### 6.2 Layout (exceljs, same generator style as `exportPacketService.js`)
+### 6.2 Quotation / PI layout
+The quote prints with the 外销合同 sheet layout, so an accepted PI and the later 外销合同 of the same order look alike and carry the same lines and prices. It is built with exceljs, reusing the cell styles and helpers of `exportPacketService.js`.
 
-**Header**
-- Seller: company name and address from 设置 > 公司信息.
-- Title: QUOTATION, or PROFORMA INVOICE once ACCEPTED.
-- Quote/PI number, date, valid until.
-- Buyer: `Customer.legalName` and address.
-- Currency, Incoterm and port (e.g. "FOB Shanghai" or "CIF Los Angeles").
-- Payment terms.
+**Title and header (rows 1–8)**
 
-**Lines**
+| Row | Left label (A) → value (B:E) | Right label (F) → value (G:J) |
+|---|---|---|
+| 1 | `QUOTATION / 报价单`, or `PROFORMA INVOICE / 形式发票` once ACCEPTED (A1:J1) | |
+| 2 | Quote/PI number, e.g. `QT2611-003` (A2:J2) | |
+| 4 | Seller → company name and address (设置 > 公司信息) | Quote No. / PI No. → number |
+| 5 | Buyer → `Customer.legalName` (Q16) | Date → issue date |
+| 6 | Destination → the destination ports of the stores on the quote, comma-separated, or `-` | Trade Term → `FOB <port of loading>` (Q7) |
+| 7 | Currency → `USD` | Valid Until → `validUntil` |
+| 8 | Payment Terms → `paymentTerms` (B:J) | |
 
-| No. | Description (EN/CN) | Specification | Ship-to store | Qty | Unit | Unit price | Amount |
-|---|---|---|---|---|---|---|---|
+**Lines (header row 9)** — the 外销合同 columns, with the Package column replaced by the store:
 
-- The ship-to store column, or one block per store, is chosen at export (Q2).
-- Optional columns: packing (pcs/ctn), CBM and gross weight per line, taken from product master data.
+| No. | Description | Specification | HS Code | Quantity | Unit | Unit Price (USD) | Amount (USD) | Ship-to Store | Remarks |
+|---|---|---|---|---|---|---|---|---|---|
 
-**Footer**
-- Total quantity, total amount, total CBM and gross weight.
-- Amount in words (USD).
-- Bank details for payment only if the owner confirms (Q9). Company account identifiers are Restricted data, so v1 omits them.
+- One row per product × store, sorted by store, then by the grid's product order. Ship-to Store prints `Store.code` (falling back to the name).
+- After each store's rows, a `SUBTOTAL <store>` row with the amount; at the end the `TOTAL / 合计` row with total quantity and amount, as in the sample.
+- Unit prices are whole numbers under the pricing rule (§7) and print with 2 decimals (`#,##0.00`), the same format as the export sheets.
+- Bank details print only if the owner confirms (Q9). Company account identifiers are Restricted data, so v1 omits them.
 
 **Never printed:** costs, markups and supplier names.
 
@@ -537,6 +569,7 @@ Searched the current tree, git history (`git log --all --diff-filter=A` for offi
 ## 7. Pricing rule (报价规则)
 
 ### 7.1 Today: three disagreeing sources
+This table describes the code **before** the pricing PRs; every value in it (the 6.8 default, the −0.2 adjustment, the zero-refund 10% tier, rounding to a total ending in 0/5) is retired by §7.2.
 
 | Where | What it does |
 |---|---|
@@ -545,44 +578,53 @@ Searched the current tree, git history (`git log --all --diff-filter=A` for offi
 | `config/pricing.json` + `pricing.schema.json` | `mode` tiered/multiplier, `exchangeAdjustment −0.2`, `refundableMarkup 0.3`, `noRefundMarkup 0.1`, `multiplier 1.3`. Used by `exportPricing.js`, `exportReadinessService.js`, `exportPacketService.js`, and reimplemented in `scripts/prepare_export_packet.py`. The 10% tier keys off a **zero tax-refund rate**, not a category. Rounding picks a total ending in 0/5 or an integer unit price closest to the target markup. |
 
 ### 7.2 New rule (one formula, one file, one implementation)
+Owner decision 10: sell price = purchase cost × 1.3 (normal) or × 1.1 (special categories such as 瓷砖), converted by the configured rate, rounded **up** to a whole number.
 ```
 rate        = pricing.exchangeRate                    // CNY per 1 USD, set in 设置 > 报价规则
 markup      = markup of the product's category, else the nearest ancestor category
-              listed in pricing.categoryMarkups, else pricing.defaultMarkup
-raw         = costCny × (1 + markup) ÷ rate           // costCny = unit purchase price ¥, tax included
-unitPrice   = ceil(raw ÷ roundUpTo) × roundUpTo        // round UP; roundUpTo default 0.01 USD
+              listed in pricing.categoryMarkups, else pricing.defaultMarkup (0.3)
+              // 瓷砖 is listed with 0.1
+priced      = costCny × (1 + markup)                  // CNY; costCny = unit purchase cost ¥ (basis: Q5c)
+step        = pricing.roundUpTo                       // default 1 → whole number
+up(x)       = Math.ceil(Number((x / step).toFixed(6))) * step   // float guard: 19.0000000001 stays 19
+
+Variant U (whole USD):  unitPrice = up(priced ÷ rate)
+Variant Y (whole yuan): unitPrice = round2(up(priced) ÷ rate)
+
 lineTotal   = round2(unitPrice × quantity)
 ```
-- **Rounding up:** compute `Math.ceil(Number((raw / step).toFixed(6))) * step`, so floating-point noise (19.000000001) does not add a cent.
-- **Markup is on cost** (×1.30), the same meaning as today. If the owner means gross margin (`cost ÷ (1 − 30%)`), only that one line changes (Q5).
-- **No buffer and no adjustment.** The configured rate *is* the quoting rate. To keep a safety buffer, the admin enters a lower rate (Q5).
+- **Which variant is open (Q5a).** The owner's note says "convert by the exchange rate, then round up to whole yuan"; the task brief says "integer unit price" in the quote currency. They can differ by up to about $1 per unit price, so this spec does not pick one. The implementation keeps the rounding in one line of `priceFor()`, tests both variants' examples, and the pricing PR (J6) does not merge until Q5a is answered. `roundUpTo` stays a config value (default 1) either way.
+- **Markup is on cost** (× 1.3 / × 1.1), not a margin on price. Answered by the owner.
+- **No buffer and no adjustment.** The configured rate *is* the quoting rate. The old `exchangeAdjustment −0.2` is removed; an admin who wants a safety buffer enters a lower rate.
+- **No zero-refund tier.** The × 1.1 multiplier keys off the product's **category**, not its tax-refund rate. Products with a 0% refund rate get × 1.3 unless their category is listed (Q5d asks whether any refund-free categories should be listed).
 - **Unit price does not depend on quantity.** The "total ends in 0/5" logic is dropped.
 - **Missing or zero cost → no suggested price.** The line is flagged 缺成本, and the user enters a price manually, which gets the 手动价 badge.
 - **Rate must be a positive finite number** (≤ 4 decimals). An invalid file stops pricing with a clear error and no hidden default, as today.
 
-**Examples** (rate 6.8, step 0.01):
+**Examples** (rate 7.2, step 1):
 
-| Cost ¥ | Category | Markup | Raw | Price $ |
-|---|---|---|---|---|
-| 100.00 | 餐具 (normal) | 30% | 19.1176 | **19.12** |
-| 100.00 | 瓷砖 | 10% | 16.1765 | **16.18** |
-| 68.00 | normal | 30% | 13.0000 | **13.00** |
-| 0 / missing | any | — | — | 缺成本 |
+| Cost ¥ | Category | × | Cost × multiplier ¥ | ÷ rate | Variant U price $ | Variant Y price $ |
+|---|---|---|---|---|---|---|
+| 100.00 | 餐具 (normal) | 1.3 | 130.00 | 18.0556 | **19** | **18.06** |
+| 100.00 | 瓷砖 | 1.1 | 110.00 (float: 110.00000000000001) | 15.2778 | **16** | **15.28** (not 15.42: guard keeps 110) |
+| 72.00 | normal | 1.3 | 93.60 | 13.0000 (float: 13.000000000000002) | **13** (guard keeps 13) | **13.06** (93.6 → 94) |
+| 55.38 | normal | 1.3 | 71.994 | 9.9992 | **10** | **10.00** (72 ÷ 7.2) |
+| 0 / missing | any | — | — | — | 缺成本 | 缺成本 |
 
 ### 7.3 Config file and settings UI
 `config/pricing.json` stays the only source. It keeps the existing revision, lock and atomic save, the deploy-time backup and restore, and the stderr audit of field names and hashes. Only the shape changes:
 ```json
 {
-  "exchangeRate": 6.8,
+  "exchangeRate": 7.2,
   "defaultMarkup": 0.3,
   "categoryMarkups": [{ "categoryId": "<ProductCategory.id>", "categoryName": "瓷砖", "markup": 0.1 }],
-  "roundUpTo": 0.01
+  "roundUpTo": 1
 }
 ```
 - `pricing.schema.json` is updated to match:
-  - `exchangeRate` between 0.01 and 100;
+  - `exchangeRate` a positive number up to 100 (≤ 4 decimals);
   - markups between 0 and 1;
-  - `roundUpTo` one of 0.01, 0.1 or 1;
+  - `roundUpTo` a positive whole number, default 1;
   - `categoryId` must exist when saved;
   - `categoryName` is a display snapshot.
 - **设置 > 报价规则** is one card containing:
@@ -590,9 +632,10 @@ lineTotal   = round2(unitPrice × quantity)
   - default markup %;
   - category list (add a category, set %);
   - round-up step;
-  - a live preview 「成本 ¥100 → $19.12」;
+  - a live preview 「成本 ¥100 → $19」 (normal) and 「→ $16」 (瓷砖), following the variant chosen in Q5a;
   - the last change (who and when).
   It is ADMIN only and replaces both `PricingConfigCard` and the 基础参数 rate/profit fields.
+- **The live `config/pricing.json` on the server is not converted by a merge.** The deploy keeps the runtime file, so the pricing PR documents a one-off conversion (backup, convert old shape → new shape, validate, restore path). Running it on production needs owner approval and is not part of any PR.
 - **Saved order and quote prices are never recalculated** when the rule changes. Each quote and order stores its rate snapshot. Customs, forex and finance code that needs a rate for an order uses **that order's stored `exchangeRate`**. Only "no order yet" cases (new quote, new order default) read the config.
 
 ### 7.4 What to delete or change
@@ -603,11 +646,12 @@ lineTotal   = round2(unitPrice × quantity)
 | `frontend/src/app/dashboard/settings/components/tabs/SystemConfigTab.tsx` | delete the rate/profit fields ("1.3 表示 30% 利润") |
 | `frontend/src/app/dashboard/settings/components/PricingConfigCard.tsx`, `services/pricing.service.ts` | replace with the new 报价规则 card |
 | `backend/src/services/exportPricing.js` | replace `targetMarkupFor`, `unitForRoundedTotal`, the nearest-5 candidates and `strictCap` with one `priceFor({ costCny, categoryId }, config)` |
-| `exportReadinessService.js`, `exportPacketService.js` | call `priceFor`. **Packet generation uses the confirmed order line price** (`SalesItem.sellingPrice` / `PackingItem.unitPrice`). The historical-price tolerance gate (`historicalQuoteAllowed`) is removed; the formula only *suggests* prices for unpriced lines. Data-missing blockers stay. This is a behaviour change, so it needs owner sign-off (Q5). |
+| `exportReadinessService.js`, `exportPacketService.js` | call `priceFor`. **Packet generation uses the confirmed order line price** (`SalesItem.sellingPrice` / `PackingItem.unitPrice`). The historical-price tolerance gate (`historicalQuoteAllowed`) is removed; the formula only *suggests* prices for unpriced lines. Data-missing blockers stay. This is a behaviour change, so it needs owner sign-off (Q5e). |
 | `scripts/prepare_export_packet.py`, `tests/test_pricing_configuration.py` | remove the Python copy of the formula. Retire the script if production no longer uses it (to verify); otherwise make it call the Node service. Either way, only one implementation remains. |
 | `SystemConfig` keys `exchangeRate`, `profitRate` and their readers (§7.1) | switch to the order's rate or to `pricing.exchangeRate`. Stop writing the keys; a later cleanup removes the rows. |
 | `openAgentService.js` tool `update_system_config` for exchangeRate/profitRate | AI may *read* the rule. Changing it is only possible in 设置 by ADMIN (Q10). |
 | `config/pricing.json`, `config/pricing.schema.json`, `docs/operations/export-pricing.md`, `tests/fixtures/pricing-synthetic.json`, `lifecycle/singleton-config.template.json` | update to the new shape and fixtures |
+| `docs/出口清单快速制单SOP.md` (定价规则 section, the −0.2 adjusted rate and the zero-refund 10% path) | replace with a pointer to §7.2; the refund-rate lookup and data checks stay |
 | `AGENTS.md` (Export pricing section), `SECURITY.md`, `data-classification.json` | updated together in the pricing PR (`AGENTS.md` rule for config changes) |
 
 ---
@@ -666,7 +710,7 @@ All of it is built on shadcn/ui (mandatory per `AGENTS.md`). Tokens live in `fro
 - sticky header and a sticky right-hand actions column;
 - horizontal scroll inside the table (fixes cut-off columns at 1280 px);
 - row click opens the detail page;
-- per-row 「更多 ▾」 holding edit and delete (delete always asks for confirmation);
+- per-row 「更多 ▾」 holding edit and 归档 / 恢复 (§4.11); delete only for the user's own drafts where the backend allows it, always with confirmation;
 - CSV export through the existing service.
 
 **Error state:** the server message plus a 重试 button. Summary cards show 「—」 and never 0 while loading or after an error.
@@ -751,39 +795,56 @@ The 3D container loading plan (集装箱装货图, 40HQ) is being audited and re
 - Possibly `vercel.json`, `render.yaml` and the Supabase keep-alive workflow (production runs on the VPS).
 - The frontend `xlsx@0.18.5` dependency (used in 5 files; unmaintained on npm), to be replaced by server-side exceljs parsing.
 
-**Production data** (QA-…, 「(文件损坏)」 and 「(存疑)」 suppliers): archive them with `isActive=false` after owner approval. Never delete them (Q11).
+**Production data** (QA-… test records, 「(存疑)」 suppliers and, if confirmed, 「(文件损坏)」 suppliers) is **archived, never deleted** (owner decision 13, §4.11, card J9). The production run of the archive script is a separate backed-up step that needs owner approval.
 
 ---
 
 ## 13. Open questions for the owner
 
+Numbers are stable (task cards refer to them). Answered questions stay listed, marked **Answered**, so earlier references still resolve.
+
+### 13.1 Answered (2026-10-30)
+- **Q5 (part) Markup basis:** markup on cost, × 1.3 normal / × 1.1 tiles. No rate buffer; the configured rate is the quoting rate. Round **up** to a whole number (but see Q5a).
+- **Q6 Payables:** draft purchase contracts are not payables; one shared computation on every page (§4.7).
+- **Q7 (part) Currency and Incoterm:** USD; Seapot buys **FOB** (§4.1, §5).
+- **Q11 (part) Archiving:** test data and 存疑 suppliers may be archived, never hard-deleted (§4.11).
+- **Q14 UI process:** the lightweight process for pure UI PRs is approved (card JP implements §14).
+- **Q15 Seapot research:** received; its effect is in §1.4 and §5.1. New questions from it are Q16–Q18.
+- **Q2 (part) Quote format:** no separate quote Excel; use the three-forms workbook and the contract template (§6).
+
+### 13.2 Still open
 1. **Request limit.** What is `TRUSTED_PROXY_CIDRS` in production? With it unset, all staff may share one budget of 100 requests per minute. This is an ops check outside this spec; the redesign aims for ≤ 5 API calls per page load.
-2. **Quote sample.** Please send a sample quote Excel. Does Seapot want one PI with a block per store, or a store column? Which columns (CBM, packing, photos)? Must quotes have versions, or is 「复制为新报价」 enough?
+2. **Quote layout details.** §6.2 prints one row per product × store with a store column and per-store subtotals. Does Seapot instead want one PI per store (each store is its own LLC, Q16)? Extra columns (CBM, packing, photos)? Are versions needed, or is 「复制为新报价」 enough?
 3. **Quote lifecycle.** Is "accepted" a simple button, or do you need the customer's signed PI uploaded as proof?
 4. **Supplier comparison.** Compare on the tax-included price or the price after tax refund? Should 1% invoice suppliers be flagged as "no refund"?
-5. **Pricing.**
-   - Is 30% a markup on cost (cost × 1.3, as today) or a margin on price (cost ÷ 0.7)?
-   - Round up to $0.01, $0.10 or $1?
-   - Drop the −0.2 rate buffer (by entering the buffered rate directly)?
-   - Besides 瓷砖, which categories get 10%?
-   - Today the 10% applies to zero-refund products. Should that still apply?
-   - May packet generation stop applying the historical-price tolerance gate and simply use the confirmed order price?
-6. **Payables.** Should draft purchase contracts count toward 应付? Today 首页, 财务概览 and 经营执行 show different totals.
-7. **Currency and terms.** USD only? Which Incoterms (FOB Shanghai / CIF Los Angeles / DDP?) and payment terms does Seapot use?
+5. **Pricing, remaining points.**
+   - **5a. Whole yuan or whole USD?** Your note says "convert by the exchange rate, then round up to whole yuan"; with USD quotes that can mean rounding the CNY price up before converting (¥130 → $18.06 at 7.2) or rounding the USD price up after converting ($18.06 → $19). §7.2 shows both. **Blocks merging the pricing PR (J6).**
+   - **5b. Which categories get × 1.1** besides 瓷砖? Does a 瓷砖 product category already exist in production, and should its sub-categories inherit 1.1?
+   - **5c. Cost basis.** Is "purchase price" the tax-included price (价税合计 per unit, as the 13% VAT invoice shows) or the price before tax? The purchase contract template prints 不含税单价 + 13% tax.
+   - **5d. Zero-refund goods.** The old SOP capped products with a 0% refund rate at 10% markup. Under the new rule they get × 1.3 unless their category is listed. Confirm.
+   - **5e. Packet price gate.** May export-document generation stop applying the historical-price tolerance gate and simply use the confirmed order price?
+6. *(Answered, §13.1.)*
+7. **Port of loading and payment terms.** FOB which Chinese port(s) (prints as "FOB <port>")? What payment terms does Seapot use (e.g. 30% deposit, 70% before shipment)?
 8. **Per-store purchasing.** Do suppliers pack and label per store? If not, should purchase lines still be split per store, or keep one line with a store breakdown?
 9. **Bank details.** May the PI print the company bank account? It is Restricted data today, so printing it needs an explicit decision.
-10. **AI.** The assistant can currently change the exchange rate through chat. This spec removes that, so settings are the only place to change it. OK?
-11. **Data clean-up.** May QA/test records and the 「(文件损坏)」 / 「(存疑)」 suppliers be archived? Who will fill in supplier contacts and product weights/CBM?
+10. **AI.** The assistant can currently change the exchange rate through chat. This spec removes that, so 设置 > 报价规则 is the only place ("one config place"). OK?
+11. **Data clean-up, remaining points.** Should 「(文件损坏)」 suppliers be archived too? Who fills in supplier contacts and product weights/CBM? **Approval to run the archive script on production** (separate backed-up step).
 12. **Branding.** Is the product named 「捷淞」, 「捷淞外贸系统」 or 「捷淞国际物流」? Is there a logo or brand colour to keep?
 13. **Repo housekeeping.** May the root clutter (§12) and the Vercel/Render/Supabase leftovers be removed in a separate PR?
-14. **UI process.** Do you accept the lightweight UI-PR process (§14)? If so, someone with repository-admin rights must change `AGENTS.md` and CI/ruleset settings; this spec doesn't.
-15. **Seapot research.** When the customer research arrives, are there Seapot-specific requirements (shipping marks per store, store codes, delivery schedule) that should shape the store model?
+14. *(Answered, §13.1.)*
+15. *(Answered, §13.1.)*
+16. **Buyer and ship-to entities.** Public filings show one LLC per Seapot store (e.g. Khp Sacramento LLC, Seapot Cerritos LLC, Seapot TX Group LLC) and a possible group buying entity, Sp Food Trading LLC. Who is the buyer on the PI and export documents, and should each store's LLC print as ship-to?
+17. **Store list and codes.** Which are the ~10 current 门店 (research confirms 5–6 operating stores, including Plano, Texas, plus pipeline sites)? What short code should shipping marks use for each?
+18. **Units and US compliance.** Should tile lines print m² or sq ft? Do electrical items (induction burners) need UL/ETL/NSF evidence tracked in the system? Tracking it is out of scope for this redesign (§1.4).
 
----
+### 13.3 Approvals needed before specific steps (not design questions)
+- **Database migrations** A, B1, B2 and any archive migration (cards J11, J16, J20, J9) are one-way doors: owner sign-off before merge and before the production run.
+- **Live `config/pricing.json` conversion** (card J6): owner sign-off before the production file is converted.
+- **Production archive run** (card J9): owner sign-off, with a backup.
 
-## 14. Lightweight process for UI-only PRs (proposal only)
+## 14. Lightweight process for UI-only PRs (approved)
 
-Nothing here is changed by this PR. `AGENTS.md`, workflows, required checks and the `main-protection` ruleset stay exactly as they are until the owner approves and an admin applies the change.
+The owner approved the lightweight process on 2026-10-30. Nothing here is changed by this docs PR: card JP implements the check script, CI wiring and `AGENTS.md` text in its own full-process PR. The `main-protection` ruleset, the 9 required checks and the review-freshness requirement stay exactly as they are.
 
 ### 14.1 Definition of a UI-only PR
 **Every changed path is inside:**
@@ -799,7 +860,7 @@ Nothing here is changed by this PR. `AGENTS.md`, workflows, required checks and 
 A small proposed script, `scripts/check-ui-only.cjs` (not written in this PR), would verify the diff against this allowlist, so the `ui-only` label can't be applied to the wrong PR.
 
 ### 14.2 What changes for UI-only PRs (proposal)
-- **Approval:** the bot that the owner named as sole approver approves and merges. No review-freshness marker, and no local `check-review-freshness.cjs` run. UI-only PRs are two-way doors: rollback = revert the merge commit and redeploy (`docs/operations/production-rollback.md`).
+- **Approval:** the bot that the owner named as sole approver approves and merges, after an independent review. The review-freshness marker and the local `check-review-freshness.cjs` run stay required (card JP does not change them). UI-only PRs are two-way doors: rollback = revert the merge commit and redeploy (`docs/operations/production-rollback.md`).
 - **PR body:** a short form instead of the full template — "UI-only (two-way door) · blast radius: <pages> · rollback: revert" — plus before/after screenshots from the Playwright run.
 - **Checks that stay required** (all 9 stay in the ruleset):
 
@@ -833,84 +894,88 @@ The migrations and the production backfill (§5.5) are **one-way doors** and nee
 
 ## 15. Phased implementation plan
 
-Each PR is small and independently mergeable, and leaves `main` deployable. **UI** = qualifies for §14 (if adopted). **Full** = full process. Effort is in developer-days for one experienced developer.
+Each PR is small and independently mergeable, and leaves `main` deployable. **UI** = qualifies for the lightweight process (§14, approved). **Full** = full process. Effort is in developer-days for one experienced developer.
 
 Verification for every PR: the 9 required CI checks. Additional checks are listed per PR. "E2E" means `frontend/e2e` specs are added or updated for the touched pages; backend PRs add unit tests in the same folder (`*.test.js`) and, where they write data, an `integration/*.integration.js` suite.
 
-### Phase 0: Spec
-| PR | Scope | Files | Effort | Process |
-|---|---|---|---|---|
-| 0.1 | This document | `docs/redesign/UX-REDESIGN-2026.md` | — | docs |
+Each row names its task card in `claude-tasks-20261031/` (outside the repo). **Depends on** lists cards that must be merged first unless noted. The container stream (cards C1–C5, §11) runs separately.
+
+### Phase 0: Spec and design freeze
+| PR | Card | Scope | Files | Effort | Process | Depends on |
+|---|---|---|---|---|---|---|
+| 0.1 | J0 | This document, v1 + v2 | `docs/redesign/UX-REDESIGN-2026.md` | — | docs | — |
+| 0.2 | J10 | Data-model freeze: exact schema diffs for migrations A, B1, B2, backfill rules, rollback, permissions, test plan | `docs/redesign/DATA-MODEL-2026.md` | 1 | docs | J0 |
 
 ### Phase 1: Foundation (no behaviour change)
-| PR | Scope | Files | Effort | Process |
-|---|---|---|---|---|
-| 1.1 | Design tokens: colours, radius, type scale, tabular numbers; update `DESIGN.md` | `globals.css`, `DESIGN.md` | 1 | UI |
-| 1.2 | App shell: grouped sidebar, top bar with breadcrumb + title, ⌘K search, single `PageHeader`; new menu labels **pointing to the existing URLs** (no URL changes yet); delete `ModuleTabHeader` | `components/layout/*`, `navigation.config.ts`, `app/dashboard/layout.tsx`, page headers | 3 | UI (+ `AGENTS.md` 商品 line, done by an admin) |
-| 1.3 | AI docked side panel; remove floating button and AI menu; `/dashboard/ai` stub opens the panel; route/record context | `components/ai/AIAssistant.tsx`, `LazyAIAssistantMount.tsx`, layout | 2 | UI |
-| 1.4 | Shared blocks: `DataTable`, `StatusBadge` merge, money/date formatters, `ErrorState` (server reason + retry, no fake zeros), confirm-delete in 「更多」 | `components/ui/*`, `lib/format*` | 3 | UI |
-| 1.5 | Quick wins: public pages (placeholder, wording, `AuthShell`, `<h1>`, titles, 404), 首页 WPS box admin-only, 经营执行 summary line, inventory quantity column, `包装中` colour | auth pages, `dashboard/page.tsx`, `reports/page.tsx`, `InventoryTab.tsx` | 2 | UI |
+| PR | Card | Scope | Files | Effort | Process | Depends on |
+|---|---|---|---|---|---|---|
+| 1.1 | J1 | Design tokens: colours, radius, type scale, tabular numbers; update `DESIGN.md` | `globals.css`, `DESIGN.md` | 1 | UI | — |
+| 1.2 | J2 | App shell: grouped sidebar, top bar with breadcrumb + title, ⌘K search, single `PageHeader`; new menu labels **pointing to the existing URLs**; delete `ModuleTabHeader` | `components/layout/*`, `navigation.config.ts`, `app/dashboard/layout.tsx`, page headers | 3 | UI (+ `AGENTS.md` 商品 line, done by an admin) | J1 |
+| 1.3 | J3 | AI docked side panel on every page; remove floating button and AI menu; `/dashboard/ai` stub opens the panel; route/record context | `components/ai/AIAssistant.tsx`, `LazyAIAssistantMount.tsx`, layout | 2 | UI | J2 |
+| 1.4 | J4 | Shared blocks: `DataTable`, `StatusBadge` merge, money/date formatters, `ErrorState` (server reason + retry, no fake zeros), confirm in 「更多」 | `components/ui/*`, `lib/format*` | 3 | UI | — |
+| 1.5 | J5 | Quick wins: public pages (placeholder, wording, `AuthShell`, `<h1>`, titles, 404), 首页 WPS box admin-only, 经营执行 summary line, inventory quantity column, `包装中` colour | auth pages, `dashboard/page.tsx`, `reports/page.tsx`, `InventoryTab.tsx` | 2 | UI | — |
+| 1.6 | JP | Lightweight UI-PR process (§14): `scripts/check-ui-only.cjs` + test, CI wiring for the `ui-only` label, UI-only PR body variant, `AGENTS.md` text; rulesets and review freshness unchanged | `scripts/`, `.github/`, `AGENTS.md` | 1 | **Full** (`.github/`) | J0 |
 
-### Phase 2: One pricing rule
-| PR | Scope | Files | Effort | Process |
-|---|---|---|---|---|
-| 2.1 | New `pricing.json` shape and schema; `priceFor()` with round-up and category markup; `POST /pricing/preview`; settings card 报价规则; delete the frontend constants and 基础参数 fields | §7.4 list (backend, config, frontend settings, docs, fixtures) | 3 | **Full** |
-| 2.2 | Rate consumers: customs, forex, patrol, AI context and `routes/sales.js` use the order rate or the config; AI write tool removed; packet uses the confirmed order price (after Q5); Python duplicate retired or delegated | services listed in §7.1, `openAgentService.js`, `prepare_export_packet.py` | 3 | **Full** (finance-adjacent) |
+### Phase 2: One pricing rule and the owner's business rules
+| PR | Card | Scope | Files | Effort | Process | Depends on |
+|---|---|---|---|---|---|---|
+| 2.1 | J6 | New `pricing.json` shape and schema; `priceFor()` (× 1.3 / × 1.1 by category, round up, step default 1); `POST /pricing/preview`; settings card 报价规则; delete the frontend constants and 基础参数 fields; live-config conversion steps in the PR body | §7.4 list (backend, config, frontend settings, docs, fixtures) | 3 | **Full**; merge waits for Q5a; live conversion needs owner approval | J0 |
+| 2.2 | J7 | Rate consumers: customs, forex, patrol, AI context and `routes/sales.js` use the order rate or the config; AI write tool removed; packet uses the confirmed order price (after Q5e); Python duplicate retired or delegated; SOP pricing section replaced | services listed in §7.1, `openAgentService.js`, `prepare_export_packet.py`, `docs/出口清单快速制单SOP.md` | 3 | **Full** (finance-adjacent) | J6 |
+| 2.3 | J8 | **Payables, one basis** (§4.7): map every payables computation, one shared backend function excluding DRAFT/CANCELLED, every endpoint uses it, frontends only display | `financeService.js`, `dashboardController.js`, AI context, exports (+ consistency test) | 2 | **Full** (finance) | J0 |
+| 2.4 | J9 | **Archive, never delete** (§4.11): reuse `isActive` or add nullable `archivedAt`/`archivedReason`; 「已归档」 filter and ADMIN restore; `archive-test-data.js` (`--dry-run` default, `--confirm`, `--backup-dir`, receipt); no production run | services/routes of the affected objects, `backend/scripts/archive-test-data.js` (+ tests), migration only if needed | 2 | **Full**; one-way door if it adds a migration | J0 |
 
-Verification: pricing unit tests with the examples in §7.2 (including floating-point edge cases), updated `pricing-synthetic.json`, and `pricingConfigService`/route auth tests.
+Verification for 2.1: pricing unit tests with the examples in §7.2 for both variants (including the float cases 110.00000000000001 and 13.000000000000002), missing cost → 缺成本, the 瓷砖 category and an inherited sub-category; updated `pricing-synthetic.json`; `pricingConfigService`/route auth tests. For 2.3: a fixture with draft, effective, cancelled and partly paid contracts gives identical totals on every endpoint.
 
 ### Phase 3: Customer and stores
-| PR | Scope | Files | Effort | Process |
-|---|---|---|---|---|
-| 3.1 | Migration A (Customer, `Store.customerId`, order-level fields) + backfill script (dry-run/confirm) | `schema.prisma`, migration, `backend/scripts/backfill-default-customer.js` (+ test) | 2 | **Full**, one-way door |
-| 3.2 | Customers API (CRUD, stores under a customer), RBAC, BOSS GET whitelist, lifecycle registration, classification docs | `routes/customers.js`, controller/service, `bossReadOnly.js`, `lifecycle/resources.json`, `SECURITY.md`, `AGENTS.md`, `data-classification.json` | 2 | **Full** |
-| 3.3 | 客户与门店 pages (list, detail with stores and orders); remove the inline `CreateStoreDialog` from the order form | `app/dashboard/customers/**` | 2 | UI |
+| PR | Card | Scope | Files | Effort | Process | Depends on |
+|---|---|---|---|---|---|---|
+| 3.1 | J11 | Migration A (Customer with FOB default, `Store.customerId` / `code` / `legalName`, order-level fields) + backfill script (dry-run/confirm) | `schema.prisma`, migration, `backend/scripts/backfill-default-customer.js` (+ test) | 2 | **Full**, one-way door | J10 |
+| 3.2 | J12 | Customers API (CRUD, stores under a customer), RBAC, BOSS GET whitelist, lifecycle registration, classification docs | `routes/customers.js`, controller/service, `bossReadOnly.js`, `lifecycle/resources.json`, `SECURITY.md`, `AGENTS.md`, `data-classification.json` | 2 | **Full** | J11 |
+| 3.3 | J13 | 客户与门店 pages (list, detail with stores and orders); remove the inline `CreateStoreDialog` from the order form | `app/dashboard/customers/**` | 2 | UI | J12, J2 |
 
 ### Phase 4: Supplier price comparison and per-store purchasing
-| PR | Scope | Files | Effort | Process |
-|---|---|---|---|---|
-| 4.1 | Extend price-history with `bySupplier`; exclude DRAFT/CANCELLED; same roles | `purchaseController.getProductPriceHistory`, routes, tests | 1 | **Full** (backend) |
-| 4.2 | Comparison popover in the purchase line editor; product detail 采购价格 tab; supplier detail page | `purchases/**`, `products/[id]`, `suppliers/[id]` | 3 | UI |
-| 4.3 | Migration B part 1: `PurchaseItem.storeId`, `PurchaseContract.salesContractId`; 「生成采购单」 service (one DRAFT contract per supplier, in a transaction) + route | schema, `purchase*Service`, routes, lifecycle | 3 | **Full**, one-way door |
+| PR | Card | Scope | Files | Effort | Process | Depends on |
+|---|---|---|---|---|---|---|
+| 4.1 | J14 | Extend price-history with `bySupplier`; exclude DRAFT/CANCELLED and archived suppliers; same roles | `purchaseController.getProductPriceHistory`, routes, tests | 1 | **Full** (backend) | — |
+| 4.2 | J15 | Comparison popover in the purchase line editor; product detail 采购价格 tab; supplier detail page | `purchases/**`, `products/[id]`, `suppliers/[id]` | 3 | UI | J14, J2 |
+| 4.3 | J16 | Migration B1: `PurchaseItem.storeId`, `PurchaseContract.salesContractId`; 「生成采购单」 service (one DRAFT contract per supplier, in a transaction) + route | schema, `purchase*Service`, routes, lifecycle | 3 | **Full**, one-way door | J11, J10 |
 
 ### Phase 5: Export order rewrite
-| PR | Scope | Files | Effort | Process |
-|---|---|---|---|---|
-| 5.1 | `/dashboard/orders` list (table); old `/sales` URLs become stubs | `app/dashboard/orders/page.tsx`, stubs | 2 | UI |
-| 5.2 | `/orders/new` and edit: order-level header, product × store grid, paste from Excel, server-side pickers (fixes the 100-row limit), pricing preview | `orders/new`, `components/orders/*` | 5 | UI (uses APIs from 2.1/3.2) |
-| 5.3 | `/orders/[id]`: tabs, one next-step button, 「单证 ▾」 menu, 按门店 table, 货柜 tab embedding the current/PR container view (§11); split `SalesDetailPageContent.tsx` (2,058 lines) | `orders/[id]/**` | 5 | UI |
+| PR | Card | Scope | Files | Effort | Process | Depends on |
+|---|---|---|---|---|---|---|
+| 5.1 | J17 | `/dashboard/orders` list (table); old `/sales` URLs become stubs | `app/dashboard/orders/page.tsx`, stubs | 2 | UI | J2, J4 |
+| 5.2 | J18 | `/orders/new` and edit: order-level header (Seapot, USD, FOB), product × store grid, paste from Excel, server-side pickers (fixes the 100-row limit), pricing preview with whole-number prices | `orders/new`, `components/orders/*` | 5 | UI (uses APIs from J6/J12) | J6, J12, J17 |
+| 5.3 | J19 | `/orders/[id]`: tabs, one next-step button, 「单证 ▾」 menu, 按门店 table, 货柜 tab embedding the container view (§11); split `SalesDetailPageContent.tsx` (2,058 lines) | `orders/[id]/**` | 5 | UI | J18, container PR (C-stream) |
 
 ### Phase 6: Quote / PI
-| PR | Scope | Files | Effort | Process |
-|---|---|---|---|---|
-| 6.1 | Migration B part 2 (`Quote`, `QuoteItem`); quote service with state machine; convert-to-order transaction; routes, RBAC, lifecycle, BOSS whitelist, classification | schema, `quoteService.js`, `routes/quotes.js` (+ tests, integration) | 4 | **Full**, one-way door |
-| 6.2 | Quotation/PI Excel export (streamed, not stored) + print view | `quoteExportService.js` (exceljs), route | 2 | **Full** (generated documents) |
-| 6.3 | Quote pages: list, new/edit grid (reuses the 5.2 grid), detail | `app/dashboard/quotes/**` | 3 | UI |
+| PR | Card | Scope | Files | Effort | Process | Depends on |
+|---|---|---|---|---|---|---|
+| 6.1 | J20 | Migration B2 (`Quote`, `QuoteItem`, FOB default); quote service with state machine; convert-to-order transaction; routes, RBAC, lifecycle, BOSS whitelist, classification | schema, `quoteService.js`, `routes/quotes.js` (+ tests, integration) | 4 | **Full**, one-way door | J10, J11, J6 |
+| 6.2 | J21 | Quotation/PI Excel export in the 外销合同 layout (§6.2; streamed, not stored) + print view | `quoteExportService.js` (exceljs), route | 2 | **Full** (generated documents) | J20 |
+| 6.3 | J22 | Quote pages: list, new/edit grid (reuses the 5.2 grid), detail | `app/dashboard/quotes/**` | 3 | UI | J20, J18 |
 
 ### Phase 7: Remaining modules re-skinned
-| PR | Scope | Files | Effort | Process |
-|---|---|---|---|---|
-| 7.1 | `/dashboard/purchases` list/new/detail on the new shell (receipt panels keep their logic); old URLs become stubs | `app/dashboard/purchases/**`; split `CreatePurchasePageContent.tsx`, `ContractsPageContent.tsx` | 4 | UI |
-| 7.2 | `/dashboard/inventory` (single view, store filter, confirmed status changes); products table with 「资料不全」 filter | `inventory/**`, `products/**` | 3 | UI |
-| 7.3 | 单证与退税: `/dashboard/customs` with tabs; move `app/customs-declarations/components`; tax-refund list readable | `customs/**`, `tax-refunds/**` | 3 | UI |
-| 7.4 | 财务: tabs; split `payments/page.tsx` (1,958 lines) into 收款/付款; statements inner tabs; 经营分析 | `finance/**` | 5 | UI |
-| 7.5 | 首页 to-dos: read-only `GET /dashboard/todos` (backend) | `routes/dashboard.js` + service + tests | 2 | **Full** (backend, read-only) |
-| 7.6 | 首页 UI by role | `app/dashboard/page.tsx` | 2 | UI |
-| 7.7 | Settings sections; users page merge; logs/notifications/about moves | `settings/**` | 2 | UI |
+| PR | Card | Scope | Files | Effort | Process | Depends on |
+|---|---|---|---|---|---|---|
+| 7.1 | J23 | `/dashboard/purchases` list/new/detail on the new shell (receipt panels keep their logic); old URLs become stubs | `app/dashboard/purchases/**`; split `CreatePurchasePageContent.tsx`, `ContractsPageContent.tsx` | 4 | UI | J2, J4 |
+| 7.2 | J24 | `/dashboard/inventory` (single view, store filter, confirmed status changes); products table with 「资料不全」 filter | `inventory/**`, `products/**` | 3 | UI | J2, J4 |
+| 7.3 | J25 | 单证与退税: `/dashboard/customs` with tabs; move `app/customs-declarations/components`; tax-refund list readable | `customs/**`, `tax-refunds/**` | 3 | UI | J2, J4 |
+| 7.4 | J26 | 财务: tabs; split `payments/page.tsx` (1,958 lines) into 收款/付款; statements inner tabs; 经营分析; payables shown from the shared function | `finance/**` | 5 | UI | J2, J4, J8 |
+| 7.5 | J27 | 首页 to-dos: read-only `GET /dashboard/todos` using the shared payables function | `routes/dashboard.js` + service + tests | 2 | **Full** (backend, read-only) | J8 |
+| 7.6 | J28 | 首页 UI by role | `app/dashboard/page.tsx` | 2 | UI | J27, J2 |
+| 7.7 | J29 | Settings sections; users page merge; logs/notifications/about moves | `settings/**` | 2 | UI | J2, J6 |
 
 ### Phase 8: Clean-up and mobile
-| PR | Scope | Files | Effort | Process |
-|---|---|---|---|---|
-| 8.1 | Delete dead pages and components (§12), unused `*_TABS`, the duplicate `BatchImportDialog` | frontend only | 1 | UI |
-| 8.2 | Mobile pass: bottom bar, read-only detail cards, receipt with photo, confirmation on every status tap | `components/mobile/*`, pages | 3 | UI |
-| 8.3 | Housekeeping (§12, after Q13) | root files | 0.5 | **Full** (deletes files outside the frontend) |
+| PR | Card | Scope | Files | Effort | Process | Depends on |
+|---|---|---|---|---|---|---|
+| 8.1 | J30 | Delete dead pages and components (§12), unused `*_TABS`, the duplicate `BatchImportDialog` (code only; business records are archived, §4.11) | frontend only | 1 | UI | J17–J29 |
+| 8.2 | J31 | Mobile pass: bottom bar, read-only detail cards, receipt with photo, confirmation on every status tap | `components/mobile/*`, pages | 3 | UI | J17–J29 |
+| 8.3 | J32 | Housekeeping (§12, after Q13) | root files | 0.5 | **Full** (deletes files outside the frontend) | J30, Q13 |
 
-**Total:** about 80 developer-days (≈ 16 weeks for one developer). Backend work is about 25 of those days and is concentrated in Phases 2, 3, 4.3, 6.1–6.2 and 7.5.
+**Total:** about 86 developer-days (≈ 17 weeks for one developer). Backend work is about 30 of those days and is concentrated in Phases 2, 3, 4.3, 6.1–6.2 and 7.5.
 
 **Recommended order:**
-1. Phase 1 (visible improvement within about 2 weeks).
-2. Phase 2 and Phase 3, in parallel.
-3. Phase 4, then Phase 5, then Phase 6.
-4. Phases 7 and 8.
-
-Phase 6 depends on 2.1, 3.1 and 5.2. Phase 4.3 depends on 3.1.
+1. J0, then in parallel: Phase 1 (J1 → J2 → J3; J4, J5, JP), J6, J8, J9, J10, J14.
+2. J7 after J6; J11 → J12 → J13 and J11 → J16 after J10.
+3. Phase 5, then Phase 6 (J20 needs J10, J11, J6).
+4. Phase 7 as its dependencies merge, then Phase 8.
