@@ -189,9 +189,7 @@ export default function ForgotPasswordPage() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="请输入新密码"
                 />
-                <p className="text-xs text-muted-foreground">
-                  {PASSWORD_HINT}
-                </p>
+                <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="recovery-confirm">确认新密码</Label>

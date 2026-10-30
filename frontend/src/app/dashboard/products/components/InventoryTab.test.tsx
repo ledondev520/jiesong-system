@@ -71,7 +71,7 @@ it("数量列只显示数量和有效单位，纯数字单位不冒充第二个�
   expect(badges.length).toBeGreaterThan(0);
   for (const badge of badges) {
     expect(badge.className).toContain("amber");
-    expect(badge.className).not.toContain("border-destructive");
+    expect(badge.className).not.toContain("bg-destructive/10");
   }
 });
 
