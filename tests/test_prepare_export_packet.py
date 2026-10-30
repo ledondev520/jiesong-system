@@ -16,6 +16,7 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
+@unittest.skip("Python 公式副本已退役：parse_args 拒绝运行，报价见 backend exportPricing.priceFor")
 class PathConfigurationTests(unittest.TestCase):
     arguments = ["--contract", "SYNTHETIC", "--spot-rate", "7", "--refund-dbf", "synthetic.dbf"]
 

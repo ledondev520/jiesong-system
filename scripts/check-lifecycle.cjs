@@ -216,18 +216,30 @@ function check(root = ROOT, { baselineRoutes } = {}) {
         return schema.required.every((key) => {
           const rule = schema.properties[key];
           const item = value[key];
-          return rule.type === 'number'
-            ? typeof item === 'number' &&
-                Number.isFinite(item) &&
-                item >= rule.minimum &&
-                item <= rule.maximum
-            : rule.enum.includes(item);
+          if (rule.type === 'array')
+            return Array.isArray(item) && item.length <= rule.maxItems;
+          const aboveMin =
+            rule.exclusiveMinimum !== undefined
+              ? item > rule.exclusiveMinimum
+              : item >= rule.minimum;
+          return (
+            typeof item === 'number' &&
+            Number.isFinite(item) &&
+            aboveMin &&
+            item <= rule.maximum &&
+            (rule.type !== 'integer' || Number.isInteger(item)) &&
+            (rule.maxDecimals === undefined ||
+              Number((item * 10 ** rule.maxDecimals).toFixed(6)) % 1 === 0)
+          );
         });
       };
       if (
         !validConfig(m?.initial) ||
         !validConfig(m?.replace) ||
-        schema.required.every((key) => m.initial[key] === m.replace[key]) ||
+        schema.required.every(
+          (key) =>
+            JSON.stringify(m.initial[key]) === JSON.stringify(m.replace[key]),
+        ) ||
         !Array.isArray(m?.invalid) ||
         !m.invalid.length ||
         m.invalid.some(validConfig)
