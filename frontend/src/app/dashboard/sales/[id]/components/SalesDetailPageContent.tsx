@@ -107,6 +107,8 @@ import {
   CONTAINER_40HQ,
   SHIPPING_READY_THRESHOLD_PCT,
   buildPackingBoxes,
+  countItemsMissingBoxes,
+  countItemsMissingDimensions,
   evaluateShippingReadiness,
   packBoxes,
 } from "@/lib/binPacking";
@@ -827,9 +829,12 @@ export default function SalesDetailPage({ params }: PageProps) {
   const usedCBM = volumeUsed;
   const cbmPercent = Math.min((usedCBM / maxCBM) * 100, 100);
 
-  // 出柜条件：毛重(22t)或体积(68CBM)任一利用率 ≥ 80%
+  // 出柜条件：毛重或体积任一利用率 ≥ 阈值（40HQ 限值与阈值见 binPacking / config/containers.json）
   const readiness = evaluateShippingReadiness(weightUsed, usedCBM, {
     unplacedBoxCount: packingPlan.unplacedBoxes.length,
+    packingItemCount: packingRows.length,
+    missingBoxItemCount: countItemsMissingBoxes(packingRows),
+    missingDimensionItemCount: countItemsMissingDimensions(packingRows, products),
   });
 
   const currentStepIndex = STATUS_ORDER[contract.status] ?? 0;
@@ -841,14 +846,35 @@ export default function SalesDetailPage({ params }: PageProps) {
     SalesStatus.ARRIVED,
     SalesStatus.COMPLETED,
   ].includes(contract.status);
-  const readinessProblem = readiness.overloaded
-    ? `${readiness.overloadReasons.includes("weight") ? "毛重超过 22t" : ""}${readiness.overloadReasons.length === 2 ? "、" : ""}${readiness.overloadReasons.includes("volume") ? "体积超过 68 CBM" : ""}`
-    : !readiness.physicalFit
-      ? `仍有 ${readiness.unplacedBoxCount} 箱未装下`
-      : readiness.ready
-        ? "满足出柜条件且全部箱件可装下"
-        : "未达出柜标准";
-  const readinessIsBlocking = readiness.overloaded || !readiness.physicalFit;
+  const overloadText = [
+    readiness.overloadReasons.includes("weight")
+      ? `毛重超过 ${CONTAINER_40HQ.maxWeight / 1000}t`
+      : "",
+    readiness.overloadReasons.includes("volume")
+      ? `体积超过 ${CONTAINER_40HQ.maxVolume} CBM`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("、");
+  const readinessProblem =
+    packingRows.length === 0
+      ? "尚未录入装箱明细"
+      : readiness.missingBoxItemCount > 0
+        ? `${readiness.missingBoxItemCount} 行装箱明细未填写箱数`
+        : readiness.missingDimensionItemCount > 0
+          ? `${readiness.missingDimensionItemCount} 行缺少箱规和体积，无法排柜`
+          : readiness.overloaded
+            ? overloadText
+            : !readiness.physicalFit
+              ? `仍有 ${readiness.unplacedBoxCount} 箱未装下`
+              : readiness.ready
+                ? "满足出柜条件且全部箱件可装下"
+                : "未达出柜标准";
+  const readinessIsBlocking =
+    packingRows.length === 0 ||
+    readiness.missingBoxItemCount > 0 ||
+    readiness.overloaded ||
+    !readiness.physicalFit;
   const readinessHeadline = hasShipped
     ? `历史装箱数据${readiness.ready ? "模拟核对" : "待核对"}：${readinessProblem}`
     : `${readinessIsBlocking ? "不可出货：" : ""}${readinessProblem}`;
@@ -939,7 +965,7 @@ export default function SalesDetailPage({ params }: PageProps) {
         />
       </div>
 
-      {/* 出柜条件（双80%指标）：毛重 22t / 体积 68CBM 任一 ≥ 80% 即可出柜 */}
+      {/* 出柜条件（双80%指标）：毛重或体积任一利用率 ≥ 阈值即可出柜 */}
       <div
         className={
           readinessIsBlocking
@@ -1128,7 +1154,9 @@ export default function SalesDetailPage({ params }: PageProps) {
               </div>
               <div>
                 <p className="text-sm font-medium">{contract.contractNo}</p>
-                <p className="text-xs text-muted-foreground">40HQ 标准货柜</p>
+                <p className="text-xs text-muted-foreground">
+                  {CONTAINER_40HQ.code} 标准货柜
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -1532,7 +1560,8 @@ export default function SalesDetailPage({ params }: PageProps) {
                 3D 装箱可视化
               </CardTitle>
               <CardDescription>
-                40HQ 标准货柜 ({CONTAINER_40HQ.length}×{CONTAINER_40HQ.width}×
+                {CONTAINER_40HQ.code} 标准货柜 ({CONTAINER_40HQ.length}×
+                {CONTAINER_40HQ.width}×
                 {CONTAINER_40HQ.height} mm)
               </CardDescription>
             </CardHeader>

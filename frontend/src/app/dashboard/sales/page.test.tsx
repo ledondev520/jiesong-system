@@ -139,6 +139,25 @@ describe('SalesPage 交互逻辑', () => {
     expect(await screen.findAllByText('暂无出口合同')).toHaveLength(2);
   });
 
+  it('列表徽章只表达利用率：达标显示「利用率达标」，未达显示「未达80%」，不再称「可出柜」', async () => {
+    const base = {
+      status: 'PACKING', signedAt: null, totalBoxes: 1, totalAmount: 1000, port: { name: '深圳' }, stores: [],
+    };
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          { ...base, id: 'sc-ok', contractNo: 'EXP-OK', volume: 60, grossWeight: 1000, loadingUtilisation: { weightPct: 4.5, volumePct: 88.2, reachedBy: 'volume', utilisationReady: true, overReasons: [] } },
+          { ...base, id: 'sc-low', contractNo: 'EXP-LOW', volume: 10, grossWeight: 1000, loadingUtilisation: { weightPct: 4.5, volumePct: 14.7, reachedBy: 'none', utilisationReady: false, overReasons: [] } },
+        ],
+      },
+    });
+    render(<SalesPage />);
+
+    expect((await screen.findAllByText('利用率达标')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('未达80%').length).toBeGreaterThan(0);
+    expect(screen.queryByText('可出柜')).not.toBeInTheDocument();
+  });
+
   it('删除成功后提示并刷新列表', async () => {
     const contract = {
       id: 'sc-1',
