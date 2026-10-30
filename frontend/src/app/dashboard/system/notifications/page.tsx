@@ -38,10 +38,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  ADMIN_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -176,7 +172,6 @@ export default function SystemNotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="通知中心"
         description="查看系统通知并管理已读状态"

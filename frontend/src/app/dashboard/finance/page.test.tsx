@@ -45,11 +45,6 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard/finance',
 }));
 
-vi.mock('@/lib/tab-memory', () => ({
-  saveModuleTab: vi.fn(),
-  getModuleTab: vi.fn((href: string) => href),
-}));
-
 vi.mock('./components/FinanceOverviewCharts', () => ({
   default: () => (
     <div data-testid="finance-overview-charts">

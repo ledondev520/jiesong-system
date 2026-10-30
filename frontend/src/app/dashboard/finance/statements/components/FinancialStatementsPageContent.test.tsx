@@ -14,10 +14,6 @@ const mockListStatements = vi.fn();
 const mockPreviewBundle = vi.fn();
 const mockConfirmBundle = vi.fn();
 
-vi.mock('@/components/layout/ModuleTabHeader', () => ({
-  FINANCE_TABS: [],
-  ModuleTabHeader: () => <div>财务导航</div>,
-}));
 
 vi.mock('@/lib/api-cache', () => ({
   cachedFetch: (_key: string, fetcher: () => Promise<unknown>) => fetcher(),

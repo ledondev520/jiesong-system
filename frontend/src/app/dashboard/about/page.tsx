@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { toast } from 'sonner';
 
 const DEFAULT_ORIGIN = 'https://your-vps-host';
@@ -93,7 +92,6 @@ export default function AboutAgentPage() {
 
   return (
     <div className="min-w-0 space-y-6 break-words">
-      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="关于 Agent 使用"
         description="让内部同事的 Agent 用几句话或几条命令，就能接上这套系统。"

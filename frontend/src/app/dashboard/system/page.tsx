@@ -14,7 +14,6 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, ADMIN_TABS } from '@/components/layout/ModuleTabHeader';
 import { SYSTEM_CENTER_LINKS } from '@/components/layout/navigation.config';
 
 /**
@@ -25,7 +24,6 @@ export default function SystemOverviewPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         eyebrow="系统管理 / 运维中心"
         title="运维中心"

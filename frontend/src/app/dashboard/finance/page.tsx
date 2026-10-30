@@ -35,7 +35,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
 import { financeService } from '@/services/finance.service';
 import {
   getTransactionStats, getInvoiceStats,
@@ -248,7 +247,6 @@ export default function FinancePage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
         title="财务概览"
         description="公司财务进度、收支健康、成本结构与利润趋势。"

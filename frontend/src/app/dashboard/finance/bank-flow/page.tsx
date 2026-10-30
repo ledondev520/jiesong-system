@@ -13,10 +13,6 @@ import { useCallback, useEffect, useState } from "react";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { useSearchParams } from "next/navigation";
-import {
-  ModuleTabHeader,
-  FINANCE_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -215,7 +211,6 @@ export default function BankFlowPage() {
 
   return (
     <div className="space-y-4">
-      <ModuleTabHeader tabs={FINANCE_TABS} />
 
       {loadError && (
         <ErrorState

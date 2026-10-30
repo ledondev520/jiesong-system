@@ -11,10 +11,6 @@
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  ModuleTabHeader,
-  FINANCE_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { ErrorState } from "@/components/ui/data-state";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { clearApiGetCache } from "@/lib/axios";
@@ -288,7 +284,6 @@ export default function ReconciliationPage() {
 
   return (
     <div className="space-y-4">
-      <ModuleTabHeader tabs={FINANCE_TABS} />
 
       {(reconError || unmatchedError || contractsError) && (
         <ErrorState
