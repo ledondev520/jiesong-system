@@ -97,8 +97,8 @@
 - 页面内容切换用 shadcn `Tabs`（不触发路由跳转）
 
 ### 移动端导航
-- `md` 以下 Sidebar 隐藏，通过 Header 的汉堡菜单（`Sheet`）展开导航
-- 移动端导航数据与 Sidebar 保持完全一致（`mobileNavItems` = Sidebar `moduleNavItems` 镜像）
+- `md` 以下 Sidebar 隐藏，使用底部 TabBar：首页 · 订单 · 采购 · 库存 · 更多（其余菜单、AI 助手、用户信息在「更多」Sheet）
+- 数据来源与 Sidebar 相同（`navigation.config.ts`）
 
 ---
 
