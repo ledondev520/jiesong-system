@@ -29,9 +29,10 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
+const authState = vi.hoisted(() => ({ role: "ADMIN" as string }));
 vi.mock("@/store/auth.store", () => ({
   useAuthStore: () => ({
-    user: { id: "u-1", name: "管理员", role: Role.ADMIN },
+    user: { id: "u-1", name: "测试用户", role: authState.role },
   }),
 }));
 
@@ -205,6 +206,21 @@ describe("DashboardPage 交互逻辑", () => {
     await waitFor(() =>
       expect(screen.getByRole("status")).toHaveTextContent("状态读取失败"),
     );
+  });
+
+  it("WPS 同步状态框仅管理员可见，非管理员不请求同步状态", async () => {
+    mockSyncStatus.mockClear();
+    authState.role = Role.SALES;
+    try {
+      render(<DashboardPage />);
+      await waitFor(() =>
+        expect(screen.getByText("待起草采购")).toBeInTheDocument(),
+      );
+      expect(screen.queryByText(/WPS 出货同步/)).not.toBeInTheDocument();
+      expect(mockSyncStatus).not.toHaveBeenCalled();
+    } finally {
+      authState.role = Role.ADMIN;
+    }
   });
 
   it("渲染工作台首屏核心结构", async () => {
