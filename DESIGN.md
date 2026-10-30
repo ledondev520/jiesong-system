@@ -76,30 +76,25 @@
 
 ## 导航架构
 
-系统采用 **两级导航**：
+侧栏分组，菜单项来自 `navigation.config.ts`（指向现有 URL，角色可见性用 `visibleRoles`）；已删除 `ModuleTabHeader`。
 
 ```
-Level 1：Sidebar（6个模块入口）
-  - 经营中台  → /dashboard
-  - 采购      → /dashboard/contracts
-  - 出口      → /dashboard/sales
-  - 财务      → /dashboard/finance/statements
-  - AI 助手   → /dashboard/ai/sessions
-  - 系统管理  → /dashboard/settings
-
-Level 2：ModuleTabHeader（模块内水平 Tab，切换路由）
-  - 经营中台: 工作台 | 经营执行 | 库存状态
-  - 采购:     采购合同 | 供应商管理
-  - 出口:     出口合同 | 出口退税 | 报关单 | HS 编码
-  - 财务:     财务报表 | 收付管理
-  - AI:       AI 会话
-  - 系统管理: 系统配置 | 用户管理 | 通知中心 | 系统日志 | 导入记录 | 合同模板
+首页            /dashboard
+业务
+  出口订单      /dashboard/sales
+  采购          /dashboard/contracts
+  库存          /dashboard/inventory-status
+  单证与退税    /dashboard/customs-declarations（子页：报关单 | 出口退税）
+  财务          /dashboard/finance（子页：财务概览 | 财务报表 | 收付管理 | 经营执行）
+资料
+  供应商 · 商品 · HS 编码
+设置（ADMIN）   /dashboard/settings（子页：系统配置 | 账号管理 | 系统日志）
 ```
 
-**规则**：
+- 报价、客户与门店页面上线前在配置中 `hidden`；AI 助手无菜单项，从顶栏按钮（手机端「更多」）进入
+- 激活项在侧栏展开子页面，替代原页面顶部的模块 Tab
+- 顶栏：面包屑与标题（手机端在内容区）· ⌘K 搜索 · 通知 · AI 入口 · 用户菜单
 - 页面内容切换用 shadcn `Tabs`（不触发路由跳转）
-- 路由级跳转用 `ModuleTabHeader`
-- 禁止在同一页面同时使用 `ModuleTabHeader` + 页面内 `Tabs` 超过一层（避免3级导航）
 
 ### 移动端导航
 - `md` 以下 Sidebar 隐藏，通过 Header 的汉堡菜单（`Sheet`）展开导航
