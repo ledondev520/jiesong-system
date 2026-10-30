@@ -30,4 +30,22 @@ describe('status-badge', () => {
     render(<StatusBadge status="PACKING" />);
     expect(screen.getByText('装箱中')).toBeInTheDocument();
   });
+
+  it('按业务对象取状态表：库存「包装中」为蓝色而非危险色', () => {
+    expect(getStatusBadgeConfig('PACKING', {}, 'inventory')).toEqual({ label: '包装中', tone: 'info' });
+    expect(getStatusBadgeConfig('PACKING', {}, 'salesOrder')).toEqual({ label: '装柜中', tone: 'info' });
+    expect(getStatusBadgeConfig('READY', {}, 'purchaseContract')).toEqual({ label: '待装柜', tone: 'warning' });
+    expect(getStatusBadgeConfig('EXPIRED', {}, 'quote')).toEqual({ label: '已过期', tone: 'warning' });
+  });
+
+  it('不传 domain 时保持原有默认映射，domain 表里没有的状态回退默认映射', () => {
+    expect(getStatusBadgeConfig('PACKING')).toEqual({ label: '装箱中', tone: 'warning' });
+    expect(getStatusBadgeConfig('INBOUND', {}, 'quote')).toEqual({ label: '已入库', tone: 'secondary' });
+  });
+
+  it('StatusBadge 接受 domain 并渲染对应文案和配色', () => {
+    render(<StatusBadge status="arrived" domain="salesOrder" />);
+    const badge = screen.getByText('已到港');
+    expect(badge.className).toContain('text-amber-800');
+  });
 });

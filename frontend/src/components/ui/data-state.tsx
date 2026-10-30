@@ -4,6 +4,8 @@ import React from 'react';
 import { LucideIcon, Loader2, ServerCrash } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Button } from '@/components/ui/button';
+import { describeFailure } from '@/lib/error-reason';
 import { cn } from '@/lib/utils';
 
 interface LoadingStateProps {
@@ -18,6 +20,11 @@ interface ErrorStateProps {
   description?: string;
   action?: React.ReactNode;
   className?: string;
+  /** 失败的事（如「加载港口失败」）；与 error 一起给出时描述为「失败的事：服务端原因」 */
+  what?: string;
+  error?: unknown;
+  /** 给出时渲染「重试」按钮；显式传入的 action 优先 */
+  onRetry?: () => void;
 }
 
 interface TableStateRowProps extends ErrorStateProps {
@@ -54,10 +61,21 @@ export function LoadingState({
 export function ErrorState({
   icon: Icon = ServerCrash,
   title = '数据加载失败',
-  description = '无法连接到服务器，请稍后重试。',
-  action,
+  description: descriptionProp = '无法连接到服务器，请稍后重试。',
+  action: actionProp,
   className,
+  what,
+  error,
+  onRetry,
 }: ErrorStateProps) {
+  const description = what ? describeFailure(what, error) : descriptionProp;
+  const action =
+    actionProp ??
+    (onRetry ? (
+      <Button type="button" variant="outline" onClick={onRetry}>
+        重试
+      </Button>
+    ) : undefined);
   return (
     <div
       className={cn(
@@ -85,6 +103,9 @@ export function TableStateRow({
   description,
   action,
   className,
+  what,
+  error,
+  onRetry,
 }: TableStateRowProps) {
   return (
     <TableRow>
@@ -107,6 +128,9 @@ export function TableStateRow({
             title={title}
             description={description}
             action={action}
+            what={what}
+            error={error}
+            onRetry={onRetry}
             className={cn('min-h-[8rem] rounded-none border-0 bg-transparent', className)}
           />
         ) : null}

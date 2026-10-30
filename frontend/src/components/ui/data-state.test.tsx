@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { vi } from 'vitest';
 import { AlertTriangle, Inbox } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { Table, TableBody } from '@/components/ui/table';
@@ -42,5 +43,34 @@ describe('data-state', () => {
 
     expect(screen.getByText('暂无记录')).toBeInTheDocument();
     expect(screen.getByText('当前筛选条件下没有结果。')).toBeInTheDocument();
+  });
+
+  it('error state 显示「失败的事：服务端原因」并提供重试按钮', () => {
+    const onRetry = vi.fn();
+    render(<ErrorState what="加载港口失败" error={{ message: '数据库忙' }} onRetry={onRetry} />);
+
+    expect(screen.getByText('加载港口失败：数据库忙')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('显式 action 优先于 onRetry；不传 onRetry 不渲染按钮', () => {
+    const { rerender } = render(<ErrorState what="加载失败" error="x" />);
+    expect(screen.queryByRole('button')).toBeNull();
+    rerender(<ErrorState what="加载失败" error="x" onRetry={() => {}} action={<button type="button">联系管理员</button>} />);
+    expect(screen.queryByRole('button', { name: '重试' })).toBeNull();
+    expect(screen.getByRole('button', { name: '联系管理员' })).toBeInTheDocument();
+  });
+
+  it('table error row 透传 what/error/onRetry', () => {
+    render(
+      <Table>
+        <TableBody>
+          <TableStateRow colSpan={3} variant="error" what="加载港口失败" error={{ message: '超时' }} onRetry={() => {}} />
+        </TableBody>
+      </Table>,
+    );
+    expect(screen.getByText('加载港口失败：超时')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
   });
 });
