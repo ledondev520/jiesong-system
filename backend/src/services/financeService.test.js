@@ -791,13 +791,15 @@ test('getReceivables: 正式合同金额不再扣除第三方装箱货值', asyn
 });
 
 test('getStats: 排除第三方拼柜金额后计算真实应收', async () => {
-  const originalPurchaseAggregate = prisma.purchaseContract.aggregate;
+  const originalPurchaseFindMany = prisma.purchaseContract.findMany;
   const originalSalesFindMany = prisma.salesContract.findMany;
   const originalPackingItemGroupBy = prisma.packingItem.groupBy;
 
-  prisma.purchaseContract.aggregate = async () => ({
-    _sum: { totalAmount: 1000, paidAmount: 200 },
-  });
+  // 只返回已生效合同（payablesService 在查询层按状态过滤）；这里再混入草稿证明汇总层也会剔除。
+  prisma.purchaseContract.findMany = async () => ([
+    { id: 'p1', status: 'SIGNED', totalAmount: 1000, paidAmount: 200, expectedDate: null },
+    { id: 'p-draft', status: 'DRAFT', totalAmount: 5000, paidAmount: 0, expectedDate: null },
+  ]);
   prisma.salesContract.findMany = async () => ([
     {
       id: 'contract-1',
@@ -839,7 +841,7 @@ test('getStats: 排除第三方拼柜金额后计算真实应收', async () => {
       },
     });
   } finally {
-    prisma.purchaseContract.aggregate = originalPurchaseAggregate;
+    prisma.purchaseContract.findMany = originalPurchaseFindMany;
     prisma.salesContract.findMany = originalSalesFindMany;
     prisma.packingItem.groupBy = originalPackingItemGroupBy;
   }
