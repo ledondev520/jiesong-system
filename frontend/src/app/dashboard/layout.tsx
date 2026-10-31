@@ -189,7 +189,7 @@ export default function DashboardLayout({
   return (
     <>
       <NetworkStatus />
-      <div className="grid min-h-screen w-full bg-muted/40 md:grid-cols-[260px_1fr]">
+      <div className="grid min-h-screen w-full bg-muted/40 md:grid-cols-[232px_1fr]">
         {/* 桌面端侧边栏：移动端隐藏 */}
         <div className="hidden border-r bg-sidebar md:block">
           <Sidebar />
@@ -204,7 +204,8 @@ export default function DashboardLayout({
                 "calc(56px + env(safe-area-inset-bottom) + 1.25rem)",
             }}
           >
-            <Breadcrumbs />
+            {/* 桌面端面包屑在顶栏；手机端顶栏放品牌，面包屑留在内容区 */}
+            <Breadcrumbs className="md:hidden" />
             {user?.role === Role.BOSS && isBossRestrictedPath(pathname) ? (
               <div role="alert" className="rounded-md border p-4 text-sm">
                 老板角色仅可查看经营和业务信息，该页面包含管理或写入操作。

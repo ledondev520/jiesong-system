@@ -41,7 +41,7 @@ test.afterEach(async () => {
  */
 async function enterHs(page: Page, role: HsRole = "PURCHASE") {
   const token = await loginHsAs(page, fixture, role);
-  await page.getByRole("link", { name: "出口", exact: true }).first().click();
+  await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
   await expect(page).toHaveURL(/\/dashboard\/sales$/);
   await page.getByRole("link", { name: "HS 编码", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/hs-codes/);

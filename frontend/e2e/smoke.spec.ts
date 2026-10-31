@@ -62,11 +62,11 @@ test.describe('侧边栏导航全覆盖', () => {
     const sidebarNav = page.locator('nav').first();
 
     const navCases = [
-      { label: '经营中台', path: '/dashboard', url: /\/dashboard$/, heading: '工作台' },
+      { label: '首页', path: '/dashboard', url: /\/dashboard$/, heading: '工作台' },
       { label: '采购', path: '/dashboard/contracts', url: /\/dashboard\/contracts$/, heading: '采购合同' },
-      { label: '出口', path: '/dashboard/sales', url: /\/dashboard\/sales$/, heading: '出口合同' },
+      { label: '出口订单', path: '/dashboard/sales', url: /\/dashboard\/sales$/, heading: '出口合同' },
       { label: '财务', path: '/dashboard/finance', url: /\/dashboard\/finance$/, heading: '财务概览' },
-      { label: '系统管理', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '系统配置' },
+      { label: '设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '系统配置' },
     ] as const;
 
     for (const item of navCases) {
