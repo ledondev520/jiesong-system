@@ -40,11 +40,10 @@ vi.mock("@/services/sales.service", () => ({
       .fn()
       .mockResolvedValue({ data: { contractNo: "SYNTHETIC-001" } }),
     calculatePrice: vi.fn().mockResolvedValue(2),
-    getExchangeRate: vi
-      .fn()
-      .mockResolvedValue({
-        data: { rate: 6.72, buffer: 0.2, effectiveRate: 6.52 },
-      }),
+    previewOrderMargin: vi.fn().mockResolvedValue(null),
+    getExchangeRate: vi.fn().mockResolvedValue({
+      data: { rate: 6.72, buffer: 0.2, effectiveRate: 6.52 },
+    }),
     create: mocks.createSale,
     createWithItems: mocks.createSale,
     addItem: mocks.addItem,

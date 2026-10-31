@@ -5,7 +5,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { markupFor, priceFor, roundUnitPrice, historicalQuoteAllowed } = require('./exportPricing');
+const { ORDER_MARGIN_BAND, markupFor, orderMargin, priceFor, roundUnitPrice, historicalQuoteAllowed } = require('./exportPricing');
 const { chainFor } = require('./productCategoryChain');
 
 // 规范 §7.2 示例：现汇 7.2、不加调整，便于对照
@@ -103,4 +103,53 @@ test('历史报价复算按分类目标加价并保留 5 个百分点容差', ()
   assert.equal(historicalQuoteAllowed({ ...base, unitPriceUsd: 200 }, spec).allowed, false);
   assert.equal(historicalQuoteAllowed({ ...base, unitPriceUsd: 110, categoryIds: ['tile'] }, spec).allowed, true);
   assert.equal(historicalQuoteAllowed({ ...base, unitPriceUsd: 130, costCny: 0 }, spec).allowed, false);
+});
+
+// 报价汇率 5.2 − 0.2 = 5，成本 ¥100 × 1 件：售价 $26 → ¥130 → 利润率恰为 30%
+const band = { ...spec, exchangeRate: 5.2, exchangeAdjustment: -0.2 };
+const line = (unitPriceUsd, extra = {}) => ({ costCny: 100, quantity: 1, unitPriceUsd, ...extra });
+
+test('订单利润率：区间 30%~35% 只在一个常量里', () => {
+  assert.deepEqual(ORDER_MARGIN_BAND, { min: 0.3, max: 0.35 });
+});
+
+test('订单利润率：区间内与端点（恰好 30%、35%）不提示', () => {
+  for (const [price, pct] of [[26, 30], [26.5, 32.5], [27, 35]]) {
+    const result = orderMargin({ lines: [line(price)] }, band);
+    assert.equal(result.marginPct, pct);
+    assert.equal(result.warning, null, String(price));
+  }
+});
+
+test('订单利润率：低于 30% 或高于 35% 给出不阻断的提示', () => {
+  assert.equal(orderMargin({ lines: [line(25.9)] }, band).warning, '订单整体利润率 29.5% 不在 30%~35% 范围内');
+  assert.equal(orderMargin({ lines: [line(27.1)] }, band).warning, '订单整体利润率 35.5% 不在 30%~35% 范围内');
+  // 按订单整体判断：一行偏低、一行偏高合计在区间内则不提示
+  assert.equal(orderMargin({ lines: [line(25), line(28)] }, band).warning, null);
+});
+
+test('订单利润率：负责人例子 成本 10000 @ 现汇 6.72 售价 1995 → 30.07%，在区间内', () => {
+  const owner = { ...spec, exchangeRate: 6.72, exchangeAdjustment: -0.2 };
+  const result = orderMargin({ lines: [{ costCny: 10000, quantity: 3, unitPriceUsd: 1995 }] }, owner);
+  assert.equal(result.marginPct, 30.07);
+  assert.equal(result.warning, null);
+  // 订单保存的现汇优先于配置现汇
+  assert.equal(orderMargin({ lines: [{ costCny: 10000, quantity: 1, unitPriceUsd: 1995 }], spotRate: 7.2 }, owner).marginPct, 39.65); // 1995 × 7.0 ÷ 10000 − 1
+});
+
+test('订单利润率：瓷砖（分类加价）行不参与区间检查；只有瓷砖行不提示', () => {
+  const mixed = orderMargin({ lines: [line(26.5), line(22, { categoryIds: ['tile-sub', 'tile'] })] }, band);
+  assert.equal(mixed.marginPct, 32.5);
+  assert.equal(mixed.excludedLines, 1);
+  assert.equal(mixed.warning, null);
+  const tilesOnly = orderMargin({ lines: [line(22, { categoryIds: ['tile'] })] }, band);
+  assert.deepEqual([tilesOnly.margin, tilesOnly.warning, tilesOnly.excludedLines], [null, null, 1]);
+});
+
+test('订单利润率：售价合计为 0、成本为 0、无明细或汇率无效时不报错也不提示', () => {
+  for (const input of [{ lines: [line(0)] }, { lines: [{ ...line(26), costCny: 0 }] }, { lines: [] }, {}, { lines: [line(26)], spotRate: 0.1 }]) {
+    const result = orderMargin(input, band);
+    assert.equal(result.margin, null);
+    assert.equal(result.warning, null);
+  }
 });

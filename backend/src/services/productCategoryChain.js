@@ -25,4 +25,13 @@ const withCategoryChains = async (items, prismaClient) => {
     : item));
 };
 
-module.exports = { chainFor, withCategoryChains };
+/** 商品 ID → 分类链；未知商品或无分类的商品不在结果中（调用方按无分类处理） */
+const categoryIdsByProduct = async (productIds, prismaClient) => {
+  const ids = [...new Set(productIds.filter((id) => typeof id === 'string' && id))];
+  if (!ids.length) return new Map();
+  const products = await prismaClient.product.findMany({ where: { id: { in: ids } }, select: { id: true, categoryId: true } });
+  const chained = await withCategoryChains(products.map((product) => ({ product })), prismaClient);
+  return new Map(chained.map(({ product }) => [product.id, product.categoryIds || []]));
+};
+
+module.exports = { categoryIdsByProduct, chainFor, withCategoryChains };

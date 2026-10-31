@@ -245,6 +245,29 @@ describe("salesService.calculatePrice / getExchangeRate", () => {
     );
   });
 
+  it("带商品时把 productId 交给后端取分类加价；订单利润率预览走同一端点的 items 模式", async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { recommended: 1690, warning: null },
+    });
+    await salesService.calculatePrice(10000, 6.72, "prod-tile");
+    expect(api.post).toHaveBeenLastCalledWith("/sales/calculate-price", {
+      costPrice: 10000,
+      exchangeRate: 6.72,
+      productId: "prod-tile",
+    });
+    const items = [
+      { productId: "p", quantity: 1, costPrice: 100, sellingPrice: 20 },
+    ];
+    expect(await salesService.previewOrderMargin(6.72, items)).toEqual({
+      recommended: 1690,
+      warning: null,
+    });
+    expect(api.post).toHaveBeenLastCalledWith("/sales/calculate-price", {
+      exchangeRate: 6.72,
+      items,
+    });
+  });
+
   it("getExchangeRate 读取 /system/exchange-rate", async () => {
     (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
     await salesService.getExchangeRate();

@@ -13,7 +13,8 @@ const path = require('node:path');
 const pricingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sales-service-pricing-'));
 process.env.JIESONG_PRICING_CONFIG = path.join(pricingDir, 'pricing.json');
 fs.writeFileSync(process.env.JIESONG_PRICING_CONFIG, JSON.stringify({
-  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5,
+  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, roundUpTo: 5,
+  categoryMarkups: [{ categoryId: 'cat-tile', categoryName: '瓷砖', markup: 0.1 }],
 }), { mode: 0o600 });
 test.after(() => fs.rmSync(pricingDir, { recursive: true, force: true }));
 const prisma = require('../utils/prisma');
@@ -405,6 +406,41 @@ test('calculateSellingPrice: 只按唯一报价规则；拒绝请求里的 profi
   );
   assert.equal(salesService.calculateSellingPrice({ costPrice: 10000 }).recommended, 1995); // 现汇取配置 6.72
 });
+
+// 合成商品：p-tile 属于“瓷砖”子分类（祖先命中 cat-tile 加价 10%），p-cup 无分类
+const withSyntheticCatalog = async (run) => {
+  const originalProducts = prisma.product.findMany;
+  const originalCategories = prisma.productCategory.findMany;
+  prisma.product.findMany = async ({ where }) => [{ id: 'p-tile', categoryId: 'cat-tile-sub' }, { id: 'p-cup', categoryId: null }]
+    .filter((product) => where.id.in.includes(product.id));
+  prisma.productCategory.findMany = async () => [{ id: 'cat-tile-sub', parentId: 'cat-tile' }, { id: 'cat-tile', parentId: null }];
+  try {
+    await run();
+  } finally {
+    prisma.product.findMany = originalProducts;
+    prisma.productCategory.findMany = originalCategories;
+  }
+};
+
+test('calculateProductSellingPrice: 带商品时按分类链取瓷砖 ×1.1，无分类按默认 ×1.3', () => withSyntheticCatalog(async () => {
+  // 11000 ÷ 6.52 = 1687.12 → 1688 → 个位 8 → 1690；13000 ÷ 6.52 → 1995
+  assert.equal((await salesService.calculateProductSellingPrice({ productId: 'p-tile', costPrice: 10000, exchangeRate: 6.72 })).recommended, 1690);
+  assert.equal((await salesService.calculateProductSellingPrice({ productId: 'p-cup', costPrice: 10000, exchangeRate: 6.72 })).recommended, 1995);
+  assert.equal((await salesService.calculateProductSellingPrice({ costPrice: 10000, exchangeRate: 6.72 })).recommended, 1995);
+}));
+
+test('previewOrderMargin: 返回订单整体利润率与不阻断提示；瓷砖行不参与区间检查', () => withSyntheticCatalog(async () => {
+  const cup = { productId: 'p-cup', quantity: 2, costPrice: 10000, sellingPrice: 1995 };
+  const tile = { productId: 'p-tile', quantity: 1, costPrice: 10000, sellingPrice: 1690 };
+  const inBand = await salesService.previewOrderMargin({ exchangeRate: 6.72, items: [cup, tile] });
+  assert.deepEqual([inBand.marginPct, inBand.excludedLines, inBand.warning], [30.07, 1, null]);
+  const low = await salesService.previewOrderMargin({ exchangeRate: 6.72, items: [{ ...cup, sellingPrice: 1900 }, tile] });
+  assert.equal(low.warning, '订单整体利润率 23.88% 不在 30%~35% 范围内');
+  const tilesOnly = await salesService.previewOrderMargin({ exchangeRate: 6.72, items: [tile] });
+  assert.deepEqual([tilesOnly.marginPct, tilesOnly.warning], [null, null]);
+  await assert.rejects(salesService.previewOrderMargin({ items: 'x' }), (error) => error.statusCode === 400);
+  await assert.rejects(salesService.previewOrderMargin({ exchangeRate: 0, items: [cup] }), (error) => error.statusCode === 400);
+}));
 
 test('createSalesContract: 未给汇率时用唯一报价配置的现汇，而不是代码里的 7.0', async () => {
   const originalCount = prisma.salesContract.count;

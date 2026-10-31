@@ -14,8 +14,8 @@ const {
   validateSalesTransition,
 } = require('./salesStateMachine');
 const inventorySnapshot = require('./inventorySnapshot');
-const { defaultSpotRate, priceFor } = require('./exportPricing');
-const { withCategoryChains } = require('./productCategoryChain');
+const { defaultSpotRate, orderMargin, priceFor } = require('./exportPricing');
+const { categoryIdsByProduct, withCategoryChains } = require('./productCategoryChain');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
@@ -352,6 +352,28 @@ const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate, categoryId
     effectiveRate: priced.effectiveRate,
     markup: priced.markup,
   };
+};
+
+/** 报价页按商品取分类链后再定价：瓷砖等分类加价与后端保存时一致。 */
+const calculateProductSellingPrice = async ({ productId, ...input } = {}) => {
+  const categoryIds = productId ? (await categoryIdsByProduct([productId], prisma)).get(productId) : undefined;
+  return calculateSellingPrice({ ...input, categoryIds });
+};
+
+/** 报价/建单预览的订单整体利润率（只提示，不阻止保存）；口径见 exportPricing.orderMargin。 */
+const previewOrderMargin = async ({ exchangeRate, items } = {}) => {
+  if (!Array.isArray(items) || items.length > 100) throw createError('items 必须为不超过100条的数组', 400);
+  if (exchangeRate !== undefined && !(Number(exchangeRate) > 0)) throw createError('exchangeRate 必须大于0', 400);
+  const chains = await categoryIdsByProduct(items.map((item) => item?.productId), prisma);
+  return orderMargin({
+    spotRate: exchangeRate === undefined ? undefined : Number(exchangeRate),
+    lines: items.map((item) => ({
+      costCny: item?.costPrice,
+      quantity: item?.quantity,
+      unitPriceUsd: item?.sellingPrice,
+      categoryIds: chains.get(item?.productId) || [],
+    })),
+  });
 };
 
 const addPackingItem = async (id, data = {}) => prisma.$transaction(async (tx) => {
@@ -704,6 +726,8 @@ module.exports = {
   updateSalesStatus,
   getNextContractNo,
   calculateSellingPrice,
+  calculateProductSellingPrice,
+  previewOrderMargin,
   addPackingItem,
   updatePackingItem,
   removePackingItem,

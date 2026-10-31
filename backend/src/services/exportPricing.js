@@ -54,6 +54,44 @@ const realizedMarkup = (unitPriceUsd, quantity, effectiveRate, costCny) => (
   costCny > 0 ? (unitPriceUsd * quantity * effectiveRate) / costCny - 1 : null
 );
 
+// 订单整体利润率提示区间（负责人 2026-10-31 14:36 SGT 默认 30%~35%，可调整）；端点本身不提示
+const ORDER_MARGIN_BAND = { min: 0.3, max: 0.35 };
+
+/**
+ * 订单整体利润率（只提示，不阻止保存）。口径沿用 realizedMarkup（实际加价，即 profitRate 1.3 = 30%）：
+ *   Σ(售价USD × 数量) × 报价汇率(现汇 + 调整) ÷ Σ(成本¥ × 数量) − 1
+ * 命中 categoryMarkups 的分类加价行（瓷砖 ×1.1）不参与区间检查；只有这类行、或售价/成本合计为 0 时不提示。
+ * @param {{ lines: { costCny: number, quantity: number, unitPriceUsd: number, categoryIds?: string[] }[], spotRate?: number }} input
+ */
+const orderMargin = ({ lines = [], spotRate } = {}, config = loadPricingConfig()) => {
+  const rate = effectiveRateFor(spotRate === undefined ? config.exchangeRate : spotRate, config);
+  const categoryPriced = new Set(config.categoryMarkups.map((entry) => entry.categoryId));
+  let sellUsd = 0;
+  let costCny = 0;
+  let excludedLines = 0;
+  for (const line of lines) {
+    if ((line.categoryIds || []).some((id) => categoryPriced.has(id))) {
+      excludedLines += 1;
+    } else {
+      sellUsd += toNumber(line.unitPriceUsd) * toNumber(line.quantity);
+      costCny += toNumber(line.costCny) * toNumber(line.quantity);
+    }
+  }
+  const margin = rate > 0 && sellUsd > 0 && costCny > 0 ? round((sellUsd * rate) / costCny - 1, 6) : null;
+  const outOfBand = margin !== null && (margin < ORDER_MARGIN_BAND.min || margin > ORDER_MARGIN_BAND.max);
+  const percent = (value) => round(value * 100, 2);
+  return {
+    margin,
+    marginPct: margin === null ? null : percent(margin),
+    band: { minPct: percent(ORDER_MARGIN_BAND.min), maxPct: percent(ORDER_MARGIN_BAND.max) },
+    effectiveRate: rate,
+    excludedLines,
+    warning: outOfBand
+      ? `订单整体利润率 ${percent(margin)}% 不在 ${percent(ORDER_MARGIN_BAND.min)}%~${percent(ORDER_MARGIN_BAND.max)}% 范围内`
+      : null,
+  };
+};
+
 /**
  * 职责：按唯一规则给出建议单价。
  * 返回 status：OK | MISSING_COST（缺成本，不给建议价）| INVALID_RATE（现汇缺失或调整后非正）
@@ -99,5 +137,6 @@ const historicalQuoteAllowed = ({ unitPriceUsd, quantity, effectiveRate, costCny
 };
 
 module.exports = {
-  PRICE_TOLERANCE, currentRates, defaultSpotRate, effectiveRateFor, historicalQuoteAllowed, markupFor, priceFor, realizedMarkup, round, roundUnitPrice,
+  ORDER_MARGIN_BAND, PRICE_TOLERANCE, currentRates, defaultSpotRate, effectiveRateFor, historicalQuoteAllowed, markupFor, orderMargin, priceFor,
+  realizedMarkup, round, roundUnitPrice,
 };
