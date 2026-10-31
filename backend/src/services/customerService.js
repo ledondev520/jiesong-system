@@ -8,7 +8,12 @@ const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 
 const INCOTERMS = ['FOB', 'CFR', 'CIF', 'EXW', 'DDP'];
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Linear-time check (a backtracking regex here was flagged as polynomial ReDoS): one @, no whitespace, dot inside the domain.
+const isEmail = (value) => {
+  const at = value.indexOf('@');
+  const dot = value.lastIndexOf('.');
+  return at > 0 && at === value.lastIndexOf('@') && !/\s/.test(value) && dot > at + 1 && dot < value.length - 1;
+};
 const STORE_CODE = /^[A-Z0-9-]{2,12}$/;
 const MAX_TEXT = 500;
 
@@ -18,7 +23,7 @@ const validateCustomerData = (data) => {
     if (typeof value === 'string' && value.length > MAX_TEXT) throw createError(`${field}过长`, 400);
   }
   if (data.country != null && !/^[A-Z]{2}$/.test(data.country)) throw createError('国家须为两位字母代码', 400);
-  if (data.contactEmail != null && !EMAIL.test(data.contactEmail)) throw createError('联系邮箱格式无效', 400);
+  if (data.contactEmail != null && !isEmail(data.contactEmail)) throw createError('联系邮箱格式无效', 400);
   if (data.defaultCurrency !== undefined && data.defaultCurrency !== 'USD') throw createError('目前仅支持美元(USD)', 400);
   if (data.defaultIncoterm !== undefined && !INCOTERMS.includes(data.defaultIncoterm)) {
     throw createError(`贸易术语须为 ${INCOTERMS.join('/')}`, 400);
