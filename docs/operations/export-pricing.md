@@ -6,11 +6,11 @@
 ```
 有效汇率   = 现汇 + exchangeAdjustment            // 现汇：已有订单用该订单保存的现汇，否则 pricing.exchangeRate
 加价       = 商品分类、其最近祖先分类在 categoryMarkups 中的加价，否则 defaultMarkup
-单价(USD)  = 向上取整到 roundUpTo( 单位采购成本¥ × (1 + 加价) ÷ 有效汇率 )
+单价(USD)  = 先向上取整到整美元，再向上取整到 roundUpTo 的倍数( 单位采购成本¥ × (1 + 加价) ÷ 有效汇率 )
            = Math.ceil(Number((x / step).toFixed(6))) * step       // 浮点保护：19.0000000001 仍为 19
 ```
 
-负责人 2026-10-31 决定：先按 CNY 加价（普通 ×1.3，瓷砖 ×1.1），再按「现汇 − 0.2」换算，**在美元上**向上取整到整数（不是先取整到整元再换算）。
+负责人 2026-10-31 终版：先按 CNY 加价（普通 ×1.3，瓷砖 ×1.1），再按「现汇 − 0.2」换算，**在美元上**先向上取整到整美元，再向上取整到 5 的倍数（1993.87→1994→1995；1996→2000；2000 不变），不是先取整到整元再换算。
 缺采购成本（空、0、负数）不给建议价（缺成本），由人工填写；现汇缺失或有效汇率不为正时拒绝报价。
 
 ## 配置字段（`config/pricing.schema.json`）
@@ -21,7 +21,7 @@
 | exchangeAdjustment | -0.2 | -2 至 2；`exchangeRate + exchangeAdjustment` 必须大于 0 |
 | defaultMarkup | 0.3 | 0 至 1 |
 | categoryMarkups | `[]` | 至多 200 项 `{categoryId, categoryName, markup(0–1)}`，ID 不可重复；保存时核对分类存在，名称以数据库为准 |
-| roundUpTo | 1 | 1 至 1000 的整数（美元步长） |
+| roundUpTo | 5 | 1 至 1000 的整数（美元步长；先整美元再取整到该步长的倍数） |
 
 字符串数字、布尔、null、未知字段、NaN、超范围值均拒绝。文件缺失、损坏、旧结构（tiered/multiplier）或不合法时停止计算，不使用隐藏默认。
 loader 不读取 `.env`。已保存的订单/报价价格不会因配置变化被重算。
