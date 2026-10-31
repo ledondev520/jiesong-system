@@ -1,7 +1,7 @@
 /**
  * Input: 订单表头、商品 × 门店的明细行、建议单价
  * Output: 行小计/合计/按门店小计，粘贴文本解析，以及 POST /sales 的创建载荷
- * Pos: 订单编辑器的纯逻辑；价格口径只来自服务端预览（整美元后取整到 5 的倍数），这里不重算
+ * Pos: 订单编辑器的纯逻辑；价格口径只来自服务端（预览展示；提交时非人工价不带单价，由服务端按同一规则计算），这里不重算
  */
 import type { SalesCreationPayload } from "@/services/sales.service";
 
@@ -16,6 +16,8 @@ export interface OrderLine {
   costCny: string;
   /** 服务端建议单价（美元）；缺成本时为 null */
   suggested: number | null;
+  /** 建议单价是按哪组输入（现汇、商品、成本）算出的，见 pricingInputs；输入一变就作废 */
+  suggestedFor?: string;
   /** 人工单价；空串 = 采用建议价 */
   manualPrice: string;
 }
@@ -35,6 +37,34 @@ const positive = (text: string): number | null => {
     ? value
     : null;
 };
+
+/** 一行的报价输入（订单现汇 + 商品 + 成本）；建议价只对算出它的那组输入有效 */
+export const pricingInputs = (
+  line: Pick<OrderLine, "productId" | "costCny">,
+  exchangeRate: string,
+) => JSON.stringify([exchangeRate.trim(), line.productId, line.costCny.trim()]);
+
+/** 过期的建议价（现汇、商品或成本已变）视为待报价，不能被当成单价提交或计入合计 */
+export const withCurrentPricing = (
+  lines: OrderLine[],
+  exchangeRate: string,
+): OrderLine[] =>
+  lines.map((line) =>
+    line.suggested !== null &&
+    line.suggestedFor !== pricingInputs(line, exchangeRate)
+      ? { ...line, suggested: null }
+      : line,
+  );
+
+/** 还有非人工价的行在等按当前输入算出的建议价 */
+export const pricingPending = (lines: OrderLine[], exchangeRate: string) =>
+  lines.some(
+    (line) =>
+      !isManualPrice(line) &&
+      Boolean(line.productId) &&
+      positive(line.costCny) !== null &&
+      line.suggestedFor !== pricingInputs(line, exchangeRate),
+  );
 
 /** 人工价优先；无效的人工价不静默回退到建议价（返回 null，由校验提示） */
 export const effectivePrice = (line: OrderLine): number | null =>
@@ -103,7 +133,10 @@ export function buildCreationPayload(
       quantity: Number(line.quantity),
       unit: line.unit || undefined,
       costPrice: Number(line.costCny),
-      sellingPrice: effectivePrice(line) as number,
+      // 只有人工价才带单价；其余由服务端按同一报价规则和本单现汇计算，避免提交过期的建议价
+      ...(isManualPrice(line)
+        ? { sellingPrice: effectivePrice(line) as number }
+        : {}),
     })),
   } as SalesCreationPayload;
 }

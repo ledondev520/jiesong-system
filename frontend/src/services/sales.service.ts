@@ -25,7 +25,8 @@ export interface SalesCreationItem {
   quantity: number;
   unit?: string;
   costPrice: number;
-  sellingPrice: number;
+  /** 人工价才填；省略时服务端按报价规则计算 */
+  sellingPrice?: number;
   note?: string;
 }
 export type SalesCreationPayload = Omit<SalesCreatePayload, "items"> & {
