@@ -11,6 +11,7 @@ const { withUtf8Bom } = require('../utils/csvExport');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
+const { outstandingOf } = require('./payablesService');
 const { getExportReadiness } = require('./exportReadinessService');
 
 /**
@@ -158,7 +159,7 @@ const exportPurchases = async (query) => {
     c.supplier?.name || '',
     c.totalAmount,
     c.paidAmount,
-    c.totalAmount - c.paidAmount,
+    outstandingOf(c), // 与付款列表同口径：草稿/已取消为 0
     c.status,
     c.signedAt ? formatDate(c.signedAt) : '',
     c.expectedDate ? formatDate(c.expectedDate) : '',
