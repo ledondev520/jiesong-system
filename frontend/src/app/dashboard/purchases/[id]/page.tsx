@@ -91,6 +91,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ContractFiles from "@/components/contract/ContractFiles";
+import { isPayable } from "../components/purchaseListHelpers";
 import { PurchaseReceiptPanel } from "./components/PurchaseReceiptPanel";
 import { PurchaseFlowPanel } from "./components/PurchaseFlowPanel";
 import { PurchaseProductionPanel } from "./components/PurchaseProductionPanel";
@@ -644,6 +645,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     totalAmount: contract.totalAmount,
     paidAmount: contract.paidAmount,
   });
+  // 草稿合同尚未生效，不属于应付（与列表页同一口径）：不显示待付金额与付款进度。
+  const payable = isPayable(contract);
   const paidPercent =
     amountSummary.grossAmount > 0
       ? Math.min(
@@ -815,7 +818,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                   ¥{contract.paidAmount.toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">已付金额</p>
-                <Progress value={paidPercent} className="mt-2 h-1.5" />
+                {payable && (
+                  <Progress value={paidPercent} className="mt-2 h-1.5" />
+                )}
               </div>
             </div>
           </CardContent>
@@ -827,10 +832,21 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 <DollarSign className="h-4 w-4 text-amber-600" />
               </div>
               <div>
-                <div className="text-xl font-bold tabular-nums">
-                  ¥{amountSummary.remainingAmount.toLocaleString()}
-                </div>
-                <p className="text-xs text-muted-foreground">待付金额</p>
+                {payable ? (
+                  <>
+                    <div className="text-xl font-bold tabular-nums">
+                      ¥{amountSummary.remainingAmount.toLocaleString()}
+                    </div>
+                    <p className="text-xs text-muted-foreground">待付金额</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-xl font-bold">草稿 · 不计应付</div>
+                    <p className="text-xs text-muted-foreground">
+                      合同生效后才计入待付金额
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>

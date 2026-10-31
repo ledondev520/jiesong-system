@@ -167,6 +167,39 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     });
   });
 
+  it.each([
+    ["DRAFT", false],
+    ["SIGNED", true],
+  ])(
+    "%s 合同按应付口径显示待付金额（payable=%s；草稿不计应付，与列表同口径）",
+    async (status, payable) => {
+      mockGetById.mockResolvedValue({
+        data: {
+          id: "p-1",
+          contractNo: "PO2500002",
+          status,
+          totalAmount: 100000,
+          paidAmount: 0,
+          taxRate: 0,
+          supplier: { name: "供应商A" },
+          items: [],
+        },
+      });
+
+      renderPage("p-1");
+
+      await screen.findByRole("heading", { name: "PO2500002" });
+      if (payable) {
+        const label = screen.getByText("待付金额");
+        expect(label.previousElementSibling).toHaveTextContent("¥100,000");
+        expect(screen.queryByText("草稿 · 不计应付")).not.toBeInTheDocument();
+      } else {
+        expect(screen.getByText("草稿 · 不计应付")).toBeInTheDocument();
+        expect(screen.queryByText("待付金额")).not.toBeInTheDocument();
+      }
+    },
+  );
+
   it("点击生成购销合同会打开弹窗", async () => {
     mockGetById.mockResolvedValue({
       data: {
