@@ -14,7 +14,7 @@ describe("list URL state", () => {
       const fields = listUrlFields[name];
       const path =
         name === "customs"
-          ? "/dashboard/tax-refunds?view=customs"
+          ? "/dashboard/customs?view=customs"
           : "/dashboard/products?tab=inventory";
       window.history.replaceState({}, "", path + "&source=qa#rows");
       let hook = renderHook(() => useListUrlState(fields));
@@ -65,11 +65,11 @@ describe("list URL state", () => {
   });
 
   it("checks the current tab before publishing a stale event", () => {
-    window.history.replaceState({}, "", "/dashboard/tax-refunds?view=customs");
+    window.history.replaceState({}, "", "/dashboard/customs?view=customs");
     const { result } = renderHook(() =>
       useListUrlState(listUrlFields.customs, ["view", "customs"]),
     );
-    window.history.replaceState({}, "", "/dashboard/tax-refunds?view=refunds");
+    window.history.replaceState({}, "", "/dashboard/customs?view=refunds");
     act(() => result.current[1]({ keyword: "late", page: 2 }));
     expect(window.location.search).toBe("?view=refunds");
   });

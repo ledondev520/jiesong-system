@@ -11,7 +11,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ModuleTabHeader, AI_TABS } from "@/components/layout/ModuleTabHeader";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -68,6 +67,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { formatDateTime, formatTime } from "@/lib/date-format";
 import api from "@/lib/axios";
+import { stripPageContext } from "@/lib/ai-message-text";
 import type { ApiResponse, PaginatedResponse } from "@/types";
 import { MobileListCard } from "@/components/mobile";
 
@@ -1353,7 +1353,6 @@ export default function AiSessionsPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={AI_TABS} moduleName="AI 助手" />
       <PageHeader
         title="AI 会话列表"
         description="用量趋势见上图；下方用标签切换「聊天会话」与「其他 AI 调用」（含 HS 编码推荐）"
@@ -1493,7 +1492,7 @@ export default function AiSessionsPage() {
                 </p>
               </div>
               <Link
-                href="/dashboard/ai"
+                href="/dashboard?ai=1"
                 className="text-xs text-primary hover:underline"
               >
                 前往 AI 助手对话 →
@@ -2684,7 +2683,9 @@ export default function AiSessionsPage() {
                       </div>
                     ) : null}
                     <p className="whitespace-pre-wrap leading-relaxed">
-                      {msg.content}
+                      {msg.role === "user"
+                        ? stripPageContext(msg.content)
+                        : msg.content}
                     </p>
                   </div>
                 ))}

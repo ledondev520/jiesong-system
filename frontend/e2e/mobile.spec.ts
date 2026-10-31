@@ -11,20 +11,20 @@ import { mockApiRoutes, signInAsAdmin } from "./helpers";
 const routes = [
   "/dashboard",
   "/dashboard/reports",
-  "/dashboard/contracts",
-  "/dashboard/purchase/create",
-  "/dashboard/purchase/pc-001",
+  "/dashboard/purchases",
+  "/dashboard/purchases/new",
+  "/dashboard/purchases/pc-001",
   "/dashboard/suppliers",
   "/dashboard/products",
-  "/dashboard/inventory-status",
+  "/dashboard/inventory",
   "/dashboard/sales",
   "/dashboard/sales/create",
   "/dashboard/sales/sc-001",
-  "/dashboard/tax-refunds",
-  "/dashboard/tax-refunds?view=customs",
-  "/dashboard/tax-refunds?view=refunds",
+  "/dashboard/customs",
+  "/dashboard/customs?view=customs",
+  "/dashboard/customs?view=refunds",
   "/dashboard/tax-refunds/create",
-  "/dashboard/customs-declarations/create",
+  "/dashboard/customs/new",
   "/dashboard/hs-codes",
   "/dashboard/finance",
   "/dashboard/finance/statements",
@@ -38,7 +38,6 @@ const routes = [
   "/dashboard/users",
   "/dashboard/system/logs",
   "/dashboard/system/notifications",
-  "/dashboard/ai",
   "/dashboard/ai/sessions",
   "/dashboard/about",
   "/dashboard/settings/ports",
@@ -49,7 +48,6 @@ const routes = [
   "/dashboard/system",
   "/dashboard/logistics",
   "/dashboard/logistics/containers",
-  "/dashboard/contracts/templates",
 ];
 
 async function expectFitsViewport(page: Page) {
@@ -120,11 +118,9 @@ for (const width of [320, 390, 430]) {
       await page.getByRole("button", { name: "更多", exact: true }).click();
       const sheet = page.getByRole("dialog");
       await expect(
-        sheet.getByRole("button", { name: "系统管理", exact: true }),
+        sheet.getByRole("button", { name: "设置", exact: true }),
       ).toBeVisible();
-      await sheet
-        .getByRole("button", { name: "系统管理", exact: true })
-        .click();
+      await sheet.getByRole("button", { name: "设置", exact: true }).click();
       await expect(page).toHaveURL(/\/dashboard\/settings$/);
       await page.getByRole("button", { name: /搜索商品/ }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
@@ -307,7 +303,7 @@ test.describe("手机核心操作", () => {
   });
 
   test("采购供应商选择与手机档案定位", async ({ page }) => {
-    await signInAsAdmin(page, "/dashboard/purchase/create");
+    await signInAsAdmin(page, "/dashboard/purchases/new");
     await page.getByRole("combobox", { name: "商品 *", exact: true }).click();
     await page.getByRole("option", { name: /不锈钢门/ }).click();
     await page
@@ -338,8 +334,8 @@ test.describe("手机核心操作", () => {
   test("报关退税详情、编辑和手机卡片完整显示", async ({ page }) => {
     await signInAsAdmin(page);
     for (const route of [
-      "/dashboard/customs-declarations/cd-1",
-      "/dashboard/customs-declarations/cd-1/edit",
+      "/dashboard/customs/cd-1",
+      "/dashboard/customs/cd-1/edit",
       "/dashboard/tax-refunds/tr-1",
       "/dashboard/tax-refunds/tr-1/edit",
     ]) {
@@ -362,7 +358,7 @@ test.describe("平板与桌面保持可用", () => {
       await signInAsAdmin(page);
       for (const route of [
         "/dashboard",
-        "/dashboard/contracts",
+        "/dashboard/purchases",
         "/dashboard/sales",
         "/dashboard/settings",
       ]) {

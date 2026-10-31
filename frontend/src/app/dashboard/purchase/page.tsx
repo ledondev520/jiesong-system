@@ -1,12 +1,12 @@
 /**
  * Input: 无
- * Output: 重定向到采购合同列表页
- * Pos: 采购模块兼容入口，避免 `/dashboard/purchase` 404
+ * Output: 重定向到采购列表页
+ * Pos: 旧 `/dashboard/purchase` 兼容入口（重定向 stub）
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
-import { redirect } from 'next/navigation';
+import { redirect } from "next/navigation";
 
 export default function PurchasePage() {
-  redirect('/dashboard/contracts');
+  redirect("/dashboard/purchases");
 }

@@ -22,10 +22,6 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  OPERATIONS_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { TradeWorkflowBoard } from "@/components/dashboard/TradeWorkflowBoard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -208,7 +204,6 @@ function DashboardContent() {
 
   return (
     <div className="space-y-5 pb-4 md:space-y-8 md:pb-16">
-      <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
       <PageHeader
         title="工作台"
         description="按专项单执行采购、出口、退税与财务结清的唯一下一步。"
@@ -323,7 +318,7 @@ function DashboardContent() {
             <BusinessWrite>
               <Button
                 className="justify-start rounded-md"
-                onClick={() => router.push("/dashboard/purchase/create")}
+                onClick={() => router.push("/dashboard/purchases/new")}
               >
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 新建采购合同
@@ -342,7 +337,7 @@ function DashboardContent() {
             <Button
               className="justify-start rounded-md"
               variant="outline"
-              onClick={() => router.push("/dashboard/tax-refunds?view=customs")}
+              onClick={() => router.push("/dashboard/customs?view=customs")}
             >
               <FileText className="mr-2 h-4 w-4" />
               查看报关单

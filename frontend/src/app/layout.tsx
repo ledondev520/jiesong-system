@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/sonner";
-import { LazyAIAssistantMount } from "@/components/ai/LazyAIAssistantMount";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { GlobalErrorBoundary } from "@/components/layout/GlobalErrorBoundary";
 import "./globals.css";
@@ -34,8 +33,7 @@ const serifFallback = {
     '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC", sans-serif',
   "--font-ui-mono":
     '"SFMono-Regular", "Menlo", "Monaco", "Consolas", monospace',
-  "--font-display-serif":
-    '"Songti SC", "STSong", "Noto Serif CJK SC", serif',
+  "--font-display-serif": '"Songti SC", "STSong", "Noto Serif CJK SC", serif',
 } as React.CSSProperties;
 
 export default function RootLayout({
@@ -44,10 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="zh-CN"
-      suppressHydrationWarning
-    >
+    <html lang="zh-CN" suppressHydrationWarning>
       <body
         className="antialiased"
         style={{
@@ -59,7 +54,6 @@ export default function RootLayout({
           <GlobalErrorBoundary>
             {children}
             <Toaster position="top-center" />
-            <LazyAIAssistantMount />
           </GlobalErrorBoundary>
         </ThemeProvider>
       </body>

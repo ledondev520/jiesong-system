@@ -150,7 +150,7 @@ describe("DashboardPage 交互逻辑", () => {
           stageCount: 8,
           nextAction: {
             label: "登记采购尾款",
-            href: "/dashboard/purchase/p-1",
+            href: "/dashboard/purchases/p-1",
           },
           issues: [],
           stages: [
@@ -275,7 +275,7 @@ describe("DashboardPage 交互逻辑", () => {
     await user.click(
       screen.getByRole("button", { name: "EXP-001 下一步：登记采购尾款" }),
     );
-    expect(mockPush).toHaveBeenCalledWith("/dashboard/purchase/p-1");
+    expect(mockPush).toHaveBeenCalledWith("/dashboard/purchases/p-1");
   });
 
   it("点击快速动作跳转到对应路径", async () => {
@@ -289,14 +289,12 @@ describe("DashboardPage 交互逻辑", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /新建采购合同/ }));
-    expect(mockPush).toHaveBeenCalledWith("/dashboard/purchase/create");
+    expect(mockPush).toHaveBeenCalledWith("/dashboard/purchases/new");
 
     await user.click(screen.getByRole("button", { name: /新建出口合同/ }));
     expect(mockPush).toHaveBeenCalledWith("/dashboard/sales/create");
 
     await user.click(screen.getByRole("button", { name: /查看报关单/ }));
-    expect(mockPush).toHaveBeenCalledWith(
-      "/dashboard/tax-refunds?view=customs",
-    );
+    expect(mockPush).toHaveBeenCalledWith("/dashboard/customs?view=customs");
   });
 });

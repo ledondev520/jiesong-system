@@ -6,19 +6,27 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+} from "react";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
   CardDescription,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   DollarSign,
   ArrowDownLeft,
@@ -32,27 +40,30 @@ import {
   RefreshCw,
   Landmark,
   FileText,
-} from 'lucide-react';
-import Link from 'next/link';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { ModuleTabHeader, FINANCE_TABS } from '@/components/layout/ModuleTabHeader';
-import { financeService } from '@/services/finance.service';
+} from "lucide-react";
+import Link from "next/link";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { financeService } from "@/services/finance.service";
 import {
-  getTransactionStats, getInvoiceStats,
-  type BankFlowStats, type InvoiceStats,
-} from '@/services/bankFlow.service';
-import api, { clearApiGetCache } from '@/lib/axios';
-import { type ApiResponse } from '@/types';
-import { cachedFetch, invalidateCache } from '@/lib/api-cache';
-import { EmptyState } from '@/components/ui/empty-state';
-import { ErrorState, LoadingState } from '@/components/ui/data-state';
-import { KpiCard } from '@/components/finance/KpiCard';
+  getTransactionStats,
+  getInvoiceStats,
+  type BankFlowStats,
+  type InvoiceStats,
+} from "@/services/bankFlow.service";
+import api, { clearApiGetCache } from "@/lib/axios";
+import { type ApiResponse } from "@/types";
+import { cachedFetch, invalidateCache } from "@/lib/api-cache";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState, LoadingState } from "@/components/ui/data-state";
+import { KpiCard } from "@/components/finance/KpiCard";
 import {
   buildCnyCashFlowForecast,
   convertPaymentTrendsToCny,
-} from '@/lib/finance-currency';
+} from "@/lib/finance-currency";
 
-const FinanceOverviewCharts = lazy(() => import('./components/FinanceOverviewCharts'));
+const FinanceOverviewCharts = lazy(
+  () => import("./components/FinanceOverviewCharts"),
+);
 
 const financeChartsFallback = (
   <Card aria-busy="true">
@@ -90,18 +101,21 @@ interface ExchangeRate {
   effectiveRate: number;
 }
 
-function calcTrendDirection(current: number, previous: number): 'up' | 'down' | 'neutral' {
-  if (!previous || previous === 0) return 'neutral';
+function calcTrendDirection(
+  current: number,
+  previous: number,
+): "up" | "down" | "neutral" {
+  if (!previous || previous === 0) return "neutral";
   const diff = ((current - previous) / previous) * 100;
-  if (diff > 0.1) return 'up';
-  if (diff < -0.1) return 'down';
-  return 'neutral';
+  if (diff > 0.1) return "up";
+  if (diff < -0.1) return "down";
+  return "neutral";
 }
 
 function calcTrendValue(current: number, previous: number): string {
-  if (!previous || previous === 0) return '环比持平';
+  if (!previous || previous === 0) return "环比持平";
   const diff = ((current - previous) / previous) * 100;
-  const sign = diff > 0 ? '+' : '';
+  const sign = diff > 0 ? "+" : "";
   return `环比 ${sign}${diff.toFixed(1)}%`;
 }
 
@@ -126,40 +140,61 @@ export default function FinancePage() {
 
   const hasLoadedRef = useRef(false);
 
-  const loadData = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      invalidateCache('fin-');
-      clearApiGetCache();
-    }
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    setLoadError(false);
+  const loadData = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) {
+        invalidateCache("fin-");
+        clearApiGetCache();
+      }
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+      setLoadError(false);
 
-    try {
-      const [statsRes, rateRes, trendsRes, overdueRes, bankStatsRes, invStatsRes] = await Promise.all([
-        cachedFetch('fin-stats', () => financeService.getStats()),
-        cachedFetch('fin-exchange-rate', () => api.get<ApiResponse<ExchangeRate>, ApiResponse<ExchangeRate>>('/system/exchange-rate')),
-        cachedFetch(`fin-payment-trends-${trendDays}`, () => api.get<ApiResponse<PaymentTrendPoint[]>, ApiResponse<PaymentTrendPoint[]>>(
-          `/finance/payment-trends?days=${trendDays}`
-        )),
-        cachedFetch('fin-overdue-receivables', () => api.get<ApiResponse<OverdueItem[]>, ApiResponse<OverdueItem[]>>('/finance/overdue-receivables')),
-        getTransactionStats().catch(() => null),
-        getInvoiceStats().catch(() => null),
-      ]);
-      setStats(statsRes);
-      if (rateRes.data) setExchangeRate(rateRes.data);
-      if (trendsRes.data) setTrends(trendsRes.data);
-      if (overdueRes.data) setOverdueList(overdueRes.data);
-      setBankStats(bankStatsRes);
-      setInvStats(invStatsRes);
-    } catch (err) {
-      console.error('获取财务数据失败:', err);
-      setLoadError(true);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [trendDays]);
+      try {
+        const [
+          statsRes,
+          rateRes,
+          trendsRes,
+          overdueRes,
+          bankStatsRes,
+          invStatsRes,
+        ] = await Promise.all([
+          cachedFetch("fin-stats", () => financeService.getStats()),
+          cachedFetch("fin-exchange-rate", () =>
+            api.get<ApiResponse<ExchangeRate>, ApiResponse<ExchangeRate>>(
+              "/system/exchange-rate",
+            ),
+          ),
+          cachedFetch(`fin-payment-trends-${trendDays}`, () =>
+            api.get<
+              ApiResponse<PaymentTrendPoint[]>,
+              ApiResponse<PaymentTrendPoint[]>
+            >(`/finance/payment-trends?days=${trendDays}`),
+          ),
+          cachedFetch("fin-overdue-receivables", () =>
+            api.get<ApiResponse<OverdueItem[]>, ApiResponse<OverdueItem[]>>(
+              "/finance/overdue-receivables",
+            ),
+          ),
+          getTransactionStats().catch(() => null),
+          getInvoiceStats().catch(() => null),
+        ]);
+        setStats(statsRes);
+        if (rateRes.data) setExchangeRate(rateRes.data);
+        if (trendsRes.data) setTrends(trendsRes.data);
+        if (overdueRes.data) setOverdueList(overdueRes.data);
+        setBankStats(bankStatsRes);
+        setInvStats(invStatsRes);
+      } catch (err) {
+        console.error("获取财务数据失败:", err);
+        setLoadError(true);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [trendDays],
+  );
 
   useEffect(() => {
     void loadData(hasLoadedRef.current);
@@ -167,24 +202,32 @@ export default function FinancePage() {
   }, [loadData]);
 
   // 计算同比/环比（基于 trends 数组最后两个点）
-  const { payableTrend, receivableTrend, payableTrendDir, receivableTrendDir } = useMemo(() => {
-    if (trends.length < 2 || !trends[trends.length - 1] || !trends[trends.length - 2]) {
+  const { payableTrend, receivableTrend, payableTrendDir, receivableTrendDir } =
+    useMemo(() => {
+      if (
+        trends.length < 2 ||
+        !trends[trends.length - 1] ||
+        !trends[trends.length - 2]
+      ) {
+        return {
+          payableTrend: "环比持平",
+          receivableTrend: "环比持平",
+          payableTrendDir: "neutral" as const,
+          receivableTrendDir: "neutral" as const,
+        };
+      }
+      const last = trends[trends.length - 1];
+      const prev = trends[trends.length - 2];
       return {
-        payableTrend: '环比持平',
-        receivableTrend: '环比持平',
-        payableTrendDir: 'neutral' as const,
-        receivableTrendDir: 'neutral' as const,
+        payableTrend: calcTrendValue(last.payables, prev.payables),
+        receivableTrend: calcTrendValue(last.receivables, prev.receivables),
+        payableTrendDir: calcTrendDirection(last.payables, prev.payables),
+        receivableTrendDir: calcTrendDirection(
+          last.receivables,
+          prev.receivables,
+        ),
       };
-    }
-    const last = trends[trends.length - 1];
-    const prev = trends[trends.length - 2];
-    return {
-      payableTrend: calcTrendValue(last.payables, prev.payables),
-      receivableTrend: calcTrendValue(last.receivables, prev.receivables),
-      payableTrendDir: calcTrendDirection(last.payables, prev.payables),
-      receivableTrendDir: calcTrendDirection(last.receivables, prev.receivables),
-    };
-  }, [trends]);
+    }, [trends]);
 
   // 应收为 USD、应付为 CNY，统一按当前结算汇率折算为 CNY 后才允许比较和预测。
   const cnyTrends = useMemo(
@@ -212,8 +255,15 @@ export default function FinancePage() {
           title="财务概览"
           description="公司财务进度、收支健康、成本结构与利润趋势。"
           actions={
-            <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
-              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadData(true)}
+              disabled={refreshing}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
+              />
               重试
             </Button>
           }
@@ -222,8 +272,15 @@ export default function FinancePage() {
           title="数据加载失败"
           description="无法连接到服务器，请检查网络连接或稍后重试。"
           action={
-            <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing}>
-              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadData(true)}
+              disabled={refreshing}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
+              />
               重试
             </Button>
           }
@@ -233,22 +290,28 @@ export default function FinancePage() {
   }
 
   // 计算完成率与紧迫度
-  const payableRate = stats && stats.payable.total > 0
-    ? Math.round((stats.payable.paid / stats.payable.total) * 100)
-    : 0;
-  const receivableRate = stats && stats.receivable.total > 0
-    ? Math.round((stats.receivable.received / stats.receivable.total) * 100)
-    : 0;
+  const payableRate =
+    stats && stats.payable.total > 0
+      ? Math.round((stats.payable.paid / stats.payable.total) * 100)
+      : 0;
+  const receivableRate =
+    stats && stats.receivable.total > 0
+      ? Math.round((stats.receivable.received / stats.receivable.total) * 100)
+      : 0;
 
   // 紧迫性阈值：待付/待收超过总额 50% 时高亮警示
-  const payableUrgent = stats ? (stats.payable.unpaid / Math.max(stats.payable.total, 1)) > 0.5 : false;
-  const receivableUrgent = stats ? (stats.receivable.unreceived / Math.max(stats.receivable.total, 1)) > 0.5 : false;
+  const payableUrgent = stats
+    ? stats.payable.unpaid / Math.max(stats.payable.total, 1) > 0.5
+    : false;
+  const receivableUrgent = stats
+    ? stats.receivable.unreceived / Math.max(stats.receivable.total, 1) > 0.5
+    : false;
 
-  const hasData = stats && (stats.payable.total > 0 || stats.receivable.total > 0);
+  const hasData =
+    stats && (stats.payable.total > 0 || stats.receivable.total > 0);
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
         title="财务概览"
         description="公司财务进度、收支健康、成本结构与利润趋势。"
@@ -259,7 +322,9 @@ export default function FinancePage() {
             onClick={() => loadData(true)}
             disabled={refreshing}
           >
-            <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
+            />
             刷新
           </Button>
         }
@@ -269,8 +334,12 @@ export default function FinancePage() {
         <Card className="border-primary/20 bg-primary/[0.03]">
           <CardContent className="space-y-4 pt-6">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">公司财务进度</p>
-              <h3 className="text-lg font-semibold tracking-tight">先看收付压力，再下钻经营执行</h3>
+              <p className="text-sm font-medium text-muted-foreground">
+                公司财务进度
+              </p>
+              <h3 className="text-lg font-semibold tracking-tight">
+                先看收付压力，再下钻经营执行
+              </h3>
               <p className="text-sm leading-6 text-muted-foreground">
                 财务概览先给出应付完成率、应收完成率和待付待收风险；三表导入、账期选择和收入利润、成本结构、资产负债下钻集中放在报表分析页面。
               </p>
@@ -301,14 +370,21 @@ export default function FinancePage() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">当前结算汇率</p>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    当前结算汇率
+                  </p>
                   <p className="text-2xl font-bold tabular-nums">
-                    {exchangeRate?.effectiveRate != null ? exchangeRate.effectiveRate.toFixed(2) : '—'}
-                    <span className="text-sm font-normal text-muted-foreground ml-1">¥/$</span>
+                    {exchangeRate?.effectiveRate != null
+                      ? exchangeRate.effectiveRate.toFixed(2)
+                      : "—"}
+                    <span className="text-sm font-normal text-muted-foreground ml-1">
+                      ¥/$
+                    </span>
                   </p>
                   {exchangeRate && (
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      市场汇率 {exchangeRate.rate?.toFixed(2) ?? '—'} · 风险缓冲 {exchangeRate.buffer?.toFixed(2) ?? '—'}
+                      市场汇率 {exchangeRate.rate?.toFixed(2) ?? "—"} · 风险缓冲{" "}
+                      {exchangeRate.buffer?.toFixed(2) ?? "—"}
                     </p>
                   )}
                 </div>
@@ -318,43 +394,67 @@ export default function FinancePage() {
           </Card>
 
           {/* 应付完成率 */}
-          <Card className={payableUrgent ? 'border-destructive/40 bg-destructive/5' : 'border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/10'}>
+          <Card
+            className={
+              payableUrgent
+                ? "border-destructive/40 bg-destructive/5"
+                : "border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/10"
+            }
+          >
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-muted-foreground">应付账款完成率</p>
-                {payableUrgent
-                  ? <AlertTriangle className="h-4 w-4 text-destructive" />
-                  : <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                }
+                <p className="text-xs font-medium text-muted-foreground">
+                  应付账款完成率
+                </p>
+                {payableUrgent ? (
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                )}
               </div>
-              <p className="text-2xl font-bold tabular-nums mb-2">{payableRate}%</p>
+              <p className="text-2xl font-bold tabular-nums mb-2">
+                {payableRate}%
+              </p>
               <Progress
                 value={payableRate}
-                className={`h-2 ${payableUrgent ? '[&>div]:bg-destructive' : '[&>div]:bg-emerald-600'}`}
+                className={`h-2 ${payableUrgent ? "[&>div]:bg-destructive" : "[&>div]:bg-emerald-600"}`}
               />
               <p className="text-xs text-muted-foreground mt-1.5">
-                已付 ¥{(stats?.payable.paid ?? 0).toLocaleString()} / 总额 ¥{(stats?.payable.total ?? 0).toLocaleString()}
+                已付 ¥{(stats?.payable.paid ?? 0).toLocaleString()} / 总额 ¥
+                {(stats?.payable.total ?? 0).toLocaleString()}
               </p>
             </CardContent>
           </Card>
 
           {/* 应收完成率 */}
-          <Card className={receivableUrgent ? 'border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10' : 'border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/10'}>
+          <Card
+            className={
+              receivableUrgent
+                ? "border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10"
+                : "border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/10"
+            }
+          >
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-muted-foreground">应收账款完成率</p>
-                {receivableUrgent
-                  ? <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  : <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                }
+                <p className="text-xs font-medium text-muted-foreground">
+                  应收账款完成率
+                </p>
+                {receivableUrgent ? (
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                )}
               </div>
-              <p className="text-2xl font-bold tabular-nums mb-2">{receivableRate}%</p>
+              <p className="text-2xl font-bold tabular-nums mb-2">
+                {receivableRate}%
+              </p>
               <Progress
                 value={receivableRate}
-                className={`h-2 ${receivableUrgent ? '[&>div]:bg-amber-500' : '[&>div]:bg-emerald-600'}`}
+                className={`h-2 ${receivableUrgent ? "[&>div]:bg-amber-500" : "[&>div]:bg-emerald-600"}`}
               />
               <p className="text-xs text-muted-foreground mt-1.5">
-                已收 USD {(stats?.receivable.received ?? 0).toLocaleString()} / 总额 USD {(stats?.receivable.total ?? 0).toLocaleString()}
+                已收 USD {(stats?.receivable.received ?? 0).toLocaleString()} /
+                总额 USD {(stats?.receivable.total ?? 0).toLocaleString()}
               </p>
             </CardContent>
           </Card>
@@ -374,11 +474,13 @@ export default function FinancePage() {
         <KpiCard
           label="待付账款"
           value={`¥${(stats?.payable.unpaid ?? 0).toLocaleString()}`}
-          subLabel={payableUrgent ? '超过总额50%，建议优先处理' : '尚未支付给供应商'}
+          subLabel={
+            payableUrgent ? "超过总额50%，建议优先处理" : "尚未支付给供应商"
+          }
           trend="down"
-          trendValue={payableUrgent ? '高风险' : '正常'}
+          trendValue={payableUrgent ? "高风险" : "正常"}
           icon={<Wallet className="h-4 w-4" />}
-          valueClassName={payableUrgent ? 'text-destructive' : undefined}
+          valueClassName={payableUrgent ? "text-destructive" : undefined}
         />
         <KpiCard
           label="应收账款总额"
@@ -391,11 +493,15 @@ export default function FinancePage() {
         <KpiCard
           label="待收账款"
           value={`USD ${(stats?.receivable.unreceived ?? 0).toLocaleString()}`}
-          subLabel={receivableUrgent ? '当前客户剩余欠款偏高，建议优先跟进' : '当前客户剩余欠款'}
+          subLabel={
+            receivableUrgent
+              ? "当前客户剩余欠款偏高，建议优先跟进"
+              : "当前客户剩余欠款"
+          }
           trend="neutral"
-          trendValue={receivableUrgent ? '需跟进' : '正常'}
+          trendValue={receivableUrgent ? "需跟进" : "正常"}
           icon={<DollarSign className="h-4 w-4" />}
-          valueClassName={receivableUrgent ? 'text-amber-600' : undefined}
+          valueClassName={receivableUrgent ? "text-amber-600" : undefined}
         />
       </div>
 
@@ -419,7 +525,9 @@ export default function FinancePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Landmark className="h-4 w-4 text-primary" />
-                      <CardTitle className="text-sm font-medium">银行流水</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        银行流水
+                      </CardTitle>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
@@ -429,24 +537,40 @@ export default function FinancePage() {
                     <div>
                       <p className="text-xs text-muted-foreground">总收入</p>
                       <p className="text-base font-bold text-emerald-600 tabular-nums">
-                        ¥{bankStats.totalIn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ¥
+                        {bankStats.totalIn.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">总支出</p>
                       <p className="text-base font-bold text-red-600 tabular-nums">
-                        ¥{bankStats.totalOut.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ¥
+                        {bankStats.totalOut.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">净现金流</p>
-                      <p className={`text-base font-bold tabular-nums ${bankStats.netFlow >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        ¥{bankStats.netFlow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <p
+                        className={`text-base font-bold tabular-nums ${bankStats.netFlow >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                      >
+                        ¥
+                        {bankStats.netFlow.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">交易笔数</p>
-                      <p className="text-base font-bold tabular-nums">{bankStats.txnCount.toLocaleString()}</p>
+                      <p className="text-base font-bold tabular-nums">
+                        {bankStats.txnCount.toLocaleString()}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -461,7 +585,9 @@ export default function FinancePage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-primary" />
-                      <CardTitle className="text-sm font-medium">发票台账</CardTitle>
+                      <CardTitle className="text-sm font-medium">
+                        发票台账
+                      </CardTitle>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
@@ -469,23 +595,39 @@ export default function FinancePage() {
                 <CardContent>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-xs text-muted-foreground">有效发票金额</p>
+                      <p className="text-xs text-muted-foreground">
+                        有效发票金额
+                      </p>
                       <p className="text-base font-bold text-primary tabular-nums">
-                        ¥{invStats.validTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ¥
+                        {invStats.validTotal.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">有效税额</p>
                       <p className="text-base font-bold tabular-nums">
-                        ¥{invStats.validTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ¥
+                        {invStats.validTax.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">有效发票数</p>
-                      <p className="text-base font-bold tabular-nums">{invStats.validCount.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">
+                        有效发票数
+                      </p>
+                      <p className="text-base font-bold tabular-nums">
+                        {invStats.validCount.toLocaleString()}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">已红冲 / 总记录</p>
+                      <p className="text-xs text-muted-foreground">
+                        已红冲 / 总记录
+                      </p>
                       <p className="text-base font-bold tabular-nums text-muted-foreground">
                         {invStats.reversedCount} / {invStats.totalCount}
                       </p>
@@ -520,8 +662,13 @@ export default function FinancePage() {
                   className="flex items-center justify-between rounded-md border border-red-200/50 bg-background px-3 py-2 text-sm"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="font-mono font-medium">{item.contractNo}</span>
-                    <Badge variant="outline" className="text-xs border-red-500/50 text-red-700 dark:text-red-400">
+                    <span className="font-mono font-medium">
+                      {item.contractNo}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-red-500/50 text-red-700 dark:text-red-400"
+                    >
                       逾期 {item.overdueDays} 天
                     </Badge>
                   </div>
@@ -533,7 +680,10 @@ export default function FinancePage() {
               {overdueList.length > 5 && (
                 <p className="text-xs text-center text-muted-foreground pt-1">
                   还有 {overdueList.length - 5} 条逾期记录，
-                  <Link href="/dashboard/payments?tab=receivable" className="text-primary underline-offset-2 hover:underline">
+                  <Link
+                    href="/dashboard/payments?tab=receivable"
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
                     查看全部应收明细
                   </Link>
                 </p>
@@ -551,7 +701,9 @@ export default function FinancePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">应付账款明细</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">查看各供应商欠款详情</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    查看各供应商欠款详情
+                  </p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
@@ -565,7 +717,9 @@ export default function FinancePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">应收账款明细</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">查看各门店待回款详情</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    查看各门店待回款详情
+                  </p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
@@ -579,7 +733,9 @@ export default function FinancePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">收付管理</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">流水明细与登记操作</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    流水明细与登记操作
+                  </p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
@@ -592,8 +748,12 @@ export default function FinancePage() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-primary">财务报表分析</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">收入利润、成本结构、资产负债</p>
+                  <p className="text-sm font-medium text-primary">
+                    财务报表分析
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    收入利润、成本结构、资产负债
+                  </p>
                 </div>
                 <BarChart3 className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
               </div>
@@ -607,7 +767,9 @@ export default function FinancePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">银行流水查询</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">按对方名称、日期查看资金往来</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    按对方名称、日期查看资金往来
+                  </p>
                 </div>
                 <Landmark className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
@@ -621,7 +783,9 @@ export default function FinancePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium">发票台账查询</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">按销方、状态筛选发票明细</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    按销方、状态筛选发票明细
+                  </p>
                 </div>
                 <FileText className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
@@ -641,10 +805,14 @@ export default function FinancePage() {
               action={
                 <div className="flex flex-wrap justify-center gap-3">
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/dashboard/payments?tab=payable">查看应付明细</Link>
+                    <Link href="/dashboard/payments?tab=payable">
+                      查看应付明细
+                    </Link>
                   </Button>
                   <Button asChild size="sm">
-                    <Link href="/dashboard/payments?tab=receivable">查看应收明细</Link>
+                    <Link href="/dashboard/payments?tab=receivable">
+                      查看应收明细
+                    </Link>
                   </Button>
                 </div>
               }
@@ -656,7 +824,8 @@ export default function FinancePage() {
       {/* 账款货币说明 */}
       {hasData && (
         <p className="text-xs text-muted-foreground text-center">
-          应付账款以人民币（CNY / ¥）计；应收账款以美元（USD）计。汇率数据来自系统配置。
+          应付账款以人民币（CNY /
+          ¥）计；应收账款以美元（USD）计。汇率数据来自系统配置。
         </p>
       )}
     </div>

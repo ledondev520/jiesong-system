@@ -130,7 +130,7 @@ test("PURCHASE arrival survives reload and stays pending until inspection", asyn
   fixture = await startRoleFixture("purchase");
   await forwardRealApi(page, fixture);
   await loginAs(page, fixture, "PURCHASE");
-  await page.goto(`/dashboard/purchase/${fixture.purchaseId}`);
+  await page.goto(`/dashboard/purchases/${fixture.purchaseId}`);
   await expect(page.getByText("分批到货与验货", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "登记分批到货" }).click();
   const dialog = page.getByRole("dialog", { name: "登记本批到货" });
@@ -178,7 +178,7 @@ test("WAREHOUSE inspection persists its actor and only accepted stock reaches in
   fixture = await startRoleFixture("warehouse");
   await forwardRealApi(page, fixture);
   await loginAs(page, fixture, "WAREHOUSE");
-  await page.goto(`/dashboard/purchase/${fixture.purchaseId}`);
+  await page.goto(`/dashboard/purchases/${fixture.purchaseId}`);
   await page.getByRole("button", { name: "登记验货", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "登记本批验货" });
   await dialog.getByLabel(`${productName} 累计合格量`).fill("30");
@@ -222,7 +222,7 @@ test("WAREHOUSE inspection persists its actor and only accepted stock reaches in
     history.getByText("合成检验：30件合格，10件待复验"),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.goto("/dashboard/inventory-status");
+  await page.goto("/dashboard/inventory");
   const row = page.getByRole("row").filter({ hasText: productName });
   await expect(row).toContainText("CG-SYNTHETIC-ROLE");
   await expect(row).toContainText("30 件");
@@ -238,7 +238,7 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   fixture = await startRoleFixture("sales");
   await forwardRealApi(page, fixture);
   const salesToken = await loginAs(page, fixture, "SALES");
-  await page.goto(`/dashboard/purchase/${fixture.purchaseId}`);
+  await page.goto(`/dashboard/purchases/${fixture.purchaseId}`);
   await expect(page.getByText("分批到货与验货", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "登记分批到货" })).toHaveCount(
     0,
@@ -325,7 +325,7 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   );
   expect(repeat.status()).toBe(200);
   expect(readDomain(fixture)).toEqual(domain);
-  await page.goto("/dashboard/inventory-status");
+  await page.goto("/dashboard/inventory");
   const rows = page.getByRole("row").filter({ hasText: productName });
   await expect(rows.filter({ hasText: "已出库" })).toHaveCount(outbound.length);
   await expect(rows.filter({ hasText: "已入库" })).toContainText("10 件");
@@ -340,7 +340,7 @@ test("BOSS reads purchase and sales UI, hides write controls and cannot mutate r
   await expect(
     page.getByRole("link", { name: "AI 助手", exact: true }),
   ).toHaveCount(0);
-  await page.goto(`/dashboard/purchase/${fixture.purchaseId}`);
+  await page.goto(`/dashboard/purchases/${fixture.purchaseId}`);
   await expect(
     page.getByText("本批到货 100 · 合格 30 · 待验 0 · 待复验 70"),
   ).toBeVisible();
@@ -462,12 +462,15 @@ async function fillTaxRecordDraft(
 for (const kind of ["customs", "refunds"] as const) {
   const pathname =
     kind === "customs" ? "/customs-declarations" : "/tax-refunds";
+  // 页面路由与 API 路径不同：报关单页面在 /dashboard/customs（新建为 /new）
+  const pagePath = kind === "customs" ? "/customs" : "/tax-refunds";
+  const createPath = kind === "customs" ? "/new" : "/create";
   const numberLabel = kind === "customs" ? "报关单号" : "退税单号";
   const editLabel = kind === "customs" ? "编辑报关单" : "编辑退税单";
   const listURL =
     kind === "customs"
-      ? /\/dashboard\/tax-refunds\?view=customs$/
-      : /\/dashboard\/tax-refunds$/;
+      ? /\/dashboard\/customs\?view=customs$/
+      : /\/dashboard\/customs$/;
 
   test(`FINANCE ${kind} unsaved create return cancels with zero record or audit writes`, async ({
     page,
@@ -484,14 +487,14 @@ for (const kind of ["customs", "refunds"] as const) {
       )
         writes += 1;
     });
-    await page.goto(`/dashboard${pathname}/create`);
+    await page.goto(`/dashboard${pagePath}${createPath}`);
     await fillTaxRecordDraft(page, kind);
     await page.getByRole("button", { name: "返回", exact: true }).click();
     await expect(page).toHaveURL(listURL);
     expect(readTaxRecords(fixture)).toEqual(before);
     expect(writes).toBe(0);
     await page.reload();
-    await page.goto(`/dashboard${pathname}/create`);
+    await page.goto(`/dashboard${pagePath}${createPath}`);
     await expect(page.getByLabel(numberLabel, { exact: true })).toHaveValue("");
     await expect(page.getByLabel("备注", { exact: true })).toHaveValue("");
     expect(readTaxRecords(fixture)).toEqual(before);
@@ -506,7 +509,7 @@ for (const kind of ["customs", "refunds"] as const) {
     await loginAs(page, fixture, "FINANCE");
     const seed = fixture.taxRecords!;
     const before = readTaxRecords(fixture);
-    await page.goto(`/dashboard${pathname}/create`);
+    await page.goto(`/dashboard${pagePath}${createPath}`);
     const values = await fillTaxRecordDraft(
       page,
       kind,
@@ -550,7 +553,7 @@ for (const kind of ["customs", "refunds"] as const) {
     const response = await created;
     expect(response.status()).toBe(201);
     const id = (await response.json()).data.id as string;
-    await expect(page).toHaveURL(`/dashboard${pathname}/${id}`);
+    await expect(page).toHaveURL(`/dashboard${pagePath}/${id}`);
     await expect(
       page.getByRole("heading", { name: number, exact: true }),
     ).toBeVisible();
@@ -619,7 +622,7 @@ for (const kind of ["customs", "refunds"] as const) {
     const updated = mutation(page, `${pathname}/${id}`, "PUT");
     await page.getByRole("button", { name: "保存变更", exact: true }).click();
     expect((await updated).status()).toBe(200);
-    await expect(page).toHaveURL(`/dashboard${pathname}/${id}`);
+    await expect(page).toHaveURL(`/dashboard${pagePath}/${id}`);
     await page.reload();
     await expect(page.getByText(note, { exact: true })).toBeVisible();
     await expect.poll(() => readTaxRecords(fixture).audit.length).toBe(2);
@@ -674,7 +677,7 @@ for (const kind of ["customs", "refunds"] as const) {
       )
         writes += 1;
     });
-    await page.goto(`/dashboard${pathname}/${id}/edit`);
+    await page.goto(`/dashboard${pagePath}/${id}/edit`);
     await expect(
       page.getByRole("button", { name: "保存变更", exact: true }),
     ).toBeEnabled();
@@ -695,7 +698,7 @@ for (const kind of ["customs", "refunds"] as const) {
       .getByLabel(kind === "customs" ? "货值总额" : "申报金额", { exact: true })
       .fill("999");
     await page.getByRole("button", { name: "返回", exact: true }).click();
-    await expect(page).toHaveURL(`/dashboard${pathname}/${id}`);
+    await expect(page).toHaveURL(`/dashboard${pagePath}/${id}`);
     await expect(page.getByText(originalNote, { exact: true })).toBeVisible();
     expect(readTaxRecords(fixture)).toEqual(before);
     expect(writes).toBe(0);

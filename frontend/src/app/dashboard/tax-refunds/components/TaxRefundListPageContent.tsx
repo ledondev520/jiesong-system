@@ -36,10 +36,6 @@ import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  EXPORT_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -70,7 +66,7 @@ import { TaxRefundWorkbench } from "./TaxRefundWorkbench";
 const DEFAULT_PAGE_SIZE = 20;
 
 const CustomsDeclarationListPageContent = lazy(() =>
-  import("@/app/customs-declarations/components/CustomsDeclarationListPageContent").then(
+  import("@/app/dashboard/customs/components/CustomsDeclarationListPageContent").then(
     (module) => ({
       default: module.CustomsDeclarationListPageContent,
     }),
@@ -228,10 +224,10 @@ export function TaxRefundListPageContent() {
   const handleViewChange = (view: string) => {
     const href =
       view === "customs"
-        ? "/dashboard/tax-refunds?view=customs"
+        ? "/dashboard/customs?view=customs"
         : view === "refunds"
-          ? "/dashboard/tax-refunds?view=refunds"
-          : "/dashboard/tax-refunds";
+          ? "/dashboard/customs?view=refunds"
+          : "/dashboard/customs";
     setKeyword("");
     setStatus("ALL");
     setPage(1);
@@ -240,7 +236,6 @@ export function TaxRefundListPageContent() {
 
   return (
     <div className="space-y-6 pb-10">
-      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="出口退税"
         description="从待申报清单、进项发票核验到申报明细生成，在一个工作台完成税局操作前准备。"

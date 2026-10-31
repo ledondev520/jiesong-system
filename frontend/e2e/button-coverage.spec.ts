@@ -1,5 +1,5 @@
-import { test, expect, type Locator, type Page } from '@playwright/test';
-import { mockApiRoutes, signInAsAdmin } from './helpers';
+import { test, expect, type Locator, type Page } from "@playwright/test";
+import { mockApiRoutes, signInAsAdmin } from "./helpers";
 
 interface PageCase {
   name: string;
@@ -12,30 +12,43 @@ interface PageCase {
 }
 
 const pageCases: PageCase[] = [
-  { name: '首页', path: '/', minClicks: 0 },
-  { name: '注册页', path: '/register', minClicks: 0, requiresAuth: false, shellLocator: 'body' },
-  { name: '找回密码页', path: '/forgot-password', minClicks: 0, requiresAuth: false, shellLocator: 'body' },
-  { name: '工作台', path: '/dashboard' },
-  { name: '采购合同', path: '/dashboard/contracts' },
-  { name: '合同模板管理', path: '/dashboard/contracts/templates', minClicks: 0 },
-  { name: '合同模板上传', path: '/dashboard/contracts/template', minClicks: 0 },
-  { name: '采购列表', path: '/dashboard/purchase' },
+  { name: "首页", path: "/", minClicks: 0 },
+  {
+    name: "注册页",
+    path: "/register",
+    minClicks: 0,
+    requiresAuth: false,
+    shellLocator: "body",
+  },
+  {
+    name: "找回密码页",
+    path: "/forgot-password",
+    minClicks: 0,
+    requiresAuth: false,
+    shellLocator: "body",
+  },
+  { name: "工作台", path: "/dashboard" },
+  { name: "采购合同", path: "/dashboard/purchases" },
   // 该页面控件密集，限制巡检动作预算可降低偶发超时。
-  { name: '采购创建', path: '/dashboard/purchase/create', minClicks: 0 },
-  { name: '采购详情', path: '/dashboard/purchase/pc-001', minClicks: 0 },
-  { name: '出口合同', path: '/dashboard/sales' },
-  { name: '出口创建', path: '/dashboard/sales/create', minClicks: 0 },
-  { name: '商品档案', path: '/dashboard/products' },
-  { name: '库存状态', path: '/dashboard/inventory-status', minClicks: 0 },
-  { name: '设置', path: '/dashboard/settings', minClicks: 0 },
-  { name: '商品管理', path: '/dashboard/products' },
-  { name: '供应商管理', path: '/dashboard/suppliers' },
-  { name: '用户管理', path: '/dashboard/users' },
-  { name: '应付账款', path: '/dashboard/payments?tab=payable', minClicks: 0 },
-  { name: '应收账款', path: '/dashboard/payments?tab=receivable', minClicks: 0 },
-  { name: '系统管理', path: '/dashboard/system', minClicks: 0 },
-  { name: '通知中心', path: '/dashboard/system/notifications' },
-  { name: '系统日志', path: '/dashboard/system/logs' },
+  { name: "采购创建", path: "/dashboard/purchases/new", minClicks: 0 },
+  { name: "采购详情", path: "/dashboard/purchases/pc-001", minClicks: 0 },
+  { name: "出口合同", path: "/dashboard/sales" },
+  { name: "出口创建", path: "/dashboard/sales/create", minClicks: 0 },
+  { name: "商品档案", path: "/dashboard/products" },
+  { name: "库存", path: "/dashboard/inventory", minClicks: 0 },
+  { name: "设置", path: "/dashboard/settings", minClicks: 0 },
+  { name: "商品管理", path: "/dashboard/products" },
+  { name: "供应商管理", path: "/dashboard/suppliers" },
+  { name: "用户管理", path: "/dashboard/users" },
+  { name: "应付账款", path: "/dashboard/payments?tab=payable", minClicks: 0 },
+  {
+    name: "应收账款",
+    path: "/dashboard/payments?tab=receivable",
+    minClicks: 0,
+  },
+  { name: "系统管理", path: "/dashboard/system", minClicks: 0 },
+  { name: "通知中心", path: "/dashboard/system/notifications" },
+  { name: "系统日志", path: "/dashboard/system/logs" },
 ];
 
 const skipPatterns = [
@@ -66,13 +79,14 @@ const ignorablePageErrorPatterns = [
 ];
 
 const normalize = (value: string | null | undefined): string =>
-  (value || '').replace(/\s+/g, ' ').trim();
+  (value || "").replace(/\s+/g, " ").trim();
 
-const shouldSkip = (label: string): boolean => skipPatterns.some((pattern) => pattern.test(label));
+const shouldSkip = (label: string): boolean =>
+  skipPatterns.some((pattern) => pattern.test(label));
 
 const normalizePath = (path: string): string => {
-  const cleaned = path.replace(/[?#].*$/, '').replace(/\/+$/, '');
-  return cleaned || '/';
+  const cleaned = path.replace(/[?#].*$/, "").replace(/\/+$/, "");
+  return cleaned || "/";
 };
 
 const safeClick = async (locator: Locator) => {
@@ -90,18 +104,29 @@ const safeClick = async (locator: Locator) => {
 };
 
 const assertNoRuntimeError = async (page: Page) => {
-  await expect(page.getByRole('heading', {
-    name: /Application error: a client-side exception has occurred while loading localhost/i,
-  })).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: '页面出现异常' })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", {
+      name: /Application error: a client-side exception has occurred while loading localhost/i,
+    }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "页面出现异常" })).toHaveCount(
+    0,
+  );
 };
 
 const waitForLoadingDone = async (page: Page) => {
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForLoadState('networkidle').catch(() => {});
-  const loadingHint = page.getByText('加载中...');
-  if (await loadingHint.first().isVisible().catch(() => false)) {
-    await expect(loadingHint.first()).not.toBeVisible({ timeout: 15000 }).catch(() => {});
+  await page.waitForLoadState("domcontentloaded");
+  await page.waitForLoadState("networkidle").catch(() => {});
+  const loadingHint = page.getByText("加载中...");
+  if (
+    await loadingHint
+      .first()
+      .isVisible()
+      .catch(() => false)
+  ) {
+    await expect(loadingHint.first())
+      .not.toBeVisible({ timeout: 15000 })
+      .catch(() => {});
   }
 };
 
@@ -113,7 +138,9 @@ const clickAllBusinessButtons = async (
   const clickedList: string[] = [];
   const maxActionsPerPage = options?.maxActions ?? 10;
   const maxDurationMs = options?.maxDurationMs ?? 30000;
-  const basePath = normalizePath(options?.basePath ?? new URL(page.url()).pathname);
+  const basePath = normalizePath(
+    options?.basePath ?? new URL(page.url()).pathname,
+  );
   const startedAt = Date.now();
 
   for (let step = 0; step < maxActionsPerPage; step += 1) {
@@ -126,19 +153,21 @@ const clickAllBusinessButtons = async (
       .evaluateAll((elements) =>
         elements.slice(0, 30).map((element, index) => ({
           index,
-          ariaLabel: (element.getAttribute('aria-label') || '').trim(),
-          text: (element.textContent || '').replace(/\s+/g, ' ').trim(),
-          title: (element.getAttribute('title') || '').trim(),
-          dataSlot: (element.getAttribute('data-slot') || '').trim(),
-          hasPopup: Boolean(element.getAttribute('aria-haspopup')),
+          ariaLabel: (element.getAttribute("aria-label") || "").trim(),
+          text: (element.textContent || "").replace(/\s+/g, " ").trim(),
+          title: (element.getAttribute("title") || "").trim(),
+          dataSlot: (element.getAttribute("data-slot") || "").trim(),
+          hasPopup: Boolean(element.getAttribute("aria-haspopup")),
           disabled:
-            element.hasAttribute('disabled') ||
-            element.getAttribute('aria-disabled') === 'true',
-        }))
+            element.hasAttribute("disabled") ||
+            element.getAttribute("aria-disabled") === "true",
+        })),
       );
 
     const candidate = descriptors.find((item) => {
-      const label = normalize(item.ariaLabel || item.text || item.title || item.dataSlot);
+      const label = normalize(
+        item.ariaLabel || item.text || item.title || item.dataSlot,
+      );
       if (!label) return false;
       if (item.hasPopup || item.disabled) return false;
       if (shouldSkip(label) || processedLabels.has(label)) return false;
@@ -149,15 +178,26 @@ const clickAllBusinessButtons = async (
       break;
     }
 
-    const label = normalize(candidate.ariaLabel || candidate.text || candidate.title || candidate.dataSlot);
+    const label = normalize(
+      candidate.ariaLabel ||
+        candidate.text ||
+        candidate.title ||
+        candidate.dataSlot,
+    );
     processedLabels.add(label);
 
-    const button = page.locator('main button:visible, [role="dialog"] button:visible').nth(candidate.index);
+    const button = page
+      .locator('main button:visible, [role="dialog"] button:visible')
+      .nth(candidate.index);
     let clicked = true;
     await button.scrollIntoViewIfNeeded().catch(() => {});
     await safeClick(button).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
-      if (/not attached|detached|not visible|outside of the viewport|intercepts pointer events|Timeout/i.test(message)) {
+      if (
+        /not attached|detached|not visible|outside of the viewport|intercepts pointer events|Timeout/i.test(
+          message,
+        )
+      ) {
         clicked = false;
         return;
       }
@@ -182,7 +222,7 @@ const clickAllBusinessButtons = async (
   return clickedList;
 };
 
-test.describe('按钮全覆盖巡检', () => {
+test.describe("按钮全覆盖巡检", () => {
   test.beforeEach(async ({ page }) => {
     await mockApiRoutes(page);
   });
@@ -191,10 +231,10 @@ test.describe('按钮全覆盖巡检', () => {
     test(`页面按钮可点击 - ${pageCase.name}`, async ({ page }) => {
       test.setTimeout(150000);
       const pageErrors: string[] = [];
-      page.on('pageerror', (error) => {
+      page.on("pageerror", (error) => {
         pageErrors.push(error.message);
       });
-      page.on('dialog', (dialog) => {
+      page.on("dialog", (dialog) => {
         void dialog.dismiss().catch(() => {});
       });
 
@@ -205,27 +245,34 @@ test.describe('按钮全覆盖巡检', () => {
       }
       await waitForLoadingDone(page);
       await assertNoRuntimeError(page);
-      await expect(page.locator(pageCase.shellLocator ?? 'main').first()).toBeVisible();
+      await expect(
+        page.locator(pageCase.shellLocator ?? "main").first(),
+      ).toBeVisible();
       if (pageCase.requiresAuth !== false) {
         await expect(page).not.toHaveURL(/\/login$/);
       }
 
       const minClicks = pageCase.minClicks ?? 1;
-      const clickedList = minClicks === 0
-        ? []
-        : await clickAllBusinessButtons(page, {
-            maxActions: pageCase.maxActions,
-            maxDurationMs: pageCase.maxDurationMs,
-            basePath: pageCase.path,
-          });
+      const clickedList =
+        minClicks === 0
+          ? []
+          : await clickAllBusinessButtons(page, {
+              maxActions: pageCase.maxActions,
+              maxDurationMs: pageCase.maxDurationMs,
+              basePath: pageCase.path,
+            });
       const blockingErrors = pageErrors.filter(
-        (message) => !ignorablePageErrorPatterns.some((pattern) => pattern.test(message))
+        (message) =>
+          !ignorablePageErrorPatterns.some((pattern) => pattern.test(message)),
       );
 
-      expect(blockingErrors, `${pageCase.path} 发生运行时异常：${blockingErrors.join(' | ')}`).toEqual([]);
+      expect(
+        blockingErrors,
+        `${pageCase.path} 发生运行时异常：${blockingErrors.join(" | ")}`,
+      ).toEqual([]);
       expect(
         clickedList.length,
-        `${pageCase.path} 未发现可点击按钮，可能页面未加载或选择器需更新`
+        `${pageCase.path} 未发现可点击按钮，可能页面未加载或选择器需更新`,
       ).toBeGreaterThanOrEqual(minClicks);
     });
   }
