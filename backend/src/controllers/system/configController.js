@@ -10,6 +10,8 @@ const https = require('https');
 const prisma = require('../../utils/prisma');
 const { success } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
+const { loadPricingSnapshot, updatePricingConfig } = require('../../services/pricingConfigService');
+const { currentRates } = require('../../services/exportPricing');
 const {
   normalizeConfigValueForResponse,
   normalizeConfigValueForStorage,
@@ -30,8 +32,6 @@ const EXCHANGE_RATE_SYNC_TIMEOUT_MS = parsePositiveIntEnv(
  */
 const CONFIG_DOMAIN_MAP = {
   // 基础参数域：影响定价与汇率计算的全局数值
-  exchangeRate: { domain: 'params', label: '基础参数', note: '用于销售合同初始汇率填充' },
-  profitRate:   { domain: 'params', label: '基础参数', note: '例如 1.3 表示 30% 利润率' },
   stampPlatformUrl: { domain: 'params', label: '基础参数', note: '线上盖章平台链接（购销合同生成后跳转盖章）' },
   invoiceTitleInfo: { domain: 'params', label: '基础参数', note: '我方开票抬头信息（催票文本附带，多行）' },
 
@@ -54,6 +54,9 @@ const CONFIG_DOMAIN_MAP = {
   hsciqEnabled:   { domain: 'ai', label: 'AI集成', note: '是否启用 HSCIQ 海关归类 API（开启后 HS 编码推荐与申报要素将优先调用官方 API）' },
 };
 
+// 汇率/加价只来自报价配置（config/pricing.json，经 /system/pricing-config）；普通 SystemConfig 不能再保存这两项。
+const PRICING_CONFIG_KEYS = ['exchangeRate', 'profitRate'];
+
 const getDomainMeta = (key) => CONFIG_DOMAIN_MAP[key] || { domain: 'other', label: '其他', note: '' };
 
 const buildConfigValue = (key, value) => {
@@ -71,26 +74,10 @@ const formatConfigResponse = (configRecord) => {
   };
 };
 
+// 兼容旧响应形状 { rate, buffer, effectiveRate }，数值全部来自唯一报价配置。
 const resolveExchangeRateConfig = async () => {
-  const config = await prisma.systemConfig.findUnique({
-    where: { key: 'exchangeRate' },
-  });
-
-  let rate = { rate: 6.8, buffer: 0.2, effectiveRate: 6.6 };
-  if (config) {
-    try {
-      const parsed = JSON.parse(config.value);
-      rate = {
-        ...parsed,
-        effectiveRate: parsed.rate - (parsed.buffer || 0.2),
-      };
-    } catch (parseError) {
-      // exchangeRate 配置值不是合法 JSON，降级为默认值并记录以便排查。
-      console.warn('[configController] exchangeRate 解析失败，使用默认值:', parseError?.message);
-    }
-  }
-
-  return rate;
+  const rates = currentRates();
+  return { rate: rates.spotRate, buffer: -rates.adjustment, effectiveRate: rates.effectiveRate };
 };
 
 const fetchUsdCnyRate = async ({ timeoutMs = EXCHANGE_RATE_SYNC_TIMEOUT_MS } = {}) => new Promise((resolve, reject) => {
@@ -142,6 +129,7 @@ const getConfigs = async (req, res, next) => {
     const configs = await prisma.systemConfig.findMany();
 
     const formatted = configs.reduce((acc, config) => {
+      if (PRICING_CONFIG_KEYS.includes(config.key)) return acc;
       acc[config.key] = buildConfigValue(config.key, config.value);
       return acc;
     }, {});
@@ -217,6 +205,9 @@ const updateConfig = async (req, res, next) => {
   try {
     const { key } = req.params;
     const { value, note } = req.body;
+    if (PRICING_CONFIG_KEYS.includes(key)) {
+      throw createError('汇率和加价由报价配置统一维护，请在「系统配置 > 报价配置」中修改', 400);
+    }
 
     const storedValue = normalizeConfigValueForStorage(key, value);
 
@@ -244,39 +235,19 @@ const getExchangeRate = async (req, res, next) => {
 };
 
 /**
- * 职责：从公共汇率 API 自动同步 USD/CNY 汇率，并写入 systemConfig
- * 思路：
- * 1. 请求 open.er-api.com 获取实时汇率
- * 2. 保留现有 buffer 配置，只更新 rate 字段
- * 3. 写入 exchangeRate systemConfig
+ * 职责：从公共汇率 API 取现汇，并作为唯一报价配置的 exchangeRate 保存（带版本校验，ADMIN）
+ * 思路：读取当前配置与版本 → 只替换 exchangeRate → 原子整份替换；不再写 SystemConfig。
  */
 const syncExchangeRate = async (req, res, next) => {
   try {
-    // 1. 从免费开放 API 获取汇率；外部慢或失败时必须快速降级，不能拖慢系统设置界面。
     const rate = await fetchUsdCnyRate();
-
-    // 2. 读取现有配置（保留 buffer）
-    const existing = await prisma.systemConfig.findUnique({
-      where: { key: 'exchangeRate' },
-    });
-    let buffer = 0.2;
-    if (existing) {
-      try {
-        const parsed = JSON.parse(existing.value);
-        if (typeof parsed.buffer === 'number') buffer = parsed.buffer;
-      } catch { /* 使用默认 buffer */ }
-    }
-
-    // 3. 写入新汇率
-    const newValue = JSON.stringify({ rate, buffer, effectiveRate: rate - buffer });
-    await prisma.systemConfig.upsert({
-      where: { key: 'exchangeRate' },
-      update: { value: newValue, note: `汇率自动同步 - ${new Date().toISOString()}` },
-      create: { key: 'exchangeRate', value: newValue, note: '汇率自动同步' },
-    });
-
-    success(res, { rate, buffer, effectiveRate: rate - buffer }, `汇率已同步：1 USD = ${rate} CNY`);
+    const { config, revision } = loadPricingSnapshot();
+    updatePricingConfig({ ...config, exchangeRate: rate }, revision, req.user?.id);
+    const buffer = -config.exchangeAdjustment;
+    success(res, { rate, buffer, effectiveRate: Math.round((rate - buffer) * 1e6) / 1e6 }, `汇率已同步：1 USD = ${rate} CNY`);
   } catch (error) {
+    // 报价配置冲突/锁/校验（带状态码）必须如实返回，不能伪装成“同步降级”。
+    if (error.statusCode) return next(error);
     try {
       const currentRate = await resolveExchangeRateConfig();
       success(res, {

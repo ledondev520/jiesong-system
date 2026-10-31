@@ -14,6 +14,8 @@ const {
   validateSalesTransition,
 } = require('./salesStateMachine');
 const inventorySnapshot = require('./inventorySnapshot');
+const { defaultSpotRate, priceFor } = require('./exportPricing');
+const { withCategoryChains } = require('./productCategoryChain');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
@@ -150,7 +152,7 @@ const createSalesContract = async (data = {}, context = {}) => {
   }
   const year = getCurrentYear();
   const contractNo = data.contractNo || (await generateNextContractNo({ prisma, year }));
-  const exchangeRate = parseNullableNumber(data.exchangeRate, 7.0);
+  const exchangeRate = parseNullableNumber(data.exchangeRate, defaultSpotRate());
 
   const contract = await prisma.salesContract.create({
     data: {
@@ -191,8 +193,18 @@ const removeSalesContract = async (id) => prisma.$transaction(async (tx) => {
   await tx.salesContract.delete({ where: { id } });
 });
 
+// 未给售价时按唯一报价规则（订单已保存的现汇）定价；缺成本/汇率时拒绝，不再用代码里的 ×1.3。
+const ruleSellingPrice = async (contract, data) => {
+  const product = await prisma.product.findUnique({ where: { id: data.productId }, select: { id: true, categoryId: true } });
+  const [withChain] = await withCategoryChains([{ product }], prisma);
+  const priced = priceFor({ costCny: data.costPrice, categoryIds: withChain?.product?.categoryIds || [], spotRate: contract.exchangeRate });
+  if (priced.status !== 'OK') throw createError('缺少有效成本或汇率，无法按报价规则定价，请填写售价', 400);
+  return priced.unitPriceUsd;
+};
+
 const addSalesItem = async (id, data = {}) => {
   const contract = await prisma.salesContract.findUnique({ where: { id } });
+  const sellingPrice = data.sellingPrice || await ruleSellingPrice(contract, data);
 
   const item = await prisma.salesItem.create({
     data: {
@@ -202,7 +214,7 @@ const addSalesItem = async (id, data = {}) => {
       quantity: data.quantity,
       unit: data.unit,
       costPrice: data.costPrice,
-      sellingPrice: data.sellingPrice || (data.costPrice / contract.exchangeRate * 1.3),
+      sellingPrice,
       specification: data.specification,
       note: data.note,
     },
@@ -323,25 +335,22 @@ const getNextContractNo = async () => {
   return generateNextContractNo({ prisma, year });
 };
 
-const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate = 1.3 }) => {
+// 推荐售价 = 唯一报价规则（加价、现汇 − 调整、整美元后取整到 roundUpTo）。profitRate 不再由调用方传入。
+const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate, categoryIds } = {}) => {
+  if (profitRate !== undefined) throw createError('利润率由报价规则统一配置，不能在请求中指定', 400);
   const numericCostPrice = Number(costPrice);
-  const numericExchangeRate = Number(exchangeRate);
-  const numericProfitRate = Number(profitRate);
+  if (!Number.isFinite(numericCostPrice)) throw createError('costPrice 必须为数字', 400);
+  if (exchangeRate !== undefined && !(Number(exchangeRate) > 0)) throw createError('exchangeRate 必须大于0', 400);
 
-  if (!Number.isFinite(numericCostPrice) || !Number.isFinite(numericExchangeRate) || !Number.isFinite(numericProfitRate)) {
-    throw createError('costPrice、exchangeRate 和 profitRate 必须为数字', 400);
-  }
-  if (numericExchangeRate <= 0) {
-    throw createError('exchangeRate 必须大于0', 400);
-  }
-
-  const sellingPrice = numericCostPrice / numericExchangeRate * numericProfitRate;
-
+  const priced = priceFor({ costCny: numericCostPrice, categoryIds, spotRate: exchangeRate === undefined ? undefined : Number(exchangeRate) });
+  if (priced.status !== 'OK') throw createError(priced.status === 'MISSING_COST' ? 'costPrice 必须大于0' : '现汇无效，无法报价', 400);
   return {
-    exact: sellingPrice.toFixed(2),
-    roundedUp: Math.ceil(sellingPrice),
-    roundedDown: Math.floor(sellingPrice),
-    recommended: Math.round(sellingPrice),
+    exact: priced.rawUnitPriceUsd.toFixed(2),
+    roundedUp: Math.ceil(priced.rawUnitPriceUsd),
+    roundedDown: Math.floor(priced.rawUnitPriceUsd),
+    recommended: priced.unitPriceUsd,
+    effectiveRate: priced.effectiveRate,
+    markup: priced.markup,
   };
 };
 

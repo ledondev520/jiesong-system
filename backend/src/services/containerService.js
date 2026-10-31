@@ -1,5 +1,6 @@
 /** 旧货柜接口复用出口合同状态机及出库事务；创建仅为草稿，表头不能绕过状态流转。 */
 const prisma = require('../utils/prisma');
+const { defaultSpotRate } = require('./exportPricing');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
 const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
@@ -300,7 +301,7 @@ const create = async (data = {}) => {
     throw createError('新货柜必须为草稿，请通过状态入口登记后续流转', 400);
   }
   const contractNo = data.contractNo || (await generateNextContainerNo(data.portId));
-  const exchangeRate = parseNullableNumber(data.exchangeRate, 7.0);
+  const exchangeRate = parseNullableNumber(data.exchangeRate, defaultSpotRate());
 
   const contract = await prisma.salesContract.create({
     data: {

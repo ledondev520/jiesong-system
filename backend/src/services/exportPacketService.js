@@ -60,6 +60,14 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     entry.packingItemId,
     toNumber(entry.unitPriceUsd),
   ]));
+  // 订单已确认单价：订单明细（商品 × 门店）上唯一的 sellingPrice；出现多个不同价格时不猜测，回退并提示。
+  const orderPrices = new Map();
+  for (const orderItem of contract.items || []) {
+    const price = toNumber(orderItem.sellingPrice);
+    if (!(price > 0)) continue;
+    const key = `${orderItem.productId}|${orderItem.storeId}`;
+    orderPrices.set(key, new Set([...(orderPrices.get(key) || []), price]));
+  }
   const issues = [];
 
   if (!validRate) issues.push(makeIssue('INVALID_SPOT_RATE', 'error', `现汇必须大于 ${Math.max(0, FX_BUFFER)}`));
@@ -106,6 +114,11 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     const categoryIds = item.product?.categoryIds || [];
     const targetMarkup = markupFor(categoryIds, config);
     const manualUnitPrice = priceOverrideMap.get(item.id) || 0;
+    const orderPriceSet = orderPrices.get(`${item.productId}|${item.storeId}`);
+    const orderPrice = orderPriceSet?.size === 1 ? [...orderPriceSet][0] : 0;
+    if (orderPriceSet && orderPriceSet.size > 1) {
+      lineIssues.push(makeIssue('AMBIGUOUS_ORDER_PRICE', 'warning', '订单中同一商品 × 门店有多个不同单价，未采用订单价', item.id, productName));
+    }
     const historical = findHistoricalQuote(historicalQuotes, item, productName);
     const historicalCheck = historical && validRate && purchaseCostCny > 0 && quantity > 0
       ? historicalQuoteAllowed({
@@ -141,6 +154,14 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       pricingSource = 'history';
       pricingReference = `参考 ${historical.contractNo} 同品名同规格报价`;
       roundingMethod = 'historical_quote';
+    }
+    if (orderPrice > 0) {
+      // 订单已确认的成交单价优先于历史价和公式价；仅本票人工确认可覆盖
+      unitPriceUsd = orderPrice;
+      totalUsd = round(unitPriceUsd * quantity, 4);
+      pricingSource = 'order';
+      pricingReference = '订单已确认单价';
+      roundingMethod = 'order_confirmed';
     }
     if (manualUnitPrice > 0) {
       unitPriceUsd = manualUnitPrice;
@@ -254,6 +275,7 @@ const loadPacketSources = async (salesContractId, options = {}, prismaClient = p
     where: { id: salesContractId },
     include: {
       port: true,
+      items: { select: { productId: true, storeId: true, sellingPrice: true } },
       packingItems: {
         include: { product: true, store: true },
         orderBy: { createdAt: 'asc' },
