@@ -2,7 +2,7 @@
  * Input: 箱子尺寸列表、货柜尺寸、合同毛重/体积汇总
  * Output: 每个箱子在货柜中的3D位置；支持从体积自动推算尺寸（无体积则缺箱规，不伪造）；出柜条件（双80%）判定，规则与后端 shipmentReadinessService 一致
  * Pos: 工具库，实现3D装箱算法（底部优先堆叠）+ 尺寸推算 + 出柜指标判定
- * 
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -10,7 +10,7 @@
 // 生产前端因 turbopack.root 固定为 frontend/ 无法导入仓库根文件，故在此保留镜像，
 // 由 binPacking.test.ts 与该配置逐项比对防止漂移。
 export const CONTAINER_40HQ = {
-  code: '40HQ',
+  code: "40HQ",
   length: 12020,
   width: 2350,
   height: 2695,
@@ -32,7 +32,7 @@ export interface ShippingReadiness {
   /** 是否超过 40HQ 任一安全上限 */
   overloaded: boolean;
   /** 超限指标 */
-  overloadReasons: Array<'weight' | 'volume'>;
+  overloadReasons: Array<"weight" | "volume">;
   /** 3D 排柜是否已放下全部箱件 */
   physicalFit: boolean;
   /** 未能放入货柜的箱数 */
@@ -44,7 +44,7 @@ export interface ShippingReadiness {
   /** 是否同时满足利用率、上限与物理可装载性 */
   ready: boolean;
   /** 达标途径：weight/volume/both/none */
-  reachedBy: 'weight' | 'volume' | 'both' | 'none';
+  reachedBy: "weight" | "volume" | "both" | "none";
 }
 
 /**
@@ -70,9 +70,11 @@ export function evaluateShippingReadiness(
   const volumePct = ((volumeCbm || 0) / CONTAINER_40HQ.maxVolume) * 100;
   const weightOk = weightPct >= SHIPPING_READY_THRESHOLD_PCT;
   const volumeOk = volumePct >= SHIPPING_READY_THRESHOLD_PCT;
-  const overloadReasons: Array<'weight' | 'volume'> = [];
-  if ((grossWeightKg || 0) > CONTAINER_40HQ.maxWeight) overloadReasons.push('weight');
-  if ((volumeCbm || 0) > CONTAINER_40HQ.maxVolume) overloadReasons.push('volume');
+  const overloadReasons: Array<"weight" | "volume"> = [];
+  if ((grossWeightKg || 0) > CONTAINER_40HQ.maxWeight)
+    overloadReasons.push("weight");
+  if ((volumeCbm || 0) > CONTAINER_40HQ.maxVolume)
+    overloadReasons.push("volume");
   const utilizationReady = weightOk || volumeOk;
   const count = (value?: number) => Math.max(0, Math.trunc(value || 0));
   const unplacedBoxCount = count(physical.unplacedBoxCount);
@@ -89,9 +91,20 @@ export function evaluateShippingReadiness(
     unplacedBoxCount,
     missingBoxItemCount,
     missingDimensionItemCount,
-    ready: utilizationReady && overloadReasons.length === 0 && physicalFit
-      && missingBoxItemCount === 0 && physical.packingItemCount !== 0,
-    reachedBy: weightOk && volumeOk ? 'both' : weightOk ? 'weight' : volumeOk ? 'volume' : 'none',
+    ready:
+      utilizationReady &&
+      overloadReasons.length === 0 &&
+      physicalFit &&
+      missingBoxItemCount === 0 &&
+      physical.packingItemCount !== 0,
+    reachedBy:
+      weightOk && volumeOk
+        ? "both"
+        : weightOk
+          ? "weight"
+          : volumeOk
+            ? "volume"
+            : "none",
   };
 }
 
@@ -99,11 +112,11 @@ export function evaluateShippingReadiness(
 export interface Box {
   id: string;
   name: string;
-  length: number;  // mm
-  width: number;   // mm
-  height: number;  // mm
+  length: number; // mm
+  width: number; // mm
+  height: number; // mm
   weight?: number; // kg
-  color?: string;  // 用于可视化
+  color?: string; // 用于可视化
   quantity: number; // 箱数
   isEstimated?: boolean; // 尺寸是否由体积推算（非用户填写）
 }
@@ -131,7 +144,9 @@ export interface PackingBoxItemSource {
 }
 
 /** 职责：未填写箱数（≤0 或空）的装箱明细行数，对应后端 missing-box-count。 */
-export function countItemsMissingBoxes(packingItems: PackingBoxItemSource[]): number {
+export function countItemsMissingBoxes(
+  packingItems: PackingBoxItemSource[],
+): number {
   return packingItems.filter((item) => !(Number(item.boxes) > 0)).length;
 }
 
@@ -145,38 +160,45 @@ export function buildPackingBoxes(
   products: PackingBoxProductSource[] = [],
 ): Box[] {
   return packingItems.flatMap((item): Box[] => {
-    const product = item.product || products.find((entry) => entry.id === item.productId);
+    const product =
+      item.product || products.find((entry) => entry.id === item.productId);
     const quantity = Math.max(0, Math.trunc(Number(item.boxes) || 0));
     const itemHasDimensions = Boolean(item.length && item.width && item.height);
-    const productHasDimensions = Boolean(product?.length && product?.width && product?.height);
+    const productHasDimensions = Boolean(
+      product?.length && product?.width && product?.height,
+    );
 
     if (itemHasDimensions || productHasDimensions) {
-      return [{
-        id: item.id,
-        name: product?.customsName || '未知商品',
-        length: Number(itemHasDimensions ? item.length : product?.length),
-        width: Number(itemHasDimensions ? item.width : product?.width),
-        height: Number(itemHasDimensions ? item.height : product?.height),
-        weight: Number(item.grossWeight) || 0,
-        color: generateColor(item.productId),
-        quantity,
-        isEstimated: false,
-      }];
+      return [
+        {
+          id: item.id,
+          name: product?.customsName || "未知商品",
+          length: Number(itemHasDimensions ? item.length : product?.length),
+          width: Number(itemHasDimensions ? item.width : product?.width),
+          height: Number(itemHasDimensions ? item.height : product?.height),
+          weight: Number(item.grossWeight) || 0,
+          color: generateColor(item.productId),
+          quantity,
+          isEstimated: false,
+        },
+      ];
     }
 
     const inferred = inferBoxDimensions(perBoxCbm(item, product, quantity));
     if (!inferred) return [];
-    return [{
-      id: item.id,
-      name: product?.customsName || '未知商品',
-      length: inferred.length,
-      width: inferred.width,
-      height: inferred.height,
-      weight: Number(item.grossWeight) || 0,
-      color: generateColor(item.productId),
-      quantity,
-      isEstimated: true,
-    }];
+    return [
+      {
+        id: item.id,
+        name: product?.customsName || "未知商品",
+        length: inferred.length,
+        width: inferred.width,
+        height: inferred.height,
+        weight: Number(item.grossWeight) || 0,
+        color: generateColor(item.productId),
+        quantity,
+        isEstimated: true,
+      },
+    ];
   });
 }
 
@@ -190,7 +212,9 @@ function perBoxCbm(
   const itemVolume = Number(item.volume) || 0;
   const productVolume = Number(product?.volume) || 0;
   if (itemVolume > 0) return itemVolume / quantity;
-  return productVolume > 0 ? (productVolume * (Number(item.quantity) || 0)) / quantity : 0;
+  return productVolume > 0
+    ? (productVolume * (Number(item.quantity) || 0)) / quantity
+    : 0;
 }
 
 /** 职责：既无箱规也无体积的装箱明细行数（箱数已填），对应后端 missing-dimensions。 */
@@ -201,18 +225,20 @@ export function countItemsMissingDimensions(
   return packingItems.filter((item) => {
     const quantity = Math.max(0, Math.trunc(Number(item.boxes) || 0));
     if (quantity === 0) return false;
-    const product = item.product || products.find((entry) => entry.id === item.productId);
-    const hasDimensions = Boolean(item.length && item.width && item.height)
-      || Boolean(product?.length && product?.width && product?.height);
+    const product =
+      item.product || products.find((entry) => entry.id === item.productId);
+    const hasDimensions =
+      Boolean(item.length && item.width && item.height) ||
+      Boolean(product?.length && product?.width && product?.height);
     return !hasDimensions && perBoxCbm(item, product, quantity) <= 0;
   }).length;
 }
 
 // 放置后的箱子（包含位置信息）
 export interface PlacedBox extends Box {
-  posX: number;  // mm
-  posY: number;  // mm
-  posZ: number;  // mm (高度方向，0 = 地面)
+  posX: number; // mm
+  posY: number; // mm
+  posZ: number; // mm (高度方向，0 = 地面)
   rotated?: boolean; // 是否旋转（长宽互换）
 }
 
@@ -220,7 +246,7 @@ export interface PlacedBox extends Box {
 export interface PackingResult {
   placedBoxes: PlacedBox[];
   unplacedBoxes: Box[];
-  usedVolume: number;  // mm³
+  usedVolume: number; // mm³
   totalVolume: number; // mm³
   utilizationRate: number; // 利用率 %
 }
@@ -241,22 +267,22 @@ interface Space {
  * 1. 使用可用空间列表跟踪剩余空间
  * 2. 每次放置箱子后，将剩余空间分割为新的可用空间
  * 3. 优先使用Z值最小（最接近地面）的空间
- * 
+ *
  * @param boxes - 待装箱的箱子列表
  * @param container - 货柜尺寸，默认40HQ
  * @returns PackingResult - 装箱结果
  */
 export function packBoxes(
   boxes: Box[],
-  container = CONTAINER_40HQ
+  container = CONTAINER_40HQ,
 ): PackingResult {
   const placedBoxes: PlacedBox[] = [];
   const unplacedBoxes: Box[] = [];
   const GAP = 10; // 箱子间隙 (mm)
-  
+
   // 0. 展开所有箱子（按数量展开）
   const expandedBoxes: Box[] = [];
-  boxes.forEach(box => {
+  boxes.forEach((box) => {
     for (let i = 0; i < box.quantity; i++) {
       expandedBoxes.push({
         ...box,
@@ -265,46 +291,49 @@ export function packBoxes(
       });
     }
   });
-  
+
   // 1. 按体积降序排序（大箱子优先）
   const sortedBoxes = [...expandedBoxes].sort((a, b) => {
     const volA = a.length * a.width * a.height;
     const volB = b.length * b.width * b.height;
     return volB - volA;
   });
-  
+
   // 2. 初始化可用空间列表（整个货柜是一个大空间）
-  const spaces: Space[] = [{
-    x: 0,
-    y: 0,
-    z: 0,
-    length: container.length,
-    width: container.width,
-    height: container.height,
-  }];
-  
+  const spaces: Space[] = [
+    {
+      x: 0,
+      y: 0,
+      z: 0,
+      length: container.length,
+      width: container.width,
+      height: container.height,
+    },
+  ];
+
   // 3. 逐个放置箱子
   for (const box of sortedBoxes) {
     let placed = false;
-    
+
     // 尝试两种旋转方向
     const orientations = [
       { l: box.length, w: box.width, h: box.height, rotated: false },
       { l: box.width, w: box.length, h: box.height, rotated: true },
     ];
-    
+
     // 按 Z 值排序空间（底部优先）
     spaces.sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
-    
+
     for (let i = 0; i < spaces.length && !placed; i++) {
       const space = spaces[i];
-      
+
       for (const orient of orientations) {
         // 检查箱子是否能放入这个空间
-        if (orient.l <= space.length && 
-            orient.w <= space.width && 
-            orient.h <= space.height) {
-          
+        if (
+          orient.l <= space.length &&
+          orient.w <= space.width &&
+          orient.h <= space.height
+        ) {
           // 放置箱子
           placedBoxes.push({
             ...box,
@@ -316,10 +345,10 @@ export function packBoxes(
             posZ: space.z,
             rotated: orient.rotated,
           });
-          
+
           // 移除使用的空间
           spaces.splice(i, 1);
-          
+
           // 分割剩余空间（创建三个新空间：右侧、前方、上方）
           // 右侧空间（沿 X 轴）
           if (space.length - orient.l - GAP > 100) {
@@ -332,7 +361,7 @@ export function packBoxes(
               height: space.height,
             });
           }
-          
+
           // 前方空间（沿 Y 轴）
           if (space.width - orient.w - GAP > 100) {
             spaces.push({
@@ -344,7 +373,7 @@ export function packBoxes(
               height: space.height,
             });
           }
-          
+
           // 上方空间（沿 Z 轴）- 仅当这个箱子下方有支撑时才能使用
           if (space.height - orient.h - GAP > 100) {
             spaces.push({
@@ -356,26 +385,26 @@ export function packBoxes(
               height: space.height - orient.h - GAP,
             });
           }
-          
+
           placed = true;
           break;
         }
       }
     }
-    
+
     if (!placed) {
       unplacedBoxes.push(box);
     }
   }
-  
+
   // 4. 计算利用率
   const usedVolume = placedBoxes.reduce(
     (sum, box) => sum + box.length * box.width * box.height,
-    0
+    0,
   );
   const totalVolume = container.length * container.width * container.height;
   const utilizationRate = (usedVolume / totalVolume) * 100;
-  
+
   return {
     placedBoxes,
     unplacedBoxes,
@@ -396,9 +425,21 @@ export function generateColor(seed: string): string {
     hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   }
   const colors = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
-    '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
-    '#F8B500', '#00CED1', '#FF69B4', '#32CD32', '#FF4500',
+    "#FF6B6B",
+    "#4ECDC4",
+    "#45B7D1",
+    "#96CEB4",
+    "#FFEAA7",
+    "#DDA0DD",
+    "#98D8C8",
+    "#F7DC6F",
+    "#BB8FCE",
+    "#85C1E9",
+    "#F8B500",
+    "#00CED1",
+    "#FF69B4",
+    "#32CD32",
+    "#FF4500",
   ];
   return colors[Math.abs(hash) % colors.length];
 }
@@ -417,7 +458,7 @@ export function mmToM(mm: number): number {
  * 2. 使用标准纸箱比例 1.2:1:0.8（长:宽:高）推算三边
  *    L*W*H = V → 1.2x * x * 0.8x = V → 0.96x³ = V
  * 3. 对边长做上下限夹紧，防止数据异常
- * 
+ *
  * @param volumeCbm - 单箱体积（CBM，立方米）
  * @returns 推算的长宽高（mm）及 isEstimated 标记；体积无效返回 null
  */
@@ -442,7 +483,7 @@ export function inferBoxDimensions(volumeCbm: number): {
 
   return {
     length: clamp(x * 1.2, 100, CONTAINER_40HQ.length),
-    width:  clamp(x * 1.0, 100, CONTAINER_40HQ.width),
+    width: clamp(x * 1.0, 100, CONTAINER_40HQ.width),
     height: clamp(x * 0.8, 100, CONTAINER_40HQ.height),
     isEstimated: true,
   };

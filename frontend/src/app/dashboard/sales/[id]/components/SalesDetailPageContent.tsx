@@ -834,7 +834,10 @@ export default function SalesDetailPage({ params }: PageProps) {
     unplacedBoxCount: packingPlan.unplacedBoxes.length,
     packingItemCount: packingRows.length,
     missingBoxItemCount: countItemsMissingBoxes(packingRows),
-    missingDimensionItemCount: countItemsMissingDimensions(packingRows, products),
+    missingDimensionItemCount: countItemsMissingDimensions(
+      packingRows,
+      products,
+    ),
   });
 
   const currentStepIndex = STATUS_ORDER[contract.status] ?? 0;
@@ -1561,8 +1564,7 @@ export default function SalesDetailPage({ params }: PageProps) {
               </CardTitle>
               <CardDescription>
                 {CONTAINER_40HQ.code} 标准货柜 ({CONTAINER_40HQ.length}×
-                {CONTAINER_40HQ.width}×
-                {CONTAINER_40HQ.height} mm)
+                {CONTAINER_40HQ.width}×{CONTAINER_40HQ.height} mm)
               </CardDescription>
             </CardHeader>
             <CardContent>
