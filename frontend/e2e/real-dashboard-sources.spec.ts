@@ -98,12 +98,10 @@ async function selectHistoricalRisk(page: Page) {
   });
   await expect(page.locator("article").first()).toContainText(sources.riskNo);
   await expect(card).toContainText("找不到购销合同 CG-SYNTHETIC-MISSING");
-  await expect(
-    card.getByText("货柜超过 40HQ 安全上限", { exact: true }),
-  ).toBeVisible();
-  await expect(card.locator('li[title="毛重超过 22 吨安全上限"]')).toHaveCount(
-    1,
-  );
+  // Totals come from the two packing lines (25000 + 10 kg), not the editable header.
+  const overweight = "超重：毛重 25010 kg，超过40HQ安全上限 22000 kg";
+  await expect(card.getByText(overweight, { exact: true })).toBeVisible();
+  await expect(card.locator(`li[title="${overweight}"]`)).toHaveCount(1);
   await expect(
     page.getByRole("heading", { name: "EXP-SYNTHETIC-CANCELLED", exact: true }),
   ).toHaveCount(0);
