@@ -37,6 +37,24 @@ describe('FinancialStatementsTabsSection', () => {
     expect(screen.getByText('账期详情')).toBeInTheDocument();
   });
 
+  it('页签视图只显示对应区块：总览 / 资产负债表 / 利润表', () => {
+    const props = { analytics, periods: [], currentDetail: null, detailLoading: false };
+    const { rerender } = render(<FinancialStatementsTabsSection view="overview" {...props} />);
+    expect(document.querySelector('#finance-income-profit')).toBeInTheDocument();
+    expect(document.querySelector('#finance-balance')).not.toBeInTheDocument();
+    expect(document.querySelector('#finance-cost-structure')).not.toBeInTheDocument();
+    expect(document.querySelector('#finance-period-detail')).not.toBeInTheDocument();
+
+    rerender(<FinancialStatementsTabsSection view="balance" {...props} />);
+    expect(document.querySelector('#finance-balance')).toBeInTheDocument();
+    expect(document.querySelector('#finance-period-detail')).toBeInTheDocument();
+    expect(document.querySelector('#finance-income-profit')).not.toBeInTheDocument();
+
+    rerender(<FinancialStatementsTabsSection view="income" {...props} />);
+    expect(document.querySelector('#finance-cost-structure')).toBeInTheDocument();
+    expect(document.querySelector('#finance-balance')).not.toBeInTheDocument();
+  });
+
   it('账期详情可复核现金流、科目余额、明细账和来源文件', () => {
     const currentDetail = {
       id: 'period-1', year: 2026, month: 6, periodLabel: '2026年6账期', reportDate: '2026-06-30', importedAt: '2026-07-13',

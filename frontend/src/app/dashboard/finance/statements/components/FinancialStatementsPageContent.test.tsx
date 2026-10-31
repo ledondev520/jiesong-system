@@ -172,6 +172,27 @@ describe("FinancialStatementsPageContent", () => {
     });
   });
 
+  it("页内页签：默认总览，带出六个页签；?view=library 只显示资料库", async () => {
+    const { unmount } = render(<FinancialStatementsPageContent />);
+    expect(await screen.findByRole("button", { name: "上传月度会计报表" })).toBeInTheDocument();
+    for (const name of ["总览", "资产负债表", "利润表", "现金流", "明细账", "资料库"]) {
+      expect(screen.getByRole("tab", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("tab", { name: "总览" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("财务资料库")).not.toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState({}, "", "?view=library");
+    try {
+      render(<FinancialStatementsPageContent />);
+      expect(await screen.findByText("财务资料库")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "上传月度会计报表" })).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "资料库" })).toHaveAttribute("aria-selected", "true");
+    } finally {
+      window.history.replaceState({}, "", "/");
+    }
+  });
+
   it("选择三份文件后必须先生成预览，确认动作才会写入同一数据包", async () => {
     const user = userEvent.setup();
     render(<FinancialStatementsPageContent />);

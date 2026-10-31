@@ -19,6 +19,15 @@ import {
   useState,
 } from "react";
 import { ErrorState } from "@/components/ui/data-state";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { Button } from "@/components/ui/button";
 import { clearApiGetCache } from "@/lib/axios";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
@@ -41,6 +50,7 @@ import {
   type FinancialUploadFileType,
 } from "./FinancialStatementsUploadDialog";
 import { ReceivableReconciliationCard } from "./ReceivableReconciliationCard";
+import type { FinancialStatementsView } from "./FinancialStatementsTabsSection";
 
 const FinancialStatementsTabsSection = lazy(() =>
   import("./FinancialStatementsTabsSection").then((module) => ({
@@ -54,6 +64,15 @@ const FinancialEvidenceLibrary = lazy(() =>
   })),
 );
 
+const STATEMENT_TABS = [
+  { value: "overview", label: "总览" },
+  { value: "balance", label: "资产负债表" },
+  { value: "income", label: "利润表" },
+  { value: "cashflow", label: "现金流" },
+  { value: "ledger", label: "明细账" },
+  { value: "library", label: "资料库" },
+] as const;
+
 /** 解析 `${year}-${month}` 账期键；无效时返回 null（与原 loadDetail 的 `!year || !month` 判断一致） */
 function parsePeriodKey(periodKey: string) {
   const [year, month] = periodKey.split("-").map(Number);
@@ -63,6 +82,7 @@ function parsePeriodKey(periodKey: string) {
 
 export function FinancialStatementsPageContent() {
   const readOnly = useBusinessReadOnly();
+  const [{ view }, setView] = useListUrlState(listUrlFields.statements);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [periods, setPeriods] = useState<FinancialPeriod[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState("");
@@ -331,6 +351,10 @@ export function FinancialStatementsPageContent() {
     return () => window.clearTimeout(timer);
   }, [analytics, drilldownsBlocked]);
 
+  // 只读角色（老板）看不到原始资料库页签；URL 里的 library 对其回落到总览
+  const tabs = readOnly ? STATEMENT_TABS.filter((tab) => tab.value !== "library") : STATEMENT_TABS;
+  const activeView = tabs.some((tab) => tab.value === view) ? view : "overview";
+
   return (
     <div className="space-y-6" data-testid="financial-statements-page-content">
       {(loadError || detailError) && (
@@ -356,33 +380,64 @@ export function FinancialStatementsPageContent() {
         <FinancialStatementsLoadingState />
       ) : (
         <>
-          <FinancialStatementsOverview
-            analytics={analytics}
-            currentDetail={currentDetail}
-            currentPeriod={currentPeriod}
-            dangerAlerts={dangerAlerts}
-            debtRatioVal={debtRatioVal}
-            detailLoading={detailLoading}
-            hasData={hasData}
-            latestBalanceSheet={latestBs}
-            latestIncomeStatement={latestIs}
-            onOpenUploadDialog={() => setUploadDialogOpen(true)}
-            onSelectPeriod={setSelectedPeriod}
-            periods={periods}
-            selectedPeriod={selectedPeriod}
-            warningAlerts={warningAlerts}
-          />
+          <Tabs value={activeView} onValueChange={(value) => setView({ view: value })}>
+            <TabsList className="h-auto flex-wrap justify-start">
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
 
-          {currentPeriod && (
+          {activeView === "overview" && (
+            <FinancialStatementsOverview
+              analytics={analytics}
+              currentDetail={currentDetail}
+              currentPeriod={currentPeriod}
+              dangerAlerts={dangerAlerts}
+              debtRatioVal={debtRatioVal}
+              detailLoading={detailLoading}
+              hasData={hasData}
+              latestBalanceSheet={latestBs}
+              latestIncomeStatement={latestIs}
+              onOpenUploadDialog={() => setUploadDialogOpen(true)}
+              onSelectPeriod={setSelectedPeriod}
+              periods={periods}
+              selectedPeriod={selectedPeriod}
+              warningAlerts={warningAlerts}
+            />
+          )}
+
+          {activeView !== "overview" && activeView !== "library" && periods.length > 0 && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">账期</span>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-40" aria-label="选择账期">
+                  <SelectValue placeholder="选择账期" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periods.map((period) => (
+                    <SelectItem key={`${period.year}-${period.month}`} value={`${period.year}-${period.month}`}>
+                      {period.year}年{period.month}月
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {activeView === "overview" && currentPeriod && (
             <ReceivableReconciliationCard
               year={currentPeriod.year}
               month={currentPeriod.month}
             />
           )}
 
-          {hasData && analytics && showDrilldowns && (
+          {activeView !== "library" && hasData && analytics && showDrilldowns && (
             <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>
               <FinancialStatementsTabsSection
+                view={activeView as FinancialStatementsView}
                 analytics={analytics}
                 periods={periods}
                 currentDetail={currentDetail}
@@ -391,9 +446,11 @@ export function FinancialStatementsPageContent() {
             </Suspense>
           )}
 
-          <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>
-            {!readOnly && <FinancialEvidenceLibrary />}
-          </Suspense>
+          {activeView === "library" && (
+            <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>
+              {!readOnly && <FinancialEvidenceLibrary />}
+            </Suspense>
+          )}
 
           <BusinessWrite>
             {" "}

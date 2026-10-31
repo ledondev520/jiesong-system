@@ -17,6 +17,13 @@ type State<T extends Fields> = {
 };
 
 export const listUrlFields = {
+  // 财务报表页内页签（?view=）
+  statements: {
+    view: {
+      default: "overview",
+      values: ["overview", "balance", "income", "cashflow", "ledger", "library"],
+    },
+  },
   customs: {
     keyword: { default: "", resetPage: true },
     status: {

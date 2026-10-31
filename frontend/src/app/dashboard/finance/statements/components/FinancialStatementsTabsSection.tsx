@@ -695,7 +695,17 @@ function DataSourceList({
   );
 }
 
+/** 报表页内页签：总览（趋势与预警）/ 资产负债表 / 利润表 / 现金流 / 明细账（科目余额、明细账、来源校验） */
+export type FinancialStatementsView =
+  | "overview"
+  | "balance"
+  | "income"
+  | "cashflow"
+  | "ledger";
+
 interface FinancialStatementsTabsSectionProps {
+  /** 缺省 = 全部显示（兼容旧调用） */
+  view?: FinancialStatementsView;
   analytics: AnalyticsData;
   periods: FinancialPeriod[];
   currentDetail: FinancialPeriod | null;
@@ -703,12 +713,14 @@ interface FinancialStatementsTabsSectionProps {
 }
 
 export function FinancialStatementsTabsSection({
+  view,
   analytics,
   periods,
   currentDetail,
   detailLoading,
 }: FinancialStatementsTabsSectionProps) {
   const readOnly = useBusinessReadOnly();
+  const show = (section: FinancialStatementsView) => !view || view === section;
   // 支出分类占比数据（取最新一期）
   const latestTrend = analytics.trends[analytics.trends.length - 1];
   const expensePieData = latestTrend
@@ -759,6 +771,7 @@ export function FinancialStatementsTabsSection({
   return (
     <>
       <div data-testid="financial-statements-drilldowns" className="space-y-6">
+{show("overview") && (
         <section id="finance-income-profit" className="scroll-mt-24 space-y-4">
           <div>
             <h3 className="text-lg font-semibold tracking-tight">
@@ -984,7 +997,9 @@ export function FinancialStatementsTabsSection({
             </CardContent>
           </Card>
         </section>
+)}
 
+{show("income") && (
         <section id="finance-cost-structure" className="scroll-mt-24 space-y-4">
           <div>
             <h3 className="text-lg font-semibold tracking-tight">成本结构</h3>
@@ -1112,7 +1127,9 @@ export function FinancialStatementsTabsSection({
             </Card>
           </div>
         </section>
+)}
 
+{show("balance") && (
         <section id="finance-balance" className="scroll-mt-24 space-y-4">
           <div>
             <h3 className="text-lg font-semibold tracking-tight">资产负债</h3>
@@ -1327,7 +1344,9 @@ export function FinancialStatementsTabsSection({
             </Card>
           </div>
         </section>
+)}
 
+{view !== "overview" && (
         <section id="finance-period-detail" className="scroll-mt-24 space-y-4">
           <div>
             <h3 className="text-lg font-semibold tracking-tight">账期详情</h3>
@@ -1343,6 +1362,7 @@ export function FinancialStatementsTabsSection({
           ) : currentDetail ? (
             /* 手机使用明确的 minmax(0, 1fr) 列；宽账簿只在自身容器内滚动。 */
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+{show("balance") && (
               <Card className="min-w-0">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
@@ -1361,7 +1381,9 @@ export function FinancialStatementsTabsSection({
                   )}
                 </CardContent>
               </Card>
+)}
 
+{show("income") && (
               <Card className="min-w-0">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
@@ -1382,7 +1404,9 @@ export function FinancialStatementsTabsSection({
                   )}
                 </CardContent>
               </Card>
+)}
 
+{show("cashflow") && (
               <Card className="min-w-0 md:col-span-2">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
@@ -1405,8 +1429,9 @@ export function FinancialStatementsTabsSection({
                   )}
                 </CardContent>
               </Card>
+)}
 
-              {!readOnly && (
+              {show("ledger") && !readOnly && (
                 <Card className="min-w-0 md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -1428,7 +1453,7 @@ export function FinancialStatementsTabsSection({
                 </Card>
               )}
 
-              {!readOnly && (
+              {show("ledger") && !readOnly && (
                 <Card className="min-w-0 md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -1450,7 +1475,7 @@ export function FinancialStatementsTabsSection({
                 </Card>
               )}
 
-              {!readOnly && (
+              {show("ledger") && !readOnly && (
                 <Card className="min-w-0 md:col-span-2">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -1483,9 +1508,10 @@ export function FinancialStatementsTabsSection({
             </Card>
           )}
         </section>
+)}
       </div>
 
-      {analytics.historicalAlerts.length > 0 && (
+      {show("overview") && analytics.historicalAlerts.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
