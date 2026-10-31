@@ -68,7 +68,8 @@ async function expectContractBalance(
   const row = page.getByRole("row").filter({
     has: page.getByText(contractNo, { exact: true }),
   });
-  // 应收页签的金额统一显示 $ 和两位小数（UX 规范 §8.9）
+  // 应收页签：列 = 合同号 / 门店 / 状态 / 合同金额(3) / 已收(4) / 未收(5)，金额用 formatMoney 显示 $ 和两位小数（UX 规范 §8.9）。
+  // 已对照 role-browser-server 的 receipt-pool 种子核对：SHIPPED 的 USD 合同 800 / 1000，全部分配后仍有未收余额，默认「仅看未收」筛选下行不会消失。
   const usd = (value: number) =>
     `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   await expect(row.getByRole("cell").nth(3)).toHaveText(usd(total));
