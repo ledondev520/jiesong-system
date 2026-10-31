@@ -35,6 +35,29 @@
       }
     },
     {
+      "id": "customers",
+      "routeFile": "backend/src/routes/customers.js",
+      "routes": ["POST /", "PUT /:id"],
+      "update": { "file": "backend/src/controllers/customerController.js", "handler": "update" },
+      "matrix": {
+        "path": "/api/v1/customers",
+        "table": "customers",
+        "create": { "name": "Synthetic matrix customer", "legalName": "Synthetic Original LLC", "defaultIncoterm": "FOB", "contactName": "Original contact" },
+        "edit": { "name": "Synthetic edited customer", "legalName": "Synthetic Edited LLC", "country": "US" },
+        "invalid": [
+          { "name": "   ", "legalName": "Unwanted" },
+          { "name": null, "legalName": "Unwanted" },
+          { "isActive": "false" },
+          { "defaultCurrency": "EUR" },
+          { "country": "USA" }
+        ],
+        "blank": { "contactName": "", "contactPhone": "   " },
+        "clear": { "contactName": null },
+        "clearStatus": 200,
+        "filter": "Synthetic edited customer"
+      }
+    },
+    {
       "id": "pricing-config",
       "kind": "singleton-config",
       "routeFile": "backend/src/routes/system.js",
