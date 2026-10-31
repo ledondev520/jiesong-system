@@ -58,6 +58,13 @@
       }
     },
     {
+      "id": "sales-purchase-drafts",
+      "kind": "action",
+      "routeFile": "backend/src/routes/sales.js",
+      "routes": ["POST /:id/purchase-drafts"],
+      "test": "backend/src/integration/purchase-drafts.integration.js"
+    },
+    {
       "id": "pricing-config",
       "kind": "singleton-config",
       "routeFile": "backend/src/routes/system.js",
