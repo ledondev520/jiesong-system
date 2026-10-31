@@ -13,6 +13,7 @@ const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
 const { outstandingOf } = require('./payablesService');
 const { getExportReadiness } = require('./exportReadinessService');
+const { roundMoney } = require('../utils/money');
 
 /**
  * 职责：导出数据
@@ -526,7 +527,7 @@ const exportSalesContractExcel = async (contractId) => {
       quantity,
       unit: item.unit || '-',
       unitPrice,
-      amount: Math.round(amount * 100) / 100,
+      amount: roundMoney(amount),
       note: `${item.hsSource || 'missing'}${item.hsEvidence?.effectiveDate ? ` / 税则生效 ${formatDate(item.hsEvidence.effectiveDate)}` : ''}`,
     });
   });
@@ -542,7 +543,7 @@ const exportSalesContractExcel = async (contractId) => {
       quantity: '',
       unit: '',
       unitPrice: '',
-      amount: Math.round(invoiceTotal * 100) / 100,
+      amount: roundMoney(invoiceTotal),
       note: `合同金额 $${contract.totalAmount.toFixed(2)}${Math.abs(invoiceTotal - contract.totalAmount) > 0.01 ? '（与明细合计存在差异，请核对）' : ''}`,
     });
     totalRow.font = { bold: true };

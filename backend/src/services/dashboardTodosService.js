@@ -16,6 +16,7 @@
 const prisma = require('../utils/prisma');
 const { ROLES, PURCHASE_STATUS, SALES_STATUS } = require('../config/constants');
 const { PAYABLE_SELECT, payableWhere, outstandingOf, getPayablesSummary } = require('./payablesService');
+const { roundMoney } = require('../utils/money');
 
 const TOP = 5;
 const { ADMIN, BOSS, PURCHASE, SALES, FINANCE, WAREHOUSE } = ROLES;
@@ -83,7 +84,7 @@ const LISTS = {
     async load() {
       const { getOverdueReceivables } = require('./financeService');
       const rows = await getOverdueReceivables();
-      return asList(rows.length, rows.map((r) => item(r.id, r.contractNo, null, Number((r.totalAmount - r.receivedAmount).toFixed(2)), r.shippedAt)));
+      return asList(rows.length, rows.map((r) => item(r.id, r.contractNo, null, roundMoney(r.totalAmount - r.receivedAmount), r.shippedAt)));
     },
   },
   refundable: {

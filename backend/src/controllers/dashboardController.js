@@ -17,6 +17,7 @@ const { summarizePayables } = require('../services/payablesService');
 const { listLowStockAlerts } = require('../services/inventoryAlertService');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { listTradeWorkflows } = require('../services/tradeWorkflowService');
+const { roundMoney } = require('../utils/money');
 
 /**
  * 职责：返回按出口合同聚合的专项单主线路，供工作台展示唯一下一动作。
@@ -432,8 +433,7 @@ const getBusinessOverview = async (req, res, next) => {
     ]);
     // 应付与其他页面同口径：只统计已生效合同（草稿/已取消除外）。
     const payables = summarizePayables(purchases);
-    const round = (value) => Number(value.toFixed(2));
-    const sum = (items, pick) => round(items.reduce((total, item) => total + Number(pick(item) || 0), 0));
+    const sum = (items, pick) => roundMoney(items.reduce((total, item) => total + Number(pick(item) || 0), 0));
     // ponytail: 逐合同复用现有单柜计算；规模扩大后再共享批量采购索引。
     const allSummaries = sales.map((contract) => ({
       contract,
@@ -460,7 +460,7 @@ const getBusinessOverview = async (req, res, next) => {
       const month = new Date(new Date(contract.shippedAt).getTime() + 8 * 3600000).toISOString().slice(0, 7);
       const current = months.get(month) || { month, amount: 0 };
       current.amount = current.amount === null || summary.currencyPolicy.conversionRate === null
-        ? null : round(current.amount + summary.profit.expectedRevenueCny);
+        ? null : roundMoney(current.amount + summary.profit.expectedRevenueCny);
       months.set(month, current);
     });
     success(res, {

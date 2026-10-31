@@ -10,6 +10,7 @@ const { generateNextContractNo } = require('./shared/contractUtils');
 const { priceFor } = require('./exportPricing');
 const { categoryIdsByProduct } = require('./productCategoryChain');
 const { resolveOrderCustomerFields } = require('./customerService');
+const { roundMoney } = require('../utils/money');
 
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const text = (value, label, required = false, max = 2000) => {
@@ -143,7 +144,7 @@ const createSalesContractAtomically = async (data, context = {}) => {
           ...customerFields,
           signedAt: input.signedAt ? new Date(input.signedAt) : null,
           note: input.note,
-          totalAmount: Number(totalAmount.toFixed(2)),
+          totalAmount: roundMoney(totalAmount),
           ...(items ? { items: { create: items } } : {}),
         },
         include: { items: true },

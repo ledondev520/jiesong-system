@@ -3,6 +3,7 @@
  * Output: 统一 CNY 口径的趋势和现金流预测
  * Pos: 财务图表的币种换算 Module
  */
+import { roundMoney } from "./money";
 
 export interface PaymentTrendPoint {
   label: string;
@@ -20,7 +21,7 @@ export interface CnyPaymentTrendPoint {
 export interface CashFlowForecastPoint {
   label: string;
   value: number;
-  type: 'actual' | 'forecast';
+  type: "actual" | "forecast";
 }
 
 export const convertPaymentTrendsToCny = (
@@ -28,10 +29,11 @@ export const convertPaymentTrendsToCny = (
   usdToCnyRate: number,
 ): CnyPaymentTrendPoint[] => {
   if (!Number.isFinite(usdToCnyRate) || usdToCnyRate <= 0) return [];
-  const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
   return trends.map((point) => {
-    const receivablesCny = roundMoney((Number(point.receivables) || 0) * usdToCnyRate);
+    const receivablesCny = roundMoney(
+      (Number(point.receivables) || 0) * usdToCnyRate,
+    );
     const payablesCny = roundMoney(Number(point.payables) || 0);
     return {
       label: point.label,
@@ -49,12 +51,27 @@ export const buildCnyCashFlowForecast = (
   const last = trends[trends.length - 1];
   const previous = trends[trends.length - 2];
   const delta = last.netCashFlowCny - previous.netCashFlowCny;
-  const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
   return [
-    { label: `${last.label} (实际)`, value: last.netCashFlowCny, type: 'actual' },
-    { label: '预测 +1期', value: roundMoney(last.netCashFlowCny + delta), type: 'forecast' },
-    { label: '预测 +2期', value: roundMoney(last.netCashFlowCny + delta * 2), type: 'forecast' },
-    { label: '预测 +3期', value: roundMoney(last.netCashFlowCny + delta * 3), type: 'forecast' },
+    {
+      label: `${last.label} (实际)`,
+      value: last.netCashFlowCny,
+      type: "actual",
+    },
+    {
+      label: "预测 +1期",
+      value: roundMoney(last.netCashFlowCny + delta),
+      type: "forecast",
+    },
+    {
+      label: "预测 +2期",
+      value: roundMoney(last.netCashFlowCny + delta * 2),
+      type: "forecast",
+    },
+    {
+      label: "预测 +3期",
+      value: roundMoney(last.netCashFlowCny + delta * 3),
+      type: "forecast",
+    },
   ];
 };

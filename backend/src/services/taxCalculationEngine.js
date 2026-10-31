@@ -6,6 +6,7 @@
 
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
+const { roundMoney } = require('../utils/money');
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
 
@@ -16,11 +17,6 @@ const formatDate = (value) => {
   if (!value) return '-';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '-' : date.toISOString().slice(0, 10);
-};
-
-const roundCurrency = (value) => {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? Number(numeric.toFixed(2)) : 0;
 };
 
 const toNullableNumber = (value) => {
@@ -95,10 +91,11 @@ const createFilenameBase = (contractNo) => `${contractNo || 'unknown'}_税务测
  * 退税基数直接使用准备度 Module 已按采购含税成本和采购税率推导的发票注明金额。
  */
 const calculateTaxSummary = (readiness = {}) => {
-  const exchangeRate = roundCurrency(readiness.exchangeRate || 0);
+  // shortcut: roundMoney (2 dp) also rounds rate and quantity here, as the old roundCurrency did; do not widen FX precision through it.
+  const exchangeRate = roundMoney(readiness.exchangeRate || 0);
   const lines = (Array.isArray(readiness.lines) ? readiness.lines : []).map((line, index) => {
     const evidence = line.hsEvidence || null;
-    const lineAmountUsd = roundCurrency(line.totalPriceUsd);
+    const lineAmountUsd = roundMoney(line.totalPriceUsd);
     return {
       index: line.index || index + 1,
       productName: line.productName || '-',
@@ -106,17 +103,17 @@ const calculateTaxSummary = (readiness = {}) => {
       hsDescription: evidence?.productName || '当前税则证据缺失',
       declaration: line.declarationElements || '',
       storeName: line.storeName || readiness.portName || '-',
-      quantity: roundCurrency(line.quantity),
+      quantity: roundMoney(line.quantity),
       unit: line.unit || '-',
-      unitPriceUsd: roundCurrency(line.unitPriceUsd),
+      unitPriceUsd: roundMoney(line.unitPriceUsd),
       lineAmountUsd,
       exchangeRate,
-      lineAmountCny: roundCurrency(lineAmountUsd * exchangeRate),
+      lineAmountCny: roundMoney(lineAmountUsd * exchangeRate),
       vatRate: toNullableNumber(line.purchaseVatRate),
       refundRate: toNullableNumber(evidence?.refundRate),
-      refundBaseCny: roundCurrency(line.refundBaseCny),
-      estimatedRefundCny: roundCurrency(line.estimatedRefundCny),
-      nonRefundableTaxCny: roundCurrency(line.nonRefundableInputTaxCny),
+      refundBaseCny: roundMoney(line.refundBaseCny),
+      estimatedRefundCny: roundMoney(line.estimatedRefundCny),
+      nonRefundableTaxCny: roundMoney(line.nonRefundableInputTaxCny),
       hsSource: line.hsSource || 'missing',
       evidenceEffectiveDate: evidence?.effectiveDate || null,
       evidenceFetchedAt: evidence?.fetchedAt || null,
@@ -130,12 +127,12 @@ const calculateTaxSummary = (readiness = {}) => {
   const summary = {
     currency: 'CNY',
     exchangeRate,
-    totalSalesUsd: roundCurrency(lines.reduce((sum, line) => sum + line.lineAmountUsd, 0)),
-    totalSalesCny: roundCurrency(lines.reduce((sum, line) => sum + line.lineAmountCny, 0)),
-    totalPurchaseCostCny: roundCurrency(readiness.summary?.totalPurchaseCostCny),
-    totalRefundBaseCny: roundCurrency(lines.reduce((sum, line) => sum + line.refundBaseCny, 0)),
-    totalRefundAmountCny: roundCurrency(lines.reduce((sum, line) => sum + line.estimatedRefundCny, 0)),
-    totalNonRefundableTaxCny: roundCurrency(lines.reduce((sum, line) => sum + line.nonRefundableTaxCny, 0)),
+    totalSalesUsd: roundMoney(lines.reduce((sum, line) => sum + line.lineAmountUsd, 0)),
+    totalSalesCny: roundMoney(lines.reduce((sum, line) => sum + line.lineAmountCny, 0)),
+    totalPurchaseCostCny: roundMoney(readiness.summary?.totalPurchaseCostCny),
+    totalRefundBaseCny: roundMoney(lines.reduce((sum, line) => sum + line.refundBaseCny, 0)),
+    totalRefundAmountCny: roundMoney(lines.reduce((sum, line) => sum + line.estimatedRefundCny, 0)),
+    totalNonRefundableTaxCny: roundMoney(lines.reduce((sum, line) => sum + line.nonRefundableTaxCny, 0)),
     lineCount: lines.length,
     matchedLineCount: lines.filter((line) => line.matchType === 'current_snapshot').length,
     fallbackLineCount: lines.filter((line) => line.matchType === 'missing_evidence').length,

@@ -9,6 +9,7 @@ const { createError } = require('../middleware/errorHandler');
 const { getPurchaseSettlementStatus } = require('./purchaseStateMachine');
 const { payableWhere, isInEffect, outstandingOf, getPayablesSummary } = require('./payablesService');
 const { getSalesSettlementStatus } = require('./salesStateMachine');
+const { roundMoney } = require('../utils/money');
 const {
   getEffectiveSalesContractTotal,
   getEffectiveSalesReceived,
@@ -687,7 +688,7 @@ const getReceivables = async ({ page, pageSize, skip, search, outstandingOnly = 
       ...contract,
       totalAmount: ownedTotalAmount,
       receivedAmount: ownedReceivedAmount,
-      unreceiveAmount: Number(Math.max(ownedTotalAmount - ownedReceivedAmount, 0).toFixed(2)),
+      unreceiveAmount: roundMoney(Math.max(ownedTotalAmount - ownedReceivedAmount, 0)),
       stores,
       hasThirdPartyCargo: thirdPartySources.length > 0,
       sourceParties: thirdPartySources,
@@ -768,9 +769,9 @@ const getStats = async () => {
   return {
     payable,
     receivable: {
-      total: Number(receivableTotals.total.toFixed(2)),
-      received: Number(receivableTotals.received.toFixed(2)),
-      unreceived: Number((receivableTotals.total - receivableTotals.received).toFixed(2)),
+      total: roundMoney(receivableTotals.total),
+      received: roundMoney(receivableTotals.received),
+      unreceived: roundMoney(receivableTotals.total - receivableTotals.received),
     },
   };
 };
