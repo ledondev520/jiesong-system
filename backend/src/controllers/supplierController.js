@@ -12,6 +12,12 @@ const { createError } = require('../middleware/errorHandler');
 const { normalizePagination } = require('../utils/pagination');
 const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
 
+// 归档复用 isActive：默认只列在用；status=archived 为「已归档」；status=all 不过滤。
+const archiveFilter = (status) => {
+  if (status === 'all') return {};
+  return { isActive: status !== 'archived' };
+};
+
 /**
  * 职责：获取供应商列表
  */
@@ -21,12 +27,15 @@ const list = async (req, res, next) => {
     const { keyword } = req.query;
     const lite = req.query.lite === 'true' || req.query.lite === true;
     
-    const where = keyword ? {
-      OR: [
-        { name: { contains: keyword } },
-        { shortName: { contains: keyword } },
-      ],
-    } : {};
+    const where = {
+      ...archiveFilter(req.query.status),
+      ...(keyword ? {
+        OR: [
+          { name: { contains: keyword } },
+          { shortName: { contains: keyword } },
+        ],
+      } : {}),
+    };
     
     const [suppliers, total] = await Promise.all([
       prisma.supplier.findMany({
@@ -99,6 +108,10 @@ const create = async (req, res, next) => {
  */
 const update = async (req, res, next) => {
   try {
+    // 恢复已归档供应商（isActive=true）仅 ADMIN；归档沿用 DELETE。
+    if (req.body?.isActive === true && req.user?.role !== 'ADMIN') {
+      throw createError('仅管理员可恢复已归档供应商', 403);
+    }
     const supplier = await updateSupplier({
       id: req.params.id,
       input: req.body,
@@ -112,7 +125,7 @@ const update = async (req, res, next) => {
 };
 
 /**
- * 职责：删除供应商（软删除）
+ * 职责：归档供应商（软删除，可由 ADMIN 恢复，历史单据保持关联）
  */
 const remove = async (req, res, next) => {
   try {

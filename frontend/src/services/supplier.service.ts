@@ -6,6 +6,7 @@ type SupplierListQuery = {
   pageSize?: number;
   keyword?: string;
   lite?: boolean;
+  status?: 'active' | 'archived' | 'all';
 };
 
 type SupplierUpsertInput = Omit<Partial<Supplier>, 'aliases'> & {

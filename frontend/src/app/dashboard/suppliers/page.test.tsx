@@ -88,6 +88,38 @@ describe("SuppliersPage 表单页交互逻辑", () => {
     expect(screen.queryByText("供应商弹窗已打开")).not.toBeInTheDocument();
   });
 
+  it("已归档供应商默认隐藏，仅在「已归档」筛选下显示", async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          { id: "live-1", name: "合成在用供应商", isActive: true },
+          { id: "arch-1", name: "合成归档供应商", isActive: false },
+        ],
+      },
+    });
+    const user = userEvent.setup();
+
+    render(<SuppliersPage />);
+
+    expect(
+      await screen.findByRole("button", { name: "选择供应商 合成在用供应商" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "选择供应商 合成归档供应商" }),
+    ).not.toBeInTheDocument();
+    expect(mockGetAll).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "all" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "已归档" }));
+    expect(
+      await screen.findByRole("button", { name: "选择供应商 合成归档供应商" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "选择供应商 合成在用供应商" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("在表单页创建供应商", async () => {
     mockGetAll
       .mockResolvedValueOnce({ data: { items: [] } })
@@ -403,7 +435,7 @@ describe("supplier catalog identity and deletion sessions", () => {
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
-    await user.click(screen.getByRole("button", { name: "删除当前" }));
+    await user.click(screen.getByRole("button", { name: "归档当前" }));
     await waitFor(() => expect(mockDelete).toHaveBeenCalledTimes(1));
     await user.click(
       screen.getByRole("button", { name: "选择供应商 合成供应商乙" }),
