@@ -1491,7 +1491,7 @@ export default function AiSessionsPage() {
                 </p>
               </div>
               <Link
-                href="/dashboard/ai"
+                href="/dashboard?ai=1"
                 className="text-xs text-primary hover:underline"
               >
                 前往 AI 助手对话 →

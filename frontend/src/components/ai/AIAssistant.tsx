@@ -1,6 +1,6 @@
 /**
  * Input: AI SSE API、标签Bearer或HttpOnly会话的内存CSRF证明
- * Output: AI 统一智能助手（业务页悬浮模式 + AI 模块工作区模式，流式输出+图片上传+写操作二步确认）
+ * Output: AI 统一智能助手（悬浮 / 工作区 / 停靠侧栏三种形态，docked 随提问附带页面上下文，流式输出+图片上传+写操作二步确认）
  * Pos: 全局 AI 对话模块，单入口 SSE 流式调用 unified agent
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -71,7 +71,7 @@ const INITIAL_MESSAGE: Message = {
   id: "1",
   role: "assistant",
   content:
-    "您好！我是JIESONG 助手。可以帮你查财务数据、出口合同、修改汇率等系统配置。直接提问即可，我会自动调用系统数据回答。",
+    "您好！我是 AI 助手。可以帮你查财务数据、出口合同、修改汇率等系统配置。直接提问即可，我会自动调用系统数据回答。",
   createdAt: new Date(),
 };
 
@@ -84,11 +84,28 @@ type FabPosition = {
   y: number;
 };
 
-type AIAssistantPresentation = "floating" | "workspace";
+type AIAssistantPresentation = "floating" | "workspace" | "docked";
+
+/** 当前页面上下文：只含路由与记录 id，随提问一起交给助手（不新增权限） */
+export interface AIPageContext {
+  route: string;
+  recordId?: string;
+}
 
 interface AIAssistantProps {
   presentation?: AIAssistantPresentation;
+  /** docked：关闭按钮回调（由停靠面板的宿主控制开合） */
+  onClose?: () => void;
+  pageContext?: AIPageContext;
 }
+
+/** 在提问前附一行当前页面上下文（仅路由与记录 id）；界面里仍只显示用户原文 */
+export const withPageContext = (message: string, context?: AIPageContext) =>
+  context
+    ? `【当前页面：${context.route}${
+        context.recordId ? `，记录 ID：${context.recordId}` : ""
+      }】\n${message}`
+    : message;
 
 const formatRecommendationPriority = (
   priority?: AiActionRecommendation["priority"],
@@ -109,11 +126,19 @@ const formatRecommendationMode = (
  * 思路：
  *   1. floating：以低存在感触发器驻留在业务页，展开后显示右侧面板
  *   2. workspace：在 AI 模块内直接展示完整对话工作区
- *   3. 两种形态复用同一套 SSE、图片分析、历史会话与二步确认逻辑
+ *   3. docked：填满宿主给定的停靠列/全屏面板，无悬浮入口，由宿主控制开合
+ *   4. 三种形态复用同一套 SSE、图片分析、历史会话与二步确认逻辑
  */
-export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
+export function AIAssistant({
+  presentation = "floating",
+  onClose,
+  pageContext,
+}: AIAssistantProps) {
   const isWorkspace = presentation === "workspace";
-  const [isOpen, setIsOpen] = useState(isWorkspace);
+  const isDocked = presentation === "docked";
+  // 只有 floating 形态带可拖动的悬浮入口
+  const hasFab = !isWorkspace && !isDocked;
+  const [isOpen, setIsOpen] = useState(!hasFab);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   // 初值即为欢迎消息：原先初值为空数组，挂载 effect 在 messages 为空时写入欢迎消息（挂载时总为空）。
@@ -200,17 +225,17 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
   }, [messages, isOpen]);
 
   useEffect(() => {
-    if (isWorkspace || typeof window === "undefined") {
+    if (!hasFab || typeof window === "undefined") {
       return;
     }
 
     // 提交后测量触发器尺寸再定默认位置（同一 effect 内的测量值与原先在更新函数内两次测量的结果相同）。
     const fabSize = getFabSize(triggerRef.current?.getBoundingClientRect());
     setFabPosition((current) => current ?? resolveDefaultFabPosition(fabSize));
-  }, [getFabSize, isWorkspace, resolveDefaultFabPosition]);
+  }, [getFabSize, hasFab, resolveDefaultFabPosition]);
 
   useEffect(() => {
-    if (isWorkspace || typeof window === "undefined") {
+    if (!hasFab || typeof window === "undefined") {
       return;
     }
 
@@ -270,7 +295,7 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerUp);
     };
-  }, [clampFabPosition, isWorkspace, resolveDefaultFabPosition]);
+  }, [clampFabPosition, hasFab, resolveDefaultFabPosition]);
 
   const loadSessions = useCallback(async () => {
     setIsLoadingSessions(true);
@@ -575,7 +600,7 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
         },
         body: JSON.stringify({
           agentType: "unified",
-          message: userMessage,
+          message: withPageContext(userMessage, pageContext),
           sessionId: sessionId || undefined,
           ...(capturedImage ? { imageUrl: capturedImage } : {}),
         }),
@@ -685,7 +710,7 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
 
   return (
     <>
-      {!isWorkspace && (
+      {hasFab && (
         <Button
           ref={triggerRef}
           variant="outline"
@@ -713,12 +738,20 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
 
       <aside
         role="complementary"
-        aria-label={isWorkspace ? "AI 助手工作区" : "AI 助手侧边面板"}
+        aria-label={
+          isWorkspace
+            ? "AI 助手工作区"
+            : isDocked
+              ? "AI 助手面板"
+              : "AI 助手侧边面板"
+        }
         className={cn(
           isWorkspace
             ? "relative h-[calc(100dvh-20rem)] min-h-[420px] max-h-[760px] w-full"
-            : "fixed inset-0 z-[150] transition-all duration-300 md:inset-y-4 md:left-auto md:right-4 md:w-[24rem]",
-          isWorkspace || isOpen
+            : isDocked
+              ? "relative h-full w-full"
+              : "fixed inset-0 z-[150] transition-all duration-300 md:inset-y-4 md:left-auto md:right-4 md:w-[24rem]",
+          !hasFab || isOpen
             ? "translate-x-0 opacity-100"
             : "translate-x-6 opacity-0 pointer-events-none",
         )}
@@ -728,14 +761,16 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
             "flex h-full flex-col border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85",
             isWorkspace
               ? "rounded-xl shadow-sm"
-              : "rounded-none shadow-2xl md:rounded-xl",
+              : isDocked
+                ? "rounded-none border-0 shadow-none"
+                : "rounded-none shadow-2xl md:rounded-xl",
           )}
         >
           <CardHeader className="border-b bg-muted/30 p-0">
             <div className="flex items-center justify-between px-4 py-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Bot className="h-5 w-5 text-primary" />
-                JIESONG 助手
+                AI 助手
               </CardTitle>
               <div className="flex items-center gap-1">
                 <Button
@@ -758,12 +793,12 @@ export function AIAssistant({ presentation = "floating" }: AIAssistantProps) {
                 >
                   <History className="h-4 w-4" />
                 </Button>
-                {!isWorkspace && (
+                {(hasFab || (isDocked && onClose)) && (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7"
-                    onClick={() => setIsOpen(false)}
+                    onClick={() => (hasFab ? setIsOpen(false) : onClose?.())}
                     aria-label="收起AI助手"
                   >
                     <X className="h-4 w-4" />

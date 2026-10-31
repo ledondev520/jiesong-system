@@ -38,7 +38,6 @@ const routes = [
   "/dashboard/users",
   "/dashboard/system/logs",
   "/dashboard/system/notifications",
-  "/dashboard/ai",
   "/dashboard/ai/sessions",
   "/dashboard/about",
   "/dashboard/settings/ports",

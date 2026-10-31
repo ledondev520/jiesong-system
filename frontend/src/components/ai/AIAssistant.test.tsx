@@ -7,9 +7,9 @@
  */
 
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { AIAssistant } from './AIAssistant';
+import { AIAssistant, withPageContext } from './AIAssistant';
 
 const OriginalFileReader = globalThis.FileReader;
 const mockExecuteAgentAction = vi.fn();
@@ -68,7 +68,29 @@ describe('AIAssistant', () => {
 
     await user.click(screen.getByRole('button', { name: 'AI 助手' }));
     expect(screen.getByRole('complementary', { name: 'AI 助手侧边面板' })).toBeInTheDocument();
-    expect(screen.getByText('JIESONG 助手')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('complementary', { name: 'AI 助手侧边面板' })).getByText('AI 助手'),
+    ).toBeInTheDocument();
+  });
+
+  it('停靠模式填满宿主、没有悬浮触发器，关闭交给宿主', async () => {
+    const onClose = vi.fn();
+    render(<AIAssistant presentation="docked" onClose={onClose} />);
+
+    expect(screen.queryByRole('button', { name: 'AI 助手' })).not.toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'AI 助手面板' })).toHaveClass('h-full', 'w-full');
+    expect(screen.getByRole('button', { name: '新建对话' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '历史对话' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '收起AI助手' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('页面上下文只含路由与记录 id，并附在提问前', () => {
+    expect(withPageContext('这个订单还缺什么？')).toBe('这个订单还缺什么？');
+    expect(
+      withPageContext('这个订单还缺什么？', { route: '/dashboard/sales/EXP260012', recordId: 'EXP260012' }),
+    ).toBe('【当前页面：/dashboard/sales/EXP260012，记录 ID：EXP260012】\n这个订单还缺什么？');
+    expect(withPageContext('你好', { route: '/dashboard/finance' })).toBe('【当前页面：/dashboard/finance】\n你好');
   });
 
   it('工作区模式直接展示完整对话面板且不渲染悬浮触发器', async () => {

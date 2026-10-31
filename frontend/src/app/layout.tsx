@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/sonner";
-import { LazyAIAssistantMount } from "@/components/ai/LazyAIAssistantMount";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { GlobalErrorBoundary } from "@/components/layout/GlobalErrorBoundary";
 import "./globals.css";
@@ -59,7 +58,6 @@ export default function RootLayout({
           <GlobalErrorBoundary>
             {children}
             <Toaster position="top-center" />
-            <LazyAIAssistantMount />
           </GlobalErrorBoundary>
         </ThemeProvider>
       </body>
