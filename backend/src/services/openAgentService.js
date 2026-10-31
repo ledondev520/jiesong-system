@@ -1530,6 +1530,8 @@ const READ_TOOL_SPECS = [
     isReadOnly: true,
     isConcurrencySafe: true,
     async call(input) {
+      // Restricted company bank details are not exposed to the AI assistant.
+      if (input.key === 'companyBankInfo') return toJson({ error: '该配置项不可通过助手读取' });
       const row = await prisma.systemConfig.findUnique({ where: { key: input.key } });
       if (!row) return toJson({ error: `配置项 ${input.key} 不存在` });
       try {

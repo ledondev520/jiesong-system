@@ -221,6 +221,26 @@ test('quote service over HTTP', async (t) => {
     assert.deepEqual(fs.existsSync(process.env.UPLOAD_DIR) ? fs.readdirSync(process.env.UPLOAD_DIR) : [], []);
   });
 
+  await t.test('seller block comes from company settings; bank details stay Restricted', async () => {
+    const quote = await ok('SALES', 'POST', '/quotes', { items: [line()] });
+    const printOf = async () => (await fetch(`${base}/quotes/${quote.id}/print`, { headers: { authorization: `Bearer ${roles.SALES.token}` } })).text();
+    const unset = await printOf();
+    assert.ok(!unset.includes('Bank Details')); // nothing configured → blank, nothing invented
+    for (const [key, value] of [['companyName', 'Synthetic Seller Co'], ['companyAddress', '1 Synthetic Road'], ['companyBankInfo', 'Bank: SYNTHETIC\nAccount: 000-SYNTH']]) {
+      await db.systemConfig.create({ data: { key, value: JSON.stringify(value) } });
+    }
+    const html = await printOf();
+    for (const text of ['Synthetic Seller Co', '1 Synthetic Road', 'Bank Details', 'Account: 000-SYNTH']) assert.ok(html.includes(text), text);
+    const configsFor = async (role) => (await ok(role, 'GET', '/system/configs'));
+    for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE']) {
+      const configs = await configsFor(role);
+      assert.equal(configs.companyName, 'Synthetic Seller Co', role);
+      assert.ok(!Object.hasOwn(configs, 'companyBankInfo'), role);
+    }
+    for (const role of ['ADMIN', 'FINANCE']) assert.equal((await configsFor(role)).companyBankInfo, 'Bank: SYNTHETIC\nAccount: 000-SYNTH');
+    await db.systemConfig.deleteMany({ where: { key: { in: ['companyName', 'companyAddress', 'companyBankInfo'] } } });
+  });
+
   await t.test('roles: WAREHOUSE denied, PURCHASE/FINANCE read-only, BOSS read-only, anonymous 401', async () => {
     const quote = await ok('ADMIN', 'POST', '/quotes', { items: [line()] });
     assert.equal((await call(null, 'GET', '/quotes')).status, 401);
