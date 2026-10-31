@@ -36,6 +36,9 @@ router.get('/options/next-no', salesController.getNextContractNo);
 // GET /api/v1/sales/:id - 获取出口合同详情（包含装箱明细）
 router.get('/:id', withIdValidation, salesController.getById);
 
+// GET /api/v1/sales/:id/loading-plan - 只读装柜计划（路由器已认证，读权限同合同详情；必须位于 /:id 通配之外的独立路径）
+router.get('/:id/loading-plan', withIdValidation, salesController.getLoadingPlan);
+
 // POST /api/v1/sales - 创建出口合同
 router.post('/', [
   body('exchangeRate').notEmpty().withMessage('汇率不能为空'),

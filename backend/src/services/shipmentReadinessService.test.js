@@ -7,6 +7,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  buildLoadingPlan,
   checkUtilisation,
   evaluateLoadingCheck,
   evaluateShipmentReadiness,
@@ -157,4 +158,37 @@ test('evaluateLoadingCheck: 任一阻塞时 status 为 blocked，仅未达标时
   const blocked = evaluateLoadingCheck(plan, { packingLineCount: 1, linesMissingBoxes: 2 });
   assert.equal(blocked.status, 'blocked');
   assert.equal(blocked.headline, '2 行装箱明细未填写箱数');
+});
+
+test('buildLoadingPlan: 一个柜装不下时溢出柜计入 unplaced 阻塞并给出所需柜数', () => {
+  const tile = (id, boxes) => ({
+    id, productId: id, boxes, quantity: boxes, grossWeight: boxes * 31, volume: boxes * 0.0192,
+    length: 620, width: 620, height: 50, product: { customsName: '瓷砖', category: { name: '瓷砖' } },
+  });
+  const { plan } = buildLoadingPlan({ packingItems: [tile('t1', 800)] });
+  assert.equal(plan.algorithm, 'block-ep-v1');
+  assert.equal(plan.containers.length, 2);
+  assert.equal(plan.lines[0].profile, 'tile');
+  assert.ok(plan.check.blockers.some((item) => item.code === 'over-weight'));
+  const unplaced = plan.check.blockers.find((item) => item.code === 'unplaced');
+  assert.match(unplaced.message, /^仍有 \d+ 箱装不下，共需 2 个40HQ/);
+  assert.equal(plan.check.status, 'blocked');
+  assert.deepEqual(plan.availableTypes[0], { code: '40HQ', label: '40HQ 高柜' });
+  assert.equal(plan.container.usableMm.length, 12000);
+});
+
+test('buildLoadingPlan: 指定 20GP 仅模拟，用 20GP 的内尺寸与限值', () => {
+  const { plan } = buildLoadingPlan({ packingItems: [{ ...fitItem, volume: 20 }] }, { containerType: '20GP' });
+  assert.equal(plan.containerType, '20GP');
+  assert.equal(plan.container.safeVolumeCbm, 28);
+});
+
+test('evaluateLoadingCheck: 重心偏离超过柜长 20% 给出提示但不阻塞', () => {
+  const plan = {
+    spec, totals: { cartons: 1, grossKg: 18000, cargoCbm: 55 }, lines: [], unplaced: [],
+    containers: [{ index: 0, cartons: 1, cogXmm: 2500 }],
+  };
+  const check = evaluateLoadingCheck(plan, { packingLineCount: 1, linesMissingBoxes: 0 });
+  assert.equal(check.ready, true);
+  assert.match(check.warnings.find((item) => item.code === 'cog-offset').message, /^重心偏后 3\.50 m/);
 });

@@ -78,6 +78,11 @@ test('sales route includes single-container finance summary endpoint', () => {
   assert.notEqual(getRouteIndex(salesRouter, '/:id/finance-summary', 'get'), -1);
 });
 
+test('sales route includes read-only loading-plan endpoint', () => {
+  assert.notEqual(getRouteIndex(salesRouter, '/:id/loading-plan', 'get'), -1);
+  assert.equal(getRouteIndex(salesRouter, '/:id/loading-plan', 'post'), -1);
+});
+
 test('sales route includes export packet preview and confirmed generation endpoints', () => {
   assert.notEqual(getRouteIndex(salesRouter, '/:id/export-packet/preview', 'post'), -1);
   assert.notEqual(getRouteIndex(salesRouter, '/:id/export-packet/generate', 'post'), -1);

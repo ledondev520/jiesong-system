@@ -16,7 +16,7 @@ const READ_PATHS = [
   /^\/products\/[^/]+\/(suppliers|price-history|price-trend)$/,
   /^\/products\/options\/categories$/,
   /^\/stores\/options\/ports$/,
-  /^\/sales\/[^/]+\/(files|packing-list-checks|finance-summary)$/,
+  /^\/sales\/[^/]+\/(files|packing-list-checks|finance-summary|loading-plan)$/,
   /^\/sales\/files\/[^/]+\/download$/,
   /^\/inventory\/(product|contract)\/[^/]+$/,
   /^\/containers\/[^/]+\/(items(\/summary)?|products|visualization)$/,

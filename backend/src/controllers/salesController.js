@@ -38,6 +38,15 @@ const getById = async (req, res, next) => {
   }
 };
 
+/** 只读装柜计划（3D/2D/打印共用）；?containerType= 仅用于模拟。 */
+const getLoadingPlan = async (req, res, next) => {
+  try {
+    success(res, await salesService.getLoadingPlan(req.params.id, req.query.containerType));
+  } catch (error) {
+    next(error);
+  }
+};
+
 const create = async (req, res, next) => {
   try {
     let data = req.body || {};
@@ -426,6 +435,7 @@ const generateExportPacket = async (req, res, next) => {
 module.exports = {
   list,
   getById,
+  getLoadingPlan,
   create,
   update,
   remove,
