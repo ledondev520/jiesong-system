@@ -93,7 +93,7 @@ test('存在无法装入的箱件时不得放行', () => {
   assert.equal(result.physicalFit, false);
   assert.equal(result.ready, false);
   assert.deepEqual(codes(result), ['oversize']);
-  assert.equal(result.check.headline, '可装货物 箱规 13000×1000×1000 mm 超过40HQ内尺寸或柜门，无法装入');
+  assert.equal(result.check.headline, '可装货物 箱规 13000×1000×1000 mm 超过40HQ内尺寸，无法装入');
 });
 
 test('尺寸合格但空间不足时提示装不下与所需柜数', () => {
@@ -135,10 +135,12 @@ test('只有体积的行按体积÷箱数估算，仅提示「估算」不阻塞
 });
 
 test('历史数据只做利用率判定时不排柜，也不因箱规缺失阻塞', () => {
-  const result = evaluateShipmentReadiness(
-    { packingItems: [{ ...fitItem, length: 13000, width: null }] },
-    { utilisationOnly: true },
-  );
+  // 真实超长箱（13000mm > 柜长）：排柜会阻塞，utilisationOnly 必须跳过排柜才放行
+  const contract = { packingItems: [{ ...fitItem, length: 13000, width: 1000, height: 1000 }] };
+  const blocked = evaluateShipmentReadiness(contract);
+  assert.equal(blocked.ready, false);
+  assert.equal(blocked.unplacedBoxCount, 1);
+  const result = evaluateShipmentReadiness(contract, { utilisationOnly: true });
   assert.equal(result.unplacedBoxCount, 0);
   assert.equal(result.ready, true);
 });

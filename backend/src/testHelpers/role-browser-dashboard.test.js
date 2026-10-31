@@ -142,7 +142,7 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       ['procurement', 'payment', 'production', 'loading', 'documents', 'invoice', 'tax-refund', 'finance']);
     assert.equal(risk[0].stages[0].reason, '找不到购销合同 CG-SYNTHETIC-MISSING');
     // Totals come from the two packing lines (25000 + 10 kg), not the editable header.
-    assert.match(risk[0].stages[3].reason, /^超重：毛重 \d+ kg，超过40HQ安全上限 22000 kg$/);
+    assert.match(risk[0].stages[3].reason, /^超重：毛重 25010 kg，超过40HQ安全上限 22000 kg$/);
     assert.deepEqual(risk[0].issues, [risk[0].stages[3].reason]);
     assert.equal(risk[0].nextAction.href, '/dashboard/sales/dashboard-old-risk');
     const pending = await read('/dashboard/trade-workflows?limit=100&scope=pending');

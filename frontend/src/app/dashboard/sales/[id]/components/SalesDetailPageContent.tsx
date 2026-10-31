@@ -111,6 +111,7 @@ import {
   countItemsMissingDimensions,
   evaluateShippingReadiness,
   packBoxes,
+  sumPackingTotals,
 } from "@/lib/binPacking";
 import { formatDate } from "@/lib/date-format";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -818,8 +819,9 @@ export default function SalesDetailPage({ params }: PageProps) {
   }
 
   // 计算容量利用率
-  const volumeUsed = contract.volume || 0;
-  const weightUsed = contract.grossWeight || 0;
+  // 与后端出货门槛同源：取装箱明细行合计，而非可被手工改写的合同头
+  const { grossKg: weightUsed, cargoCbm: volumeUsed } =
+    sumPackingTotals(packingRows);
   const weightPercent = Math.min(
     (weightUsed / CONTAINER_40HQ.maxWeight) * 100,
     100,

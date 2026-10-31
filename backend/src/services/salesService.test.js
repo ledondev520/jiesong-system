@@ -363,7 +363,7 @@ test('updateSalesStatus: 有箱件无法放入时拒绝确认发运', async () =
   try {
     await assert.rejects(
       () => salesService.updateSalesStatus('sc-1', 'SHIPPED'),
-      (error) => error.statusCode === 400 && /13000×1000×1000 mm 超过40HQ内尺寸或柜门，无法装入/.test(error.message),
+      (error) => error.statusCode === 400 && /13000×1000×1000 mm 超过40HQ内尺寸，无法装入/.test(error.message),
     );
     assert.equal(outStockCalled, false);
   } finally {

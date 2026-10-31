@@ -79,7 +79,7 @@ const evaluateLoadingCheck = (plan, facts) => {
     add('over-volume', `超体积：${roundTo1(totals.cargoCbm)} CBM，超过${type}安全上限 ${spec.safeVolumeCbm} CBM`);
   }
   for (const entry of plan.unplaced.filter((item) => item.reason === 'oversize' || item.reason === 'door')) {
-    add('oversize', `${entry.name} 箱规 ${dimsText(entry.cartonMm)} mm 超过${type}内尺寸或柜门，无法装入`);
+    add('oversize', `${entry.name} 箱规 ${dimsText(entry.cartonMm)} mm 超过${type}内尺寸，无法装入`);
   }
   const unplacedCartons = plan.unplaced
     .filter((item) => item.reason === 'no-space')

@@ -19,7 +19,21 @@ import {
   inferBoxDimensions,
   mmToM,
   packBoxes,
+  sumPackingTotals,
 } from "./binPacking";
+
+describe("sumPackingTotals", () => {
+  it("按明细行合计毛重与体积，忽略空值与负数", () => {
+    expect(
+      sumPackingTotals([
+        { id: "a", productId: "p", grossWeight: 5000, volume: 1.5 },
+        { id: "b", productId: "p", grossWeight: null, volume: -3 },
+        { id: "c", productId: "p", grossWeight: 10, volume: undefined },
+      ]),
+    ).toEqual({ grossKg: 5010, cargoCbm: 1.5 });
+    expect(sumPackingTotals([])).toEqual({ grossKg: 0, cargoCbm: 0 });
+  });
+});
 
 describe("容器规格镜像与 config/containers.json 一致（单一来源守卫）", () => {
   it("40HQ 是配置默认柜型，尺寸与安全上限逐项相等", () => {

@@ -568,6 +568,77 @@ describe("SalesDetailPage 交互逻辑", () => {
     expect(screen.getByRole("button", { name: "确认发运" })).toBeDisabled();
   });
 
+  it("合同头虚高但明细合计未达标时禁止确认发运（与后端同源取明细合计）", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 1,
+        volume: 60,
+        grossWeight: 18000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-small",
+            productId: "p-1",
+            boxes: 1,
+            quantity: 1,
+            volume: 1,
+            grossWeight: 5000,
+            length: 1000,
+            width: 1000,
+            height: 1000,
+            product: { id: "p-1", customsName: "小件货物" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+
+    renderPage("s-1");
+
+    expect(
+      await screen.findByRole("button", { name: "确认发运" }),
+    ).toBeDisabled();
+    expect(screen.queryByText(/满足出柜条件/)).not.toBeInTheDocument();
+  });
+
+  it("合同头偏低但明细合计达标时允许确认发运（与后端同源取明细合计）", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 1,
+        volume: 1,
+        grossWeight: 5000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-big",
+            productId: "p-1",
+            boxes: 1,
+            quantity: 1,
+            volume: 60,
+            grossWeight: 18000,
+            length: 1000,
+            width: 1000,
+            height: 1000,
+            product: { id: "p-1", customsName: "大宗货物" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+
+    renderPage("s-1");
+
+    expect(
+      await screen.findByRole("button", { name: "确认发运" }),
+    ).toBeEnabled();
+  });
+
   it("商业利用率达标但有明细未填箱数时禁止确认发运，与后端一致", async () => {
     mockGetById.mockResolvedValue({
       data: {

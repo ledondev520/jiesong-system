@@ -118,7 +118,7 @@ test('商业利用率达标但存在未装箱时装柜阶段保持阻塞', () =>
 
   const loading = workflow.stages.find((stage) => stage.key === 'loading');
   assert.equal(loading.status, 'blocked');
-  assert.match(loading.reason, /超过40HQ内尺寸或柜门，无法装入/);
+  assert.match(loading.reason, /超过40HQ内尺寸，无法装入/);
 });
 
 test('发运后的内部退税准备日为次月5日', () => {

@@ -143,6 +143,24 @@ export interface PackingBoxItemSource {
   product?: PackingBoxProductSource | null;
 }
 
+/** 职责：出柜判定的毛重/体积取自装箱明细行，与后端 sumTotals 一致，不信任可编辑的合同头。 */
+export function sumPackingTotals(packingItems: PackingBoxItemSource[]): {
+  grossKg: number;
+  cargoCbm: number;
+} {
+  const sum = (
+    pick: (item: PackingBoxItemSource) => number | null | undefined,
+  ) =>
+    packingItems.reduce(
+      (total, item) => total + Math.max(0, Number(pick(item)) || 0),
+      0,
+    );
+  return {
+    grossKg: sum((item) => item.grossWeight),
+    cargoCbm: sum((item) => item.volume),
+  };
+}
+
 /** 职责：未填写箱数（≤0 或空）的装箱明细行数，对应后端 missing-box-count。 */
 export function countItemsMissingBoxes(
   packingItems: PackingBoxItemSource[],
