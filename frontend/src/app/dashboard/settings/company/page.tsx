@@ -17,14 +17,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { describeFailure } from "@/lib/error-reason";
 import { configService } from "@/services/config.service";
 
-export const COMPANY_KEYS = ["companyName", "companyAddress", "companyBankInfo"] as const;
+export const COMPANY_KEYS = [
+  "companyName",
+  "companyAddress",
+  "companyBankInfo",
+] as const;
 type CompanyKey = (typeof COMPANY_KEYS)[number];
 type CompanyForm = Record<CompanyKey, string>;
 
-const EMPTY: CompanyForm = { companyName: "", companyAddress: "", companyBankInfo: "" };
+const EMPTY: CompanyForm = {
+  companyName: "",
+  companyAddress: "",
+  companyBankInfo: "",
+};
 
 /** 只发送改动过的键；清空 = 发送空串（后端把它存为空，打印端不印该行） */
-export function changedCompanyValues(saved: CompanyForm, draft: CompanyForm): Partial<CompanyForm> {
+export function changedCompanyValues(
+  saved: CompanyForm,
+  draft: CompanyForm,
+): Partial<CompanyForm> {
   const changes: Partial<CompanyForm> = {};
   for (const key of COMPANY_KEYS) {
     if (draft[key].trim() !== saved[key].trim()) changes[key] = draft[key];
@@ -69,7 +80,12 @@ export default function CompanySettingsPage() {
   const save = async () => {
     if (!draft.companyName.trim() && draft.companyName !== saved.companyName) {
       // 清空公司名称是允许的，但提示一次，避免误清导致报价单抬头为空
-      if (!window.confirm("公司名称将被清空，报价单/PI 的卖方抬头会留空。确定吗？")) return;
+      if (
+        !window.confirm(
+          "公司名称将被清空，报价单/PI 的卖方抬头会留空。确定吗？",
+        )
+      )
+        return;
     }
     setError(null);
     setSaving(true);
@@ -84,7 +100,14 @@ export default function CompanySettingsPage() {
     }
   };
 
-  if (loadError) return <ErrorState what="加载公司信息失败" error={loadError} onRetry={() => void load()} />;
+  if (loadError)
+    return (
+      <ErrorState
+        what="加载公司信息失败"
+        error={loadError}
+        onRetry={() => void load()}
+      />
+    );
 
   return (
     <div className="space-y-5">
@@ -94,20 +117,41 @@ export default function CompanySettingsPage() {
         showBack={false}
       />
       <Card>
-        <CardHeader><CardTitle className="text-base">卖方公司</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">卖方公司</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="company-name">公司名称</Label>
-            <Input id="company-name" disabled={loading} maxLength={200} value={draft.companyName} onChange={(e) => setDraft({ ...draft, companyName: e.target.value })} />
+            <Input
+              id="company-name"
+              disabled={loading}
+              maxLength={200}
+              value={draft.companyName}
+              onChange={(e) =>
+                setDraft({ ...draft, companyName: e.target.value })
+              }
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="company-address">公司地址</Label>
-            <Textarea id="company-address" disabled={loading} rows={3} maxLength={500} value={draft.companyAddress} onChange={(e) => setDraft({ ...draft, companyAddress: e.target.value })} />
+            <Textarea
+              id="company-address"
+              disabled={loading}
+              rows={3}
+              maxLength={500}
+              value={draft.companyAddress}
+              onChange={(e) =>
+                setDraft({ ...draft, companyAddress: e.target.value })
+              }
+            />
           </div>
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle className="text-base">收款银行（受限信息）</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">收款银行（受限信息）</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-2">
           <Label htmlFor="company-bank">银行资料（每行一项）</Label>
           <Textarea
@@ -116,18 +160,38 @@ export default function CompanySettingsPage() {
             rows={7}
             maxLength={1000}
             value={draft.companyBankInfo}
-            placeholder={"开户银行：\n账户名称：\n银行账号：\nSWIFT：\n银行地址："}
-            onChange={(e) => setDraft({ ...draft, companyBankInfo: e.target.value })}
+            placeholder={
+              "开户银行：\n账户名称：\n银行账号：\nSWIFT：\n银行地址："
+            }
+            onChange={(e) =>
+              setDraft({ ...draft, companyBankInfo: e.target.value })
+            }
           />
           <p className="text-xs text-muted-foreground">
-            仅管理员和财务可在系统中读取；审计日志只记录修改时间和操作人，不记录内容。打印报价单/PI 时会按原样逐行印出。
+            仅管理员和财务可在系统中读取；审计日志只记录修改时间和操作人，不记录内容。打印报价单/PI
+            时会按原样逐行印出。
           </p>
         </CardContent>
       </Card>
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
       <div className="flex gap-2">
-        <Button onClick={() => void save()} disabled={!dirty || saving || loading}>{saving ? "保存中..." : "保存"}</Button>
-        <Button variant="outline" onClick={() => setDraft(saved)} disabled={!dirty || saving}>还原</Button>
+        <Button
+          onClick={() => void save()}
+          disabled={!dirty || saving || loading}
+        >
+          {saving ? "保存中..." : "保存"}
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => setDraft(saved)}
+          disabled={!dirty || saving}
+        >
+          还原
+        </Button>
       </div>
     </div>
   );

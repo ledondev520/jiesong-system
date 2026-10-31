@@ -48,7 +48,11 @@ const navGroups: NavGroup[] = [
         icon: SlidersHorizontal,
       },
       { href: "/dashboard/settings/users", label: "用户", icon: Users },
-      { href: "/dashboard/settings/company", label: "公司信息", icon: Landmark },
+      {
+        href: "/dashboard/settings/company",
+        label: "公司信息",
+        icon: Landmark,
+      },
     ],
   },
   {
