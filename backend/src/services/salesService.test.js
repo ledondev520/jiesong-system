@@ -180,6 +180,27 @@ test('getSalesContractById: 返回第三方拼柜标记与来源方', async () =
   }
 });
 
+test('getSalesContractById: 读取关联采购单的数量与状态但不读取采购价格', async () => {
+  const originalFindUnique = prisma.salesContract.findUnique;
+  let args = null;
+  prisma.salesContract.findUnique = async (callArgs) => {
+    args = callArgs;
+    return { id: 'sc-3', packingItems: [], purchaseContracts: [] };
+  };
+
+  try {
+    await salesService.getSalesContractById('sc-3');
+    const { select } = args.include.purchaseContracts;
+    assert.equal(select.status, true);
+    assert.equal(select.items.select.storeId, true);
+    assert.equal(select.items.select.unitPrice, undefined);
+    assert.equal(select.items.select.totalPrice, undefined);
+    assert.equal(select.totalAmount, undefined);
+  } finally {
+    prisma.salesContract.findUnique = originalFindUnique;
+  }
+});
+
 test('createSalesContract: 未传合同号时自动生成并写入', async () => {
   const originalCount = prisma.salesContract.count;
   const originalCreate = prisma.salesContract.create;

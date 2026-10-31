@@ -134,6 +134,25 @@ const getSalesContractById = async (id) => {
         orderBy: { createdAt: 'asc' },
       },
       payments: true,
+      // 订单详情「采购」页签与「按门店」表；只读数量与状态，不含采购价格
+      purchaseContracts: {
+        select: {
+          id: true,
+          contractNo: true,
+          status: true,
+          supplier: { select: { id: true, name: true } },
+          items: {
+            select: {
+              id: true,
+              productId: true,
+              storeId: true,
+              quantity: true,
+              receiptItems: { select: { acceptedQuantity: true } },
+            },
+          },
+        },
+        orderBy: { contractNo: 'asc' },
+      },
     },
   });
 
