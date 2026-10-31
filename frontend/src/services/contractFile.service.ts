@@ -30,6 +30,7 @@ export type ContractFileCategory =
   | "OTHER"
   | "SIGNED_CONTRACT"
   | "PRODUCTION_PHOTO"
+  | "RECEIPT_PHOTO"
   | "SUPPLIER_INVOICE"
   | "CARRIER_DOCUMENT"
   | "SYSTEM_GENERATED_WORD"

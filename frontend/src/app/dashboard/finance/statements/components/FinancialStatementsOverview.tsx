@@ -6,18 +6,24 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { BusinessWrite } from '@/lib/hooks/useBusinessReadOnly';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { PageHeader } from '@/components/layout/PageHeader';
+} from "@/components/ui/select";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   ArrowRightLeft,
   BarChart3,
@@ -29,8 +35,12 @@ import {
   TrendingUp,
   Upload,
   Wallet,
-} from 'lucide-react';
-import type { AnalyticsData, FinancialAlert, FinancialPeriod } from '@/services/financialStatements.service';
+} from "lucide-react";
+import type {
+  AnalyticsData,
+  FinancialAlert,
+  FinancialPeriod,
+} from "@/services/financialStatements.service";
 import {
   AlertItem,
   FinancialHealthAlert,
@@ -41,7 +51,7 @@ import {
   profitColor,
   type StatementsBalanceSheet,
   type StatementsIncomeStatement,
-} from './FinancialStatementsShared';
+} from "./FinancialStatementsShared";
 
 interface FinancialStatementsLoadingStateProps {
   count?: number;
@@ -95,13 +105,17 @@ interface FinancialStatementsOverviewProps {
   warningAlerts: FinancialAlert[];
 }
 
-function calcTrend(current: number | null | undefined, previous: number | null | undefined): { dir: 'up' | 'down' | 'neutral'; text: string } {
-  if (current == null || previous == null || previous === 0) return { dir: 'neutral', text: '无可比上期数据' };
+function calcTrend(
+  current: number | null | undefined,
+  previous: number | null | undefined,
+): { dir: "up" | "down" | "neutral"; text: string } {
+  if (current == null || previous == null || previous === 0)
+    return { dir: "neutral", text: "无可比上期数据" };
   const diff = ((current - previous) / Math.abs(previous)) * 100;
-  const sign = diff > 0 ? '+' : '';
-  if (Math.abs(diff) < 0.1) return { dir: 'neutral', text: '环比持平' };
+  const sign = diff > 0 ? "+" : "";
+  if (Math.abs(diff) < 0.1) return { dir: "neutral", text: "环比持平" };
   return {
-    dir: diff > 0 ? 'up' : 'down',
+    dir: diff > 0 ? "up" : "down",
     text: `环比 ${sign}${diff.toFixed(1)}%`,
   };
 }
@@ -138,17 +152,30 @@ export function FinancialStatementsOverview({
                   </SelectTrigger>
                   <SelectContent>
                     {periods.map((period) => (
-                      <SelectItem key={period.id} value={`${period.year}-${period.month}`}>
+                      <SelectItem
+                        key={period.id}
+                        value={`${period.year}-${period.month}`}
+                      >
                         {period.periodLabel}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               )}
-              <BusinessWrite><Button onClick={onOpenUploadDialog} variant="default" className="h-11 w-full sm:w-auto">
-                <Upload className="mr-2 h-4 w-4" />
-                上传月度会计报表
-              </Button></BusinessWrite>
+              <BusinessWrite>
+                {/* 手机端报表只读：上传/解析确认在电脑上做 */}
+                <Button
+                  onClick={onOpenUploadDialog}
+                  variant="default"
+                  className="hidden h-11 w-full md:inline-flex md:w-auto"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  上传月度会计报表
+                </Button>
+                <p className="text-xs text-muted-foreground md:hidden">
+                  手机端仅查看报表摘要，上传请在电脑上操作
+                </p>
+              </BusinessWrite>
             </div>
           }
         />
@@ -159,7 +186,9 @@ export function FinancialStatementsOverview({
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16">
             <BarChart3 className="h-16 w-16 text-muted-foreground/40" />
             <div className="text-center">
-              <p className="text-lg font-semibold text-muted-foreground">暂无财务报表数据</p>
+              <p className="text-lg font-semibold text-muted-foreground">
+                暂无财务报表数据
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 点击上方&ldquo;上传月度会计报表&rdquo;，先核对解析预览，再确认写入账期
               </p>
@@ -170,7 +199,10 @@ export function FinancialStatementsOverview({
 
       {hasData && (
         <>
-          <p className="text-xs text-muted-foreground">健康提示与预警基于最新账期：{analytics?.latestPeriod?.periodLabel || '未知'}</p>
+          <p className="text-xs text-muted-foreground">
+            健康提示与预警基于最新账期：
+            {analytics?.latestPeriod?.periodLabel || "未知"}
+          </p>
           {(dangerAlerts.length > 0 || warningAlerts.length > 0) && (
             <div className="space-y-2">
               {dangerAlerts.map((alert, index) => (
@@ -183,7 +215,9 @@ export function FinancialStatementsOverview({
           )}
 
           {dangerAlerts.length === 0 && warningAlerts.length === 0 && (
-            <FinancialHealthAlert periodLabel={analytics?.latestPeriod?.periodLabel} />
+            <FinancialHealthAlert
+              periodLabel={analytics?.latestPeriod?.periodLabel}
+            />
           )}
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -196,18 +230,38 @@ export function FinancialStatementsOverview({
             {(() => {
               const trends = analytics?.trends ?? [];
               const selected = currentDetail ?? currentPeriod;
-              const previousDate = selected ? new Date(selected.year, selected.month - 2, 1) : null;
-              const prev = previousDate ? trends.find((point) => point.year === previousDate.getFullYear() && point.month === previousDate.getMonth() + 1) : null;
-              const revenueTrend = calcTrend(latestIncomeStatement?.revenueMonth, prev?.revenue);
-              const profitTrend = calcTrend(latestIncomeStatement?.netProfitMonth, prev?.netProfit);
-              const prevDebtRatio = prev && prev.totalAssets ? prev.totalLiabilities / prev.totalAssets : null;
+              const previousDate = selected
+                ? new Date(selected.year, selected.month - 2, 1)
+                : null;
+              const prev = previousDate
+                ? trends.find(
+                    (point) =>
+                      point.year === previousDate.getFullYear() &&
+                      point.month === previousDate.getMonth() + 1,
+                  )
+                : null;
+              const revenueTrend = calcTrend(
+                latestIncomeStatement?.revenueMonth,
+                prev?.revenue,
+              );
+              const profitTrend = calcTrend(
+                latestIncomeStatement?.netProfitMonth,
+                prev?.netProfit,
+              );
+              const prevDebtRatio =
+                prev && prev.totalAssets
+                  ? prev.totalLiabilities / prev.totalAssets
+                  : null;
               const debtTrend = calcTrend(debtRatioVal, prevDebtRatio);
-              const equityTrend = calcTrend(latestBalanceSheet?.totalEquity, prev?.totalEquity);
+              const equityTrend = calcTrend(
+                latestBalanceSheet?.totalEquity,
+                prev?.totalEquity,
+              );
 
               return (
                 <>
                   <KpiCard
-                    title={`本期营业收入（${currentDetail?.periodLabel ?? currentPeriod?.periodLabel ?? ''}）`}
+                    title={`本期营业收入（${currentDetail?.periodLabel ?? currentPeriod?.periodLabel ?? ""}）`}
                     value={fmtWan(latestIncomeStatement?.revenueMonth)}
                     subValue={`累计：${fmtWan(latestIncomeStatement?.revenueYTD)}`}
                     icon={TrendingUp}
@@ -219,7 +273,9 @@ export function FinancialStatementsOverview({
                     value={fmtWan(latestIncomeStatement?.netProfitMonth)}
                     subValue={`累计：${fmtWan(latestIncomeStatement?.netProfitYTD)}`}
                     icon={DollarSign}
-                    valueClass={profitColor(latestIncomeStatement?.netProfitMonth)}
+                    valueClass={profitColor(
+                      latestIncomeStatement?.netProfitMonth,
+                    )}
                     trend={profitTrend.dir}
                     trendValue={profitTrend.text}
                   />
@@ -228,7 +284,11 @@ export function FinancialStatementsOverview({
                     value={fmtPercent(debtRatioVal)}
                     subValue={`负债 ${fmtWan(latestBalanceSheet?.totalLiabilities)} / 资产 ${fmtWan(latestBalanceSheet?.totalAssets)}`}
                     icon={Scale}
-                    valueClass={debtRatioVal != null && debtRatioVal > 0.7 ? 'text-destructive' : 'text-foreground'}
+                    valueClass={
+                      debtRatioVal != null && debtRatioVal > 0.7
+                        ? "text-destructive"
+                        : "text-foreground"
+                    }
                     trend={debtTrend.dir}
                     trendValue={debtTrend.text}
                   />
@@ -257,7 +317,9 @@ export function FinancialStatementsOverview({
                   </Badge>
                 )}
               </CardTitle>
-              <CardDescription>应收账款、存货、应付账款等流动性关键项</CardDescription>
+              <CardDescription>
+                应收账款、存货、应付账款等流动性关键项
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {detailLoading ? (
@@ -268,19 +330,56 @@ export function FinancialStatementsOverview({
               ) : (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                   {[
-                    { label: '应收账款', value: latestBalanceSheet?.accountsReceivable, icon: TrendingUp, color: 'text-blue-600 dark:text-blue-400' },
-                    { label: '预付账款', value: latestBalanceSheet?.prepaidExpenses, icon: ArrowRightLeft, color: 'text-purple-600 dark:text-purple-400' },
-                    { label: '其他应收款', value: latestBalanceSheet?.otherReceivables, icon: ArrowRightLeft, color: 'text-indigo-600 dark:text-indigo-400' },
-                    { label: '存货', value: latestBalanceSheet?.inventory, icon: Package, color: 'text-amber-600 dark:text-amber-400' },
-                    { label: '应付账款', value: latestBalanceSheet?.accountsPayable, icon: TrendingDown, color: 'text-rose-600 dark:text-rose-400' },
-                    { label: '其他应付款', value: latestBalanceSheet?.otherPayables, icon: TrendingDown, color: 'text-orange-600 dark:text-orange-400' },
+                    {
+                      label: "应收账款",
+                      value: latestBalanceSheet?.accountsReceivable,
+                      icon: TrendingUp,
+                      color: "text-blue-600 dark:text-blue-400",
+                    },
+                    {
+                      label: "预付账款",
+                      value: latestBalanceSheet?.prepaidExpenses,
+                      icon: ArrowRightLeft,
+                      color: "text-purple-600 dark:text-purple-400",
+                    },
+                    {
+                      label: "其他应收款",
+                      value: latestBalanceSheet?.otherReceivables,
+                      icon: ArrowRightLeft,
+                      color: "text-indigo-600 dark:text-indigo-400",
+                    },
+                    {
+                      label: "存货",
+                      value: latestBalanceSheet?.inventory,
+                      icon: Package,
+                      color: "text-amber-600 dark:text-amber-400",
+                    },
+                    {
+                      label: "应付账款",
+                      value: latestBalanceSheet?.accountsPayable,
+                      icon: TrendingDown,
+                      color: "text-rose-600 dark:text-rose-400",
+                    },
+                    {
+                      label: "其他应付款",
+                      value: latestBalanceSheet?.otherPayables,
+                      icon: TrendingDown,
+                      color: "text-orange-600 dark:text-orange-400",
+                    },
                   ].map((item) => (
-                    <div key={item.label} className="space-y-1 rounded-lg border bg-card p-3">
-                      <p className="text-xs text-muted-foreground">{item.label}</p>
-                      <p className={`text-sm font-semibold tabular-nums ${item.value != null ? item.color : 'text-muted-foreground'}`}>
+                    <div
+                      key={item.label}
+                      className="space-y-1 rounded-lg border bg-card p-3"
+                    >
+                      <p className="text-xs text-muted-foreground">
+                        {item.label}
+                      </p>
+                      <p
+                        className={`text-sm font-semibold tabular-nums ${item.value != null ? item.color : "text-muted-foreground"}`}
+                      >
                         {item.value != null
-                          ? `¥${(item.value / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}万`
-                          : '—'}
+                          ? `¥${(item.value / 10000).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}万`
+                          : "—"}
                       </p>
                     </div>
                   ))}

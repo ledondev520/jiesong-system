@@ -723,6 +723,45 @@ describe("SalesDetailPage 交互逻辑", () => {
     },
   );
 
+  it("手机上 3D 装箱页签不渲染 3D 场景，只给出说明；桌面照常渲染", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "SYNTHETIC-3D",
+        status: "PACKING",
+        totalBoxes: 1,
+        volume: 1,
+        grossWeight: 1,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-1",
+            productId: "p-1",
+            boxes: 1,
+            quantity: 1,
+            volume: 1,
+            product: { id: "p-1", customsName: "合成商品" },
+          },
+        ],
+        port: { name: "合成港口" },
+      },
+    });
+    const user = userEvent.setup();
+    mockIsMobile.mockReturnValue(true);
+    const { unmount } = renderPage("s-1");
+    await user.click(await screen.findByRole("tab", { name: /3D/ }));
+    expect(
+      await screen.findByText(/3D 装箱视图仅在电脑上提供/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("3D容器视图")).not.toBeInTheDocument();
+    unmount();
+
+    mockIsMobile.mockReturnValue(false);
+    renderPage("s-1");
+    await user.click(await screen.findByRole("tab", { name: /3D/ }));
+    expect(await screen.findByText("3D容器视图")).toBeInTheDocument();
+  });
+
   it("装柜达标且全部箱件可放下时允许确认发运", async () => {
     mockGetById.mockResolvedValue({
       data: {
@@ -756,6 +795,19 @@ describe("SalesDetailPage 交互逻辑", () => {
     const shipButton = await screen.findByRole("button", { name: "确认发运" });
     expect(shipButton).toBeEnabled();
     await user.click(shipButton);
+    expect(mockUpdateSalesStatus).not.toHaveBeenCalled();
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "取消",
+      }),
+    );
+    expect(mockUpdateSalesStatus).not.toHaveBeenCalled();
+    await user.click(shipButton);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "确认",
+      }),
+    );
 
     expect(mockUpdateSalesStatus).toHaveBeenCalledWith("s-1", "SHIPPED");
   });
@@ -796,6 +848,11 @@ describe("SalesDetailPage 交互逻辑", () => {
     renderPage("s-1");
     const ship = await screen.findByRole("button", { name: "确认发运" });
     await user.click(ship);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "确认",
+      }),
+    );
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith(message));
     expect(mockToastError).not.toHaveBeenCalledWith("状态推进失败");
     expect(mockGetById).toHaveBeenCalledTimes(1);
@@ -812,6 +869,11 @@ describe("SalesDetailPage 交互逻辑", () => {
     });
     mockGetById.mockResolvedValue({ data: { ...contract, status: "SHIPPED" } });
     await user.click(ship);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "确认",
+      }),
+    );
     await waitFor(() => expect(mockUpdateSalesStatus).toHaveBeenCalledTimes(2));
     expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(1, "s-1", "SHIPPED");
     expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(2, "s-1", "SHIPPED");

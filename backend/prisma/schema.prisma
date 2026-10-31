@@ -933,7 +933,7 @@ model ContractFile {
   mimeType           String   @default("")
   fileSize           Int
   description        String?
-  category           String   @default("OTHER") // SIGNED_CONTRACT/PRODUCTION_PHOTO/SUPPLIER_INVOICE/SYSTEM_GENERATED_*
+  category           String   @default("OTHER") // SIGNED_CONTRACT/PRODUCTION_PHOTO/RECEIPT_PHOTO/SUPPLIER_INVOICE/SYSTEM_GENERATED_*
   checksum           String?
   uploadedAt         DateTime @default(now())
 

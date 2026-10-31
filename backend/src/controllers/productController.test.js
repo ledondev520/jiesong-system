@@ -117,14 +117,33 @@ test('list: 资料不全筛选毛重/体积/HS 缺失，并保留关键词的 OR
   let listWhere;
   let nextError;
   const res = createMockRes();
-  await withMockProductDelegate({
-    findMany: async (args) => { listWhere = args.where; return []; },
-    count: async () => 0,
-  }, async () => productController.list({ query: { incomplete: 'true', keyword: '砖', page: '1', pageSize: '20' } }, res, error => { nextError = error; }));
+  const originalRaw = prisma.$queryRaw;
+  prisma.$queryRaw = async () => [];
+  try {
+    await withMockProductDelegate({
+      findMany: async (args) => { listWhere = args.where; return []; },
+      count: async () => 0,
+    }, async () => productController.list({ query: { incomplete: 'true', keyword: '砖', page: '1', pageSize: '20' } }, res, error => { nextError = error; }));
+  } finally { prisma.$queryRaw = originalRaw; }
   assert.ifError(nextError);
   assert.equal(listWhere.OR.length, 2);
   const fields = listWhere.AND[0].OR.map(clause => Object.keys(clause)[0]);
   assert.deepEqual([...new Set(fields)], ['grossWeight', 'volume', 'hsCode']);
+});
+
+test('list: 资料不全筛选把仅空白的 HS 编码视为缺失（按原始查询得到的 id 加入 OR）', async () => {
+  let listWhere;
+  let rawSql;
+  const originalRaw = prisma.$queryRaw;
+  prisma.$queryRaw = async (strings) => { rawSql = strings.join('?'); return [{ id: 'blank-hs' }]; };
+  try {
+    await withMockProductDelegate({
+      findMany: async (args) => { listWhere = args.where; return []; },
+      count: async () => 0,
+    }, async () => productController.list({ query: { incomplete: 'true', page: '1', pageSize: '20' } }, createMockRes(), error => { throw error; }));
+  } finally { prisma.$queryRaw = originalRaw; }
+  assert.match(rawSql, /TRIM\(hsCode,/);
+  assert.deepEqual(listWhere.AND[0].OR.at(-1), { id: { in: ['blank-hs'] } });
 });
 
 test('list: 未传 incomplete 时不加资料不全条件', async () => {

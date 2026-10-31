@@ -7,10 +7,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { MobileListCard } from "@/components/mobile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
@@ -55,6 +56,7 @@ interface OrderRow {
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const role = useAuthStore((state) => state.user?.role);
   const canEditCustomer = !!role && CUSTOMER_WRITE_ROLES.includes(role);
   const canEditStores = !!role && STORE_WRITE_ROLES.includes(role);
@@ -217,26 +219,54 @@ export default function CustomerDetailPage() {
           ) : null}
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={storeColumns}
-            data={stores}
-            rowKey={(store) => store.id}
-            loading={loading}
-            emptyTitle="该客户暂无门店"
-            renderActions={
-              canEditStores
-                ? (store) => (
-                    <RowActionsMenu
-                      onEdit={() => setEditingStore(store)}
-                      onDelete={() => deactivateStore(store)}
-                      deleteLabel={store.isActive ? "停用" : "恢复"}
-                      confirmTitle={`${store.isActive ? "停用" : "恢复"}门店「${store.name}」？`}
-                      confirmDescription="已有订单不受影响。"
+          {/* 手机端只读卡片（编辑/停用在电脑上做） */}
+          <div className="space-y-2 md:hidden">
+            {!loading && stores.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                该客户暂无门店
+              </p>
+            ) : (
+              stores.map((store) => (
+                <MobileListCard
+                  key={store.id}
+                  title={store.name}
+                  subtitle={store.legalName || undefined}
+                  badge={
+                    <StatusBadge
+                      status={store.isActive ? "ACTIVE" : "ARCHIVED"}
+                      statusMap={STATUS_MAP}
                     />
-                  )
-                : undefined
-            }
-          />
+                  }
+                  fields={[
+                    { label: "简称", value: store.code || "—" },
+                    { label: "目的港", value: store.port?.name || "—" },
+                  ]}
+                />
+              ))
+            )}
+          </div>
+          <div className="hidden md:block">
+            <DataTable
+              columns={storeColumns}
+              data={stores}
+              rowKey={(store) => store.id}
+              loading={loading}
+              emptyTitle="该客户暂无门店"
+              renderActions={
+                canEditStores
+                  ? (store) => (
+                      <RowActionsMenu
+                        onEdit={() => setEditingStore(store)}
+                        onDelete={() => deactivateStore(store)}
+                        deleteLabel={store.isActive ? "停用" : "恢复"}
+                        confirmTitle={`${store.isActive ? "停用" : "恢复"}门店「${store.name}」？`}
+                        confirmDescription="已有订单不受影响。"
+                      />
+                    )
+                  : undefined
+              }
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -245,13 +275,37 @@ export default function CustomerDetailPage() {
           <CardTitle className="text-base">最近订单</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
-            columns={orderColumns}
-            data={orders}
-            rowKey={(order) => order.id}
-            loading={loading}
-            emptyTitle="该客户暂无订单"
-          />
+          <div className="space-y-2 md:hidden">
+            {!loading && orders.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                该客户暂无订单
+              </p>
+            ) : (
+              orders.map((order) => (
+                <MobileListCard
+                  key={order.id}
+                  title={order.contractNo}
+                  badge={order.status}
+                  amount={{
+                    label: "金额 (USD)",
+                    value: (order.totalAmount ?? 0).toLocaleString("en-US", {
+                      minimumFractionDigits: 2,
+                    }),
+                  }}
+                  onClick={() => router.push(`/dashboard/sales/${order.id}`)}
+                />
+              ))
+            )}
+          </div>
+          <div className="hidden md:block">
+            <DataTable
+              columns={orderColumns}
+              data={orders}
+              rowKey={(order) => order.id}
+              loading={loading}
+              emptyTitle="该客户暂无订单"
+            />
+          </div>
         </CardContent>
       </Card>
 

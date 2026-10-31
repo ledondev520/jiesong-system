@@ -116,6 +116,7 @@ import {
 import { formatDate } from "@/lib/date-format";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ContractFiles from "@/components/contract/ContractFiles";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // 动态导入 3D 组件（避免 SSR 问题）
@@ -234,6 +235,7 @@ export default function SalesDetailPage({ params }: PageProps) {
   const [taxPreparationOpen, setTaxPreparationOpen] = useState(false);
   const [importPurchaseOpen, setImportPurchaseOpen] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [advanceTarget, setAdvanceTarget] = useState<SalesStatus | null>(null);
   const [exportingWorkbook, setExportingWorkbook] = useState(false);
 
   // 截图区域引用
@@ -265,6 +267,18 @@ export default function SalesDetailPage({ params }: PageProps) {
     } finally {
       setExportingWorkbook(false);
     }
+  };
+
+  /** 选择采购装柜只是打开导入弹窗，不改状态；其余推进先确认（手机上误触同样要拦住）。 */
+  const requestAdvance = (nextStatus: SalesStatus) => {
+    if (
+      nextStatus === SalesStatus.PACKING &&
+      contract?.status === SalesStatus.CONFIRMED
+    ) {
+      void handleAdvanceStatus(nextStatus);
+      return;
+    }
+    setAdvanceTarget(nextStatus);
   };
 
   const handleAdvanceStatus = async (nextStatus: SalesStatus) => {
@@ -901,7 +915,7 @@ export default function SalesDetailPage({ params }: PageProps) {
               {nextSalesAction && (
                 <BusinessWrite>
                   <Button
-                    onClick={() => handleAdvanceStatus(nextSalesAction.status)}
+                    onClick={() => requestAdvance(nextSalesAction.status)}
                     disabled={statusUpdating || shipmentBlocked}
                     title={shipmentBlocked ? readinessHeadline : undefined}
                   >
@@ -912,6 +926,19 @@ export default function SalesDetailPage({ params }: PageProps) {
                     )}
                     {nextSalesAction.label}
                   </Button>
+                  <ConfirmActionDialog
+                    open={advanceTarget !== null}
+                    onOpenChange={(open) => {
+                      if (!open) setAdvanceTarget(null);
+                    }}
+                    title="确认推进合同状态"
+                    description={`将出口合同 ${contract.contractNo} 推进到「${nextSalesAction.label}」阶段，确认后立即生效。`}
+                    onConfirm={() => {
+                      const target = advanceTarget;
+                      setAdvanceTarget(null);
+                      if (target) void handleAdvanceStatus(target);
+                    }}
+                  />
                 </BusinessWrite>
               )}
               <BusinessWrite>
@@ -1571,7 +1598,11 @@ export default function SalesDetailPage({ params }: PageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {contract.packingItems && contract.packingItems.length > 0 ? (
+              {isMobile ? (
+                <div className="flex h-40 items-center justify-center rounded-md border border-dashed px-4 text-center text-sm text-muted-foreground">
+                  3D 装箱视图仅在电脑上提供，手机请查看「装箱明细」
+                </div>
+              ) : contract.packingItems && contract.packingItems.length > 0 ? (
                 <Suspense
                   fallback={
                     <div className="h-[500px] flex items-center justify-center">

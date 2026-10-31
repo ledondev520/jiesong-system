@@ -495,7 +495,8 @@ describe("purchase inline supplier editor sessions (synthetic fixtures)", () => 
     } as never);
     render(<CreatePurchasePage />);
     await user.click(await screen.findByRole("button", { name: /比价/ }));
-    await user.click(screen.getByRole("button", { name: "用此供应商" }));
+    // 手机卡片与桌面表格各一个按钮，任取其一
+    await user.click(screen.getAllByRole("button", { name: "用此供应商" })[0]);
     expect(screen.getByRole("spinbutton", { name: /单价/ })).toHaveValue(8);
     await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: "下一步：合同信息" }));

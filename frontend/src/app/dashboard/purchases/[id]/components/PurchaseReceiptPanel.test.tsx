@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
+import { toast } from "sonner";
 import { PurchaseReceiptPanel } from "./PurchaseReceiptPanel";
 import type { PurchaseReceiptList } from "@/services/purchaseReceipt.service";
 
@@ -7,6 +8,7 @@ const list = vi.fn();
 const create = vi.fn();
 const inspect = vi.fn();
 const inspections = vi.fn();
+const uploadPhoto = vi.fn();
 let role = "PURCHASE";
 vi.mock("@/services/purchaseReceipt.service", () => ({
   purchaseReceiptService: {
@@ -15,6 +17,9 @@ vi.mock("@/services/purchaseReceipt.service", () => ({
     inspect: (...args: unknown[]) => inspect(...args),
     inspections: (...args: unknown[]) => inspections(...args),
   },
+}));
+vi.mock("@/services/contractFile.service", () => ({
+  uploadContractFile: (...args: unknown[]) => uploadPhoto(...args),
 }));
 vi.mock("@/store/auth.store", () => ({
   useAuthStore: (selector: (state: unknown) => unknown) =>
@@ -86,6 +91,7 @@ beforeEach(() => {
   role = "PURCHASE";
   list.mockReset();
   create.mockReset();
+  uploadPhoto.mockReset();
   inspect.mockReset();
   inspections.mockReset();
   inspections.mockResolvedValue({
@@ -150,6 +156,90 @@ it("新到货只登记到货量，不自动验收，失败重试复用幂等键"
   expect(create.mock.calls[1][1].requestId).toBe(
     create.mock.calls[0][1].requestId,
   );
+});
+const openArrival = async () => {
+  render(<PurchaseReceiptPanel purchaseContractId="purchase-1" />);
+  fireEvent.click(await screen.findByText("登记分批到货"));
+  fireEvent.change(screen.getByLabelText("测试商品 本批到货量"), {
+    target: { value: "4" },
+  });
+  fireEvent.change(screen.getByLabelText("到货日期"), {
+    target: { value: "2020-01-02" },
+  });
+};
+const photo = (name: string, type = "image/jpeg") =>
+  new File(["x"], name, { type });
+it("到货照片：手机可直接拍照（capture），到货保存成功后才上传为 RECEIPT_PHOTO 附件", async () => {
+  uploadPhoto.mockResolvedValue({});
+  await openArrival();
+  const input = screen.getByLabelText(/到货照片/);
+  expect(input).toHaveAttribute("capture", "environment");
+  expect(input).toHaveAttribute("accept", "image/jpeg,image/png");
+  fireEvent.change(input, {
+    target: { files: [photo("a.jpg"), photo("b.png", "image/png")] },
+  });
+  expect(screen.getByText("a.jpg")).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("移除照片 b.png"));
+  expect(screen.queryByText("b.png")).not.toBeInTheDocument();
+  expect(uploadPhoto).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("保存到货"));
+  await waitFor(() => expect(uploadPhoto).toHaveBeenCalledTimes(1));
+  expect(uploadPhoto).toHaveBeenCalledWith(
+    "purchase-1",
+    "PURCHASE",
+    expect.objectContaining({ name: "a.jpg" }),
+    "到货照片 2020-01-02",
+    "RECEIPT_PHOTO",
+  );
+  expect(create.mock.invocationCallOrder[0]).toBeLessThan(
+    uploadPhoto.mock.invocationCallOrder[0],
+  );
+});
+it("到货照片：单张超过 10MB 在选择时即拒绝，不加入列表", async () => {
+  await openArrival();
+  const big = photo("big.jpg");
+  Object.defineProperty(big, "size", { value: 10 * 1024 * 1024 + 1 });
+  fireEvent.change(screen.getByLabelText(/到货照片/), {
+    target: { files: [big] },
+  });
+  expect(screen.getByText("单张照片不超过 10MB")).toBeInTheDocument();
+  expect(screen.queryByText("big.jpg")).not.toBeInTheDocument();
+});
+it("到货保存失败时不上传照片；照片上传失败不回滚到货，只提示补传", async () => {
+  create.mockRejectedValueOnce(new Error("offline"));
+  uploadPhoto.mockRejectedValue(new Error("上传失败"));
+  await openArrival();
+  fireEvent.change(screen.getByLabelText(/到货照片/), {
+    target: { files: [photo("a.jpg")] },
+  });
+  fireEvent.click(screen.getByText("保存到货"));
+  await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "保存到货" })).toBeEnabled(),
+  );
+  expect(uploadPhoto).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("保存到货"));
+  await waitFor(() => expect(uploadPhoto).toHaveBeenCalledTimes(1));
+  await waitFor(() =>
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining("1 张照片上传失败"),
+    ),
+  );
+  expect(create).toHaveBeenCalledTimes(2);
+  expect(screen.queryByLabelText("到货日期")).not.toBeInTheDocument();
+});
+it("到货照片只接受 JPG/PNG，且最多 6 张", async () => {
+  await openArrival();
+  const input = screen.getByLabelText(/到货照片/);
+  fireEvent.change(input, {
+    target: { files: [photo("a.pdf", "application/pdf")] },
+  });
+  expect(await screen.findByRole("alert")).toHaveTextContent("仅支持 JPG、PNG");
+  fireEvent.change(input, {
+    target: { files: Array.from({ length: 7 }, (_, i) => photo(`p${i}.jpg`)) },
+  });
+  expect(await screen.findByRole("alert")).toHaveTextContent("最多上传 6 张");
+  expect(screen.queryByText("p0.jpg")).not.toBeInTheDocument();
 });
 it("编辑失败登记的数量会更换幂等键，不能超过当前剩余量", async () => {
   create.mockRejectedValue(new Error("offline"));

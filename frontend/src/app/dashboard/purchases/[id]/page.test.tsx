@@ -7,7 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import PurchaseDetailPage from "./page";
@@ -320,6 +320,20 @@ describe("PurchaseDetailPage 交互逻辑", () => {
       name: "确认已签约",
     });
     await user.click(nextButton);
+    // 每次状态点击都要先确认：取消不发请求，确认后才推进
+    expect(mockUpdatePurchaseStatus).not.toHaveBeenCalled();
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "取消",
+      }),
+    );
+    expect(mockUpdatePurchaseStatus).not.toHaveBeenCalled();
+    await user.click(nextButton);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "确认",
+      }),
+    );
 
     expect(mockUpdatePurchaseStatus).toHaveBeenCalledWith("p-1", "SIGNED");
   });

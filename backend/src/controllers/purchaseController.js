@@ -474,6 +474,7 @@ const uploadFile = async (req, res, next) => {
       req.file,
       req.body?.description,
       req.body?.category,
+      req.user,
     );
     
     created(res, contractFile, '文件上传成功');
@@ -516,6 +517,7 @@ const deleteFile = async (req, res, next) => {
       throw createError('文件不存在', 404);
     }
     fileService.assertFileAccess(file, req.user);
+    fileService.assertReceiptPhotoAccess(fileService.CONTRACT_TYPE.PURCHASE, file.category, req.user);
     
     // 旧采购入口继续保留物理归档；不改变现有留存约定。
     

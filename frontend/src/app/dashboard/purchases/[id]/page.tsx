@@ -89,6 +89,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ContractFiles from "@/components/contract/ContractFiles";
 import { isPayable, nonPayableNotice } from "../components/purchaseListHelpers";
@@ -97,6 +98,7 @@ import { PurchaseFlowPanel } from "./components/PurchaseFlowPanel";
 import { PurchaseProductionPanel } from "./components/PurchaseProductionPanel";
 import { configService } from "@/services/config.service";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
 import {
   calculatePurchaseLineAmounts,
   summarizePurchaseAmounts,
@@ -321,6 +323,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const readOnly = useBusinessReadOnly();
   const isMobile = useMobile();
   const router = useRouter();
+  const userRole = useAuthStore((state) => state.user?.role);
   const [loadError, setLoadError] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const { id } = use(params);
@@ -344,6 +347,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [contractFiles, setContractFiles] = useState<ContractFile[]>([]);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [advanceConfirmOpen, setAdvanceConfirmOpen] = useState(false);
   const [productionEditorOpen, setProductionEditorOpen] = useState(false);
 
   // 系统配置：线上盖章平台链接 + 我方开票抬头（选填）
@@ -569,6 +573,20 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     }
   };
 
+  /** 登记完工资料只是打开编辑器，不改状态；其余推进先确认（手机上误触同样要拦住）。 */
+  const requestAdvance = () => {
+    if (
+      contract &&
+      [PurchaseStatus.SIGNED, PurchaseStatus.PRODUCING].includes(
+        contract.status,
+      )
+    ) {
+      void handleAdvanceStatus();
+      return;
+    }
+    setAdvanceConfirmOpen(true);
+  };
+
   const handleCancel = async () => {
     if (
       !contract ||
@@ -726,7 +744,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <BusinessWrite>
                 <Button
                   className="h-9 rounded-md text-xs"
-                  onClick={handleAdvanceStatus}
+                  onClick={requestAdvance}
                   disabled={statusUpdating || productionCompletionBlocked}
                   title={
                     productionCompletionBlocked
@@ -741,6 +759,16 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                   )}
                   {nextPurchaseAction.label}
                 </Button>
+                <ConfirmActionDialog
+                  open={advanceConfirmOpen}
+                  onOpenChange={setAdvanceConfirmOpen}
+                  title="确认推进合同状态"
+                  description={`将采购合同 ${contract.contractNo} 推进到「${nextPurchaseAction.label}」阶段，确认后立即生效。`}
+                  onConfirm={() => {
+                    setAdvanceConfirmOpen(false);
+                    void handleAdvanceStatus();
+                  }}
+                />
               </BusinessWrite>
             )}
             <BusinessWrite>
@@ -1278,6 +1306,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           { value: "SIGNED_CONTRACT", label: "供应商盖章件" },
           { value: "SUPPLIER_INVOICE", label: "供应商发票" },
           { value: "OTHER", label: "其他附件" },
+          // 与后端 assertReceiptPhotoAccess 一致：仅到货角色可补传到货照片
+          ...(["ADMIN", "PURCHASE", "WAREHOUSE"].includes(userRole || "")
+            ? [{ value: "RECEIPT_PHOTO" as const, label: "到货照片" }]
+            : []),
         ]}
       />
 

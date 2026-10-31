@@ -31,6 +31,7 @@ const uploadFile = async (req, res, next) => {
       req.file,
       req.body.description,
       req.body.category,
+      req.user,
     );
 
     created(res, { ...fileRecord, contractType }, '文件上传成功');
@@ -89,6 +90,7 @@ const deleteFile = async (req, res, next) => {
     const existing = await fileService.findFileById(fileId);
     if (!existing) throw createError('文件不存在', 404);
     fileService.assertFileAccess(existing, req.user);
+    fileService.assertReceiptPhotoAccess(existing.contractType, existing.category, req.user);
     const file = await fileService.deleteFileRecord(fileId);
     if (!file) throw createError('文件不存在', 404);
 

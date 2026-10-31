@@ -52,10 +52,13 @@ const list = async (req, res, next) => {
     // 资料不全：毛重、体积或 HS 编码缺失/为 0（只读筛选，用 AND 避免覆盖关键词的 OR）
     const incomplete = req.query.incomplete === 'true' || req.query.incomplete === true;
     if (incomplete) {
+      // 仅空白的 HS 编码也算缺失（与列表行标记 hsCode.trim() 一致）；SQLite TRIM 默认只去空格，补制表/换行/NBSP/全角空格
+      const blankHs = await prisma.$queryRaw`SELECT id FROM products WHERE hsCode IS NOT NULL AND hsCode <> '' AND TRIM(hsCode, ' ' || char(9, 10, 11, 12, 13, 160, 12288)) = ''`;
       where.AND = [{ OR: [
         { grossWeight: null }, { grossWeight: 0 },
         { volume: null }, { volume: 0 },
         { hsCode: null }, { hsCode: '' },
+        ...(blankHs.length ? [{ id: { in: blankHs.map(row => row.id) } }] : []),
       ] }];
     }
 

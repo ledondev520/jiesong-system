@@ -39,6 +39,7 @@ import {
 import { ErrorState } from "@/components/ui/data-state";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { toast } from "sonner";
+import { uploadContractFile } from "@/services/contractFile.service";
 
 // 与原 `await fn()` 同一时序：直接在请求返回的 Promise 上 then，不额外增加微任务；
 // 同步异常/非 Promise 返回值也走失败/成功分支。
@@ -79,6 +80,10 @@ function runAwait<T>(
 }
 
 // 与后端数量上限容差一致，避免0.1+0.2误报超过0.3。
+const MAX_ARRIVAL_PHOTOS = 6;
+const PHOTO_TYPES = ["image/jpeg", "image/png"];
+// 与后端 contractUpload 的 10MB 上限一致，避免保存到货后才发现照片过大
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const EPSILON = 1e-9;
 
 interface Props {
@@ -91,6 +96,8 @@ interface ArrivalForm {
   date: string;
   note: string;
   quantities: Record<string, number>;
+  /** 到货照片：登记成功后作为合同附件（RECEIPT_PHOTO）上传，不属于到货请求体 */
+  photos: File[];
 }
 interface InspectionForm {
   requestId: string;
@@ -296,7 +303,27 @@ export function PurchaseReceiptPanel({
         note: arrival.note.trim() || undefined,
         items: items.filter((item) => item.arrivedQuantity > 0),
       });
+      // 到货已保存后再传照片；照片失败不回滚到货，也不要求重复登记。
+      const failedPhotos: string[] = [];
+      for (const photo of arrival.photos) {
+        try {
+          await uploadContractFile(
+            purchaseContractId,
+            "PURCHASE",
+            photo,
+            `到货照片 ${arrival.date}`,
+            "RECEIPT_PHOTO",
+          );
+        } catch {
+          failedPhotos.push(photo.name);
+        }
+      }
       afterSave();
+      if (failedPhotos.length > 0) {
+        toast.error(
+          `到货已登记，但 ${failedPhotos.length} 张照片上传失败，请在合同附件中补传`,
+        );
+      }
     } catch (error) {
       setFormError(
         (error as { message?: string })?.message || "到货登记失败，请原样重试",
@@ -381,6 +408,7 @@ export function PurchaseReceiptPanel({
                   requestId: crypto.randomUUID(),
                   date: formatDate(new Date()),
                   note: "",
+                  photos: [],
                   quantities: Object.fromEntries(
                     remainingItems.map((item) => [item.purchaseItemId, 0]),
                   ),
@@ -660,6 +688,66 @@ export function PurchaseReceiptPanel({
                     changeArrival({ note: event.target.value })
                   }
                 />
+                <Label htmlFor="receipt-photos">
+                  到货照片（选填，可直接拍照）
+                </Label>
+                <Input
+                  id="receipt-photos"
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  capture="environment"
+                  multiple
+                  onChange={(event) => {
+                    const picked = Array.from(event.target.files ?? []);
+                    event.target.value = "";
+                    if (
+                      picked.some((file) => !PHOTO_TYPES.includes(file.type))
+                    ) {
+                      setFormError("到货照片仅支持 JPG、PNG 格式");
+                      return;
+                    }
+                    if (picked.some((file) => file.size > MAX_PHOTO_BYTES)) {
+                      setFormError("单张照片不超过 10MB");
+                      return;
+                    }
+                    if (
+                      arrival.photos.length + picked.length >
+                      MAX_ARRIVAL_PHOTOS
+                    ) {
+                      setFormError(`最多上传 ${MAX_ARRIVAL_PHOTOS} 张到货照片`);
+                      return;
+                    }
+                    setFormError("");
+                    changeArrival({ photos: [...arrival.photos, ...picked] });
+                  }}
+                />
+                {arrival.photos.length > 0 && (
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {arrival.photos.map((photo, index) => (
+                      <li
+                        key={`${photo.name}-${index}`}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="min-w-0 truncate">{photo.name}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`移除照片 ${photo.name}`}
+                          onClick={() =>
+                            changeArrival({
+                              photos: arrival.photos.filter(
+                                (_, position) => position !== index,
+                              ),
+                            })
+                          }
+                        >
+                          移除
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {formError && (
                   <p role="alert" className="text-sm text-destructive">
                     {formError}
