@@ -4,7 +4,7 @@
  * Pos: 财务报表唯一上传主界面；三类来源不能绕过预览直接写库
  */
 
-import type { RefObject } from 'react';
+import type { RefObject } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -13,11 +13,11 @@ import {
   RefreshCw,
   Upload,
   X,
-} from 'lucide-react';
-import type { FinancialStatementImportPreview } from '@/services/financialStatements.service';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+} from "lucide-react";
+import type { FinancialStatementImportPreview } from "@/services/financialStatements.service";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -25,12 +25,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SemanticBadge } from "@/components/ui/status-badge";
 
-export type FinancialUploadFileType = 'statement' | 'trialBalance' | 'generalLedger';
+export type FinancialUploadFileType =
+  "statement" | "trialBalance" | "generalLedger";
 export type FinancialUploadFiles = Record<FinancialUploadFileType, File | null>;
 
 interface FinancialStatementsUploadDialogProps {
@@ -42,14 +43,20 @@ interface FinancialStatementsUploadDialogProps {
   previewing: boolean;
   confirming: boolean;
   overwriteConfirmed: boolean;
-  fileInputRefs: Record<FinancialUploadFileType, RefObject<HTMLInputElement | null>>;
+  fileInputRefs: Record<
+    FinancialUploadFileType,
+    RefObject<HTMLInputElement | null>
+  >;
   onClearFiles: () => void;
   onConfirm: () => void;
   onMonthChange: (value: string) => void;
   onOpenChange: (open: boolean) => void;
   onOverwriteConfirmedChange: (checked: boolean) => void;
   onPreview: () => void;
-  onUploadFileChange: (type: FinancialUploadFileType, file: File | null) => void;
+  onUploadFileChange: (
+    type: FinancialUploadFileType,
+    file: File | null,
+  ) => void;
   onYearChange: (value: string) => void;
 }
 
@@ -60,19 +67,36 @@ const sourceFields: Array<{
   accept: string;
   hint: string;
 }> = [
-  { type: 'statement', id: 'statement-file', label: '会计报表（.xlsx）', accept: '.xlsx', hint: '资产负债表、利润表；现金流量表有则一并读取' },
-  { type: 'trialBalance', id: 'trial-balance-file', label: '科目余额表（.xls / .xlsx）', accept: '.xls,.xlsx', hint: '保留科目层级、期初、本期、本年累计和期末借贷' },
-  { type: 'generalLedger', id: 'general-ledger-file', label: '明细账（.xlsx）', accept: '.xlsx', hint: '保留期初、凭证、本期合计和本年累计行' },
+  {
+    type: "statement",
+    id: "statement-file",
+    label: "会计报表（.xlsx）",
+    accept: ".xlsx",
+    hint: "资产负债表、利润表；现金流量表有则一并读取",
+  },
+  {
+    type: "trialBalance",
+    id: "trial-balance-file",
+    label: "科目余额表（.xls / .xlsx）",
+    accept: ".xls,.xlsx",
+    hint: "保留科目层级、期初、本期、本年累计和期末借贷",
+  },
+  {
+    type: "generalLedger",
+    id: "general-ledger-file",
+    label: "明细账（.xlsx）",
+    accept: ".xlsx",
+    hint: "保留期初、凭证、本期合计和本年累计行",
+  },
 ];
 
-const moneyFormatter = new Intl.NumberFormat('zh-CN', {
+const moneyFormatter = new Intl.NumberFormat("zh-CN", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-const formatCny = (value: number | null) => (
-  value === null ? '—' : `CNY ${moneyFormatter.format(value)}`
-);
+const formatCny = (value: number | null) =>
+  value === null ? "—" : `CNY ${moneyFormatter.format(value)}`;
 
 export function FinancialStatementsUploadDialog({
   open,
@@ -94,9 +118,12 @@ export function FinancialStatementsUploadDialog({
   onYearChange,
 }: FinancialStatementsUploadDialogProps) {
   const busy = previewing || confirming;
-  const hasAllFiles = sourceFields.every(({ type }) => Boolean(uploadFiles[type]));
+  const hasAllFiles = sourceFields.every(({ type }) =>
+    Boolean(uploadFiles[type]),
+  );
   const overwriteRequired = Boolean(preview?.period.existing);
-  const confirmDisabled = !preview?.ready || busy || (overwriteRequired && !overwriteConfirmed);
+  const confirmDisabled =
+    !preview?.ready || busy || (overwriteRequired && !overwriteConfirmed);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -116,7 +143,10 @@ export function FinancialStatementsUploadDialog({
             {sourceFields.map(({ type, id, label, accept, hint }) => {
               const file = uploadFiles[type];
               return (
-                <div key={type} className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                <div
+                  key={type}
+                  className="space-y-2 rounded-lg border bg-muted/20 p-3"
+                >
                   <Label htmlFor={id}>{label}</Label>
                   <Input
                     id={id}
@@ -125,11 +155,18 @@ export function FinancialStatementsUploadDialog({
                     accept={accept}
                     className="cursor-pointer"
                     disabled={busy}
-                    onChange={(event) => onUploadFileChange(type, event.target.files?.[0] ?? null)}
+                    onChange={(event) =>
+                      onUploadFileChange(type, event.target.files?.[0] ?? null)
+                    }
                   />
-                  <p className="text-xs leading-5 text-muted-foreground">{hint}</p>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {hint}
+                  </p>
                   {file && (
-                    <p className="truncate text-xs font-medium" title={file.name}>
+                    <p
+                      className="truncate text-xs font-medium"
+                      title={file.name}
+                    >
                       {file.name} · {(file.size / 1024).toFixed(1)} KB
                     </p>
                   )}
@@ -140,7 +177,13 @@ export function FinancialStatementsUploadDialog({
 
           {Object.values(uploadFiles).some(Boolean) && (
             <div className="flex justify-end">
-              <Button type="button" variant="ghost" size="sm" onClick={onClearFiles} disabled={busy}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onClearFiles}
+                disabled={busy}
+              >
                 <X className="h-4 w-4" />
                 清空三份文件
               </Button>
@@ -186,46 +229,63 @@ export function FinancialStatementsUploadDialog({
                 <div className="flex items-center gap-2">
                   <FileCheck2 className="h-4 w-4 text-primary" />
                   <span className="text-sm font-semibold">三文件解析预览</span>
-                  <SemanticBadge tone={preview.ready ? 'success' : 'danger'}>
-                    {preview.ready ? '可确认' : '存在阻塞'}
+                  <SemanticBadge tone={preview.ready ? "success" : "danger"}>
+                    {preview.ready ? "可确认" : "存在阻塞"}
                   </SemanticBadge>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {preview.period.periodLabel} · 报表日 {preview.period.reportDate}
+                  {preview.period.periodLabel} · 报表日{" "}
+                  {preview.period.reportDate}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {[
-                  ['资产总计', preview.summary.totalAssets],
-                  ['负债合计', preview.summary.totalLiabilities],
-                  ['所有者权益', preview.summary.totalEquity],
-                  ['本月营业收入', preview.summary.revenueMonth],
-                  ['本月营业成本', preview.summary.costOfSalesMonth],
-                  ['本月净利润', preview.summary.netProfitMonth],
+                  ["资产总计", preview.summary.totalAssets],
+                  ["负债合计", preview.summary.totalLiabilities],
+                  ["所有者权益", preview.summary.totalEquity],
+                  ["本月营业收入", preview.summary.revenueMonth],
+                  ["本月营业成本", preview.summary.costOfSalesMonth],
+                  ["本月净利润", preview.summary.netProfitMonth],
                 ].map(([label, value]) => (
-                  <div key={String(label)} className="rounded-md border bg-background px-3 py-2">
+                  <div
+                    key={String(label)}
+                    className="rounded-md border bg-background px-3 py-2"
+                  >
                     <p className="text-xs text-muted-foreground">{label}</p>
-                    <p className="mt-1 text-sm font-semibold tabular-nums">{formatCny(value as number | null)}</p>
+                    <p className="mt-1 text-sm font-semibold tabular-nums">
+                      {formatCny(value as number | null)}
+                    </p>
                   </div>
                 ))}
               </div>
 
               <div className="flex flex-wrap gap-2 text-xs">
-                <SemanticBadge tone="neutral">报表字段 {(preview.summary.balanceSheetFieldCount ?? 0) + (preview.summary.incomeStatementFieldCount ?? 0)} 个</SemanticBadge>
-                <SemanticBadge tone="neutral">现金流字段 {preview.summary.cashFlowFieldCount ?? 0} 个</SemanticBadge>
-                <SemanticBadge tone="neutral">科目余额 {preview.summary.accountBalanceRowCount ?? 0} 行</SemanticBadge>
-                <SemanticBadge tone="neutral">明细账 {preview.summary.generalLedgerRowCount ?? 0} 行</SemanticBadge>
+                <SemanticBadge tone="neutral">
+                  报表字段{" "}
+                  {(preview.summary.balanceSheetFieldCount ?? 0) +
+                    (preview.summary.incomeStatementFieldCount ?? 0)}{" "}
+                  个
+                </SemanticBadge>
+                <SemanticBadge tone="neutral">
+                  现金流字段 {preview.summary.cashFlowFieldCount ?? 0} 个
+                </SemanticBadge>
+                <SemanticBadge tone="neutral">
+                  科目余额 {preview.summary.accountBalanceRowCount ?? 0} 行
+                </SemanticBadge>
+                <SemanticBadge tone="neutral">
+                  明细账 {preview.summary.generalLedgerRowCount ?? 0} 行
+                </SemanticBadge>
               </div>
 
-              {preview.summary.accountingEquationDifference === 0
-                && preview.summary.trialBalanceChecks?.periodDifference === 0
-                && preview.summary.trialBalanceChecks?.endingDifference === 0 && (
-                <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  资产负债表与科目余额表借贷平衡校验通过
-                </div>
-              )}
+              {preview.summary.accountingEquationDifference === 0 &&
+                preview.summary.trialBalanceChecks?.periodDifference === 0 &&
+                preview.summary.trialBalanceChecks?.endingDifference === 0 && (
+                  <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    资产负债表与科目余额表借贷平衡校验通过
+                  </div>
+                )}
 
               {preview.blockers.map((message) => (
                 <Alert key={message} variant="destructive">
@@ -236,8 +296,13 @@ export function FinancialStatementsUploadDialog({
               ))}
 
               {preview.warnings.map((message) => (
-                <div key={message} className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                  <SemanticBadge tone="warning" className="mt-0.5 shrink-0">复核</SemanticBadge>
+                <div
+                  key={message}
+                  className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                >
+                  <SemanticBadge tone="warning" className="mt-0.5 shrink-0">
+                    复核
+                  </SemanticBadge>
                   <span>{message}</span>
                 </div>
               ))}
@@ -247,10 +312,16 @@ export function FinancialStatementsUploadDialog({
                   <Checkbox
                     id="confirm-overwrite-period"
                     checked={overwriteConfirmed}
-                    onCheckedChange={(checked) => onOverwriteConfirmedChange(checked === true)}
+                    onCheckedChange={(checked) =>
+                      onOverwriteConfirmedChange(checked === true)
+                    }
                   />
-                  <Label htmlFor="confirm-overwrite-period" className="cursor-pointer leading-5">
-                    确认覆盖 {preview.period.periodLabel}；该账期的报表、科目余额、明细账和来源校验将整体更新
+                  <Label
+                    htmlFor="confirm-overwrite-period"
+                    className="cursor-pointer leading-5"
+                  >
+                    确认覆盖 {preview.period.periodLabel}
+                    ；该账期的报表、科目余额、明细账和来源校验将整体更新
                   </Label>
                 </div>
               )}
@@ -259,23 +330,49 @@ export function FinancialStatementsUploadDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={busy}
+          >
             取消
           </Button>
           {!preview ? (
-            <Button type="button" onClick={onPreview} disabled={!hasAllFiles || busy}>
-              {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />}
-              {previewing ? '解析中...' : '解析三份文件'}
+            <Button
+              type="button"
+              onClick={onPreview}
+              disabled={!hasAllFiles || busy}
+            >
+              {previewing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileCheck2 className="h-4 w-4" />
+              )}
+              {previewing ? "解析中..." : "解析三份文件"}
             </Button>
           ) : (
             <>
-              <Button type="button" variant="outline" onClick={onPreview} disabled={!hasAllFiles || busy}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onPreview}
+                disabled={!hasAllFiles || busy}
+              >
                 <RefreshCw className="h-4 w-4" />
                 重新解析
               </Button>
-              <Button type="button" onClick={onConfirm} disabled={confirmDisabled}>
-                {confirming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                {confirming ? '写入中...' : '确认写入账期'}
+              <Button
+                type="button"
+                onClick={onConfirm}
+                disabled={confirmDisabled}
+              >
+                {confirming ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {confirming ? "写入中..." : "确认写入账期"}
               </Button>
             </>
           )}

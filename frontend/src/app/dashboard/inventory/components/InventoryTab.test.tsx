@@ -49,6 +49,44 @@ it("库存后端总数与实际页码一致，第二页继续请求服务端", a
   expect(screen.getByText(/第 2\/16 页/)).toBeInTheDocument();
 });
 
+it("数量列只显示数量和有效单位，纯数字单位不冒充第二个数字；包装中为警示色而非红色", async () => {
+  const row = (
+    id: string,
+    quantity: number,
+    unit: string,
+    status: InventoryStatus,
+  ) => ({
+    id,
+    productId: `p-${id}`,
+    product: { customsName: `商品${id}`, unit },
+    quantity,
+    status,
+    createdAt: "2026-10-01",
+    updatedAt: "2026-10-01",
+  });
+  getAll.mockResolvedValueOnce({
+    data: {
+      items: [
+        row("a", 40, "41.0", InventoryStatus.PACKING),
+        row("b", 6, "件", InventoryStatus.SHIPPING),
+      ] as unknown as Inventory[],
+      pagination: { total: 2, totalPages: 1 },
+    },
+  });
+  render(<InventoryTab />);
+  expect((await screen.findAllByText("40")).length).toBeGreaterThan(0);
+  expect(screen.getAllByText("6 件").length).toBeGreaterThan(0);
+  expect(screen.queryByText(/41\.0/)).not.toBeInTheDocument();
+  const badges = screen
+    .getAllByText("包装中")
+    .filter((el) => el.className.includes("border-"));
+  expect(badges.length).toBeGreaterThan(0);
+  for (const badge of badges) {
+    expect(badge.className).toContain("amber");
+    expect(badge.className).not.toContain("bg-destructive/10");
+  }
+});
+
 it("采购来源库存不再要求手工设置入库/出库", async () => {
   getAll.mockResolvedValueOnce({
     data: {

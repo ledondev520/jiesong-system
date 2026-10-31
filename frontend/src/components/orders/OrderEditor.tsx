@@ -14,7 +14,7 @@ import { ProductPicker } from "@/components/orders/ProductPicker";
 import { PasteRowsDialog } from "@/components/orders/PasteRowsDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SemanticBadge } from "@/components/ui/semantic-badge";
+import { SemanticBadge } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { describeFailure } from "@/lib/error-reason";

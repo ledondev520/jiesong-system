@@ -229,7 +229,7 @@ const appendContextLines = (context, byName, salesKeyword) => {
       const itemDetails = contract.items?.map((item) =>
         `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, 售价$${item.sellingPrice}, 门店:${item.store?.name || '未知'})`
       ).join(', ') || '无商品明细';
-      context.push(`【销售合同${contract.contractNo}】状态:${contract.status}, 金额:$${contract.totalAmount}, 已收:$${contract.receivedAmount}\\n  商品明细: ${itemDetails}\\n  链接: /dashboard/contracts?tab=sales`);
+      context.push(`【销售合同${contract.contractNo}】状态:${contract.status}, 金额:$${contract.totalAmount}, 已收:$${contract.receivedAmount}\\n  商品明细: ${itemDetails}\\n  链接: /dashboard/orders`);
     });
   } else if (salesKeyword && exactSales && Array.isArray(exactSales[1])) {
     const fuzzyResult = Object.entries(byName).find(([name]) => name.startsWith('sales:fuzzy:'));
@@ -264,7 +264,7 @@ const appendContextLines = (context, byName, salesKeyword) => {
         const itemDetails = contract.packingItems?.map((item) =>
           `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, ${item.boxes || 0}箱)`
         ).join(', ') || '暂无装箱记录';
-        context.push(`【货柜${contract.contractNo}】港口:${contract.port?.name || '未知'}, 状态:${contract.status}, 总箱数:${contract.totalBoxes}, 体积:${contract.volume}CBM\\n  装箱明细: ${itemDetails}\\n  链接: /dashboard/inventory-container?tab=container`);
+        context.push(`【货柜${contract.contractNo}】港口:${contract.port?.name || '未知'}, 状态:${contract.status}, 总箱数:${contract.totalBoxes}, 体积:${contract.volume}CBM\\n  装箱明细: ${itemDetails}\\n  链接: /dashboard/inventory`);
       });
     }
 

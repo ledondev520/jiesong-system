@@ -80,9 +80,6 @@ export const listUrlFields = {
       resetPage: true,
     },
   },
-  productTabs: {
-    tab: { default: "products", values: ["products", "inventory"] },
-  },
 } as const satisfies Record<string, Fields>;
 
 function readField(value: string | null, field: Field) {
