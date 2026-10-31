@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { RegistrationReceiptPanel } from "@/components/auth/RegistrationReceiptPanel";
 import {
   clearRegistrationReceipt,
@@ -21,7 +22,11 @@ import {
   useRegistrationReceipt,
 } from "@/lib/registration-receipt";
 import { authService } from "@/services/auth.service";
-import { isValidPassword, PASSWORD_MESSAGE } from "@/lib/password-policy";
+import {
+  isValidPassword,
+  PASSWORD_HINT,
+  PASSWORD_MESSAGE,
+} from "@/lib/password-policy";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -89,10 +94,12 @@ export default function RegisterPage() {
     }
   };
   return (
-    <div className="auth-shell">
+    <AuthShell>
       <Card className="auth-card">
         <CardHeader>
-          <CardTitle>{done ? "注册申请已提交" : "邮箱注册"}</CardTitle>
+          <CardTitle role="heading" aria-level={1}>
+            {done ? "注册申请已提交" : "邮箱注册"}
+          </CardTitle>
           <CardDescription>
             {done
               ? "邮箱验证和账号申请已完成，请按下面步骤联系管理员开通。"
@@ -179,7 +186,7 @@ export default function RegisterPage() {
                   maxLength={72}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="至少8个字符，最多72字节"
+                  placeholder={PASSWORD_HINT}
                 />
               </div>
               {notice && (
@@ -228,6 +235,6 @@ export default function RegisterPage() {
           )}
         </CardFooter>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

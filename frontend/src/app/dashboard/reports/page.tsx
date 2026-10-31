@@ -337,16 +337,25 @@ function BusinessReportsContent() {
           role="alert"
           className="rounded-md border border-destructive/30 p-3 text-sm text-destructive"
         >
-          毛利待核验，缺少汇率或已售成本。
-          {overview.unavailableContracts.map((contract, index) => (
-            <Link
-              key={contract.id}
-              className="ml-2 underline"
-              href={`/dashboard/sales/${contract.id}?tab=finance`}
-            >
-              核验第{index + 1}笔：{contract.reasons.join("；")}
-            </Link>
-          ))}
+          毛利待核验，缺少汇率或已售成本，共{" "}
+          {overview.unavailableContracts.length} 笔需要处理。
+          <details className="mt-2">
+            <summary className="cursor-pointer underline">
+              查看清单（{overview.unavailableContracts.length} 笔）
+            </summary>
+            <ul className="mt-2 space-y-1">
+              {overview.unavailableContracts.map((contract, index) => (
+                <li key={contract.id}>
+                  <Link
+                    className="underline"
+                    href={`/dashboard/sales/${contract.id}?tab=finance`}
+                  >
+                    核验第{index + 1}笔：{contract.reasons.join("；")}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </details>
         </div>
       )}
       {/* 经营概览 */}
