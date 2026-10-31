@@ -70,7 +70,7 @@ describe("navigation.config helpers", () => {
     );
     expect(hrefs).toMatchObject({
       home: "/dashboard",
-      orders: "/dashboard/sales",
+      orders: "/dashboard/orders",
       purchases: "/dashboard/contracts",
       inventory: "/dashboard/inventory-status",
       documents: "/dashboard/customs-declarations",

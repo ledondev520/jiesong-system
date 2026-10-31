@@ -9,5 +9,5 @@
 import { redirect } from 'next/navigation';
 
 export default function ContainersPage() {
-  redirect('/dashboard/sales');
+  redirect('/dashboard/orders');
 }

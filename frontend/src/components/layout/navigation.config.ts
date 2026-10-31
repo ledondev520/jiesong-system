@@ -107,12 +107,13 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
   },
   {
     key: "orders",
-    href: "/dashboard/sales",
-    defaultHref: "/dashboard/sales",
+    href: "/dashboard/orders",
+    defaultHref: "/dashboard/orders",
     label: "出口订单",
     mobileLabel: "订单",
     icon: PackageOpen,
-    childPrefixes: [],
+    // 详情/新建在 J18/J19 迁到 /orders/* 之前仍在 /dashboard/sales/*
+    childPrefixes: ["/dashboard/sales"],
     children: [],
     group: "business",
     mobilePrimary: true,
