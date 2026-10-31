@@ -11,7 +11,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
-import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
+import { useAuthStore } from "@/store/auth.store";
+import { QUOTE_WRITE_ROLES } from "./quoteRoles";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { QUOTE_STATUSES, QUOTE_STATUS_LABEL, formatUsd } from "@/lib/quote";
 import { quoteService, type Quote } from "@/services/quote.service";
@@ -43,6 +44,8 @@ const dateOnly = (value: string | null | undefined) =>
 
 export function QuoteListPageContent() {
   const router = useRouter();
+  const role = useAuthStore((state) => state.user?.role);
+  const canCreate = !!role && QUOTE_WRITE_ROLES.includes(role);
   const [{ keyword, status, page, pageSize }, setListState] = useListUrlState(
     listUrlFields.quotes,
   );
@@ -123,7 +126,7 @@ export function QuoteListPageContent() {
                 重置
               </Button>
             )}
-            <BusinessWrite>
+            {canCreate && (
               <Button
                 className="h-11 rounded-xl"
                 onClick={() => router.push("/dashboard/quotes/create")}
@@ -131,7 +134,7 @@ export function QuoteListPageContent() {
                 <Plus className="mr-2 h-4 w-4" />
                 新建报价
               </Button>
-            </BusinessWrite>
+            )}
           </>
         }
       />

@@ -46,9 +46,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { QuoteEditor } from "./QuoteEditor";
+import { QUOTE_WRITE_ROLES } from "./quoteRoles";
 import { QuoteStatusBadge } from "./QuoteStatusBadge";
 
-const WRITE_ROLES: Role[] = [Role.ADMIN, Role.SALES];
 const EXPORT_ROLES: Role[] = [
   Role.ADMIN,
   Role.SALES,
@@ -61,7 +61,7 @@ const message = (error: unknown, fallback: string) =>
 export function QuoteDetailPageContent({ id }: { id: string }) {
   const router = useRouter();
   const role = useAuthStore((state) => state.user?.role);
-  const canWrite = !!role && WRITE_ROLES.includes(role);
+  const canWrite = !!role && QUOTE_WRITE_ROLES.includes(role);
   const canExport = !!role && EXPORT_ROLES.includes(role);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);

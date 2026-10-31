@@ -103,6 +103,14 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     childPrefixes: [],
     children: [],
     group: "business",
+    // 与 backend/src/routes/quotes.js 的读取角色一致（WAREHOUSE 无权访问）。
+    visibleRoles: [
+      Role.ADMIN,
+      Role.SALES,
+      Role.PURCHASE,
+      Role.FINANCE,
+      Role.BOSS,
+    ],
   },
   {
     key: "orders",

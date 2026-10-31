@@ -8,11 +8,25 @@
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useAuthStore } from "@/store/auth.store";
 import { quoteService } from "@/services/quote.service";
 import { QuoteEditor } from "../components/QuoteEditor";
+import { QUOTE_WRITE_ROLES } from "../components/quoteRoles";
 
 export default function CreateQuotePage() {
   const router = useRouter();
+  const role = useAuthStore((state) => state.user?.role);
+  if (!role || !QUOTE_WRITE_ROLES.includes(role)) {
+    return (
+      <div className="space-y-6 pb-10">
+        <PageHeader
+          title="新建报价"
+          description="仅管理员和销售可以新建报价。"
+          backHref="/dashboard/quotes"
+        />
+      </div>
+    );
+  }
   return (
     <div className="space-y-6 pb-10">
       <PageHeader

@@ -10,6 +10,7 @@ import { QuoteListPageContent } from "./QuoteListPageContent";
 const mocks = vi.hoisted(() => ({
   router: { push: vi.fn(), replace: vi.fn() },
   getAll: vi.fn(),
+  role: "SALES",
   readOnly: false,
 }));
 vi.mock("next/navigation", () => ({
@@ -25,6 +26,10 @@ vi.mock("@/lib/hooks/useBusinessReadOnly", async (importOriginal) => ({
   useBusinessReadOnly: () => mocks.readOnly,
   BusinessWrite: ({ children }: { children: React.ReactNode }) =>
     mocks.readOnly ? null : children,
+}));
+vi.mock("@/store/auth.store", () => ({
+  useAuthStore: (selector: (s: { user: { role: string } }) => unknown) =>
+    selector({ user: { role: mocks.role } }),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -45,6 +50,7 @@ describe("quote list", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.readOnly = false;
+    mocks.role = "SALES";
     window.history.replaceState({}, "", "/dashboard/quotes");
     mocks.getAll.mockResolvedValue({
       data: {
@@ -113,10 +119,20 @@ describe("quote list", () => {
     expect(mocks.router.push).toHaveBeenCalledWith("/dashboard/quotes/create");
   });
 
-  it("BOSS (read-only) sees no 新建报价", async () => {
-    mocks.readOnly = true;
+  it.each(["BOSS", "PURCHASE", "FINANCE"])(
+    "%s sees the list but no 新建报价 (create is ADMIN/SALES only)",
+    async (role) => {
+      mocks.role = role;
+      render(<QuoteListPageContent />);
+      await screen.findAllByText("QT2610-001");
+      expect(screen.queryByText("新建报价")).toBeNull();
+    },
+  );
+
+  it("ADMIN sees 新建报价", async () => {
+    mocks.role = "ADMIN";
     render(<QuoteListPageContent />);
     await screen.findAllByText("QT2610-001");
-    expect(screen.queryByText("新建报价")).toBeNull();
+    expect(screen.getByText("新建报价")).toBeTruthy();
   });
 });
