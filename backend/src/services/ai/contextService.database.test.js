@@ -16,7 +16,8 @@ function loadContext(db) {
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(require.resolve('./contextService'), 'utf8'), {
     module, exports: module.exports, console: { error() {} },
-    require: () => db,
+    // 应付汇总是共享的纯口径模块，其余依赖仍由桩/真实库替代。
+    require: (name) => (name === '../payablesService' ? require('../payablesService') : db),
   });
   return module.exports;
 }
@@ -24,7 +25,7 @@ function loadContext(db) {
 const stubDb = () => ({
   product: { count: async () => 1 },
   supplier: { count: async () => 1 },
-  purchaseContract: { count: async () => 1, aggregate: async () => ({ _sum: { totalAmount: 100, paidAmount: 20 } }) },
+  purchaseContract: { count: async () => 1, findMany: async () => [{ id: 'p1', status: 'SIGNED', totalAmount: 100, paidAmount: 20 }, { id: 'p2', status: 'DRAFT', totalAmount: 500, paidAmount: 0 }] },
   salesContract: { count: async () => 1, findMany: async () => [], aggregate: async () => ({ _sum: { totalAmount: 200, receivedAmount: 50 } }) },
   systemConfig: { findUnique: async () => ({ value: '{"rate":7,"buffer":0}' }) },
 });
@@ -77,6 +78,11 @@ test('统计查询失败不阻断已成功的业务查询', async () => {
   const context = await loadContext(db).getDbContext('最近销售合同');
   assert.match(context, /EXP123/);
   assert.match(context, /暂时无法读取/);
+});
+
+test('AI 财务概况应付只含已生效合同，草稿不计', async () => {
+  const context = await loadContext(stubDb()).getDbContext('价格和应收应付');
+  assert.match(context, /应付总额¥100, 已付¥20, 待付¥80/);
 });
 
 test('字符串JSON汇率解析后继续展示财务概况，保留零缓冲', async () => {

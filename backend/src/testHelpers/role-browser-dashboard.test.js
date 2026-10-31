@@ -108,7 +108,7 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
   await t.test('KPI and funds use draft-only, all inventory records and formal/derived ownership sources', async () => {
     // Independent SQL source literals establish the worked example, never an API echo.
     assert.deepEqual(before.purchase_contracts.map(row => [row.status, row.totalAmount, row.paidAmount]).sort(),
-      [['DRAFT', 1130, 130], ['DRAFT', 200, 50], ['PENDING', 300, 100], ['CANCELLED', 900, 100], ['COMPLETED', 100, 100]].sort());
+      [['DRAFT', 1130, 130], ['DRAFT', 200, 50], ['SIGNED', 300, 100], ['CANCELLED', 900, 100], ['COMPLETED', 100, 100]].sort());
     assert.deepEqual(before.inventories.map(row => [row.status, row.quantity]).sort(),
       [['IN_STOCK', 8], ['OUT_STOCK', 4], ['PRODUCING', 20]].sort());
     assert.equal(before.sales_contracts.find(row => row.id === 'dashboard-old-risk').amountSource, 'DERIVED');
@@ -121,8 +121,8 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       assert.equal(data.inventory.totalQuantity, 32);
       // Derived: owned 700, proportional received 175 => 525. Formal: 400-100 => 300.
       assert.equal(data.contracts.sales.receivable, 825);
-      // Non-cancelled purchases: 1000 + 150 + 200 CNY; pending is not a draft KPI.
-      assert.equal(data.contracts.purchase.unpaidAmount, 1350);
+      // Payables count only in-effect contracts (decision 12): drafts and cancelled excluded; SIGNED 300-100 = 200, COMPLETED 0.
+      assert.equal(data.contracts.purchase.unpaidAmount, 200);
       const periods = await read('/finance/statements', role);
       // The API lists periods ascending; the mounted workbench must choose max year/month, not its first row.
       assert.deepEqual(periods.map(row => [row.year, row.month, row.periodLabel]),

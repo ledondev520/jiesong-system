@@ -4,6 +4,7 @@
  * Pos: AI上下文聚合；独立查询失败不抹去其他已读取资料
  */
 const prisma = require('../../utils/prisma');
+const { getPayablesSummary } = require('../payablesService');
 
 const STOP_WORDS = ['是什么', '在哪', '多少', '有没有', '能不能', '怎么', '哪里', '哪个', '什么', '请', '帮我', '查询', '查一下', '找', '看看'];
 
@@ -157,10 +158,7 @@ const buildContextQueries = (message) => {
   if (shouldSearchFinance) {
     addQuery(tasks, 'finance', () =>
       safe(Promise.all([
-        prisma.purchaseContract.aggregate({
-          where: { NOT: { status: 'CANCELLED' } },
-          _sum: { totalAmount: true, paidAmount: true },
-        }),
+        getPayablesSummary(prisma),
         prisma.salesContract.aggregate({
           where: { NOT: { status: 'CANCELLED' } },
           _sum: { totalAmount: true, receivedAmount: true },
@@ -293,11 +291,12 @@ const appendContextLines = (context, byName, salesKeyword) => {
 
   if (Array.isArray(byName.finance) && byName.finance.length === 2) {
     const [payableStats, receivableStats] = byName.finance;
-    const payableTotal = payableStats?._sum?.totalAmount || 0;
-    const paidTotal = payableStats?._sum?.paidAmount || 0;
+    const payableTotal = payableStats?.total || 0;
+    const paidTotal = payableStats?.paid || 0;
+    const unpaidTotal = payableStats?.unpaid || 0;
     const receivableTotal = receivableStats?._sum?.totalAmount || 0;
     const receivedTotal = receivableStats?._sum?.receivedAmount || 0;
-    context.push(`【财务概况】应付总额¥${payableTotal}, 已付¥${paidTotal}, 待付¥${payableTotal - paidTotal}; 应收总额$${receivableTotal}, 已收$${receivedTotal}, 待收$${receivableTotal - receivedTotal}`);
+    context.push(`【财务概况】应付总额¥${payableTotal}, 已付¥${paidTotal}, 待付¥${unpaidTotal}（仅统计已生效合同，草稿不计）; 应收总额$${receivableTotal}, 已收$${receivedTotal}, 待收$${receivableTotal - receivedTotal}`);
   }
 };
 

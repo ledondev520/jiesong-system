@@ -14,6 +14,7 @@ const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
 const { getExportReadiness } = require('./exportReadinessService');
+const { outstandingOf } = require('./payablesService');
 
 const DEFAULT_LOGO_PATH = path.join(__dirname, '../../assets/pdf-logo.png');
 const DEFAULT_STAMP_PATH = path.join(__dirname, '../../assets/pdf-stamp.png');
@@ -414,7 +415,7 @@ const exportSystemDataRows = async (type, query = {}) => {
           item.supplier?.name || '',
           formatMoney(item.totalAmount),
           formatMoney(item.paidAmount),
-          formatMoney((item.totalAmount || 0) - (item.paidAmount || 0)),
+          formatMoney(outstandingOf(item)),
           item.status || '',
           item.signedAt ? formatDate(item.signedAt) : '',
           item.expectedDate ? formatDate(item.expectedDate) : '',
