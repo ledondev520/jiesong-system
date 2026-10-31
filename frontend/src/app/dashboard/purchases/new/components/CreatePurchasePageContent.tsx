@@ -17,15 +17,7 @@ import { invalidateCache } from "@/lib/api-cache";
 import { ErrorState } from "@/components/ui/data-state";
 import { Product, Supplier, PurchaseContract } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import {
   Select,
   SelectContent,
@@ -33,50 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { DatePicker } from "@/components/ui/date-picker";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Badge } from "@/components/ui/badge";
-import {
-  Wand2,
-  Plus,
-  Trash,
-  Loader2,
-  UserPlus,
-  Check,
-  ChevronsUpDown,
-  Star,
-  Save,
-  FileText,
-  Search,
-  Package,
-  ArrowRight,
-  ArrowLeft,
-} from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Save, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import {
   ParsedQuoteItem,
   PurchaseCreatePayload,
@@ -91,24 +42,18 @@ import { productService } from "@/services/product.service";
 import { contractTemplateService } from "@/services/contractTemplate.service";
 import { ContractTemplate } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { PriceGuard } from "@/components/purchase/PriceGuard";
-import { SupplierPriceComparePopover } from "@/components/purchase/SupplierPriceComparison";
 import {
   emptyNewSupplier,
-  PriceSummary,
   purchaseSchema,
   StepIndicator,
   type PurchaseFormValues,
   type RecommendedSupplier,
 } from "./purchaseFormParts";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { PurchaseItemsStep } from "./PurchaseItemsStep";
+import { PurchaseContractStep } from "./PurchaseContractStep";
+import { BatchProductDialog } from "./BatchProductDialog";
+import { NewSupplierDialog } from "./NewSupplierDialog";
+import { SaveTemplateDialog } from "./SaveTemplateDialog";
 
 export default function CreatePurchasePage() {
   const router = useRouter();
@@ -793,677 +738,49 @@ export default function CreatePurchasePage() {
           >
             {currentStep === 1 && (
               <>
-                {/* AI 智能录入 */}
-                <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                      <Wand2 className="h-4 w-4 text-primary" />
-                      AI 智能录入
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="purchase-ai-quote-input">
-                        采购报价原文
-                      </Label>
-                      <Textarea
-                        id="purchase-ai-quote-input"
-                        name="quoteText"
-                        placeholder="粘贴供应商报价信息 (如：'订购100平方米瓷砖，单价45元，供应商佛山陶瓷...')"
-                        value={parseText}
-                        onChange={(e) => setParseText(e.target.value)}
-                        className="min-h-[100px] rounded-md"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={handleParse}
-                      disabled={isParsing || !parseText}
-                      variant="default"
-                      className="h-9 rounded-md text-xs shadow-sm"
-                    >
-                      {isParsing ? "解析中..." : "解析报价"}
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* 采购明细 */}
-                <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
-                  <CardHeader className="flex flex-row items-center justify-between pb-3">
-                    <div>
-                      <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                        <Package className="h-4 w-4" />
-                        采购明细
-                      </CardTitle>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        先选择商品，系统会推荐供应商
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 rounded-md text-xs"
-                        onClick={() => setShowBatchSelector(true)}
-                      >
-                        <Plus className="mr-1 h-3.5 w-3.5" />
-                        批量添加
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* 价格汇总 */}
-                    <PriceSummary
-                      subtotal={totalAmount}
-                      taxRate={watchTaxRate}
-                    />
-
-                    {fields.map((field, index) => (
-                      <div
-                        key={field.id}
-                        className="grid gap-3 rounded-lg border border-border/40 bg-card p-4 md:grid-cols-12 md:items-end"
-                      >
-                        <div className="md:col-span-4">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.productId`}
-                            render={({ field }) => {
-                              return (
-                                <FormItem>
-                                  <FormLabel className="text-xs">
-                                    商品{" "}
-                                    <span className="text-destructive">*</span>
-                                  </FormLabel>
-                                  <Select
-                                    onValueChange={field.onChange}
-                                    value={field.value}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger className="h-9 rounded-md text-xs">
-                                        <SelectValue placeholder="选择商品" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      {products.map((p) => (
-                                        <SelectItem key={p.id} value={p.id}>
-                                          {p.customsName}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.quantity`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">
-                                  数量{" "}
-                                  <span className="text-destructive">*</span>
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    className="h-9 rounded-md text-xs"
-                                    {...field}
-                                    onChange={(e) =>
-                                      field.onChange(
-                                        parseFloat(e.target.value) || 0,
-                                      )
-                                    }
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.unit`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">单位</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    className="h-9 rounded-md text-xs"
-                                    {...field}
-                                    placeholder="件/箱/平米"
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.unitPrice`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">
-                                  单价 (¥){" "}
-                                  <span className="text-destructive">*</span>
-                                </FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    className="h-9 rounded-md text-xs"
-                                    {...field}
-                                    onChange={(e) =>
-                                      field.onChange(
-                                        parseFloat(e.target.value) || 0,
-                                      )
-                                    }
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                                {/* 智能比价红绿灯：与历史成交价对比 */}
-                                {watchItems[index]?.productId && (
-                                  <PriceGuard
-                                    productId={watchItems[index].productId}
-                                    currentPrice={
-                                      watchItems[index]?.unitPrice || 0
-                                    }
-                                    supplierId={form.watch("supplierId")}
-                                  />
-                                )}
-                                {/* 供应商比价：「用此供应商」同时填入供应商与不含税单价 */}
-                                {watchItems[index]?.productId && (
-                                  <SupplierPriceComparePopover
-                                    rows={supplierRows(watchItems[index])}
-                                    currentSupplierId={watchSupplierId}
-                                    onPick={(row) => pickSupplier(index, row)}
-                                  />
-                                )}
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="md:col-span-1 text-right">
-                          <p className="text-[11px] text-muted-foreground">
-                            小计
-                          </p>
-                          <p className="font-mono text-sm font-semibold tabular-nums text-emerald-600">
-                            ¥
-                            {(
-                              (watchItems[index]?.quantity || 0) *
-                              (watchItems[index]?.unitPrice || 0)
-                            ).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="md:col-span-1 flex justify-end">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-md"
-                            onClick={() => remove(index)}
-                            disabled={fields.length <= 1}
-                          >
-                            <Trash className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-
-                        {/* 价格历史对比与预警备注 */}
-                        {(() => {
-                          const item = watchItems[index];
-                          const history = item?.productId
-                            ? priceHistoryMap[item.productId]
-                            : null;
-                          const showHistory = history && history.count > 0;
-                          const isHighPrice =
-                            showHistory &&
-                            history.averagePrice !== null &&
-                            item.unitPrice > history.averagePrice * 1.1;
-                          if (!showHistory) return null;
-                          return (
-                            <div className="md:col-span-12">
-                              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                <span>
-                                  历史采购（不含税）：均价 ¥
-                                  {history.averagePrice} / 最低 ¥
-                                  {history.minPrice} / 最高 ¥{history.maxPrice}
-                                  （共 {history.count} 笔）
-                                </span>
-                              </div>
-                              {isHighPrice && (
-                                <div className="mt-2 space-y-2">
-                                  <p className="text-xs font-medium text-destructive">
-                                    当前价格高于历史均价{" "}
-                                    {(
-                                      ((item.unitPrice -
-                                        history.averagePrice!) /
-                                        history.averagePrice!) *
-                                      100
-                                    ).toFixed(1)}
-                                    %，请说明原因
-                                  </p>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.priceNote`}
-                                    render={({ field }) => (
-                                      <FormItem>
-                                        <FormControl>
-                                          <Input
-                                            {...field}
-                                            placeholder="请填写价格偏高原因（必填）"
-                                            className="h-8 rounded-md border-destructive text-xs focus-visible:ring-destructive"
-                                          />
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                    )}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-9 rounded-md text-xs"
-                      onClick={() =>
-                        append({
-                          productId: "",
-                          quantity: 0,
-                          unitPrice: 0,
-                          unit: "",
-                          note: "",
-                          priceNote: "",
-                        })
-                      }
-                    >
-                      <Plus className="mr-1.5 h-3.5 w-3.5" /> 添加商品
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <div className="flex justify-end gap-3 md:col-span-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-10 rounded-md text-sm"
-                    onClick={() => router.back()}
-                  >
-                    取消
-                  </Button>
-                  <Button
-                    type="button"
-                    className="h-10 rounded-md text-sm"
-                    onClick={goToStep2}
-                  >
-                    下一步：合同信息
-                    <ArrowRight className="ml-1.5 h-4 w-4" />
-                  </Button>
-                </div>
+                <PurchaseItemsStep
+                  form={form}
+                  router={router}
+                  fields={fields}
+                  append={append}
+                  remove={remove}
+                  products={products}
+                  parseText={parseText}
+                  setParseText={setParseText}
+                  isParsing={isParsing}
+                  handleParse={handleParse}
+                  setShowBatchSelector={setShowBatchSelector}
+                  priceHistoryMap={priceHistoryMap}
+                  supplierRows={supplierRows}
+                  pickSupplier={pickSupplier}
+                  watchItems={watchItems}
+                  watchSupplierId={watchSupplierId}
+                  watchTaxRate={watchTaxRate}
+                  totalAmount={totalAmount}
+                  goToStep2={goToStep2}
+                />
               </>
             )}
 
             {currentStep === 2 && (
               <>
-                {/* 合同详情 */}
-                <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)] md:col-span-2">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">
-                      合同信息
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid gap-5 md:grid-cols-3">
-                    {/* 合同编号 */}
-                    <FormField
-                      control={form.control}
-                      name="contractNo"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">合同编号</FormLabel>
-                          <FormControl>
-                            {contractNoLoading ? (
-                              <div className="flex h-10 items-center gap-2 rounded-md border border-border/60 bg-muted px-3 text-xs text-muted-foreground">
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                生成中...
-                              </div>
-                            ) : (
-                              <Input
-                                {...field}
-                                disabled
-                                className="h-10 rounded-md font-mono text-xs"
-                              />
-                            )}
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* 供应商 Combobox */}
-                    <FormField
-                      control={form.control}
-                      name="supplierId"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <div className="flex items-center justify-between">
-                            <FormLabel className="text-xs">
-                              供应商 <span className="text-destructive">*</span>
-                            </FormLabel>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 text-xs"
-                              disabled={dataLoading || loadError}
-                              onClick={() => changeSupplierDialog(true)}
-                            >
-                              <UserPlus className="mr-1 h-3 w-3" />
-                              新增
-                            </Button>
-                          </div>
-                          <Popover
-                            open={supplierOpen}
-                            onOpenChange={setSupplierOpen}
-                          >
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  disabled={dataLoading || loadError}
-                                  aria-expanded={supplierOpen}
-                                  className={cn(
-                                    "h-10 justify-between rounded-md text-xs font-normal",
-                                    !field.value && "text-muted-foreground",
-                                  )}
-                                >
-                                  {selectedSupplier
-                                    ? selectedSupplier.name
-                                    : "搜索或选择供应商..."}
-                                  <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-[400px] max-w-[calc(100vw-2rem)] p-0"
-                              align="start"
-                            >
-                              <Command shouldFilter={false}>
-                                <Label
-                                  htmlFor="purchase-supplier-search"
-                                  className="sr-only"
-                                >
-                                  搜索供应商
-                                </Label>
-                                <CommandInput
-                                  id="purchase-supplier-search"
-                                  name="supplierSearch"
-                                  aria-label="搜索供应商"
-                                  placeholder="输入供应商名称搜索..."
-                                  value={supplierSearch}
-                                  onValueChange={setSupplierSearch}
-                                />
-                                <CommandList>
-                                  <CommandEmpty>
-                                    <div className="py-2">
-                                      <p className="text-muted-foreground">
-                                        未找到匹配供应商
-                                      </p>
-                                      <Button
-                                        type="button"
-                                        variant="link"
-                                        size="sm"
-                                        disabled={dataLoading || loadError}
-                                        onClick={() => {
-                                          changeSupplierDialog(
-                                            true,
-                                            supplierSearch,
-                                          );
-                                          setSupplierOpen(false);
-                                        }}
-                                      >
-                                        {`+ 新增 "${supplierSearch}"`}
-                                      </Button>
-                                    </div>
-                                  </CommandEmpty>
-                                  {recommendedSupplierIds.size > 0 &&
-                                    sortedSuppliers.some(
-                                      (s) => s.isRecommended,
-                                    ) && (
-                                      <CommandGroup heading="推荐供应商">
-                                        {sortedSuppliers
-                                          .filter((s) => s.isRecommended)
-                                          .map((s) => (
-                                            <CommandItem
-                                              key={s.id}
-                                              value={s.id}
-                                              disabled={
-                                                dataLoading || loadError
-                                              }
-                                              onSelect={() => {
-                                                field.onChange(s.id);
-                                                setSupplierOpen(false);
-                                                setSupplierSearch("");
-                                              }}
-                                            >
-                                              <Check
-                                                className={cn(
-                                                  "mr-2 h-4 w-4",
-                                                  field.value === s.id
-                                                    ? "opacity-100"
-                                                    : "opacity-0",
-                                                )}
-                                              />
-                                              <Star className="mr-1 h-3 w-3 text-primary" />
-                                              <span>{s.name}</span>
-                                              {s.contactName && (
-                                                <span className="ml-2 text-xs text-muted-foreground">
-                                                  ({s.contactName})
-                                                </span>
-                                              )}
-                                              <Badge
-                                                variant="secondary"
-                                                className="ml-auto text-xs"
-                                              >
-                                                曾供应
-                                              </Badge>
-                                            </CommandItem>
-                                          ))}
-                                      </CommandGroup>
-                                    )}
-                                  <CommandGroup
-                                    heading={
-                                      recommendedSupplierIds.size > 0
-                                        ? "全部供应商"
-                                        : "供应商列表"
-                                    }
-                                  >
-                                    {sortedSuppliers
-                                      .filter((s) => !s.isRecommended)
-                                      .map((s) => (
-                                        <CommandItem
-                                          key={s.id}
-                                          value={s.id}
-                                          disabled={dataLoading || loadError}
-                                          onSelect={() => {
-                                            field.onChange(s.id);
-                                            setSupplierOpen(false);
-                                            setSupplierSearch("");
-                                          }}
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              field.value === s.id
-                                                ? "opacity-100"
-                                                : "opacity-0",
-                                            )}
-                                          />
-                                          <span>{s.name}</span>
-                                          {s.contactName && (
-                                            <span className="ml-2 text-xs text-muted-foreground">
-                                              ({s.contactName})
-                                            </span>
-                                          )}
-                                        </CommandItem>
-                                      ))}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* 签订日期 */}
-                    <FormField
-                      control={form.control}
-                      name="signedAt"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <Label
-                            htmlFor="purchase-signed-at"
-                            className="mb-1.5 text-xs"
-                          >
-                            签订日期
-                          </Label>
-                          <DatePicker
-                            date={field.value}
-                            setDate={field.onChange}
-                            triggerProps={{
-                              id: "purchase-signed-at",
-                              name: "signedAt",
-                            }}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="expectedDate"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <Label
-                            htmlFor="purchase-expected-date"
-                            className="mb-1.5 text-xs"
-                          >
-                            预计交期
-                          </Label>
-                          <DatePicker
-                            date={field.value}
-                            setDate={field.onChange}
-                            triggerProps={{
-                              id: "purchase-expected-date",
-                              name: "expectedDate",
-                            }}
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* 税率 */}
-                    <FormField
-                      control={form.control}
-                      name="taxRate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">
-                            税率 (%) <span className="text-destructive">*</span>
-                          </FormLabel>
-                          <Select
-                            onValueChange={(val) => field.onChange(Number(val))}
-                            defaultValue={String(field.value)}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-10 rounded-md text-xs">
-                                <SelectValue placeholder="选择税率" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="1">
-                                1% (小规模纳税人)
-                              </SelectItem>
-                              <SelectItem value="13">
-                                13% (一般纳税人)
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* 备注 */}
-                    <div className="md:col-span-3">
-                      <FormField
-                        control={form.control}
-                        name="note"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-xs">备注</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                {...field}
-                                placeholder="填写合同备注信息（可选）"
-                                className="min-h-[80px] rounded-md"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* 提交按钮 */}
-                <div className="flex justify-end gap-3 md:col-span-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-10 rounded-md text-sm"
-                    onClick={goToStep1}
-                  >
-                    <ArrowLeft className="mr-1.5 h-4 w-4" />
-                    上一步
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-10 rounded-md text-sm"
-                    onClick={() => router.back()}
-                  >
-                    取消
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="h-10 rounded-md text-sm"
-                    disabled={
-                      form.formState.isSubmitting || dataLoading || loadError
-                    }
-                  >
-                    {form.formState.isSubmitting
-                      ? "提交中..."
-                      : editId
-                        ? "保存更正"
-                        : "创建合同"}
-                  </Button>
-                </div>
+                <PurchaseContractStep
+                  form={form}
+                  editId={editId}
+                  router={router}
+                  dataLoading={dataLoading}
+                  loadError={loadError}
+                  contractNoLoading={contractNoLoading}
+                  goToStep1={goToStep1}
+                  supplierOpen={supplierOpen}
+                  setSupplierOpen={setSupplierOpen}
+                  supplierSearch={supplierSearch}
+                  setSupplierSearch={setSupplierSearch}
+                  sortedSuppliers={sortedSuppliers}
+                  recommendedSupplierIds={recommendedSupplierIds}
+                  selectedSupplier={selectedSupplier}
+                  changeSupplierDialog={changeSupplierDialog}
+                />
               </>
             )}
           </form>
@@ -1471,372 +788,38 @@ export default function CreatePurchasePage() {
       </div>
 
       {/* 批量商品选择器弹窗 */}
-      <Dialog open={showBatchSelector} onOpenChange={setShowBatchSelector}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-sm font-medium">
-              <Package className="h-4 w-4" />
-              批量添加商品
-            </DialogTitle>
-            <DialogDescription>
-              选择本次购销合同要采购的一个或多个商品。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="搜索商品名称..."
-                value={batchSearch}
-                onChange={(e) => setBatchSearch(e.target.value)}
-                className="h-9 rounded-md pl-9 text-xs"
-              />
-            </div>
-            <div className="max-h-[320px] overflow-y-auto rounded-md border border-border/40">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="w-10 text-center">
-                      <input
-                        id="batch-select-all"
-                        type="checkbox"
-                        className="h-3.5 w-3.5 rounded border-border"
-                        checked={
-                          filteredBatchProducts.length > 0 &&
-                          filteredBatchProducts.every((p) =>
-                            selectedProductIds.has(p.id),
-                          )
-                        }
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProductIds(
-                              new Set(filteredBatchProducts.map((p) => p.id)),
-                            );
-                          } else {
-                            setSelectedProductIds(new Set());
-                          }
-                        }}
-                      />
-                    </TableHead>
-                    <TableHead className="text-xs">商品名称</TableHead>
-                    <TableHead className="text-xs">规格</TableHead>
-                    <TableHead className="text-xs">单位</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBatchProducts.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="py-6 text-center text-xs text-muted-foreground"
-                      >
-                        未找到匹配商品
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredBatchProducts.map((product) => (
-                      <TableRow
-                        key={product.id}
-                        className="cursor-pointer"
-                        onClick={() => {
-                          const next = new Set(selectedProductIds);
-                          if (next.has(product.id)) {
-                            next.delete(product.id);
-                          } else {
-                            next.add(product.id);
-                          }
-                          setSelectedProductIds(next);
-                        }}
-                      >
-                        <TableCell className="text-center">
-                          <input
-                            id={`batch-product-${product.id}`}
-                            type="checkbox"
-                            className="h-3.5 w-3.5 rounded border-border"
-                            checked={selectedProductIds.has(product.id)}
-                            onChange={() => {}}
-                          />
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {product.customsName}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {product.specification || "-"}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {product.unit || "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                已选择 {selectedProductIds.size} 项
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-md text-xs"
-                  onClick={() => {
-                    setSelectedProductIds(new Set());
-                    setShowBatchSelector(false);
-                  }}
-                >
-                  取消
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-8 rounded-md text-xs"
-                  onClick={handleBatchAdd}
-                  disabled={selectedProductIds.size === 0}
-                >
-                  确认添加
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <BatchProductDialog
+        showBatchSelector={showBatchSelector}
+        setShowBatchSelector={setShowBatchSelector}
+        batchSearch={batchSearch}
+        setBatchSearch={setBatchSearch}
+        selectedProductIds={selectedProductIds}
+        setSelectedProductIds={setSelectedProductIds}
+        filteredBatchProducts={filteredBatchProducts}
+        handleBatchAdd={handleBatchAdd}
+      />
 
       {/* 新增供应商弹窗 */}
-      <Dialog open={showNewSupplierDialog} onOpenChange={changeSupplierDialog}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-sm font-medium">
-              <UserPlus className="h-4 w-4" />
-              新增供应商
-            </DialogTitle>
-            <DialogDescription>
-              录入签约、汇款和开票所需的供应商档案。
-            </DialogDescription>
-          </DialogHeader>
-          <fieldset disabled={savingSupplier} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="new-supplier-name">供应商名称 *</Label>
-              <Input
-                id="new-supplier-name"
-                name="name"
-                value={newSupplierForm.name}
-                onChange={(e) =>
-                  setNewSupplierForm((prev) => ({
-                    ...prev,
-                    name: e.target.value,
-                  }))
-                }
-                placeholder="例如：佛山市某某陶瓷有限公司"
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="new-supplier-contact-name">联系人</Label>
-                <Input
-                  id="new-supplier-contact-name"
-                  name="contactName"
-                  value={newSupplierForm.contactName}
-                  onChange={(e) =>
-                    setNewSupplierForm((prev) => ({
-                      ...prev,
-                      contactName: e.target.value,
-                    }))
-                  }
-                  placeholder="例如：张经理"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-supplier-contact-phone">联系电话</Label>
-                <Input
-                  id="new-supplier-contact-phone"
-                  name="contactPhone"
-                  value={newSupplierForm.contactPhone}
-                  onChange={(e) =>
-                    setNewSupplierForm((prev) => ({
-                      ...prev,
-                      contactPhone: e.target.value,
-                    }))
-                  }
-                  placeholder="例如：138xxxxxxxx"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-supplier-address">公司地址</Label>
-              <Input
-                id="new-supplier-address"
-                name="address"
-                value={newSupplierForm.address}
-                onChange={(e) =>
-                  setNewSupplierForm((prev) => ({
-                    ...prev,
-                    address: e.target.value,
-                  }))
-                }
-                placeholder="例如：广东省佛山市禅城区xxx"
-              />
-            </div>
-            <div className="border-t pt-4">
-              <p className="mb-3 text-sm font-medium">开票信息（合同用）</p>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="new-supplier-tax-id">纳税人识别号</Label>
-                  <Input
-                    id="new-supplier-tax-id"
-                    name="taxId"
-                    value={newSupplierForm.taxId}
-                    onChange={(e) =>
-                      setNewSupplierForm((prev) => ({
-                        ...prev,
-                        taxId: e.target.value,
-                      }))
-                    }
-                    placeholder="例如：91440000xxxxxxxxxx"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-supplier-bank-account-name">
-                    收款户名
-                  </Label>
-                  <Input
-                    id="new-supplier-bank-account-name"
-                    name="bankAccountName"
-                    value={newSupplierForm.bankAccountName}
-                    onChange={(e) =>
-                      setNewSupplierForm((prev) => ({
-                        ...prev,
-                        bankAccountName: e.target.value,
-                      }))
-                    }
-                    placeholder="供应商银行账户户名"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-supplier-bank-name">开户银行</Label>
-                  <Input
-                    id="new-supplier-bank-name"
-                    name="bankName"
-                    value={newSupplierForm.bankName}
-                    onChange={(e) =>
-                      setNewSupplierForm((prev) => ({
-                        ...prev,
-                        bankName: e.target.value,
-                      }))
-                    }
-                    placeholder="例如：中国银行佛山禅城支行"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-supplier-bank-branch">开户支行</Label>
-                  <Input
-                    id="new-supplier-bank-branch"
-                    name="bankBranch"
-                    value={newSupplierForm.bankBranch}
-                    onChange={(e) =>
-                      setNewSupplierForm((prev) => ({
-                        ...prev,
-                        bankBranch: e.target.value,
-                      }))
-                    }
-                    placeholder="例如：佛山祖庙支行"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-supplier-bank-code">
-                    联行号 / 银行编号
-                  </Label>
-                  <Input
-                    id="new-supplier-bank-code"
-                    name="bankCode"
-                    value={newSupplierForm.bankCode}
-                    onChange={(e) =>
-                      setNewSupplierForm((prev) => ({
-                        ...prev,
-                        bankCode: e.target.value,
-                      }))
-                    }
-                    placeholder="银行联行号或编号"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-supplier-bank-account">银行账号</Label>
-                  <Input
-                    id="new-supplier-bank-account"
-                    name="bankAccount"
-                    value={newSupplierForm.bankAccount}
-                    onChange={(e) =>
-                      setNewSupplierForm((prev) => ({
-                        ...prev,
-                        bankAccount: e.target.value,
-                      }))
-                    }
-                    placeholder="例如：6217xxxxxxxxxxxxxxxx"
-                  />
-                </div>
-              </div>
-            </div>
-          </fieldset>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => changeSupplierDialog(false)}
-            >
-              取消
-            </Button>
-            <Button
-              onClick={handleSaveNewSupplier}
-              disabled={savingSupplier || dataLoading || loadError}
-            >
-              {savingSupplier ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  保存中...
-                </>
-              ) : (
-                "保存供应商"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <NewSupplierDialog
+        showNewSupplierDialog={showNewSupplierDialog}
+        changeSupplierDialog={changeSupplierDialog}
+        savingSupplier={savingSupplier}
+        newSupplierForm={newSupplierForm}
+        setNewSupplierForm={setNewSupplierForm}
+        handleSaveNewSupplier={handleSaveNewSupplier}
+        dataLoading={dataLoading}
+        loadError={loadError}
+      />
 
       {/* 保存模板弹窗 */}
-      <Dialog
-        open={showSaveTemplateDialog}
-        onOpenChange={setShowSaveTemplateDialog}
-      >
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="text-sm font-medium">
-              保存为模板
-            </DialogTitle>
-            <DialogDescription>
-              将当前采购明细保存为之后可重复使用的合同模板。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label htmlFor="template-name">模板名称</Label>
-            <Input
-              id="template-name"
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="例如：标准瓷砖采购模板"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowSaveTemplateDialog(false)}
-            >
-              取消
-            </Button>
-            <Button onClick={handleSaveTemplate} disabled={savingTemplate}>
-              {savingTemplate ? "保存中..." : "保存"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SaveTemplateDialog
+        showSaveTemplateDialog={showSaveTemplateDialog}
+        setShowSaveTemplateDialog={setShowSaveTemplateDialog}
+        templateName={templateName}
+        setTemplateName={setTemplateName}
+        savingTemplate={savingTemplate}
+        handleSaveTemplate={handleSaveTemplate}
+      />
     </div>
   );
 }
