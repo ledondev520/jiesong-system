@@ -55,6 +55,11 @@ test('HTTP/SQLite: company settings are empty by default, ADMIN-written and vali
     for (const key of ['companyName', 'companyAddress', 'companyBankInfo']) assert.equal(Object.hasOwn(flat.data, key), false, `${role} ${key}`);
   }
 
+  // BOSS is read-only and /system/configs is not on its allowlist: denied, not widened for this feature.
+  const bossFlat = await call('GET', '/configs', undefined, 'BOSS');
+  assert.equal(bossFlat.status, 403);
+  assert.equal(bossFlat.data ?? null, null);
+
   // Writes: ADMIN only.
   for (const role of ['SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) assert.equal((await put('companyName', 'Nope', role)).status, 403, role);
   assert.equal((await put('companyName', 'Nope', 'ANONYMOUS')).status, 401);
@@ -82,11 +87,13 @@ test('HTTP/SQLite: company settings are empty by default, ADMIN-written and vali
   assert.equal(JSON.parse((await db.systemConfig.findUnique({ where: { key: 'companyName' } })).value), 'Synthetic Export Co');
   assert.equal(JSON.parse((await db.systemConfig.findUnique({ where: { key: 'companyAddress' } })).value), '1 Synthetic Road\nCity');
 
-  // Reads through the flat list: name/address for every role, the bank text only for ADMIN and FINANCE.
+  // Reads through the flat list: name/address for every role allowed to read configs, the bank text only for ADMIN and FINANCE.
   // BOSS has no access to the settings list at all (not on the read whitelist).
   assert.equal((await call('GET', '/configs', undefined, 'BOSS')).status, 403);
   for (const role of ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE']) {
-    const flat = (await call('GET', '/configs', undefined, role)).data;
+    const response = await call('GET', '/configs', undefined, role);
+    assert.equal(response.status, 200, role);
+    const flat = response.data;
     assert.equal(flat.companyName, 'Synthetic Export Co', role);
     assert.equal(flat.companyAddress, '1 Synthetic Road\nCity', role);
     if (['ADMIN', 'FINANCE'].includes(role)) assert.equal(flat.companyBankInfo, BANK, role);
@@ -95,7 +102,9 @@ test('HTTP/SQLite: company settings are empty by default, ADMIN-written and vali
 
   // Clearing is explicit: an empty string empties the value (the print side then leaves the line blank).
   assert.equal((await put('companyAddress', '')).status, 200);
-  assert.equal((await call('GET', '/configs', undefined, 'SALES')).data.companyAddress, '');
+  const cleared = await call('GET', '/configs', undefined, 'SALES');
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.data.companyAddress, '');
 
   // Audit rows keep who/when for the bank key but never its text.
   const deadline = Date.now() + 5000;
@@ -108,4 +117,4 @@ test('HTTP/SQLite: company settings are empty by default, ADMIN-written and vali
   assert.ok(logs.length >= 1, 'config writes are audited');
   const serialized = JSON.stringify(logs);
   for (const secret of [ACCOUNT, 'Synthetic Bank', 'SYNTHGBXX']) assert.equal(serialized.includes(secret), false, `audit must not contain ${secret}`);
-}); 
+});

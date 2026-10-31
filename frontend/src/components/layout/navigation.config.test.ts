@@ -62,6 +62,14 @@ describe("navigation.config helpers", () => {
     );
   });
 
+  it("报价菜单仅限报价读取角色（WAREHOUSE 不可见）", () => {
+    for (const role of ALL_ROLES) {
+      expect(keys(getMenuNavItems(role)).includes("quotes")).toBe(
+        role !== Role.WAREHOUSE,
+      );
+    }
+  });
+
   it("PURCHASE 保留商品入口，商品路径归属 products，设置仅管理员", () => {
     expect(getModuleByPath("/dashboard/products")?.key).toBe("products");
     expect(keys(getMenuNavItems(Role.PURCHASE))).toContain("products");
