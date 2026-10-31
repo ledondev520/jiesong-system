@@ -111,7 +111,9 @@ for (const list of registry.lists) {
           ),
         );
         const saved = window.location.href;
-        expect(new URL(saved).searchParams.get(list.tabKey)).toBe(list.tab);
+        // tabKey/tab are optional: lists without tabs (e.g. inventory) only keep the page/keyword state.
+        if (list.tabKey)
+          expect(new URL(saved).searchParams.get(list.tabKey)).toBe(list.tab);
         expect(new URL(saved).searchParams.get(list.pageKey)).toBe("3");
         expect(new URL(saved).searchParams.get("source")).toBe("qa");
         expect(new URL(saved).hash).toBe("#rows");

@@ -111,9 +111,7 @@
       "path": "/dashboard/inventory?source=qa#rows",
       "keywordKey": "inventoryKeyword",
       "pageKey": "inventoryPage",
-      "pageSizeKey": "inventoryPageSize",
-      "tabKey": "source",
-      "tab": "qa"
+      "pageSizeKey": "inventoryPageSize"
     },
     {
       "id": "customs",
