@@ -88,7 +88,8 @@ test("HTTP/SQLite: archived suppliers leave default lists, stay readable, and on
     assert.equal(response.status, expected, `${role} ${method} ${url}: ${result.message || ""}`);
     return result.data;
   };
-  const ids = async (query) => (await call("GET", `/suppliers?${query}`)).map((row) => row.id).sort();
+  const ids = async (query) =>
+    (await call("GET", `/suppliers?${query}`)).items.map((row) => row.id).sort();
 
   const keep = await db.supplier.create({ data: { name: "Synthetic keep supplier" } });
   const doubtful = await db.supplier.create({ data: { name: "Synthetic doubtful supplier (存疑)" } });
