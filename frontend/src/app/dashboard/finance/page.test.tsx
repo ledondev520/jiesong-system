@@ -103,9 +103,10 @@ describe("FinancePage 交互逻辑", () => {
       "utf8",
     );
 
-    expect(pageSource).not.toContain("from 'recharts'");
-    expect(pageSource).toContain(
-      "import('./components/FinanceOverviewCharts')",
+    // Quote-agnostic: Prettier owns the quote style of page.tsx.
+    expect(pageSource).not.toMatch(/from ["']recharts["']/);
+    expect(pageSource).toMatch(
+      /import\(["']\.\/components\/FinanceOverviewCharts["']\)/,
     );
   });
 
