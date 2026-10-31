@@ -4,7 +4,7 @@
  * Pos: 供应商比价组件测试
  */
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   SupplierPriceComparePopover,
@@ -40,9 +40,10 @@ describe("SupplierPriceComparison", () => {
         ]}
       />,
     );
-    expect(screen.getAllByText("最低")).toHaveLength(1);
-    expect(screen.getByText("质量问题")).toBeInTheDocument();
-    expect(screen.getByText("1%")).toBeInTheDocument();
+    const table = within(screen.getByTestId("supplier-price-table"));
+    expect(table.getAllByText("最低")).toHaveLength(1);
+    expect(table.getByText("质量问题")).toBeInTheDocument();
+    expect(table.getByText("1%")).toBeInTheDocument();
     expect(screen.getByText(/13% 增值税发票才能办理出口退税/)).toBeVisible();
     expect(screen.queryByText("用此供应商")).not.toBeInTheDocument();
   });
@@ -55,7 +56,40 @@ describe("SupplierPriceComparison", () => {
         onPick={onPick}
       />,
     );
-    await userEvent.click(screen.getAllByText("用此供应商")[1]);
+    await userEvent.click(
+      within(screen.getByTestId("supplier-price-table")).getAllByText(
+        "用此供应商",
+      )[1],
+    );
+    expect(onPick).toHaveBeenCalledWith(
+      expect.objectContaining({ supplierId: "乙" }),
+    );
+  });
+
+  it("手机端卡片：只在最低价卡片标「最低」，显示字段与「用此供应商」，表格仍保留 md 显示", async () => {
+    const onPick = vi.fn();
+    render(
+      <SupplierPriceComparison
+        rows={[
+          row("甲", 12),
+          row("乙", 9, { lastTaxRate: 1, hasQualityIssue: true, count: 5 }),
+        ]}
+        onPick={onPick}
+      />,
+    );
+    const cards = screen.getByTestId("supplier-price-cards");
+    expect(cards).toHaveClass("md:hidden");
+    expect(screen.getByTestId("supplier-price-table")).toHaveClass(
+      "hidden",
+      "md:block",
+    );
+    const view = within(cards);
+    expect(view.getAllByText("最低")).toHaveLength(1);
+    expect(view.getByText("质量问题")).toBeInTheDocument();
+    expect(view.getByText("1%")).toBeInTheDocument();
+    expect(view.getByText("¥9")).toBeInTheDocument();
+    expect(view.getByText("2026-09-01 · CG-乙")).toBeInTheDocument();
+    await userEvent.click(view.getAllByText("用此供应商")[1]);
     expect(onPick).toHaveBeenCalledWith(
       expect.objectContaining({ supplierId: "乙" }),
     );
@@ -79,6 +113,10 @@ describe("SupplierPriceComparePopover", () => {
     const trigger = screen.getByRole("button", { name: /比价/ });
     expect(trigger).toHaveTextContent("供应商乙");
     await userEvent.click(trigger);
-    expect(await screen.findByText("供应商甲")).toBeVisible();
+    expect(
+      await within(
+        await screen.findByTestId("supplier-price-table"),
+      ).findByText("供应商甲"),
+    ).toBeVisible();
   });
 });

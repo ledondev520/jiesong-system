@@ -55,7 +55,8 @@ describe("商品详情", () => {
     const user = userEvent.setup();
     render(<ProductDetailPage />);
     await user.click(await screen.findByRole("tab", { name: "采购价格" }));
-    expect(await screen.findByText("合成供应商甲")).toBeVisible();
+    // 手机卡片 + 桌面表格各渲染一份（由 CSS 切换）
+    expect(await screen.findAllByText("合成供应商甲")).toHaveLength(2);
     expect(screen.queryByText("用此供应商")).not.toBeInTheDocument();
     expect(mocks.getHistory).toHaveBeenCalledWith("product-1");
   });
