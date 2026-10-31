@@ -259,6 +259,12 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   expect(readDomain(fixture)).toEqual(before);
   await page.reload();
   await expect(ship).toBeEnabled();
+  // Positive control for the BOSS hidden-controls check: a writable role sees the import button on 货柜.
+  await page.getByRole("tab", { name: "货柜" }).click();
+  await expect(page.getByText("装箱明细", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "从已完工采购导入" }),
+  ).toBeVisible();
   // Warehouse releases 60 of the 100 arrived units through real authenticated HTTP.
   // Sales never writes an inspection or bypasses the failed transaction.
   const warehouse = await request.post(`${fixture.baseURL}/api/v1/auth/login`, {
@@ -357,9 +363,15 @@ test("BOSS reads purchase and sales UI, hides write controls and cannot mutate r
   await expect(
     page.getByRole("button", { name: "登记发运", exact: true }),
   ).toHaveCount(0);
+  // The import/add controls live in the 货柜 tab; assert it is mounted before checking absence.
+  await page.getByRole("tab", { name: "货柜" }).click();
+  await expect(page.getByText("装箱明细", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "从已完工采购导入" }),
   ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "手动添加商品" })).toHaveCount(
+    0,
+  );
   const before = readDomain(fixture);
   const denied = await page.evaluate(
     async ({ salesId, token }) => {

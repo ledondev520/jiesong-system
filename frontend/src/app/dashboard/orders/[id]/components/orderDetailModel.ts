@@ -173,8 +173,17 @@ export const buildStoreFulfilment = (
       );
     }
   }
+  // 历史导入行无 storeId：经来源采购明细回填门店，仍无法确定的才归「未分门店」
+  const purchaseItemStore = new Map<string, string | null | undefined>();
+  for (const purchase of contract.purchaseContracts ?? []) {
+    for (const item of purchase.items)
+      purchaseItemStore.set(item.id, item.storeId);
+  }
   for (const item of contract.packingItems ?? []) {
-    row(item.storeId).packed += item.quantity || 0;
+    const storeId =
+      item.storeId ||
+      (item.purchaseItemId ? purchaseItemStore.get(item.purchaseItemId) : null);
+    row(storeId).packed += item.quantity || 0;
   }
 
   return [...rows.values()].sort((a, b) => {

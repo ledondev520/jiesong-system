@@ -982,6 +982,41 @@ describe("OrderDetailPage 交互逻辑", () => {
     );
   });
 
+  it("同一页面实例内 ?tab= 变化（当前键与旧键）会切换页签", async () => {
+    mockSearch = new URLSearchParams("tab=overview");
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP-NAV",
+        status: "SHIPPED",
+        packingItems: [],
+      },
+    });
+    // New element per render: an identical element reference would bail out of re-rendering.
+    const ui = () => (
+      <Suspense fallback={<div>页面加载中...</div>}>
+        <SalesDetailPage params={Promise.resolve({ id: "s-1" })} />
+      </Suspense>
+    );
+    const { rerender } = render(ui());
+    const selected = (name: string) =>
+      screen.getByRole("tab", { name }).getAttribute("aria-selected");
+    await waitFor(() => expect(selected("概览")).toBe("true"));
+
+    mockSearch = new URLSearchParams("tab=finance");
+    rerender(ui());
+    await waitFor(() => expect(selected("收款")).toBe("true"));
+
+    mockSearch = new URLSearchParams("tab=receipts");
+    rerender(ui());
+    expect(selected("收款")).toBe("true");
+
+    mockSearch = new URLSearchParams("tab=container");
+    rerender(ui());
+    await waitFor(() => expect(selected("货柜")).toBe("true"));
+    expect(mockGetById).toHaveBeenCalledTimes(1);
+  });
+
   it("核销跟进只在财务标签加载并绑定当前合同", async () => {
     mockGetById.mockResolvedValue({
       data: {

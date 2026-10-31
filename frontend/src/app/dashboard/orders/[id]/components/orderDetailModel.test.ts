@@ -143,4 +143,17 @@ describe("buildStoreFulfilment", () => {
       packed: 3,
     });
   });
+  it("导入自采购明细但缺 storeId 的装箱行按来源采购明细回填门店（含部分导入），真正无来源的仍未分门店", () => {
+    const rows = buildStoreFulfilment(
+      order({
+        packingItems: [
+          { id: "k1", productId: "p1", purchaseItemId: "pi1", quantity: 4 },
+          { id: "k2", productId: "p1", purchaseItemId: "pi1", quantity: 2 },
+          { id: "k3", productId: "p1", quantity: 3 },
+        ] as SalesContract["packingItems"],
+      }),
+    );
+    expect(rows.find((r) => r.storeId === "st1")?.packed).toBe(6);
+    expect(rows.find((r) => r.storeId === "")?.packed).toBe(3);
+  });
 });

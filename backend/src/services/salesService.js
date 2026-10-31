@@ -672,6 +672,7 @@ const importPurchasePackingItems = async (salesContractId, selections = []) => {
           salesContractId,
           purchaseItemId: source.id,
           productId: source.productId,
+          storeId: source.storeId, // 保留来源门店，供订单详情「按门店」已装箱统计
           quantity: roundAllocation(Number(source.quantity) * ratio),
           unit: source.unit,
           boxes: selection.boxes,

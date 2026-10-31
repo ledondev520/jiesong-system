@@ -509,6 +509,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
   const source = {
     id: 'pi-1',
     productId: 'p-1',
+    storeId: 'st-1',
     quantity: 100,
     unit: '件',
     totalPrice: 1130,
@@ -560,6 +561,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
       salesContractId: 'sc-1',
       purchaseItemId: 'pi-1',
       productId: 'p-1',
+      storeId: 'st-1', // 部分导入（4/10 箱）仍保留来源门店
       quantity: 40,
       unit: '件',
       boxes: 4,

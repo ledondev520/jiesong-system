@@ -124,9 +124,14 @@ export function OrderDetailPage({ id }: { id: string }) {
   const [contractFiles, setContractFiles] = useState<ContractFile[]>([]);
   const [referenceDataLoading, setReferenceDataLoading] = useState(false);
   const referenceDataLoadedRef = useRef(false);
-  const [activeTab, setActiveTab] = useState<OrderTab>(() =>
-    resolveOrderTab(searchParams?.get("tab")),
-  );
+  const queryTab = resolveOrderTab(searchParams?.get("tab"));
+  const [activeTab, setActiveTab] = useState<OrderTab>(queryTab);
+  // 同一页面实例内 URL 的 ?tab= 变化（前进/后退、站内链接）时跟随，点击页签仍即时生效
+  const [seenQueryTab, setSeenQueryTab] = useState<OrderTab>(queryTab);
+  if (seenQueryTab !== queryTab) {
+    setSeenQueryTab(queryTab);
+    setActiveTab(queryTab);
+  }
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [dialog, setDialog] = useState<
