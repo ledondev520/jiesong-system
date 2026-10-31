@@ -95,3 +95,53 @@ test('confirm with a non-private backup directory writes nothing', async (t) => 
   assert.equal(await inactiveCount(a.client), 0);
   assert.deepEqual(fs.readdirSync(a.backups), []);
 });
+
+test('restore refuses a receipt written for another database (same IDs, different file): no write, backup or output receipt', async (t) => {
+  const a = fixture(t, 'src');
+  const b = fixture(t, 'copy');
+  const rows = await seed(a.client);
+  // B is a "copy" holding the same product ID, archived independently of A's receipt.
+  await b.client.product.create({ data: { id: rows.product.id, customsName: 'QA-Synthetic product', isActive: false } });
+  process.env.DATABASE_URL = `file:${a.database}`;
+  const receipt = path.join(a.root, 'receipt.json');
+  await archive.main(['--confirm', '--backup-dir', a.backups, '--receipt', receipt], a.client);
+
+  process.env.DATABASE_URL = `file:${b.database}`;
+  const output = path.join(b.root, 'restore-receipt.json');
+  await assert.rejects(
+    archive.main(['--restore', receipt, '--confirm', '--backup-dir', b.backups, '--receipt', output], b.client),
+    /different database file/,
+  );
+  assert.equal((await b.client.product.findUnique({ where: { id: rows.product.id } })).isActive, false, 'B was not reactivated');
+  assert.equal(fs.existsSync(output), false, 'no output receipt reserved');
+  assert.deepEqual(fs.readdirSync(b.backups), [], 'no backup taken');
+  // The dry-run restore is refused as well (it would present the wrong list).
+  await assert.rejects(archive.main(['--restore', receipt], b.client), /different database file/);
+});
+
+test('restore refuses incomplete or foreign-format receipts before any output or backup', async (t) => {
+  const a = fixture(t, 'shape');
+  await seed(a.client);
+  process.env.DATABASE_URL = `file:${a.database}`;
+  const receipt = path.join(a.root, 'receipt.json');
+  await archive.main(['--confirm', '--backup-dir', a.backups, '--receipt', receipt], a.client);
+  const good = JSON.parse(fs.readFileSync(receipt, 'utf8'));
+  const variants = {
+    'wrong-format': { ...good, format: 'other-v1' },
+    'restore-action': { ...good, action: 'restore' },
+    'no-fingerprint': { ...good, targetFingerprint: undefined },
+    'no-plan': { ...good, plan: undefined },
+    'bad-rows': { ...good, plan: { ...good.plan, stores: [{ nope: 1 }] } },
+    'missing-model': { ...good, plan: { suppliers: [], stores: [] } },
+  };
+  const backupsBefore = fs.readdirSync(a.backups).length;
+  for (const [name, value] of Object.entries(variants)) {
+    const file = path.join(a.root, `${name}.json`);
+    fs.writeFileSync(file, JSON.stringify(value), { mode: 0o600 });
+    const output = path.join(a.root, `${name}-out.json`);
+    await assert.rejects(archive.main(['--restore', file, '--confirm', '--backup-dir', a.backups, '--receipt', output], a.client), /Restore refused/, name);
+    assert.equal(fs.existsSync(output), false, name);
+  }
+  assert.equal(fs.readdirSync(a.backups).length, backupsBefore, 'no extra backup');
+  assert.equal(await inactiveCount(a.client), 3, 'nothing was restored');
+});

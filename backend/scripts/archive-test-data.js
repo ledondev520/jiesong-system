@@ -98,6 +98,24 @@ function parseArgs(argv) {
   return opts;
 }
 
+/**
+ * Restore input: only a complete archive receipt written for THIS database file is accepted (R2-1). A receipt from another
+ * database or copy (same IDs, different file) would otherwise reactivate that database's independently archived rows.
+ * Validated before any output is reserved or any backup is taken; fails closed without echoing receipt content.
+ */
+function readArchiveReceipt(file, target) {
+  const receipt = readPrivateJson(file);
+  const rowsOk = (rows) => Array.isArray(rows) && rows.every((row) => row && typeof row.id === 'string' && row.id);
+  if (!receipt || receipt.format !== 'jiesong-archive-receipt-v1' || receipt.action !== 'archive'
+    || !receipt.plan || !Object.keys(MODELS).every((key) => rowsOk(receipt.plan[key]))) {
+    throw new Error('Restore refused: not a supported archive receipt (format, action or plan shape).');
+  }
+  if (typeof receipt.targetFingerprint !== 'string' || receipt.targetFingerprint !== target.fingerprint) {
+    throw new Error('Restore refused: the receipt was written for a different database file; nothing was changed.');
+  }
+  return receipt;
+}
+
 function summarize(plan) {
   return Object.fromEntries(Object.keys(MODELS).map((key) => [key, plan[key].length]));
 }
@@ -109,7 +127,7 @@ async function main(argv = process.argv.slice(2), db) {
   const configured = configuredDatabase();
   const target = await targetIdentity(db, configured);
   const restoring = Boolean(opts.restore);
-  const plan = restoring ? readPrivateJson(opts.restore).plan : await selectTargets(db, opts);
+  const plan = restoring ? readArchiveReceipt(opts.restore, target).plan : await selectTargets(db, opts);
   const mode = opts.confirm ? 'CONFIRM' : 'DRY-RUN';
   console.log(`[archive-test-data] ${mode} ${restoring ? 'restore' : 'archive'}:`, JSON.stringify(summarize(plan)));
   for (const key of Object.keys(MODELS)) {
@@ -142,7 +160,7 @@ async function main(argv = process.argv.slice(2), db) {
   }
 }
 
-module.exports = { selectTargets, applyPlan, parseArgs, supplierReason, main };
+module.exports = { selectTargets, applyPlan, parseArgs, supplierReason, readArchiveReceipt, main };
 
 if (require.main === module) {
   // Prisma would otherwise auto-load backend/.env; require the target to be explicit in the process env.

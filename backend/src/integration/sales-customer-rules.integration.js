@@ -121,6 +121,20 @@ test("HTTP/SQLite: orders take the single active customer and its terms, custome
   assert.deepEqual({ i: customRow.incoterm, p: customRow.paymentTerms, l: customRow.portOfLoading }, { i: "CIF", p: "L/C at sight", l: "Ningbo" });
   await sale({ exchangeRate: 7, incoterm: "XYZ" }, 400);
   await sale({ exchangeRate: 7, currency: "EUR" }, 400);
+  // Malformed (non-string) term fields are rejected on BOTH creation paths, never defaulted to the customer's terms (R2-2).
+  const before = await db.salesContract.count();
+  for (const field of ["incoterm", "paymentTerms", "portOfLoading", "currency", "customerId"]) {
+    for (const value of [42, true, {}, ["FOB"]]) {
+      await sale({ exchangeRate: 7, [field]: value }, 400);
+      await sale({ exchangeRate: 7, items: lines, [field]: value }, 400);
+    }
+  }
+  await sale({ exchangeRate: 7, paymentTerms: "x".repeat(501) }, 400);
+  await sale({ exchangeRate: 7, items: lines, portOfLoading: "x".repeat(201) }, 400);
+  assert.equal(await db.salesContract.count(), before, "no order was created by malformed terms");
+  // null / empty string mean "not supplied" and fall back to the customer defaults.
+  const blank = await sale({ exchangeRate: 7, incoterm: null, paymentTerms: "", portOfLoading: null });
+  assert.equal((await db.salesContract.findUnique({ where: { id: blank.id } })).incoterm, "FOB");
   await sale({ exchangeRate: 7, customerId: "no-such-customer" }, 400);
   await sale({ exchangeRate: 7, customerId: (await db.customer.findFirst({ where: { isActive: false } })).id }, 400);
 

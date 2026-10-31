@@ -59,11 +59,33 @@ const resolveCustomerIdForNewStore = async (customerId, db = prisma, subject = '
  * 新订单的客户与条款（DATA-MODEL §2.4）：customerId 缺省时沿用"恰有一个启用客户"规则，否则 400「请选择客户」；
  * 请求未给出的 incoterm / paymentTerms / portOfLoading 复制自客户默认值；币种目前仅 USD。
  */
+// Supplied term fields are validated, never coerced: absent/null/'' means "use the customer default"; anything else must be a
+// string within its limit (R2-2: a non-string incoterm used to fall through to the default and be saved as a different term).
+const ORDER_TERM_LIMITS = { customerId: 128, currency: 8, incoterm: 8, paymentTerms: 500, portOfLoading: 200 };
+const ORDER_TERM_LABELS = { customerId: '客户', currency: '币种', incoterm: '贸易术语', paymentTerms: '付款条款', portOfLoading: '装运港' };
+const normalizeOrderTerms = (input = {}) => {
+  const terms = {};
+  for (const [key, max] of Object.entries(ORDER_TERM_LIMITS)) {
+    const value = input[key];
+    if (value === undefined || value === null || value === '') continue;
+    if (typeof value !== 'string' || value.trim().length > max) throw createError(`${ORDER_TERM_LABELS[key]}无效`, 400);
+    if (value.trim()) terms[key] = value.trim();
+  }
+  if (terms.currency !== undefined && terms.currency !== 'USD') throw createError('目前仅支持美元(USD)', 400);
+  if (terms.incoterm !== undefined) {
+    terms.incoterm = terms.incoterm.toUpperCase();
+    if (!INCOTERMS.includes(terms.incoterm)) throw createError(`贸易术语须为 ${INCOTERMS.join('/')}`, 400);
+  }
+  return terms;
+};
+
+/**
+ * 新订单的客户与条款（DATA-MODEL §2.4）：customerId 缺省时沿用"恰有一个启用客户"规则，否则 400「请选择客户」；
+ * 请求未给出的 incoterm / paymentTerms / portOfLoading 复制自客户默认值；币种目前仅 USD。两条创建路径共用。
+ */
 const resolveOrderCustomerFields = async (input = {}, db = prisma) => {
-  if (input.currency !== undefined && input.currency !== null && input.currency !== 'USD') throw createError('目前仅支持美元(USD)', 400);
-  const incoterm = typeof input.incoterm === 'string' && input.incoterm.trim() ? input.incoterm.trim().toUpperCase() : undefined;
-  if (incoterm !== undefined && !INCOTERMS.includes(incoterm)) throw createError(`贸易术语须为 ${INCOTERMS.join('/')}`, 400);
-  const customerId = await resolveCustomerIdForNewStore(input.customerId, db, '订单');
+  const terms = normalizeOrderTerms(input);
+  const customerId = await resolveCustomerIdForNewStore(terms.customerId, db, '订单');
   const customer = await db.customer.findUnique({
     where: { id: customerId },
     select: { defaultIncoterm: true, defaultPaymentTerms: true, defaultPortOfLoading: true },
@@ -71,9 +93,9 @@ const resolveOrderCustomerFields = async (input = {}, db = prisma) => {
   return {
     customerId,
     currency: 'USD',
-    incoterm: incoterm ?? customer.defaultIncoterm,
-    paymentTerms: input.paymentTerms || customer.defaultPaymentTerms || null,
-    portOfLoading: input.portOfLoading || customer.defaultPortOfLoading || null,
+    incoterm: terms.incoterm ?? customer.defaultIncoterm,
+    paymentTerms: terms.paymentTerms || customer.defaultPaymentTerms || null,
+    portOfLoading: terms.portOfLoading || customer.defaultPortOfLoading || null,
   };
 };
 
