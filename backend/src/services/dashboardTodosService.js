@@ -131,7 +131,7 @@ async function loadBossFigures(db, now) {
     payable: payables.unpaid,
     monthGrossProfit: overview?.overview?.grossProfit ?? null,
     definitions: {
-      receivable: '未取消出口合同的应收减已收（美元口径以财务概览为准）',
+      receivable: '未取消出口合同的应收减已收（美元，与财务概览同一函数）',
       payable: '已生效采购合同未付余额，草稿/已取消不计',
       monthGrossProfit: '上海自然月内已发运自有商品的预计毛利（人民币），资料不全时为空',
     },

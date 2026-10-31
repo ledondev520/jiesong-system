@@ -1,318 +1,168 @@
 /**
- * Input: 工作台页面、router、合成服务响应及显式延迟的工作流读取
- * Output: 工作台关键入口与独立工作流加载门槛的交互测试结果
+ * Input: 首页、router、合成待办响应（按角色）
+ * Output: 各角色待办展示、BOSS 数字、失败重试与快捷入口测试结果
  * Pos: 前端首页交互测试
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import DashboardPage from "./page";
 import { Role } from "@/types";
+import type { DashboardTodos } from "@/services/dashboardTodos.service";
 
 const mockPush = vi.fn();
-const mockGetDashboardAnalytics = vi.fn();
-const mockPurchaseGetAll = vi.fn();
-const mockSalesGetAll = vi.fn();
-const mockListStatements = vi.fn();
-const mockListTradeWorkflows = vi.fn();
-const mockSyncStatus = vi.fn();
+const mockGet = vi.fn();
+let mockRole: Role = Role.ADMIN;
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    push: mockPush,
-    back: vi.fn(),
-  }),
+  useRouter: () => ({ push: mockPush, back: vi.fn() }),
   usePathname: () => "/dashboard",
-  useSearchParams: () => new URLSearchParams(window.location.search),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
-const authState = vi.hoisted(() => ({ role: "ADMIN" as string }));
 vi.mock("@/store/auth.store", () => ({
   useAuthStore: () => ({
-    user: { id: "u-1", name: "测试用户", role: authState.role },
+    user: { id: "u-1", name: "合成用户", role: mockRole },
   }),
 }));
 
-vi.mock("@/services/ai.service", () => ({
-  aiService: {
-    getDashboardAnalytics: (...args: unknown[]) =>
-      mockGetDashboardAnalytics(...args),
-  },
+vi.mock("@/lib/hooks/useBusinessReadOnly", () => ({
+  BusinessWrite: ({ children }: { children: React.ReactNode }) =>
+    mockRole === Role.BOSS ? null : <>{children}</>,
 }));
 
-vi.mock("@/services/purchase.service", () => ({
-  purchaseService: {
-    getAll: (...args: unknown[]) => mockPurchaseGetAll(...args),
-  },
+vi.mock("@/services/dashboardTodos.service", () => ({
+  dashboardTodosService: { get: (...args: unknown[]) => mockGet(...args) },
 }));
 
-vi.mock("@/services/sales.service", () => ({
-  salesService: {
-    getAll: (...args: unknown[]) => mockSalesGetAll(...args),
-  },
-}));
+const item = (
+  id: string,
+  contractNo: string,
+  amount: number | null = null,
+) => ({
+  id,
+  contractNo,
+  party: "合成供应商",
+  amount,
+  date: null,
+});
 
-vi.mock("@/services/financialStatements.service", () => ({
-  financialStatementsService: {
-    listStatements: (...args: unknown[]) => mockListStatements(...args),
-  },
-}));
+const respond = (data: DashboardTodos) =>
+  mockGet.mockResolvedValue({ code: 200, message: "ok", data });
 
-vi.mock("@/services/tradeWorkflow.service", () => ({
-  tradeWorkflowService: {
-    syncStatus: (...args: unknown[]) => mockSyncStatus(...args),
-    list: (...args: unknown[]) => mockListTradeWorkflows(...args),
-  },
-}));
-
-describe("DashboardPage 交互逻辑", () => {
+describe("DashboardPage 待办首页", () => {
   beforeEach(() => {
-    window.history.replaceState(null, "", "/dashboard");
-    mockSyncStatus.mockResolvedValue({
-      data: {
-        state: "needs_review",
-        lastSuccessAt: "2026-09-12T07:00:00Z",
-        conflicts: 418,
-      },
-    });
     mockPush.mockReset();
-    mockGetDashboardAnalytics.mockReset();
-    mockPurchaseGetAll.mockReset();
-    mockSalesGetAll.mockReset();
-    mockListStatements.mockReset();
-    mockListTradeWorkflows.mockReset();
-    mockGetDashboardAnalytics.mockResolvedValue({
-      data: {
-        contracts: {
-          purchase: {
-            count: 3,
-            totalAmount: 10000,
-            paidAmount: 6000,
-            unpaidAmount: 4000,
-          },
-          sales: {
-            count: 2,
-            totalAmount: 5000,
-            receivedAmount: 2000,
-            receivable: 3000,
-          },
+    mockGet.mockReset();
+    mockRole = Role.ADMIN;
+  });
+
+  it("PURCHASE：只展示后端返回的列表，金额按币种格式化并链接详情", async () => {
+    mockRole = Role.PURCHASE;
+    respond({
+      role: "PURCHASE",
+      lists: {
+        ordersToPurchase: {
+          label: "订单待采购",
+          count: 7,
+          items: [item("s-1", "EXP-001", 1200)],
         },
-        inventory: { productCount: 9, recordCount: 20, totalQuantity: 500 },
-        shipments: { monthly: [] },
-        topProducts: [],
-        storeStats: [],
-      },
-    });
-    mockPurchaseGetAll.mockResolvedValue({
-      data: {
-        items: [
-          { id: "p-1", contractNo: "PO-001", status: "DRAFT" },
-          { id: "p-2", contractNo: "PO-002", status: "DRAFT" },
-          { id: "p-3", contractNo: "PO-003", status: "SIGNED" },
-        ],
-      },
-    });
-    mockSalesGetAll.mockResolvedValue({
-      data: {
-        items: [
-          {
-            id: "s-1",
-            contractNo: "EXP-001",
-            status: "CONFIRMED",
-            totalBoxes: 0,
-            grossWeight: 0,
-            volume: 0,
-          },
-          {
-            id: "s-2",
-            contractNo: "EXP-002",
-            status: "PACKING",
-            totalBoxes: 10,
-            grossWeight: 800,
-            volume: 12,
-          },
-        ],
-      },
-    });
-    mockListStatements.mockResolvedValue([
-      { id: "fs-1", periodLabel: "2026年3月账期" },
-    ]);
-    mockListTradeWorkflows.mockResolvedValue({
-      data: [
-        {
-          id: "s-1",
-          contractNo: "EXP-001",
-          status: "PACKING",
-          purchaseContractNos: ["CG-001"],
-          completedStageCount: 2,
-          stageCount: 8,
-          nextAction: {
-            label: "登记采购尾款",
-            href: "/dashboard/purchase/p-1",
-          },
-          issues: [],
-          stages: [
-            {
-              key: "procurement",
-              label: "采购签约",
-              status: "completed",
-              reason: "已签约",
-            },
-            {
-              key: "payment",
-              label: "采购付款",
-              status: "current",
-              reason: "仍有尾款待付",
-            },
-          ],
-          readiness: {
-            weightPct: 20,
-            volumePct: 30,
-            utilizationReady: false,
-            overloaded: false,
-            overloadReasons: [],
-            physicalFit: true,
-            placedBoxCount: 10,
-            unplacedBoxCount: 0,
-            estimatedDimensionCount: 0,
-            missingBoxItemCount: 0,
-            blockers: ["under-utilized"],
-            ready: false,
-          },
-          finance: {
-            purchaseTotal: 10000,
-            purchasePaid: 3000,
-            salesTotalUsd: 2000,
-            receivedUsd: 0,
-            exchangeRate: 6.64,
-          },
+        paymentsDue: {
+          label: "待付款",
+          count: 1,
+          items: [item("p-1", "CG-001", 600)],
         },
-      ],
+      },
     });
-  });
-
-  it("展示真实同步时间和历史差异；接口失败明确提示而不冒充同步正常", async () => {
-    const view = render(<DashboardPage />);
-    await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent("418 项待核对"),
-    );
-    expect(screen.getByRole("status")).toHaveTextContent("2026/9/12");
-    view.unmount();
-    mockSyncStatus.mockRejectedValueOnce(new Error("unavailable"));
-    render(<DashboardPage />);
-    await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent("状态读取失败"),
-    );
-  });
-
-  it("WPS 同步状态框仅管理员可见，非管理员不请求同步状态", async () => {
-    mockSyncStatus.mockClear();
-    authState.role = Role.SALES;
-    try {
-      render(<DashboardPage />);
-      await waitFor(() =>
-        expect(screen.getByText("待起草采购")).toBeInTheDocument(),
-      );
-      expect(screen.queryByText(/WPS 出货同步/)).not.toBeInTheDocument();
-      expect(mockSyncStatus).not.toHaveBeenCalled();
-    } finally {
-      authState.role = Role.ADMIN;
-    }
-  });
-
-  it("渲染工作台首屏核心结构", async () => {
-    // 0. Keep the real workflow loader pending while the static first-screen structure renders.
-    const workflowResponse = await mockListTradeWorkflows();
-    let resolveWorkflows!: (response: typeof workflowResponse) => void;
-    mockListTradeWorkflows.mockReturnValueOnce(
-      new Promise<typeof workflowResponse>((resolve) => {
-        resolveWorkflows = resolve;
-      }),
-    );
     render(<DashboardPage />);
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { name: "工作台" }),
-      ).toBeInTheDocument();
-      expect(screen.getByText("待起草采购")).toBeInTheDocument();
-      expect(screen.getByText("出口待补录")).toBeInTheDocument();
+    expect(await screen.findByText("订单待采购")).toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
+    expect(screen.getByText("$1,200")).toBeInTheDocument();
+    expect(screen.getByText("¥600")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "EXP-001" })).toHaveAttribute(
+      "href",
+      "/dashboard/sales/s-1",
+    );
+    expect(screen.getByRole("link", { name: "CG-001" })).toHaveAttribute(
+      "href",
+      "/dashboard/purchase/p-1",
+    );
+    expect(screen.queryByText("可申报退税")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("关键数字")).not.toBeInTheDocument();
+  });
+
+  it("BOSS：显示应收/应付/本月毛利及口径说明，不显示写入口", async () => {
+    mockRole = Role.BOSS;
+    respond({
+      role: "BOSS",
+      lists: {
+        overdueReceivables: {
+          label: "逾期未收款",
+          count: 0,
+          items: [],
+        },
+      },
+      figures: {
+        receivable: 5000,
+        payable: 600,
+        monthGrossProfit: null,
+        definitions: {
+          receivable: "应收口径说明",
+          payable: "已生效采购合同未付余额，草稿/已取消不计",
+          monthGrossProfit: "毛利口径说明",
+        },
+      },
     });
-
-    expect(screen.queryByText("仓储物流")).not.toBeInTheDocument();
-    expect(screen.getByText("库存记录")).toBeInTheDocument();
-    expect(screen.getByText("出口专项单主线路")).toBeInTheDocument();
-    expect(screen.getByText("正在加载专项单主线路…")).toBeInTheDocument();
-    expect(screen.queryByText("EXP-001")).not.toBeInTheDocument();
-
-    // 1. Static headings cannot establish that the independently loaded contract is ready.
-    const loadedContract = screen.findByText("EXP-001");
-    await act(async () => resolveWorkflows(workflowResponse));
-    expect(await loadedContract).toBeInTheDocument();
-    expect(screen.queryByText("正在加载专项单主线路…")).not.toBeInTheDocument();
-  });
-
-  it("财务账期按年月显示最新一项，不依赖列表返回顺序", async () => {
-    mockListStatements.mockResolvedValue([
-      { id: "fs-1", year: 2025, month: 1, periodLabel: "2025年1账期" },
-      { id: "fs-2", year: 2025, month: 12, periodLabel: "2025年12账期" },
-      { id: "fs-3", year: 2025, month: 6, periodLabel: "2025年6账期" },
-    ]);
-
     render(<DashboardPage />);
 
-    expect(await screen.findByText("2025年12账期")).toBeInTheDocument();
-    expect(screen.queryByText("2025年1账期")).not.toBeInTheDocument();
+    const figures = await screen.findByLabelText("关键数字");
+    expect(within(figures).getByText("$5,000")).toBeInTheDocument();
+    expect(within(figures).getByText("¥600")).toBeInTheDocument();
+    expect(within(figures).getByText("—")).toBeInTheDocument();
+    expect(within(figures).getByText(/草稿\/已取消不计/)).toBeInTheDocument();
+    expect(screen.getByText("全部处理完毕")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /新建采购合同/ }),
+    ).not.toBeInTheDocument();
   });
 
-  it("资金与账期失败分别显示读取失败并可重试，不回退到零或未上传", async () => {
-    mockGetDashboardAnalytics.mockRejectedValueOnce(new Error("offline"));
-    mockListStatements.mockRejectedValueOnce(new Error("offline"));
+  it("没有任何待办列表时给出空态", async () => {
+    respond({ role: "WAREHOUSE", lists: {} });
     render(<DashboardPage />);
-    expect(await screen.findByText("资金读取失败")).toBeInTheDocument();
-    expect(await screen.findByText("账期读取失败")).toBeInTheDocument();
-    expect(screen.queryByText("$0")).not.toBeInTheDocument();
-    expect(screen.queryByText("未上传")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "重试资金" }));
-    expect(await screen.findByText("$3,000")).toBeInTheDocument();
+    expect(await screen.findByText("暂无待办。")).toBeInTheDocument();
   });
 
-  it("首页只给出该专项单的唯一下一动作", async () => {
+  it("读取失败显示错误并可重试，不冒充没有待办", async () => {
+    mockGet.mockRejectedValueOnce(new Error("synthetic"));
+    mockGet.mockResolvedValueOnce({
+      code: 200,
+      message: "ok",
+      data: { role: "ADMIN", lists: {} },
+    });
     const user = userEvent.setup();
     render(<DashboardPage />);
 
-    await waitFor(() => {
-      expect(screen.getByText("EXP-001")).toBeInTheDocument();
-    });
+    expect(await screen.findByText("待办加载失败")).toBeInTheDocument();
+    expect(screen.queryByText("暂无待办。")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "重试" }));
+    expect(await screen.findByText("暂无待办。")).toBeInTheDocument();
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it("快捷入口跳转到对应路径", async () => {
+    respond({ role: "ADMIN", lists: {} });
+    const user = userEvent.setup();
+    render(<DashboardPage />);
 
     await user.click(
-      screen.getByRole("button", { name: "EXP-001 下一步：登记采购尾款" }),
+      await screen.findByRole("button", { name: /新建采购合同/ }),
     );
-    expect(mockPush).toHaveBeenCalledWith("/dashboard/purchase/p-1");
-  });
-
-  it("点击快速动作跳转到对应路径", async () => {
-    const user = userEvent.setup();
-    render(<DashboardPage />);
-
-    await waitFor(() => {
-      expect(
-        screen.getByRole("heading", { name: "工作台" }),
-      ).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole("button", { name: /新建采购合同/ }));
     expect(mockPush).toHaveBeenCalledWith("/dashboard/purchase/create");
-
     await user.click(screen.getByRole("button", { name: /新建出口合同/ }));
     expect(mockPush).toHaveBeenCalledWith("/dashboard/sales/create");
-
-    await user.click(screen.getByRole("button", { name: /查看报关单/ }));
-    expect(mockPush).toHaveBeenCalledWith(
-      "/dashboard/tax-refunds?view=customs",
-    );
   });
 });
