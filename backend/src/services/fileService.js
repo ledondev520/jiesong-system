@@ -23,6 +23,7 @@ const CONTRACT_FILE_CATEGORY = Object.freeze({
   OTHER: 'OTHER',
   SIGNED_CONTRACT: 'SIGNED_CONTRACT',
   PRODUCTION_PHOTO: 'PRODUCTION_PHOTO',
+  RECEIPT_PHOTO: 'RECEIPT_PHOTO',
   SUPPLIER_INVOICE: 'SUPPLIER_INVOICE',
   CARRIER_DOCUMENT: 'CARRIER_DOCUMENT',
   SYSTEM_GENERATED_WORD: 'SYSTEM_GENERATED_WORD',
@@ -90,6 +91,12 @@ const validateUploadedFileCategory = (file, category) => {
     && !['image/jpeg', 'image/png'].includes(file?.mimetype)
   ) {
     throw createError('生产实物图仅支持 JPG、PNG 格式', 400);
+  }
+  if (
+    category === CONTRACT_FILE_CATEGORY.RECEIPT_PHOTO
+    && !['image/jpeg', 'image/png'].includes(file?.mimetype)
+  ) {
+    throw createError('到货照片仅支持 JPG、PNG 格式', 400);
   }
 };
 

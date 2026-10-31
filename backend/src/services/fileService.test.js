@@ -111,6 +111,30 @@ test('createFile: 生产实物图分类只接受 JPG/PNG，错误文件不留在
   }
 });
 
+test('createFile: 到货照片分类只接受 JPG/PNG，错误文件不留在磁盘', async () => {
+  const tempDir = fs.mkdtempSync(path.join(testUploadRoot, 'receipt-photo-'));
+  const filePath = path.join(tempDir, 'not-photo.pdf');
+  fs.writeFileSync(filePath, '%PDF');
+
+  try {
+    await withMockDelegates({ purchaseContract: { findUnique: async () => ({ id: 'purchase-1' }) } }, async () => {
+      await assert.rejects(
+        () => fileService.createFile('purchase-1', 'PURCHASE', {
+          originalname: 'not-photo.pdf',
+          path: filePath,
+          mimetype: 'application/pdf',
+          size: 4,
+        }, null, 'RECEIPT_PHOTO'),
+        (error) => error.statusCode === 400 && /到货照片仅支持 JPG、PNG/.test(error.message),
+      );
+    });
+    assert.equal(fs.existsSync(filePath), false);
+    assert.equal(fileService.CONTRACT_FILE_CATEGORY.RECEIPT_PHOTO, 'RECEIPT_PHOTO');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('createFile: 验证/权限/持久化失败仅清理当前上传，保留既有凭证', async t => {
   for (const failure of ['invalid-type', 'missing-contract', 'category', 'chmod', 'database', 'deleted-contract']) {
     await t.test(failure, async () => {
