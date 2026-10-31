@@ -559,6 +559,21 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
+    if (pathname === '/api/v1/dashboard/todos' && method === 'GET') {
+      await fulfillJson(route, {
+        role: 'ADMIN',
+        lists: {
+          paymentsDue: {
+            label: '待付款',
+            count: 1,
+            items: [{ id: purchaseContract.id, contractNo: purchaseContract.contractNo, party: null, amount: 600, date: null }],
+          },
+          toLoad: { label: '待装柜', count: 0, items: [] },
+        },
+      });
+      return;
+    }
+
     if (pathname === '/api/v1/dashboard/wps-sync' && method === 'GET') {
       await fulfillJson(route, { state: 'current', lastSuccessAt: now, lastAttemptAt: now, conflicts: 0 });
       return;
