@@ -13,6 +13,9 @@ const { loadContainerConfig } = require('./containerSpecs');
 const EPS = 1e-9;
 const MAX_CONTAINERS = 20;
 const MAX_BLOCKS_PER_CONTAINER = 600;
+// 计算预算（候选块内层迭代 × 已放块数）：畸形/超大数据耗尽后 fail-closed（剩余箱进 unplaced，阻塞出货），不卡死 API 进程。
+// shortcut: 5e8 ≈ 2–3 s 同步上限，约为 300 个互不相同箱规行所需的 3 倍；更大订单需改为分片/异步排柜再调高。
+const COMPUTE_BUDGET = 500_000_000;
 const PALETTE = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
   '#BB8FCE', '#85C1E9', '#F8B500', '#00CED1', '#FF69B4', '#32CD32', '#FF4500', '#7FB069',
@@ -38,13 +41,13 @@ const usableMm = (spec, config = loadContainerConfig()) => ({
   height: spec.innerMm.height - config.clearanceMm.height,
 });
 
+// 归一化（四舍五入到整 mm）后每边必须仍 ≥1：0.1 mm 之类会变成 0，让排柜循环不收敛。
+const isValidMm = (value) => Number.isInteger(value) && value >= 1;
 const positiveDims = (source) => {
-  const length = toNumber(source?.length);
-  const width = toNumber(source?.width);
-  const height = toNumber(source?.height);
-  return length > 0 && width > 0 && height > 0
-    ? { length: Math.round(length), width: Math.round(width), height: Math.round(height) }
-    : null;
+  const length = Math.round(toNumber(source?.length));
+  const width = Math.round(toNumber(source?.width));
+  const height = Math.round(toNumber(source?.height));
+  return isValidMm(length) && isValidMm(width) && isValidMm(height) ? { length, width, height } : null;
 };
 
 /** 按单箱体积以 1.2:1:0.8 推算箱规，夹紧到可用空间；结果必须标记「估算」。 */
@@ -165,6 +168,35 @@ const loadWithinLimits = (acc) => [...acc].every(([block, pressure]) => (
   (block.nz - 1) * block.kgEach + (block.pTop + pressure) * block.cartonArea <= block.maxStackKg + EPS
 ));
 
+/**
+ * 每个底层纸箱（nx×ny 网格的一格）的底面都须有 ≥ minRatio 的面积落在下方块顶面；块平均支撑会漏掉悬空的单箱。
+ * @returns {number} 沿 x 满足条件的最长列前缀（0 表示首列即不合格）
+ */
+const supportedColumns = (blocks, ep, o, nx, ny, minRatio) => {
+  const cols = new Float64Array(nx * ny);
+  const x1 = ep.x + nx * o.l;
+  const y1 = ep.y + ny * o.w;
+  for (const b of blocks) {
+    if (b.z + b.dz !== ep.z || b.x >= x1 || b.x + b.dx <= ep.x || b.y >= y1 || b.y + b.dy <= ep.y) continue;
+    const iLo = Math.max(0, Math.floor((b.x - ep.x) / o.l));
+    const iHi = Math.min(nx - 1, Math.ceil((b.x + b.dx - ep.x) / o.l) - 1);
+    const jLo = Math.max(0, Math.floor((b.y - ep.y) / o.w));
+    const jHi = Math.min(ny - 1, Math.ceil((b.y + b.dy - ep.y) / o.w) - 1);
+    for (let i = iLo; i <= iHi; i += 1) {
+      const ox = Math.min(ep.x + (i + 1) * o.l, b.x + b.dx) - Math.max(ep.x + i * o.l, b.x);
+      for (let j = jLo; j <= jHi; j += 1) {
+        const oy = Math.min(ep.y + (j + 1) * o.w, b.y + b.dy) - Math.max(ep.y + j * o.w, b.y);
+        if (ox > 0 && oy > 0) cols[i * ny + j] += ox * oy;
+      }
+    }
+  }
+  const need = minRatio * o.l * o.w - 1e-6;
+  for (let i = 0; i < nx; i += 1) {
+    for (let j = 0; j < ny; j += 1) if (cols[i * ny + j] < need) return i;
+  }
+  return nx;
+};
+
 /** 在极值点 ep 用朝向 o 为 line 造最大的合法块；无合法块返回 null。 */
 const formBlock = (ctx, ep, o, work) => {
   const { usable, blocks, minSupportRatio, payloadCap } = ctx;
@@ -172,7 +204,7 @@ const formBlock = (ctx, ep, o, work) => {
   const nxMax = Math.floor((usable.length - ep.x) / o.l);
   const nyMax = Math.floor((usable.width - ep.y) / o.w);
   const nzFit = Math.floor((usable.height - ep.z) / o.h);
-  if (nxMax < 1 || nyMax < 1 || nzFit < 1) return null;
+  if (nxMax < 1 || nyMax < 1 || nzFit < 1 || ctx.budget <= 0) return null;
 
   const kg = line.kgPerCarton;
   const byWeight = kg > 0 ? Math.floor((payloadCap - ctx.weight + EPS) / kg) : Infinity;
@@ -186,6 +218,8 @@ const formBlock = (ctx, ep, o, work) => {
   for (let nz = nzTarget; nz >= 1; nz -= 1) {
     let best = null;
     for (let ny = Math.min(nyMax, Math.ceil(limit / nz)); ny >= 1; ny -= 1) {
+      ctx.budget -= blocks.length + 1;
+      if (ctx.budget <= 0) return best;
       const yEnd = ep.y + ny * o.w;
       const zEnd = ep.z + nz * o.h;
       let xLimit = usable.length;
@@ -206,14 +240,21 @@ const formBlock = (ctx, ep, o, work) => {
         if (limit >= ny * nz) nx = Math.floor(limit / (ny * nz));
         else { nx = 1; shapeNy = Math.min(ny, limit); shapeNz = Math.max(1, Math.floor(limit / shapeNy)); }
       }
-      const cartons = nx * shapeNy * shapeNz;
+      let cartons = nx * shapeNy * shapeNz;
       if (best && cartons <= best.cartons) continue;
 
+      const supportRefs = [];
+      let supportArea = 0;
+      if (ep.z > 0) {
+        // 逐箱支撑：沿 x 取每个底层纸箱都够支撑的最长前缀，其余列留给后续块。
+        nx = supportedColumns(blocks, ep, o, nx, shapeNy, minSupportRatio);
+        if (nx < 1) continue;
+        cartons = nx * shapeNy * shapeNz;
+        if (best && cartons <= best.cartons) continue;
+      }
       const candidate = { x: ep.x, y: ep.y, z: ep.z, nx, ny: shapeNy, nz: shapeNz, o };
       const dx = nx * o.l;
       const dy = shapeNy * o.w;
-      const supportRefs = [];
-      let supportArea = 0;
       if (ep.z > 0) {
         for (const b of blocks) {
           if (b.z + b.dz !== ep.z) continue;
@@ -221,7 +262,6 @@ const formBlock = (ctx, ep, o, work) => {
           const oy = Math.min(ep.y + dy, b.y + b.dy) - Math.max(ep.y, b.y);
           if (ox > 0 && oy > 0) { supportArea += ox * oy; supportRefs.push({ block: b, overlap: ox * oy }); }
         }
-        if (supportArea / (dx * dy) < minSupportRatio) continue;
         if (line.heavy && supportRefs.some(({ block }) => !block.heavy)) continue;
         if (kg > 0 && !loadWithinLimits(collectLoad(supportRefs, supportArea, cartons * kg))) continue;
       }
@@ -267,10 +307,23 @@ const packOne = (works, ctx) => {
     const covered = (point) => point.x >= block.x && point.x < block.x + block.dx
       && point.y >= block.y && point.y < block.y + block.dy
       && point.z >= block.z && point.z < block.z + block.dz;
-    const next = [
-      ...eps.filter((point) => !covered(point)),
+    // 悬在下层之上的块（如高出底座边缘一点）会遮住其外侧的地面；侧面极值点同时投影到其正下方的最高承托面。
+    const dropped = (point) => {
+      let z = 0;
+      for (const other of blocks) {
+        if (other !== block && other.z + other.dz <= point.z && other.x <= point.x && point.x < other.x + other.dx
+          && other.y <= point.y && point.y < other.y + other.dy) z = Math.max(z, other.z + other.dz);
+      }
+      return { ...point, z };
+    };
+    const sides = [
       { x: block.x + block.dx, y: block.y, z: block.z },
       { x: block.x, y: block.y + block.dy, z: block.z },
+    ];
+    const next = [
+      ...eps.filter((point) => !covered(point)),
+      ...sides,
+      ...(block.z > 0 ? sides.map(dropped).filter((point) => point.z < block.z) : []),
       { x: block.x, y: block.y, z: block.z + block.dz },
     ].filter((point) => point.x < ctx.usable.length && point.y < ctx.usable.width && point.z < ctx.usable.height)
       .sort(byXzy);
@@ -291,10 +344,10 @@ const packOne = (works, ctx) => {
 
   // 逐行按优先级装；某行装不下后继续后续行，扫一遍后再回头补缝，直到无进展。
   let progress = true;
-  while (progress && blocks.length < MAX_BLOCKS_PER_CONTAINER) {
+  while (progress && blocks.length < MAX_BLOCKS_PER_CONTAINER && ctx.budget > 0) {
     progress = false;
     for (const work of works) {
-      while (work.left > 0 && blocks.length < MAX_BLOCKS_PER_CONTAINER) {
+      while (work.left > 0 && blocks.length < MAX_BLOCKS_PER_CONTAINER && ctx.budget > 0) {
         const found = findBlock(work);
         if (!found) break;
         place(work, found);
@@ -321,14 +374,19 @@ const unplacedEntry = (line, cartons, reason) => ({
  * 多柜装柜计划：一次一柜，放不下的转入下一个同型柜；无法进任何空柜的箱进入 unplaced。
  * @returns {{ containers: object[], unplaced: Array<{ lineId, name, cartons, reason, cartonMm }> }}
  */
-const packContainers = (lines, spec, config = loadContainerConfig()) => {
+const packContainers = (lines, spec, config = loadContainerConfig(), { budget = COMPUTE_BUDGET } = {}) => {
   const usable = usableMm(spec, config);
   const payloadCap = Math.min(spec.safeGrossKg, spec.maxPayloadKg);
   const unplaced = [];
   const works = [];
 
   for (const line of lines) {
-    if (!line.cartonMm) { unplaced.push(unplacedEntry(line, line.cartons, 'missing-dimensions')); continue; }
+    // 入口再校验一次：直接传入的归一化行同样不得带 0/小数/非有限边长。
+    const dims = line.cartonMm;
+    if (!dims || !isValidMm(dims.length) || !isValidMm(dims.width) || !isValidMm(dims.height)) {
+      unplaced.push(unplacedEntry(line, line.cartons, 'missing-dimensions'));
+      continue;
+    }
     const fits = orientationsFor(line)
       .filter((o) => o.l <= usable.length && o.w <= usable.width && o.h <= usable.height);
     if (fits.length === 0) { unplaced.push(unplacedEntry(line, line.cartons, 'oversize')); continue; }
@@ -343,10 +401,10 @@ const packContainers = (lines, spec, config = loadContainerConfig()) => {
   }
   works.sort(priority);
 
-  const ctx = { usable, minSupportRatio: config.minSupportRatio, payloadCap, blocks: [], weight: 0 };
+  const ctx = { usable, minSupportRatio: config.minSupportRatio, payloadCap, blocks: [], weight: 0, budget };
   const containers = [];
   const lineById = new Map(lines.map((line) => [line.lineId, line]));
-  while (works.some((work) => work.left > 0) && containers.length < MAX_CONTAINERS) {
+  while (works.some((work) => work.left > 0) && containers.length < MAX_CONTAINERS && ctx.budget > 0) {
     const blocks = packOne(works, ctx);
     if (blocks.length === 0) break;
     let step = 0;

@@ -104,3 +104,14 @@ test('sales export routes: 缺失合同时将404错误传给 next', async () => 
     prisma.salesContract.findUnique = originalSalesContractFindUnique;
   }
 });
+
+test('loading-plan 路由：显式角色白名单（含 BOSS），拒绝未登录、Agent、未知角色', async () => {
+  const guard = getRouteHandlers(salesRouter, '/:id/loading-plan', 'get').find((layer) => layer.handle.isRoleAuth).handle;
+  assert.deepEqual([...guard.allowedRoles].sort(), ['ADMIN', 'BOSS', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE']);
+  const statusFor = (req) => { let status; guard(req, {}, (error) => { status = error?.statusCode ?? 200; }); return status; };
+  for (const role of guard.allowedRoles) assert.equal(statusFor({ user: { role } }), 200, role);
+  assert.equal(statusFor({}), 401, '未登录');
+  // authenticate 对 Agent 凭据只设置 req.agent/authActor、不设置 req.user，即便 grants 为空也不得进入控制器。
+  assert.equal(statusFor({ agent: { grants: [] }, authActor: { actorType: 'AGENT' } }), 401, '无授权 Agent');
+  assert.equal(statusFor({ user: { role: 'INTERN' } }), 403, '未知角色');
+});

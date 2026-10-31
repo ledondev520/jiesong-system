@@ -22,6 +22,8 @@ const { upload, pdfCheckUpload } = require('../utils/upload');
 
 const router = Router();
 const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
+// 装柜计划含 Confidential 箱规/重量：显式人类角色白名单（含 BOSS 只读）；Agent 无 req.user，roleAuth 返回 401。
+const LOADING_PLAN_ROLES = [...WRITE_ROLES, 'BOSS'];
 
 router.use(authenticate);
 
@@ -36,8 +38,8 @@ router.get('/options/next-no', salesController.getNextContractNo);
 // GET /api/v1/sales/:id - 获取出口合同详情（包含装箱明细）
 router.get('/:id', withIdValidation, salesController.getById);
 
-// GET /api/v1/sales/:id/loading-plan - 只读装柜计划（路由器已认证，读权限同合同详情；必须位于 /:id 通配之外的独立路径）
-router.get('/:id/loading-plan', withIdValidation, salesController.getLoadingPlan);
+// GET /api/v1/sales/:id/loading-plan - 只读装柜计划（显式角色白名单；必须位于 /:id 通配之外的独立路径）
+router.get('/:id/loading-plan', withIdValidation, roleAuth(...LOADING_PLAN_ROLES), salesController.getLoadingPlan);
 
 // POST /api/v1/sales - 创建出口合同
 router.post('/', [
