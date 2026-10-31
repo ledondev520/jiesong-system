@@ -7,10 +7,10 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { CustomsDeclarationDetailPageContent } from "@/app/customs-declarations/components/CustomsDeclarationDetailPageContent";
+import { CustomsDeclarationDetailPageContent } from "@/app/dashboard/customs/components/CustomsDeclarationDetailPageContent";
 import registry from "../../../../lifecycle/resources.json";
-import { InventoryTab } from "@/app/dashboard/products/components/InventoryTab";
-import { CustomsDeclarationListPageContent } from "@/app/customs-declarations/components/CustomsDeclarationListPageContent";
+import { InventoryTab } from "@/app/dashboard/inventory/components/InventoryTab";
+import { CustomsDeclarationListPageContent } from "@/app/dashboard/customs/components/CustomsDeclarationListPageContent";
 
 const mocks = vi.hoisted(() => ({
   getAll: vi.fn(),
@@ -26,16 +26,21 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
 }));
 vi.mock(
-  "@/app/customs-declarations/components/customs-return-context",
+  "@/app/dashboard/customs/components/customs-return-context",
   async (original) => ({
     ...(await original<
-      typeof import("@/app/customs-declarations/components/customs-return-context")
+      typeof import("@/app/dashboard/customs/components/customs-return-context")
     >()),
     navigateToCustomsList: mocks.documentNavigate,
   }),
 );
 vi.mock("@/services/inventory.service", () => ({
   inventoryService: { getAll: mocks.getAll },
+}));
+vi.mock("@/services/purchase.service", () => ({
+  purchaseService: {
+    getAll: vi.fn(async () => ({ data: { summary: { stores: [] } } })),
+  },
 }));
 vi.mock("@/services/customsDeclaration.service", () => ({
   customsDeclarationService: { getAll: mocks.getAll, getById: mocks.getById },
@@ -106,7 +111,9 @@ for (const list of registry.lists) {
           ),
         );
         const saved = window.location.href;
-        expect(new URL(saved).searchParams.get(list.tabKey)).toBe(list.tab);
+        // tabKey/tab are optional: lists without tabs (e.g. inventory) only keep the page/keyword state.
+        if (list.tabKey)
+          expect(new URL(saved).searchParams.get(list.tabKey)).toBe(list.tab);
         expect(new URL(saved).searchParams.get(list.pageKey)).toBe("3");
         expect(new URL(saved).searchParams.get("source")).toBe("qa");
         expect(new URL(saved).hash).toBe("#rows");
@@ -142,7 +149,7 @@ for (const list of registry.lists) {
 
 it("customs detail receives the active filtered return URL", async () => {
   const saved =
-    "/dashboard/tax-refunds?view=customs&keyword=SYN&status=RELEASED&source=qa#rows";
+    "/dashboard/customs?view=customs&keyword=SYN&status=RELEASED&source=qa#rows";
   window.history.replaceState({}, "", saved);
   mocks.getAll.mockResolvedValue({
     data: {
@@ -164,19 +171,17 @@ it("customs detail receives the active filtered return URL", async () => {
     mocks.push.mock.calls.at(-1)![0],
     window.location.origin,
   );
-  expect(destination.pathname).toBe(
-    "/dashboard/customs-declarations/synthetic-detail",
-  );
+  expect(destination.pathname).toBe("/dashboard/customs/synthetic-detail");
   expect(destination.searchParams.get("returnTo")).toBe(saved);
 });
 
 it("customs explicit return restores the active filtered URL from detail", async () => {
   const saved =
-    "/dashboard/tax-refunds?view=customs&keyword=SYN&status=RELEASED&page=3&pageSize=50&source=qa#rows";
+    "/dashboard/customs?view=customs&keyword=SYN&status=RELEASED&page=3&pageSize=50&source=qa#rows";
   window.history.replaceState(
     {},
     "",
-    `/dashboard/customs-declarations/synthetic-detail?returnTo=${encodeURIComponent(saved)}`,
+    `/dashboard/customs/synthetic-detail?returnTo=${encodeURIComponent(saved)}`,
   );
   mocks.getById.mockResolvedValue({
     data: {

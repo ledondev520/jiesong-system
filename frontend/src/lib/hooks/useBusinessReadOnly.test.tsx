@@ -47,7 +47,7 @@ it("老板导航覆盖业务、资料与自身通知，排除AI与设置", () =>
     "notifications",
   ]);
   for (const path of [
-    "/dashboard/purchase/create",
+    "/dashboard/purchases/new",
     "/dashboard/sales/id/edit",
     "/dashboard/ai",
     "/dashboard/settings",
@@ -55,7 +55,7 @@ it("老板导航覆盖业务、资料与自身通知，排除AI与设置", () =>
   ])
     expect(isBossRestrictedPath(path)).toBe(true);
   for (const path of [
-    "/dashboard/purchase/id",
+    "/dashboard/purchases/id",
     "/dashboard/finance",
     "/dashboard/system/notifications",
     "/dashboard/profile",

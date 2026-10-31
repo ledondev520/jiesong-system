@@ -119,7 +119,10 @@ test.afterEach(async () => {
  */
 async function enterFromMenu(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
-  await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
+  await page
+    .getByRole("link", { name: "出口订单", exact: true })
+    .first()
+    .click();
   await expect(page).toHaveURL(/\/dashboard\/sales$/);
   await page
     .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
@@ -308,8 +311,10 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   // has no module tabs, so use its existing Return action before the menu path.
   await page.getByRole("button", { name: "返回", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/sales$/);
-  await page.getByRole("link", { name: "单证与退税", exact: true }).click();
-  await page.getByRole("link", { name: "出口退税", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "侧边导航" })
+    .getByRole("link", { name: "单证与退税", exact: true })
+    .click();
   await page.getByRole("tab", { name: "报关单", exact: true }).click();
   await page
     .getByRole("button", {
@@ -320,8 +325,7 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   // Next client navigation must commit before reload, or reload cancels it.
   await expect(page).toHaveURL(
     (url) =>
-      url.pathname ===
-      `/dashboard/customs-declarations/${saved.customs_declarations[0].id}`,
+      url.pathname === `/dashboard/customs/${saved.customs_declarations[0].id}`,
   );
   await expect(
     page.getByRole("heading", {
@@ -342,8 +346,10 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
     .locator('[data-slot="card-content"]');
   await expect(customsAmount).toBeVisible();
   await expect(customsAmount).toHaveText("USD 20");
-  await page.getByRole("link", { name: "单证与退税", exact: true }).click();
-  await page.getByRole("link", { name: "出口退税", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "侧边导航" })
+    .getByRole("link", { name: "单证与退税", exact: true })
+    .click();
   await page.getByRole("tab", { name: "退税记录", exact: true }).click();
   await page
     .getByRole("button", {

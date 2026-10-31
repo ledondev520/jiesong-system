@@ -7,7 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { Role } from "@/types";
 import { Sidebar } from "./Sidebar";
@@ -15,7 +15,7 @@ import { Sidebar } from "./Sidebar";
 const mockLogout = vi.fn();
 const mockPrefetch = vi.fn();
 const mockPush = vi.fn();
-let mockPathname = "/dashboard/contracts";
+let mockPathname = "/dashboard/purchases";
 
 const mockUser = {
   role: Role.ADMIN,
@@ -71,13 +71,13 @@ describe("Sidebar", () => {
     mockPrefetch.mockReset();
     mockPush.mockReset();
     mockUser.role = Role.ADMIN;
-    mockPathname = "/dashboard/contracts";
+    mockPathname = "/dashboard/purchases";
   });
 
   it("渲染分组导航并标记当前路由", () => {
     const { getByText } = render(<Sidebar />);
 
-    // 当前路由是 /dashboard/contracts，对应 "采购"
+    // 当前路由是 /dashboard/purchases，对应 "采购"
     const current = getByText("采购").closest("a");
     expect(current?.className.includes("bg-sidebar-accent")).toBe(true);
     for (const label of [
@@ -95,6 +95,27 @@ describe("Sidebar", () => {
       "设置",
     ]) {
       expect(getByText(label)).toBeInTheDocument();
+    }
+  });
+
+  it("hover/focus/click 侧边栏链接不启动竞争预取，也不手动 push", () => {
+    vi.useFakeTimers();
+    try {
+      const { getByText } = render(<Sidebar />);
+      const financeLink = getByText("财务").closest("a");
+
+      expect(financeLink).not.toBeNull();
+      fireEvent.mouseEnter(financeLink!);
+      fireEvent.focus(financeLink!);
+      fireEvent.mouseEnter(financeLink!);
+
+      expect(mockPrefetch).not.toHaveBeenCalled();
+      expect(financeLink).toHaveAttribute("data-prefetch", "auto");
+
+      fireEvent.click(financeLink!);
+      expect(mockPush).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
     }
   });
 
@@ -116,7 +137,7 @@ describe("Sidebar", () => {
     );
     expect(getByText("库存").closest("a")).toHaveAttribute(
       "href",
-      "/dashboard/inventory-status",
+      "/dashboard/inventory",
     );
     expect(getByText("商品").closest("a")).toHaveAttribute(
       "href",
@@ -147,17 +168,16 @@ describe("Sidebar", () => {
     );
   });
 
-  it("单证与退税下报关单与出口退税分别激活", () => {
-    mockPathname = "/dashboard/customs-declarations/create";
-    const { getByText } = render(<Sidebar />);
+  it("单证与退税是单一菜单项，报关单子页面时保持激活", () => {
+    mockPathname = "/dashboard/customs/new";
+    const { getByText, queryByText } = render(<Sidebar />);
 
-    expect(getByText("报关单").closest("a")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(getByText("出口退税").closest("a")).not.toHaveAttribute(
-      "aria-current",
-    );
+    expect(
+      getByText("单证与退税")
+        .closest("a")
+        ?.className.includes("bg-sidebar-accent"),
+    ).toBe(true);
+    expect(queryByText("出口退税")).toBeNull();
   });
 
   it("非管理员角色不显示设置入口", () => {
@@ -178,11 +198,13 @@ describe("Sidebar", () => {
 
   it("初始渲染和空闲阶段不批量预取业务路由", () => {
     vi.useFakeTimers();
-    render(<Sidebar />);
-    vi.runOnlyPendingTimers();
+    try {
+      render(<Sidebar />);
+      vi.runOnlyPendingTimers();
 
-    expect(mockPrefetch).not.toHaveBeenCalled();
-
-    vi.useRealTimers();
+      expect(mockPrefetch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -21,6 +21,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
+import { LazyAIAssistantMount } from "@/components/ai/LazyAIAssistantMount";
 import { NetworkStatus } from "@/components/ui/network-status";
 import {
   getDefaultDashboardHref,
@@ -194,26 +195,30 @@ export default function DashboardLayout({
         <div className="hidden border-r bg-sidebar md:block">
           <Sidebar />
         </div>
-        <div className="flex min-w-0 flex-col">
-          <Header />
-          {/* 移动端底部 TabBar 高度补偿：56px + safe-area-inset-bottom */}
-          <main
-            className="flex min-w-0 flex-1 flex-col gap-6 px-4 py-5 md:px-6 lg:px-8"
-            style={{
-              paddingBottom:
-                "calc(56px + env(safe-area-inset-bottom) + 1.25rem)",
-            }}
-          >
-            {/* 桌面端面包屑在顶栏；手机端顶栏放品牌，面包屑留在内容区 */}
-            <Breadcrumbs className="md:hidden" />
-            {user?.role === Role.BOSS && isBossRestrictedPath(pathname) ? (
-              <div role="alert" className="rounded-md border p-4 text-sm">
-                老板角色仅可查看经营和业务信息，该页面包含管理或写入操作。
-              </div>
-            ) : (
-              children
-            )}
-          </main>
+        {/* 内容列 + 右侧停靠的 AI 面板：面板打开时内容列变窄，不覆盖内容 */}
+        <div className="flex min-w-0">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Header />
+            {/* 移动端底部 TabBar 高度补偿：56px + safe-area-inset-bottom */}
+            <main
+              className="flex min-w-0 flex-1 flex-col gap-6 px-4 py-5 md:px-6 lg:px-8"
+              style={{
+                paddingBottom:
+                  "calc(56px + env(safe-area-inset-bottom) + 1.25rem)",
+              }}
+            >
+              {/* 桌面端面包屑在顶栏；手机端顶栏放品牌，面包屑留在内容区 */}
+              <Breadcrumbs className="md:hidden" />
+              {user?.role === Role.BOSS && isBossRestrictedPath(pathname) ? (
+                <div role="alert" className="rounded-md border p-4 text-sm">
+                  老板角色仅可查看经营和业务信息，该页面包含管理或写入操作。
+                </div>
+              ) : (
+                children
+              )}
+            </main>
+          </div>
+          <LazyAIAssistantMount />
         </div>
         {/* 移动端底部 TabBar：桌面端由 CSS md:hidden 控制不渲染 */}
         <MobileTabBar visibleItems={visibleItems} />

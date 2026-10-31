@@ -25,6 +25,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useAuthStore } from "@/store/auth.store";
+import { useAiPanelStore } from "@/store/ai-panel.store";
 import { Role } from "@/types";
 import {
   getPrimaryMobileModuleNavItems,
@@ -223,7 +224,7 @@ export function MobileTabBar({
               <button
                 onClick={() => {
                   setMoreOpen(false);
-                  router.push("/dashboard/ai");
+                  useAiPanelStore.getState().setOpen(true);
                 }}
                 className="flex min-h-[52px] w-full touch-manipulation items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted"
               >

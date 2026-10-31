@@ -39,7 +39,7 @@ for (const width of [390, 1440]) {
         },
       });
     });
-    await signInAsAdmin(page, "/dashboard/contracts");
+    await signInAsAdmin(page, "/dashboard/purchases");
     if (width < 768)
       await page.getByRole("button", { name: "筛选与搜索" }).click();
     const search = page.getByRole("textbox", {

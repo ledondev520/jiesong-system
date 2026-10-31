@@ -48,10 +48,6 @@ vi.mock("./components/ProductDialog", () => ({
     open ? <div>商品弹窗已打开</div> : null,
 }));
 
-vi.mock("./components/InventoryTab", () => ({
-  InventoryTab: () => <div>库存状态 Tab</div>,
-}));
-
 describe("ProductsPage 交互逻辑", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/dashboard/products");
@@ -165,27 +161,34 @@ describe("ProductsPage 交互逻辑", () => {
   });
 });
 
-it("刷新商品页面恢复库存页签并保留库存查询参数", async () => {
-  window.history.replaceState(
-    {},
-    "",
-    "/dashboard/products?tab=inventory&inventoryKeyword=SYN&inventoryPage=3",
-  );
-  mockGetAll.mockResolvedValue({ data: { items: [] } });
-  const view = render(<ProductsPage />);
-  expect(await screen.findByText("库存状态 Tab")).toBeVisible();
-  expect(screen.getByRole("tab", { name: "库存状态" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await userEvent.setup().click(screen.getByRole("tab", { name: "商品档案" }));
-  expect(new URLSearchParams(window.location.search).get("inventoryPage")).toBe(
-    "3",
-  );
-  view.unmount();
+it("资料不全按钮把 incomplete 发送到后端，页面不再有库存页签", async () => {
+  mockSearchParamGet.mockImplementation(() => null);
+  mockGetAll.mockResolvedValue({
+    data: {
+      items: [
+        {
+          id: "p1",
+          customsName: "合成瓷砖",
+          grossWeight: 0,
+          volume: 0.5,
+          hsCode: "",
+        },
+      ],
+      pagination: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    },
+  });
+  const user = userEvent.setup();
   render(<ProductsPage />);
-  expect(screen.getByRole("tab", { name: "商品档案" })).toHaveAttribute(
-    "aria-selected",
-    "true",
+  expect(
+    screen.queryByRole("tab", { name: "库存状态" }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "资料不全" }));
+  await waitFor(() =>
+    expect(mockGetAll).toHaveBeenLastCalledWith(
+      expect.objectContaining({ incomplete: true }),
+    ),
   );
+  expect(
+    (await screen.findAllByText(/缺少：毛重、HS编码/)).length,
+  ).toBeGreaterThan(0);
 });

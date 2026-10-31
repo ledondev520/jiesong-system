@@ -6,11 +6,11 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,24 +18,25 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   HeaderProfileDialog,
   type HeaderProfileDraft,
   type HeaderUserMenuPreferences,
-} from './HeaderProfileDialog';
+} from "./HeaderProfileDialog";
 
-export const HEADER_USER_MENU_PREFERENCES_KEY = 'jiesong_header_user_preferences';
+export const HEADER_USER_MENU_PREFERENCES_KEY =
+  "jiesong_header_user_preferences";
 
 const defaultPreferences: HeaderUserMenuPreferences = {
   desktopNotifications: false,
   compactMode: false,
   rememberLastModule: true,
-  signature: '',
+  signature: "",
 };
 
 function readPreferences(): HeaderUserMenuPreferences {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return defaultPreferences;
   }
 
@@ -52,10 +53,10 @@ function readPreferences(): HeaderUserMenuPreferences {
       compactMode: Boolean(parsed.compactMode),
       desktopNotifications: Boolean(parsed.desktopNotifications),
       rememberLastModule:
-        typeof parsed.rememberLastModule === 'boolean'
+        typeof parsed.rememberLastModule === "boolean"
           ? parsed.rememberLastModule
           : defaultPreferences.rememberLastModule,
-      signature: typeof parsed.signature === 'string' ? parsed.signature : '',
+      signature: typeof parsed.signature === "string" ? parsed.signature : "",
     };
   } catch {
     return defaultPreferences;
@@ -63,11 +64,14 @@ function readPreferences(): HeaderUserMenuPreferences {
 }
 
 function writePreferences(preferences: HeaderUserMenuPreferences) {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return;
   }
 
-  localStorage.setItem(HEADER_USER_MENU_PREFERENCES_KEY, JSON.stringify(preferences));
+  localStorage.setItem(
+    HEADER_USER_MENU_PREFERENCES_KEY,
+    JSON.stringify(preferences),
+  );
 }
 
 interface HeaderUserMenuProps {
@@ -89,10 +93,11 @@ export function HeaderUserMenu({
   onSaveProfile,
   onLogout,
 }: HeaderUserMenuProps) {
-  const resolvedDisplayName = displayName || '管理员';
+  const resolvedDisplayName = displayName || "管理员";
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogKey, setDialogKey] = useState(0);
-  const [preferences, setPreferences] = useState<HeaderUserMenuPreferences>(defaultPreferences);
+  const [preferences, setPreferences] =
+    useState<HeaderUserMenuPreferences>(defaultPreferences);
 
   const handleOpenProfile = () => {
     setPreferences(readPreferences());
@@ -100,7 +105,10 @@ export function HeaderUserMenu({
     setDialogOpen(true);
   };
 
-  const handleSaveProfile = (profile: HeaderProfileDraft, nextPreferences: HeaderUserMenuPreferences) => {
+  const handleSaveProfile = (
+    profile: HeaderProfileDraft,
+    nextPreferences: HeaderUserMenuPreferences,
+  ) => {
     writePreferences(nextPreferences);
     setPreferences(nextPreferences);
     onSaveProfile(profile);
@@ -111,13 +119,23 @@ export function HeaderUserMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-11 gap-2 rounded-md px-2" aria-label="用户菜单">
+          <Button
+            variant="ghost"
+            className="h-11 gap-2 rounded-md px-2"
+            aria-label="用户菜单"
+          >
             <Avatar className="h-7 w-7 border">
-              {avatar ? <AvatarImage src={avatar} alt={resolvedDisplayName} /> : null}
-              <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
+              {avatar ? (
+                <AvatarImage src={avatar} alt={resolvedDisplayName} />
+              ) : null}
+              <AvatarFallback className="text-xs font-medium">
+                {initials}
+              </AvatarFallback>
             </Avatar>
-            <div className="hidden text-left sm:block">
-              <div className="text-sm font-medium leading-none">{resolvedDisplayName}</div>
+            <div className="hidden text-left lg:block">
+              <div className="text-sm font-medium leading-none">
+                {resolvedDisplayName}
+              </div>
               <div className="text-xs text-muted-foreground">{username}</div>
             </div>
             <span className="sr-only">用户菜单</span>
@@ -127,10 +145,18 @@ export function HeaderUserMenu({
           <DropdownMenuLabel>
             <div className="flex flex-col">
               <span>{resolvedDisplayName}</span>
-              <span className="text-xs font-normal text-muted-foreground">{username}</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {username}
+              </span>
               {lastLoginAt && (
                 <span className="text-[11px] font-normal text-muted-foreground/70 mt-0.5">
-                  最后登录: {new Date(lastLoginAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  最后登录:{" "}
+                  {new Date(lastLoginAt).toLocaleString("zh-CN", {
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               )}
             </div>
@@ -140,9 +166,7 @@ export function HeaderUserMenu({
             个人设置
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onLogout}>
-            退出登录
-          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onLogout}>退出登录</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <HeaderProfileDialog
