@@ -126,6 +126,35 @@ test('config: OpenAI 需要密钥，模型默认 gpt-6.1-terra，密钥只发往
   assert.equal(loadConfigWithEnv({ AI_PROVIDER: 'kimi', JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx', OPENAI_API_KEY: '', OPENAI_MODEL: '' }).ai.provider, 'kimi');
 });
 
+test('config: DeepSeek 回退默认惰性；启用后断路器参数有界，非法值/非 https/未知供应商启动失败，与主供应商相同则关闭', () => {
+  const base = { AI_PROVIDER: 'openai', OPENAI_API_KEY: 'k', JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx', AI_FALLBACK_PROVIDER: '', AI_FALLBACK_BREAKER_THRESHOLD: '', AI_FALLBACK_BREAKER_COOLDOWN_MS: '', DEEPSEEK_API_KEY: '', DEEPSEEK_BASE_URL: '' };
+  assert.deepEqual({ ...loadConfigWithEnv(base).aiFallback }, { enabled: false });
+  // 未启用时断路器变量被完全忽略，即使取值非法
+  assert.equal(loadConfigWithEnv({ ...base, AI_FALLBACK_BREAKER_THRESHOLD: 'abc' }).aiFallback.enabled, false);
+  const on = loadConfigWithEnv({ ...base, AI_FALLBACK_PROVIDER: ' DeepSeek ', DEEPSEEK_API_KEY: 'non-production-placeholder' });
+  assert.deepEqual({ ...on.aiFallback }, {
+    enabled: true, provider: 'deepseek', apiKey: 'non-production-placeholder', baseUrl: 'https://api.deepseek.com',
+    breakerThreshold: 3, breakerCooldownMs: 300000,
+  });
+  const tuned = loadConfigWithEnv({ ...base, AI_FALLBACK_PROVIDER: 'deepseek', AI_FALLBACK_BREAKER_THRESHOLD: '1', AI_FALLBACK_BREAKER_COOLDOWN_MS: '5000' });
+  assert.deepEqual([tuned.aiFallback.breakerThreshold, tuned.aiFallback.breakerCooldownMs], [1, 5000]);
+  // 缺少密钥不阻断启动（库内 deepseekApiKey 可在运行时提供）
+  assert.equal(loadConfigWithEnv({ ...base, AI_FALLBACK_PROVIDER: 'deepseek' }).aiFallback.apiKey, '');
+  for (const [name, value] of [
+    ['AI_FALLBACK_BREAKER_THRESHOLD', '0'], ['AI_FALLBACK_BREAKER_THRESHOLD', '21'], ['AI_FALLBACK_BREAKER_THRESHOLD', '1.5'],
+    ['AI_FALLBACK_BREAKER_COOLDOWN_MS', '4999'], ['AI_FALLBACK_BREAKER_COOLDOWN_MS', '3600001'], ['AI_FALLBACK_BREAKER_COOLDOWN_MS', 'x'],
+  ]) {
+    assert.throws(() => loadConfigWithEnv({ ...base, AI_FALLBACK_PROVIDER: 'deepseek', [name]: value }), new RegExp(name), `${name}=${value}`);
+  }
+  assert.throws(() => loadConfigWithEnv({ ...base, AI_FALLBACK_PROVIDER: 'kimi' }), /AI_FALLBACK_PROVIDER/);
+  assert.throws(() => loadConfigWithEnv({ ...base, AI_FALLBACK_PROVIDER: 'deepseek', DEEPSEEK_BASE_URL: 'http://api.example.test' }), /https/);
+  assert.throws(() => loadConfigWithEnv({ ...base, AI_FALLBACK_PROVIDER: 'deepseek', DEEPSEEK_BASE_URL: 'not a url' }), /DEEPSEEK_BASE_URL/);
+  // 回退与主供应商相同 = 关闭，不校验其余回退参数
+  const same = loadConfigWithEnv({ ...base, AI_PROVIDER: 'deepseek', AI_FALLBACK_PROVIDER: 'deepseek', AI_FALLBACK_BREAKER_THRESHOLD: '99' });
+  assert.equal(same.aiFallback.enabled, false);
+  assert.equal(same.ai.provider, 'deepseek');
+});
+
 test('config: 未知供应商在启动时拒绝，Kimi 活动配置复用原对象', () => {
   assert.throws(() => loadConfigWithEnv({ AI_PROVIDER: 'unsupported-provider' }), /AI_PROVIDER/);
   const config = loadConfigWithEnv({ AI_PROVIDER: 'kimi', JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx' });
