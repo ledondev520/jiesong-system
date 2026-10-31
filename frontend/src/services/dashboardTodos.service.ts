@@ -8,6 +8,8 @@ import api, { type ApiRequestConfig } from "@/lib/axios";
 import type { ApiResponse } from "@/types";
 
 export type TodoKey =
+  | "quotesToSend"
+  | "quotesAwaitingCustomer"
   | "ordersToPurchase"
   | "paymentsDue"
   | "receiptsToInspect"

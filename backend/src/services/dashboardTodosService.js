@@ -4,14 +4,14 @@
  * Pos: GET /dashboard/todos 的只读聚合（规格 §4.9）；不写库，只算当前角色可见的列表
  *
  * 口径说明（当前库结构下的最小可靠定义）：
- *   ordersToPurchase  已确认订单中，至少一条订单行尚无库存/采购分配记录（SalesItem 无 Inventory）
+ *   ordersToPurchase  已确认订单中，至少一条订单行没有未取消采购单行（同订单、商品+门店，与「生成采购单」重复规则一致）
  *   paymentsDue       已生效采购合同应付>0（payablesService 同一口径，草稿不计）
  *   receiptsToInspect 采购合同已发货、尚未收货
  *   toLoad / toShip   出口合同 CONFIRMED（待装柜）/ PACKING（待发运）
  *   missingInvoice    货已出（SHIPPED/RECEIVED/COMPLETED）但未登记发票号的采购合同（同催票提醒）
  *   overdueReceivables 沿用 financeService.getOverdueReceivables
  *   refundable        退税单 DRAFT 且单证匹配 passed
- *   报价待发送/待客户确认：Quote 表由数据模型 B2 迁移引入，当前库尚无，随 B2 合入后再加。
+ *   quotesToSend      报价 DRAFT（待发送）；quotesAwaitingCustomer 报价 SENT（待客户确认）；仅 SALES/ADMIN
  */
 const prisma = require('../utils/prisma');
 const { ROLES, PURCHASE_STATUS, SALES_STATUS } = require('../config/constants');
@@ -26,18 +26,37 @@ const item = (id, contractNo, party, amount, date) => ({
 const asList = (count, rows) => ({ count, items: rows.slice(0, TOP) });
 const byDateAsc = (a, b) => (a.date ? new Date(a.date).getTime() : Infinity) - (b.date ? new Date(b.date).getTime() : Infinity);
 
+const quotesByStatus = (status, dateField) => async (db) => {
+  const where = { status };
+  const [count, rows] = await Promise.all([
+    db.quote.count({ where }),
+    db.quote.findMany({
+      where, take: TOP, orderBy: { createdAt: 'asc' },
+      select: { id: true, quoteNo: true, totalAmount: true, createdAt: true, sentAt: true, customer: { select: { name: true } } },
+    }),
+  ]);
+  return asList(count, rows.map((r) => item(r.id, r.quoteNo, r.customer?.name, r.totalAmount, r[dateField])));
+};
+
 const LISTS = {
   ordersToPurchase: {
     label: '订单待采购', roles: [PURCHASE, ADMIN],
     async load(db) {
-      const where = { status: SALES_STATUS.CONFIRMED, items: { some: { inventories: { none: {} } } } };
-      const [count, rows] = await Promise.all([
-        db.salesContract.count({ where }),
-        db.salesContract.findMany({ where, take: TOP, orderBy: { createdAt: 'asc' }, select: { id: true, contractNo: true, totalAmount: true, signedAt: true } }),
-      ]);
-      return asList(count, rows.map((r) => item(r.id, r.contractNo, null, r.totalAmount, r.signedAt)));
+      const orders = await db.salesContract.findMany({
+        where: { status: SALES_STATUS.CONFIRMED }, orderBy: { createdAt: 'asc' },
+        select: { id: true, contractNo: true, totalAmount: true, signedAt: true, items: { select: { productId: true, storeId: true } } },
+      });
+      const purchased = await db.purchaseItem.findMany({
+        where: { purchaseContract: { salesContractId: { in: orders.map((o) => o.id) }, status: { not: PURCHASE_STATUS.CANCELLED } } },
+        select: { productId: true, storeId: true, purchaseContract: { select: { salesContractId: true } } },
+      });
+      const covered = new Set(purchased.map((p) => `${p.purchaseContract.salesContractId}/${p.productId}/${p.storeId}`));
+      const rows = orders.filter((o) => o.items.some((i) => !covered.has(`${o.id}/${i.productId}/${i.storeId}`)));
+      return asList(rows.length, rows.map((r) => item(r.id, r.contractNo, null, r.totalAmount, r.signedAt)));
     },
   },
+  quotesToSend: { label: '报价待发送', roles: [SALES, ADMIN], load: quotesByStatus('DRAFT', 'createdAt') },
+  quotesAwaitingCustomer: { label: '报价待客户确认', roles: [SALES, ADMIN], load: quotesByStatus('SENT', 'sentAt') },
   paymentsDue: {
     label: '待付款', roles: [FINANCE, PURCHASE, ADMIN],
     async load(db) {

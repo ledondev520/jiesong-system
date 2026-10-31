@@ -21,6 +21,16 @@ const LIST_META: Record<
   TodoKey,
   { all: string; currency: Currency; detail?: (id: string) => string }
 > = {
+  quotesToSend: {
+    all: "/dashboard/quotes?status=DRAFT",
+    currency: "USD",
+    detail: (id) => `/dashboard/quotes/${id}`,
+  },
+  quotesAwaitingCustomer: {
+    all: "/dashboard/quotes?status=SENT",
+    currency: "USD",
+    detail: (id) => `/dashboard/quotes/${id}`,
+  },
   ordersToPurchase: {
     all: "/dashboard/sales",
     currency: "USD",

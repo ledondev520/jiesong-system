@@ -130,6 +130,40 @@ describe("DashboardPage 待办首页", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("SALES：报价待发送/待客户确认卡片带数量、美元金额、详情与筛选入口", async () => {
+    mockRole = Role.SALES;
+    respond({
+      role: "SALES",
+      lists: {
+        quotesToSend: {
+          label: "报价待发送",
+          count: 3,
+          items: [item("q-1", "QT2611-001", 880)],
+        },
+        quotesAwaitingCustomer: {
+          label: "报价待客户确认",
+          count: 0,
+          items: [],
+        },
+      },
+    });
+    render(<DashboardPage />);
+
+    expect(await screen.findByText("报价待发送")).toBeInTheDocument();
+    expect(screen.getByText("报价待客户确认")).toBeInTheDocument();
+    expect(screen.getByText("$880")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "QT2611-001" })).toHaveAttribute(
+      "href",
+      "/dashboard/quotes/q-1",
+    );
+    const all = screen.getAllByRole("link", { name: "查看全部" });
+    expect(all.map((a) => a.getAttribute("href"))).toEqual([
+      "/dashboard/quotes?status=DRAFT",
+      "/dashboard/quotes?status=SENT",
+    ]);
+    expect(screen.getByText("全部处理完毕")).toBeInTheDocument();
+  });
+
   it("没有任何待办列表时给出空态", async () => {
     respond({ role: "WAREHOUSE", lists: {} });
     render(<DashboardPage />);
