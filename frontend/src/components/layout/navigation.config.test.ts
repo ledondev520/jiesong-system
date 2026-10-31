@@ -103,10 +103,10 @@ describe("navigation.config helpers", () => {
       "/dashboard/hs-codes": "hs-codes",
       "/dashboard/finance/statements": "finance",
       "/dashboard/payments": "finance",
-      "/dashboard/ai/sessions": "ai",
-      "/dashboard/users": "admin",
-      "/dashboard/system/logs": "admin",
-      "/dashboard/about": "admin",
+      "/dashboard/settings/ai-usage": "admin",
+      "/dashboard/settings/users": "admin",
+      "/dashboard/settings/logs": "admin",
+      "/dashboard/settings/ai-access": "admin",
     };
     for (const [path, key] of Object.entries(owner))
       expect(getModuleByPath(path)?.key, path).toBe(key);

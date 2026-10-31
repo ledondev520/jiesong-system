@@ -38,7 +38,7 @@ describe("AiAssistantModulePage", () => {
 
     expect(screen.getByRole("link", { name: "会话记录" })).toHaveAttribute(
       "href",
-      "/dashboard/ai/sessions",
+      "/dashboard/settings/ai-usage",
     );
     expect(
       screen.getByRole("heading", { name: "AI 助手" }),

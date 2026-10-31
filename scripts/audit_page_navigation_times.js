@@ -43,16 +43,16 @@ const allRoutes = [
   { id: 'finance_invoices', path: '/dashboard/finance/invoices' },
   { id: 'finance_reconciliation', path: '/dashboard/finance/reconciliation' },
   { id: 'products', path: '/dashboard/products' },
-  { id: 'ai_sessions', path: '/dashboard/ai/sessions' },
+  { id: 'ai_sessions', path: '/dashboard/settings/ai-usage' },
   { id: 'settings_home', path: '/dashboard/settings' },
-  { id: 'users', path: '/dashboard/users' },
+  { id: 'users', path: '/dashboard/settings/users' },
   { id: 'settings_ports', path: '/dashboard/settings/ports' },
   { id: 'settings_categories', path: '/dashboard/settings/categories' },
   { id: 'settings_customs_brokers', path: '/dashboard/settings/customs-brokers' },
-  { id: 'system_home', path: '/dashboard/system' },
-  { id: 'system_logs', path: '/dashboard/system/logs' },
-  { id: 'system_notifications', path: '/dashboard/system/notifications' },
-  { id: 'about', path: '/dashboard/about' },
+  { id: 'system_home', path: '/dashboard/settings' },
+  { id: 'system_logs', path: '/dashboard/settings/logs' },
+  { id: 'system_notifications', path: '/dashboard/notifications' },
+  { id: 'about', path: '/dashboard/settings/ai-access' },
 ];
 const routes = ROUTE_IDS.length > 0
   ? allRoutes.filter((route) => ROUTE_IDS.includes(route.id))

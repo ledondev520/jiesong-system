@@ -147,7 +147,7 @@ export default function AboutAgentPage() {
         description="让内部同事的 Agent 用几句话或几条命令，就能接上这套系统。"
         actions={
           <Button asChild variant="outline">
-            <Link href="/dashboard/users">
+            <Link href="/dashboard/settings/users">
               <KeyRound className="mr-2 h-4 w-4" />
               打开账号管理
             </Link>

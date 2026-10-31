@@ -143,7 +143,7 @@ export default function DashboardLayout({
       return;
     }
 
-    if (pathname === "/dashboard/system/notifications") return;
+    if (pathname === "/dashboard/notifications") return;
     const currentModule = getModuleByPath(pathname);
     if (!currentModule) {
       return;
