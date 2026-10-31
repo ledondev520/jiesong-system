@@ -198,3 +198,78 @@ test('DeepSeek service: DB 密钥优先、ENV 回退、profile/预算/本地问�
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.match(result.stdout, /deepseek synthetic checks completed/);
 });
+
+test('OpenAI service (mocked transport): env key only, OpenAI body shape, one bounded retry on 429/5xx, no retry on 401', () => {
+  const { spawnSync } = require('node:child_process');
+  // All keys and endpoints in this child are synthetic; fetch is stubbed so no real call is ever made.
+  const code = `
+    const assert = require('node:assert/strict');
+    const config = require('./src/config');
+    config.ai = { provider: 'openai', apiKey: 'test-only-openai-key', baseUrl: 'https://synthetic.invalid/v1', model: 'synthetic-openai-model', maxRetries: 1, maxOutputTokens: 16000 };
+    const prisma = require('./src/utils/prisma');
+    // The OpenAI key must never be read from (or overridden by) the database.
+    prisma.systemConfig.findUnique = async () => { throw new Error('openai key must not be looked up in the database'); };
+    prisma.systemConfig.findMany = async () => [];
+    const sse = (chunks) => new Response(chunks.map(chunk => 'data: ' + JSON.stringify(chunk) + '\\n\\n').join('') + 'data: [DONE]\\n\\n', { headers: { 'content-type': 'text/event-stream' } });
+    let phase = 'retry-then-ok';
+    const seen = [];
+    global.fetch = async (url, options) => {
+      const body = JSON.parse(options.body);
+      seen.push({ phase, url: String(url), auth: new Headers(options.headers).get('authorization'), body });
+      const count = seen.filter(call => call.phase === phase).length;
+      if (phase === 'retry-then-ok' && count === 1) return new Response(JSON.stringify({ error: { message: 'rate' } }), { status: 429, headers: { 'retry-after': '0', 'content-type': 'application/json' } });
+      if (phase === 'always-503') return new Response(JSON.stringify({ error: { message: 'down' } }), { status: 503, headers: { 'content-type': 'application/json' } });
+      if (phase === 'quota') return new Response(JSON.stringify({ error: { message: 'cap', type: 'insufficient_quota', code: 'insufficient_quota' } }), { status: 429, headers: { 'content-type': 'application/json' } });
+      if (phase === 'unauthorized') return new Response(JSON.stringify({ error: { message: 'bad key' } }), { status: 401, headers: { 'content-type': 'application/json' } });
+      return sse([{ choices: [{ delta: { content: 'OK' } }] }, { choices: [], usage: { prompt_tokens: 3, completion_tokens: 5 } }]);
+    };
+    const ai = require('./src/services/aiService');
+    (async () => {
+      assert.ok(Object.values(ai.MODELS).every(model => model === 'synthetic-openai-model'));
+      assert.deepEqual(ai.getAIModelOptions(), { model: 'synthetic-openai-model' });
+      assert.equal((await ai.estimateTokens([{ role: 'user', content: 'synthetic' }])).data.total_tokens > 0, true);
+      assert.equal((await ai.generateGreeting()).source, 'local');
+      assert.equal(seen.length, 0, 'budget estimate and greeting never call upstream');
+
+      const ok = await ai.callAI([{ role: 'user', content: 'synthetic' }], 'ignored-legacy-model');
+      assert.equal(ok.content, 'OK');
+      assert.equal(ok.model, 'synthetic-openai-model');
+      assert.deepEqual(ok.tokenUsage, { promptTokens: 3, outputTokens: 5 });
+      const calls = seen.filter(call => call.phase === 'retry-then-ok');
+      assert.equal(calls.length, 2, 'one 429 then one retry');
+      for (const call of calls) {
+        assert.equal(call.url, 'https://synthetic.invalid/v1/chat/completions');
+        assert.equal(call.auth, 'Bearer test-only-openai-key');
+        assert.equal(call.body.model, 'synthetic-openai-model');
+        assert.equal(call.body.stream, true);
+        assert.deepEqual(call.body.stream_options, { include_usage: true });
+        assert.ok(call.body.max_completion_tokens > 0);
+        for (const key of ['max_tokens', 'temperature', 'thinking', 'reasoning_effort']) assert.equal(Object.hasOwn(call.body, key), false, key);
+      }
+
+      phase = 'always-503';
+      const failed = await ai.callAI([{ role: 'user', content: 'synthetic' }]);
+      assert.equal(seen.filter(call => call.phase === 'always-503').length, 2, 'retries are bounded to maxRetries');
+      assert.ok(!failed.content.includes('test-only-openai-key'));
+
+      phase = 'unauthorized';
+      const denied = await ai.callAI([{ role: 'user', content: 'synthetic' }]);
+      assert.equal(seen.filter(call => call.phase === 'unauthorized').length, 1, '401 is never retried');
+      assert.match(denied.content, /API Key/);
+      phase = 'quota';
+      const capped = await ai.callAI([{ role: 'user', content: 'synthetic' }]);
+      assert.equal(seen.filter(call => call.phase === 'quota').length, 1, 'an exhausted spend cap is never retried');
+      assert.match(capped.content, /额度/);
+      assert.doesNotMatch(capped.content, /频繁/);
+      console.log('openai synthetic checks completed');
+    })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => prisma.$disconnect());
+  `;
+  const result = spawnSync(process.execPath, ['-e', code], {
+    cwd: require('node:path').resolve(__dirname, '../..'),
+    env: { ...process.env, NODE_ENV: 'test', AI_ALLOW_REMOTE: 'true', AI_PROVIDER: 'kimi', OPENAI_API_KEY: '' },
+    encoding: 'utf8', timeout: 8000,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /openai synthetic checks completed/);
+  assert.equal((result.stdout + result.stderr).includes('test-only-openai-key'), false, 'the key is never printed');
+});

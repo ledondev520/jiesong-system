@@ -92,14 +92,47 @@ if (envResult.error && envResult.error.code !== 'ENOENT') {
 }
 
 const aiProvider = (process.env.AI_PROVIDER || 'kimi').trim().toLowerCase();
-if (!['kimi', 'deepseek'].includes(aiProvider)) {
-  throw new Error('AI_PROVIDER 仅支持 kimi 或 deepseek');
+if (!['kimi', 'deepseek', 'openai'].includes(aiProvider)) {
+  throw new Error('AI_PROVIDER 仅支持 kimi、deepseek 或 openai');
 }
 const kimi = {
   provider: 'kimi',
   apiKey: process.env.KIMI_API_KEY || '',
   baseUrl: process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1',
 };
+
+// OpenAI：密钥只来自进程环境（生产由 PM2 node_args --env-file=/etc/openai/openai.env 注入），不入库、不写仓库、不打印。
+// 显式设置但非法/越界的值：AI_PROVIDER=openai 时启动失败（与 base URL 校验一致），其他供应商忽略并用默认值。
+const openaiIntEnv = (name, fallback, min, max) => {
+  const raw = (process.env[name] || '').trim();
+  if (!raw) return fallback;
+  const parsed = /^\d+$/.test(raw) ? Number.parseInt(raw, 10) : NaN;
+  if (parsed >= min && parsed <= max) return parsed;
+  if (aiProvider === 'openai') throw new Error(`${name} 必须是 ${min}–${max} 之间的整数`);
+  return fallback;
+};
+const openai = {
+  provider: 'openai',
+  apiKey: (process.env.OPENAI_API_KEY || '').trim(),
+  baseUrl: (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').trim(),
+  // 负责人决定（2026-10-31）：所有 OpenAI 调用（聊天、推荐、视觉、Agent）统一 gpt-6.1-terra，无廉价回退模型。
+  model: (process.env.OPENAI_MODEL || '').trim() || 'gpt-6.1-terra',
+  // 429/5xx 的有限重试次数（共用同一完整响应 deadline）；0 = 单次调用
+  maxRetries: openaiIntEnv('OPENAI_MAX_RETRIES', 1, 0, 2),
+  maxOutputTokens: openaiIntEnv('OPENAI_MAX_OUTPUT_TOKENS', 16000, 256, 128000),
+};
+if (aiProvider === 'openai') {
+  if (!openai.apiKey) {
+    throw new Error('AI_PROVIDER=openai 需要配置 OPENAI_API_KEY（OPENAI_MODEL 默认 gpt-6.1-terra）');
+  }
+  // 密钥只发往 https；http 仅允许本机回环（本地模拟服务）。
+  let endpoint;
+  try { endpoint = new URL(openai.baseUrl); } catch { throw new Error('OPENAI_BASE_URL 无效'); }
+  const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname);
+  if (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && loopback)) {
+    throw new Error('OPENAI_BASE_URL 必须使用 https（仅本机回环可用 http）');
+  }
+}
 
 // Optional email registration must be either fully configured or disabled.
 const emailKeys = ['ALIBABA_CLOUD_ACCESS_KEY_ID', 'ALIBABA_CLOUD_ACCESS_KEY_SECRET', 'JIESONG_EMAIL_FROM'];
@@ -121,12 +154,13 @@ const config = {
   },
   
   // 活动 AI 供系统聊天、HS 推荐与 Agent 使用；Kimi 独立配置保留兼容既有集成。
-  ai: aiProvider === 'deepseek' ? {
+  ai: aiProvider === 'openai' ? openai : aiProvider === 'deepseek' ? {
     provider: 'deepseek',
     apiKey: process.env.DEEPSEEK_API_KEY || '',
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
   } : kimi,
   kimi,
+  openai,
 
   // HSCIQ API 配置（海关编码智能查询）
   hsciq: {
