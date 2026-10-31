@@ -112,7 +112,7 @@ describe("Sidebar", () => {
 
     expect(getByText("出口订单").closest("a")).toHaveAttribute(
       "href",
-      "/dashboard/sales",
+      "/dashboard/orders",
     );
     expect(getByText("库存").closest("a")).toHaveAttribute(
       "href",

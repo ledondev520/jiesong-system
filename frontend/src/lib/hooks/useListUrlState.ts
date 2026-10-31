@@ -23,6 +23,17 @@ export const listUrlFields = {
     page: { default: 1 },
     pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
   },
+  // 出口订单列表；沿用旧 /dashboard/sales 的查询参数名（q、status、shipped、shippedFrom/To、storeId）
+  orders: {
+    keyword: { default: "", key: "q", resetPage: true },
+    status: { default: "", resetPage: true },
+    shipped: { default: "", values: ["", "true"], resetPage: true },
+    shippedFrom: { default: "", resetPage: true },
+    shippedTo: { default: "", resetPage: true },
+    storeId: { default: "", resetPage: true },
+    page: { default: 1 },
+    pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
+  },
   customs: {
     keyword: { default: "", resetPage: true },
     status: {

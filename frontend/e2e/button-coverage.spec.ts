@@ -23,7 +23,7 @@ const pageCases: PageCase[] = [
   // 该页面控件密集，限制巡检动作预算可降低偶发超时。
   { name: '采购创建', path: '/dashboard/purchase/create', minClicks: 0 },
   { name: '采购详情', path: '/dashboard/purchase/pc-001', minClicks: 0 },
-  { name: '出口合同', path: '/dashboard/sales' },
+  { name: '出口订单', path: '/dashboard/orders' },
   { name: '出口创建', path: '/dashboard/sales/create', minClicks: 0 },
   { name: '商品档案', path: '/dashboard/products' },
   { name: '库存状态', path: '/dashboard/inventory-status', minClicks: 0 },
