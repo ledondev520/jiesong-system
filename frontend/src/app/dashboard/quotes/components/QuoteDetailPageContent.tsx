@@ -25,7 +25,7 @@ import {
 } from "@/lib/quote";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SemanticBadge } from "@/components/ui/semantic-badge";
+import { SemanticBadge } from "@/components/ui/status-badge";
 import {
   Table,
   TableBody,

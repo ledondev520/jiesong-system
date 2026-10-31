@@ -3,7 +3,7 @@
  * Output: status badge using the shared semantic tones; 已过期 is shown beside SENT, never stored
  * Pos: quote list and detail
  */
-import { SemanticBadge } from "@/components/ui/semantic-badge";
+import { SemanticBadge } from "@/components/ui/status-badge";
 import {
   QUOTE_STATUS_LABEL,
   QUOTE_STATUS_TONE,

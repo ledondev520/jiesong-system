@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SemanticBadge } from "@/components/ui/semantic-badge";
+import { SemanticBadge } from "@/components/ui/status-badge";
 import { describeFailure } from "@/lib/error-reason";
 import { formatMoney } from "@/lib/format";
 import {
