@@ -80,7 +80,8 @@ const ALL_STORES = "ALL";
 /** 待确认的状态变更：单条或批量，确认后才调用接口 */
 type PendingChange =
   | { kind: "single"; id: string; label: string; status: InventoryStatus }
-  | { kind: "batch"; count: number; status: InventoryStatus };
+  // ids 在打开弹窗时固定：之后刷新缩小选择也不会让弹窗文案与实际更新的条数不一致。
+  | { kind: "batch"; ids: string[]; status: InventoryStatus };
 
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
   [InventoryStatus.PRODUCING]: "生产中",
@@ -320,7 +321,7 @@ export function InventoryTab() {
       toast.error("请先选择要更新的库存记录");
       return;
     }
-    setPendingChange({ kind: "batch", count: selectedIds.length, status });
+    setPendingChange({ kind: "batch", ids: [...selectedIds], status });
   };
 
   const confirmPendingChange = () => {
@@ -330,7 +331,7 @@ export function InventoryTab() {
     if (change.kind === "single") {
       void handleStatusChange(change.id, change.status);
     } else {
-      void handleBatchStatusChange(change.status);
+      void handleBatchStatusChange(change.ids, change.status);
     }
   };
 
@@ -365,23 +366,22 @@ export function InventoryTab() {
 
   /**
    * 职责：批量更新选中库存状态并回写结果。
+   * @param ids 打开确认弹窗时选中的库存ID
    * @param status 目标状态
    * @returns Promise<void>
    */
   const handleBatchStatusChange = async (
+    ids: string[],
     status: InventoryStatus,
   ): Promise<void> => {
-    if (selectedIds.length === 0) {
+    if (ids.length === 0) {
       toast.error("请先选择要更新的库存记录");
       return;
     }
 
     setBatchUpdating(true);
     try {
-      const response = await inventoryService.batchUpdateStatus(
-        selectedIds,
-        status,
-      );
+      const response = await inventoryService.batchUpdateStatus(ids, status);
       const result = response.data;
       if (result?.success) {
         toast.success(`批量更新完成：成功 ${result.success} 条`);
@@ -876,7 +876,7 @@ export function InventoryTab() {
               {pendingChange?.kind === "single"
                 ? `将「${pendingChange.label}」设为${STATUS_LABEL_MAP[pendingChange.status]}。`
                 : pendingChange
-                  ? `将选中的 ${pendingChange.count} 条库存设为${STATUS_LABEL_MAP[pendingChange.status]}。`
+                  ? `将选中的 ${pendingChange.ids.length} 条库存设为${STATUS_LABEL_MAP[pendingChange.status]}。`
                   : null}
               状态变更会改变可出库数量，请确认无误。
             </AlertDialogDescription>

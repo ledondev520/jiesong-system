@@ -10,8 +10,15 @@ const getAll = vi.fn(async (_params: unknown) => ({
     pagination: { total: 302, totalPages: 16 },
   },
 }));
+const batchUpdateStatus = vi.fn(async (_ids: string[], _status: string) => ({
+  data: { success: 2, failed: 0 },
+}));
 vi.mock("@/services/inventory.service", () => ({
-  inventoryService: { getAll: (...args: unknown[]) => getAll(args[0]) },
+  inventoryService: {
+    getAll: (...args: unknown[]) => getAll(args[0]),
+    batchUpdateStatus: (ids: string[], status: string) =>
+      batchUpdateStatus(ids, status),
+  },
 }));
 vi.mock("@/services/purchase.service", () => ({
   purchaseService: {
@@ -82,4 +89,41 @@ it("URL 中的店铺筛选发送到后端并可见", async () => {
     ),
   );
   expect((await screen.findAllByText("第二店")).length).toBeGreaterThan(0);
+});
+
+it("批量变更确认弹窗的条数与实际提交的库存一致", async () => {
+  getAll.mockResolvedValueOnce({
+    data: {
+      items: ["a", "b"].map((id) => ({
+        id: `manual-${id}`,
+        productId: "synthetic-product",
+        product: { customsName: `手工库存${id}` },
+        quantity: 5,
+        status: InventoryStatus.PACKING,
+        createdAt: "2026-10-01",
+        updatedAt: "2026-10-01",
+      })) as unknown as Inventory[],
+      pagination: { total: 2, totalPages: 1 },
+    },
+  });
+  batchUpdateStatus.mockClear();
+  const user = userEvent.setup();
+  render(<InventoryTab />);
+  const selectAll = await screen.findAllByRole("checkbox", {
+    name: "全选库存记录",
+  });
+  await user.click(selectAll[0]);
+  await user.click(
+    screen.getAllByRole("button", { name: "批量设为已入库" })[0],
+  );
+  expect(
+    await screen.findByText(/将选中的 2 条库存设为已入库/),
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "确认" }));
+  await waitFor(() =>
+    expect(batchUpdateStatus).toHaveBeenCalledWith(
+      ["manual-a", "manual-b"],
+      InventoryStatus.INBOUND,
+    ),
+  );
 });
