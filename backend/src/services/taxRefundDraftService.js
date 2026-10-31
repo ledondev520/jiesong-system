@@ -5,8 +5,8 @@
  */
 
 const prisma = require('../utils/prisma');
+const { roundMoney } = require('../utils/money');
 
-const roundCurrency = (value) => Number(value.toFixed(2));
 
 const buildRefundNo = (now, index) => {
   const datePart = [
@@ -113,7 +113,7 @@ const createDraftForDeclaration = async (declaration, now, index) => {
       forexVerificationId: forexVerification?.id || null,
       status: 'DRAFT',
       declaredAmount: declaration.totalAmount || 0,
-      refundableAmount: roundCurrency(refundableAmount),
+      refundableAmount: roundMoney(refundableAmount),
       refundedAmount: 0,
       appliedAt: now,
       note: noteParts.join('；'),

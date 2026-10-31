@@ -9,6 +9,7 @@
  */
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
+const { roundMoney } = require('../utils/money');
 const { createError } = require('../middleware/errorHandler');
 const { loadSellerIdentity } = require('./sellerIdentityService');
 const { applyTitle, styleTable, configureSheet } = require('./exportPacketService');
@@ -18,7 +19,6 @@ const SHANGHAI_OFFSET_MS = 8 * 3600 * 1000;
 const COLUMNS = ['No.', 'Description', 'Specification', 'HS Code', 'Quantity', 'Unit', 'Unit Price (USD)', 'Amount (USD)', 'Ship-to Store', 'Remarks'];
 
 const day = (date) => (date ? new Date(date.getTime() + SHANGHAI_OFFSET_MS).toISOString().slice(0, 10) : '-');
-const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 /** Plain document model; the only place quote fields are chosen for printing. */
 const buildQuoteDocument = (quote, seller = {}) => {
@@ -31,7 +31,7 @@ const buildQuoteDocument = (quote, seller = {}) => {
     if (!groups.length || groups.at(-1).store !== key) groups.push({ store: key, lines: [] });
     groups.at(-1).lines.push({
       description: item.product?.customsName || '', specification: item.specification || '', hsCode: item.product?.hsCode || '',
-      quantity: item.quantity, unit: item.unit || '', unitPrice: item.unitPrice, amount: round2(item.unitPrice * item.quantity),
+      quantity: item.quantity, unit: item.unit || '', unitPrice: item.unitPrice, amount: roundMoney(item.unitPrice * item.quantity),
       store: key, remarks: item.note || '',
     });
   }
@@ -39,7 +39,7 @@ const buildQuoteDocument = (quote, seller = {}) => {
   for (const group of groups) {
     group.lines.forEach((line) => { number += 1; line.index = number; });
     group.quantity = group.lines.reduce((sum, line) => sum + line.quantity, 0);
-    group.amount = round2(group.lines.reduce((sum, line) => sum + line.amount, 0));
+    group.amount = roundMoney(group.lines.reduce((sum, line) => sum + line.amount, 0));
   }
   const ports = [...new Set(sorted.map((item) => item.store?.port?.name).filter(Boolean))];
   return {
@@ -55,7 +55,7 @@ const buildQuoteDocument = (quote, seller = {}) => {
     bankDetails: seller.bank || '',
     groups,
     totalQuantity: groups.reduce((sum, group) => sum + group.quantity, 0),
-    totalAmount: round2(groups.reduce((sum, group) => sum + group.amount, 0)),
+    totalAmount: roundMoney(groups.reduce((sum, group) => sum + group.amount, 0)),
   };
 };
 

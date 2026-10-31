@@ -5,11 +5,11 @@
  */
 
 const prisma = require('../utils/prisma');
+const { roundMoney } = require('../utils/money');
 const { SALES_AMOUNT_SOURCE } = require('./salesContractAmount');
 
 const DEFAULT_CUSTOMER_KEY = 'SP FOOD';
 
-const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 const normalizeText = (value) => String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
 const extractContractNo = (value) => normalizeText(value).match(/EXP\d+/)?.[0] || null;
 const recognitionDate = (contract) => contract.shippedAt || contract.signedAt || null;

@@ -31,6 +31,7 @@ const {
   updatePurchaseProductionDetails,
 } = require('../services/purchaseProductionService');
 const purchaseInvoiceService = require('../services/purchaseInvoiceService');
+const { roundMoney } = require('../utils/money');
 
 /**
  * 职责：检查商品价格是否高于历史均价并生成警告
@@ -68,8 +69,8 @@ const checkPriceWarnings = async (items, prismaClient) => {
     if (diffPct > 10) {
       warnings.push({
         productId: item.productId,
-        currentPrice: Number(currentPrice.toFixed(2)),
-        averagePrice: Number(averagePrice.toFixed(2)),
+        currentPrice: roundMoney(currentPrice),
+        averagePrice: roundMoney(averagePrice),
         diffPct: Number(diffPct.toFixed(1)),
         message: `当前价格 ¥${currentPrice} 高于历史均价 ¥${averagePrice.toFixed(2)} ${diffPct.toFixed(1)}%，请说明原因`,
       });
@@ -636,13 +637,13 @@ const getProductPriceHistory = async (req, res, next) => {
     const maxPrice = Math.max(...priceValues);
 
     success(res, {
-      averagePrice: Number(averagePrice.toFixed(2)),
-      minPrice: Number(minPrice.toFixed(2)),
-      maxPrice: Number(maxPrice.toFixed(2)),
+      averagePrice: roundMoney(averagePrice),
+      minPrice: roundMoney(minPrice),
+      maxPrice: roundMoney(maxPrice),
       count: priceValues.length,
       history: prices.map((p) => ({
         contractNo: p.contractNo,
-        price: Number(p.price.toFixed(2)),
+        price: roundMoney(p.price),
         date: p.date,
       })),
       bySupplier: summarizePricesBySupplier(prices),
@@ -669,7 +670,7 @@ function summarizePricesBySupplier(prices) {
         supplierId: last.supplier.id,
         supplierName: last.supplier.shortName || last.supplier.name,
         hasQualityIssue: last.supplier.hasQualityIssue,
-        lastPrice: Number(last.price.toFixed(2)),
+        lastPrice: roundMoney(last.price),
         lastDate: last.date,
         lastContractNo: last.contractNo,
         lastTaxRate: last.taxRate,

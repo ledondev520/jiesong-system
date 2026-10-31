@@ -7,6 +7,7 @@
  */
 
 const crypto = require('crypto');
+const { roundMoney } = require('../utils/money');
 const ExcelJS = require('exceljs');
 const XLSX = require('xlsx');
 const prisma = require('../utils/prisma');
@@ -449,7 +450,6 @@ const createPreviewId = (buffer, year, month, periodLabel) => crypto
   .digest('hex');
 
 const countPopulatedFields = (record) => Object.values(record).filter((value) => value !== null).length;
-const roundMoney = (value) => Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 
 const buildStatementPreview = ({
   buffer,

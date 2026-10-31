@@ -9,6 +9,7 @@ const { createError } = require('../middleware/errorHandler');
 const { getPurchaseSettlementStatus } = require('./purchaseStateMachine');
 const { payableWhere, isInEffect, outstandingOf, getPayablesSummary } = require('./payablesService');
 const { getSalesSettlementStatus } = require('./salesStateMachine');
+const { roundMoney } = require('../utils/money');
 const {
   getEffectiveSalesContractTotal,
   getEffectiveSalesReceived,
@@ -768,8 +769,8 @@ const getStats = async () => {
   return {
     payable,
     receivable: {
-      total: Number(receivableTotals.total.toFixed(2)),
-      received: Number(receivableTotals.received.toFixed(2)),
+      total: roundMoney(receivableTotals.total),
+      received: roundMoney(receivableTotals.received),
       unreceived: Number((receivableTotals.total - receivableTotals.received).toFixed(2)),
     },
   };

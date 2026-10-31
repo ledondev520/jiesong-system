@@ -11,6 +11,7 @@
  */
 const { PURCHASE_STATUS } = require('../config/constants');
 const { normalizePurchaseStatus } = require('./purchaseStateMachine');
+const { toCents } = require('../utils/money');
 
 const PAYABLE_STATUSES = [
   PURCHASE_STATUS.SIGNED,
@@ -23,7 +24,6 @@ const PAYABLE_STATUSES = [
 
 const PAYABLE_SELECT = { id: true, status: true, totalAmount: true, paidAmount: true, expectedDate: true };
 
-const toCents = (value) => Math.round((Number(value) || 0) * 100);
 // 先规范化：历史行的旧别名（PENDING_INSPECTION、IN_STOCK）和小写拼写与状态机同口径，仍计入应付。
 const isInEffect = (contract) => PAYABLE_STATUSES.includes(normalizePurchaseStatus(contract?.status));
 

@@ -5,6 +5,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { roundMoney } = require('../utils/money');
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
 const {
@@ -14,10 +15,8 @@ const {
 } = require('./salesContractAmount');
 
 const SALES_SETTLEMENT_TYPES = new Set(['RECEIVABLE', 'RECEIVABLE_COLLECTION', 'INCOME']);
-const ROUNDING_EPSILON = Number.EPSILON;
 
-const roundMoney = (value) => Math.round((Number(value || 0) + ROUNDING_EPSILON) * 100) / 100;
-const roundPercent = (value) => Math.round((Number(value || 0) + ROUNDING_EPSILON) * 100) / 100;
+const roundPercent = roundMoney; // same 2-decimal rule
 const normalizeCurrency = (value) => String(value || '').trim().toUpperCase();
 const normalizeContractNo = (value) => String(value || '').replace(/\s+/g, '').toUpperCase();
 const unique = (values) => Array.from(new Set(values.filter(Boolean)));

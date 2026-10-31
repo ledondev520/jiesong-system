@@ -5,6 +5,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { roundMoney } = require('../utils/money');
 const { createError } = require('../middleware/errorHandler');
 const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { normalizePurchaseStatus, PURCHASE_STATUS } = require('./purchaseStateMachine');
@@ -34,7 +35,6 @@ const SALES_RANK = Object.freeze({
 });
 
 const unique = (values) => Array.from(new Set(values.filter(Boolean)));
-const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 const hasInvoiceNumbers = (value) => {
   try {
     return normalizeInvoiceNumbers(value).length > 0;
