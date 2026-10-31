@@ -76,6 +76,10 @@ export function OrderEditor() {
       .getAll({ pageSize: 100 })
       .then((response) => {
         setCustomers(response.data.items);
+        if (response.data.items.length === 0)
+          setLoadError(
+            "暂无启用的客户，请先到「客户与门店」新增客户后再建订单",
+          );
         // 只有一个启用客户（Seapot）时默认选中
         if (response.data.items.length === 1)
           applyCustomer(response.data.items[0]);

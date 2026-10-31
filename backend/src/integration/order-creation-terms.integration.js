@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-test('HTTP/SQLite: new orders adopt the single active customer, copy its terms and price unpriced lines by the rule', async (t) => {
+test('HTTP/SQLite: new orders need an active customer (none → 400), adopt a single one, copy its terms and price unpriced lines by the rule', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-order-terms-'));
   fs.chmodSync(directory, 0o700);
   const database = path.join(directory, 'synthetic.db');
@@ -46,19 +46,25 @@ test('HTTP/SQLite: new orders adopt the single active customer, copy its terms a
   const line = (extra = {}) => ({ productId: product.id, storeId: store.id, quantity: 10, costPrice: 10000, unit: '件', ...extra });
   const order = (extra = {}) => ({ exchangeRate: 6.72, items: [line()], ...extra });
 
-  // No customers yet (legacy database): creation still works with a null customer and the USD default.
-  const legacy = await create(order());
-  assert.equal(legacy.status, 201);
-  assert.equal(legacy.data.customerId, null);
-  assert.equal(legacy.data.currency, 'USD');
-  assert.equal(legacy.data.items[0].sellingPrice, 1995, '¥10,000 → 1993.87 → 1994 → 1995 by the locked rule');
-  assert.equal(legacy.data.totalAmount, 19950);
+  // No active customer: 400 with a clear message and nothing written (DATA-MODEL §2.4).
+  const none = await create(order());
+  assert.equal(none.status, 400);
+  assert.match(none.message, /请选择客户/);
+  assert.match(none.message, /客户与门店/);
+  assert.equal(await db.salesContract.count(), 0);
+  const archived = await db.customer.create({ data: { name: 'Synthetic Archived', isActive: false } });
+  assert.equal((await create(order())).status, 400, 'archived customers do not count as active');
+  assert.equal((await create(order({ customerId: archived.id }))).status, 400, 'an archived customer cannot be selected either');
+  assert.equal(await db.salesContract.count(), 0);
 
   // One active customer is adopted and its default terms are copied.
   const seapot = await db.customer.create({ data: { name: 'Synthetic Seapot', defaultIncoterm: 'FOB', defaultPaymentTerms: '30% deposit', defaultPortOfLoading: 'Shanghai' } });
   const adopted = await create(order());
   assert.equal(adopted.status, 201);
   assert.equal(adopted.data.customerId, seapot.id);
+  assert.equal(adopted.data.currency, 'USD');
+  assert.equal(adopted.data.items[0].sellingPrice, 1995, '¥10,000 → 1993.87 → 1994 → 1995 by the locked rule');
+  assert.equal(adopted.data.totalAmount, 19950);
   assert.deepEqual([adopted.data.incoterm, adopted.data.paymentTerms, adopted.data.portOfLoading], ['FOB', '30% deposit', 'Shanghai']);
   // Explicit values override the copied defaults; an explicit selling price is kept as entered.
   const explicit = await create(order({ incoterm: 'cif', paymentTerms: 'T/T', items: [line({ sellingPrice: 1234 })] }));

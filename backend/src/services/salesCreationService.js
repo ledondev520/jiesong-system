@@ -121,8 +121,8 @@ const createSalesContractAtomically = async (data, context = {}) => {
         ]);
         if (products !== productIds.length || stores !== storeIds.length) throw createError('商品或门店已不存在，请刷新后重新选择', 400);
       }
-      // 客户：显式选择必须存在且未归档；缺省时仅当恰有一个启用客户才采用，多个则要求选择。
-      // 与 DATA-MODEL-2026 §2.4 的差异：没有任何启用客户时（旧库/测试库）不阻断，客户留空。
+      // 客户（DATA-MODEL-2026 §2.4）：显式选择必须存在且未归档；缺省时仅当恰有一个启用客户才采用，
+      // 没有或有多个启用客户都返回 400「请选择客户」。
       let customer = null;
       if (input.customerId) {
         customer = await tx.customer.findUnique({ where: { id: input.customerId } });
@@ -130,8 +130,9 @@ const createSalesContractAtomically = async (data, context = {}) => {
         if (!customer.isActive) throw createError('客户已归档，不能新建订单', 400);
       } else {
         const active = await tx.customer.findMany({ where: { isActive: true }, take: 2 });
+        if (active.length === 0) throw createError('请选择客户：暂无启用的客户，请先在「客户与门店」新增客户', 400);
         if (active.length > 1) throw createError('请选择客户', 400);
-        customer = active[0] || null;
+        customer = active[0];
       }
       let pricedItems = input.items;
       if (input.items?.some(item => item.sellingPrice === undefined)) {
