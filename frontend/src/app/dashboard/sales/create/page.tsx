@@ -589,14 +589,6 @@ export default function CreateSalesPage() {
                                     stores={stores}
                                     value={field.value}
                                     onChange={field.onChange}
-                                    onCreated={(store) =>
-                                      setStores((current) => [
-                                        ...current.filter(
-                                          (item) => item.id !== store.id,
-                                        ),
-                                        store,
-                                      ])
-                                    }
                                   />
                                   <FormMessage />
                                 </FormItem>

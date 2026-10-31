@@ -25,6 +25,9 @@ export const listUrlFields = {
     shippedFrom: { default: "", resetPage: true },
     shippedTo: { default: "", resetPage: true },
     storeId: { default: "", resetPage: true },
+  customers: {
+    keyword: { default: "", resetPage: true },
+    archived: { default: "no", values: ["no", "yes"], resetPage: true },
     page: { default: 1 },
     pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
   },

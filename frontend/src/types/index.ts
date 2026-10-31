@@ -143,6 +143,32 @@ export interface Store {
   createdAt: string;
   updatedAt: string;
   port?: Port;
+  /** 迁移 A：所属客户、简称（2–12 位 A-Z0-9-）、经营主体 */
+  customerId?: string | null;
+  code?: string | null;
+  legalName?: string | null;
+  customer?: { id: string; name: string } | null;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  legalName?: string | null;
+  country?: string | null;
+  address?: string | null;
+  contactName?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  defaultCurrency: string;
+  defaultIncoterm: string;
+  defaultPaymentTerms?: string | null;
+  defaultPortOfLoading?: string | null;
+  note?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { stores: number };
+  stores?: Store[];
 }
 
 export interface Product {
