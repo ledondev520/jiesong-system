@@ -20,6 +20,8 @@ test('HTTP/SQLite：发运后不能通过销售或旧货柜入口篡改已出库
   execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbFile], { input: ddl });
   fs.chmodSync(dbFile, 0o600);
   db = require('../utils/prisma');
+  // Order creation needs exactly one active customer (DATA-MODEL §2.4).
+  await db.customer.create({ data: { name: '合成客户' } });
   const jwt = require('jsonwebtoken');
   const config = require('../config');
   const users = {};
