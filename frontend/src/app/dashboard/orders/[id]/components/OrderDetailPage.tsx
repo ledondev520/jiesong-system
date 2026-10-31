@@ -38,6 +38,7 @@ import {
 import { useAuthStore } from "@/store/auth.store";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { formatDate } from "@/lib/date-format";
+import type { LoadingPlan } from "@/lib/containerLoading";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -123,6 +124,11 @@ export function OrderDetailPage({ id }: { id: string }) {
   const [stores, setStores] = useState<Store[]>([]);
   const [inventories, setInventories] = useState<Inventory[]>([]);
   const [contractFiles, setContractFiles] = useState<ContractFile[]>([]);
+  // 装柜计划绑定到取得它时的合同对象：合同刷新后旧计划立即失效（fail closed）
+  const [planState, setPlanState] = useState<{
+    forContract: SalesContract;
+    plan: LoadingPlan | null;
+  } | null>(null);
   const [referenceDataLoading, setReferenceDataLoading] = useState(false);
   const referenceDataLoadedRef = useRef(false);
   const queryTab = resolveOrderTab(searchParams?.get("tab"));
@@ -194,6 +200,24 @@ export function OrderDetailPage({ id }: { id: string }) {
     void loadData();
   }, [loadData]);
 
+  // 排柜与出货门槛全部来自后端 loading-plan（与确认发运同一实现）
+  useEffect(() => {
+    if (!contract) return;
+    let cancelled = false;
+    salesService
+      .getLoadingPlan(id)
+      .then((res) => {
+        if (!cancelled)
+          setPlanState({ forContract: contract, plan: res.data ?? null });
+      })
+      .catch(() => {
+        if (!cancelled) setPlanState({ forContract: contract, plan: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [contract, id]);
+
   useEffect(() => {
     if (itemDialogOpen || activeTab === "container" || activeTab === "lines") {
       void loadReferenceData();
@@ -264,7 +288,7 @@ export function OrderDetailPage({ id }: { id: string }) {
   const readiness = evaluateOrderReadiness(
     contract.status,
     packingRows,
-    products,
+    planState?.forContract === contract ? planState.plan : null,
   );
   const nextStep = getNextStep(contract, {
     canGeneratePurchase: Boolean(role && PURCHASE_DRAFT_ROLES.includes(role)),

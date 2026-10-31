@@ -17,7 +17,6 @@ import {
   Truck,
 } from "lucide-react";
 import { SalesStatus, type SalesContract } from "@/types";
-import { CONTAINER_40HQ } from "@/lib/binPacking";
 import { formatDate } from "@/lib/date-format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -163,7 +162,7 @@ export function OrderOverviewTab({
         </Metric>
         <Metric label="未收款" value={usd(Math.max(total - received, 0))} />
         <Metric
-          label={`${readiness.totals.cartons} 箱 · 毛重 ${readiness.totals.grossKg.toLocaleString()} kg（${CONTAINER_40HQ.code}）`}
+          label={`${readiness.totals.cartons} 箱 · 毛重 ${readiness.totals.grossKg.toLocaleString()} kg（${readiness.plan?.containerType ?? "40HQ"}）`}
           value={`${readiness.totals.cargoCbm.toFixed(2)} CBM`}
         >
           <p

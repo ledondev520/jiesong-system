@@ -19,7 +19,7 @@ const inventorySnapshot = require('./inventorySnapshot');
 const { defaultSpotRate, orderMargin, orderRateInput, priceFor } = require('./exportPricing');
 const { categoryIdsByProduct, withCategoryChains } = require('./productCategoryChain');
 const { lastConfirmedPrices } = require('./lastConfirmedPrice');
-const { checkUtilisation, evaluateShipmentReadiness } = require('./shipmentReadinessService');
+const { buildLoadingPlan, checkUtilisation, evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { getContainerSpec } = require('./containerSpecs');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
@@ -179,6 +179,32 @@ const getSalesContractById = async (id) => {
   };
 };
 
+/** 只读装柜计划：柜型仅用于模拟，确认发运门槛固定按默认柜型。 */
+const getLoadingPlan = async (id, containerType) => {
+  getContainerSpec(containerType); // 先校验柜型，未知柜型 400，不读库
+  const contract = await prisma.salesContract.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      packingItems: {
+        select: {
+          id: true, productId: true, boxes: true, quantity: true, grossWeight: true, volume: true,
+          length: true, width: true, height: true,
+          product: {
+            select: {
+              customsName: true, length: true, width: true, height: true, volume: true,
+              category: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+  });
+  if (!contract) throw createError('出口合同不存在', 404);
+  return buildLoadingPlan(contract, { containerType }).plan;
+};
+
 // 完整明细及带请求键的创建走原子服务；既有仅建表头的调用保持兼容。
 const createSalesContract = async (data = {}, context = {}) => {
   if (data.items !== undefined || context.idempotencyKey) {
@@ -315,6 +341,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
                 width: true,
                 height: true,
                 volume: true,
+                category: { select: { name: true } },
               },
             },
           },
@@ -768,6 +795,7 @@ module.exports = {
   getThirdPartySources,
   getSalesContracts,
   getSalesContractById,
+  getLoadingPlan,
   createSalesContract,
   updateSalesContract,
   removeSalesContract,

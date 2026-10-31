@@ -1,14 +1,11 @@
 /**
- * Input: 装箱明细、柜型规格（config/containers.json，默认 40HQ）
- * Output: 利用率判定 checkUtilisation、完整装柜检查 evaluateLoadingCheck、兼容旧调用方的 evaluateShipmentReadiness
- * Pos: 出口合同确认发运前的权威门槛；柜型尺寸与限值只来自 containerSpecs
- *
- * C2 仍用本文件内的旧排柜算法判断“装得下”；C3 将替换为 containerPacking.js 并输出同形状的 plan。
+ * Input: 装箱明细、柜型规格（config/containers.json，默认 40HQ）、containerPacking 的多柜装柜计划
+ * Output: 利用率判定 checkUtilisation、完整装柜检查 evaluateLoadingCheck、装柜计划 buildLoadingPlan、兼容旧调用方的 evaluateShipmentReadiness
+ * Pos: 出口合同确认发运前的权威门槛；柜型尺寸与限值只来自 containerSpecs，排柜只来自 containerPacking
  */
 
-const { getContainerSpec, loadContainerConfig } = require('./containerSpecs');
-
-const BOX_GAP_MM = 10;
+const { getContainerSpec, listContainerTypes, loadContainerConfig } = require('./containerSpecs');
+const { toCartonLines, packContainers, usableMm } = require('./containerPacking');
 
 const toNumber = (value) => {
   const parsed = Number(value);
@@ -40,6 +37,8 @@ const checkUtilisation = (totals, spec, thresholdPct = loadContainerConfig().rea
   if (grossKg > spec.safeGrossKg) overReasons.push('weight');
   if (cargoCbm > spec.safeVolumeCbm) overReasons.push('volume');
   return {
+    containerType: spec.code,
+    thresholdPct,
     weightPct,
     volumePct,
     reachedBy: weightOk && volumeOk ? 'both' : weightOk ? 'weight' : volumeOk ? 'volume' : 'none',
@@ -54,11 +53,13 @@ const dimsText = (dims) => (dims ? `${dims.length}×${dims.width}×${dims.height
  * 在装柜计划上执行完整检查（PRD:138：任一指标 ≥ 阈值，且全部箱装得下，且不超限）。
  * @param {{ spec: object, totals: { cartons: number, grossKg: number, cargoCbm: number },
  *   lines: Array<{ name: string, cartons: number, dimsSource: string }>,
+ *   containers: Array<{ index: number, cartons: number, cogXmm: number }>,
  *   unplaced: Array<{ name: string, cartons: number, reason: string, cartonMm?: object }> }} plan
  * @param {{ packingLineCount: number, linesMissingBoxes: number }} facts
  */
 const evaluateLoadingCheck = (plan, facts) => {
   const { spec, totals } = plan;
+  const containers = plan.containers || [];
   const thresholdPct = loadContainerConfig().readyThresholdPct;
   const util = checkUtilisation(totals, spec, thresholdPct);
   const type = spec.code;
@@ -81,13 +82,12 @@ const evaluateLoadingCheck = (plan, facts) => {
   for (const entry of plan.unplaced.filter((item) => item.reason === 'oversize' || item.reason === 'door')) {
     add('oversize', `${entry.name} 箱规 ${dimsText(entry.cartonMm)} mm 超过${type}内尺寸，无法装入`);
   }
-  const unplacedCartons = plan.unplaced
-    .filter((item) => item.reason === 'no-space')
-    .reduce((sum, item) => sum + item.cartons, 0);
-  if (unplacedCartons > 0) {
-    // shortcut: C2 只有单柜排柜，所需柜数取容量下限；C3 改用多柜计划的真实柜数。
-    const needed = Math.max(2, Math.ceil(totals.cargoCbm / spec.safeVolumeCbm), Math.ceil(totals.grossKg / spec.safeGrossKg));
-    add('unplaced', `仍有 ${unplacedCartons} 箱装不下，共需 ${needed} 个${type}，请拆分订单或更换柜型`);
+  // 首柜之外的箱子（溢出柜 + 任何柜都放不进的箱）都意味着一个柜装不下。
+  const overflowCartons = containers.slice(1).reduce((sum, container) => sum + container.cartons, 0)
+    + plan.unplaced.filter((item) => item.reason === 'no-space').reduce((sum, item) => sum + item.cartons, 0);
+  // 汇总已超限时“超重/超体积”已说明一个柜装不下，不再重复提示溢出。
+  if (overflowCartons > 0 && util.overReasons.length === 0) {
+    add('unplaced', `仍有 ${overflowCartons} 箱装不下，共需 ${Math.max(2, containers.length)} 个${type}，请拆分订单或更换柜型`);
   }
   if (!util.utilisationReady) {
     const { weightPct, volumePct } = util;
@@ -101,6 +101,18 @@ const evaluateLoadingCheck = (plan, facts) => {
       code: 'estimated',
       message: `${estimatedLines} 行箱规为估算（按体积÷箱数推算），装柜结果仅供参考，请补充实际箱规`,
     });
+  }
+
+  const halfLength = usableMm(spec).length / 2;
+  for (const container of containers) {
+    const offset = container.cogXmm - halfLength;
+    if (Math.abs(offset) > halfLength * 0.2) {
+      const prefix = containers.length > 1 ? `第 ${container.index + 1} 柜` : '';
+      warnings.push({
+        code: 'cog-offset',
+        message: `${prefix}重心偏${offset > 0 ? '前' : '后'} ${(Math.abs(offset) / 1000).toFixed(2)} m，建议重新分布重货`,
+      });
+    }
   }
 
   const hardBlockers = blockers.filter((item) => item.code !== 'under-utilised');
@@ -120,101 +132,6 @@ const evaluateLoadingCheck = (plan, facts) => {
   };
 };
 
-// ---- 旧排柜算法（C3 替换）：按箱展开后做空间切分 ----
-
-const inferBoxDimensions = (volumeCbm, inner) => {
-  const base = Math.cbrt((volumeCbm * 1e9) / 0.96);
-  const clamp = (value, max) => Math.round(Math.max(100, Math.min(value, max)));
-  return {
-    length: clamp(base * 1.2, inner.length),
-    width: clamp(base, inner.width),
-    height: clamp(base * 0.8, inner.height),
-  };
-};
-
-/** 每行装箱明细一条；无箱规且无体积时标记 missing，不再伪造箱子。 */
-const buildPlanLines = (packingItems, inner) => packingItems.flatMap((item) => {
-  const cartons = Math.max(0, Math.trunc(toNumber(item.boxes)));
-  if (cartons === 0) return [];
-
-  const product = item.product || {};
-  const name = product.customsName || product.name || '未知商品';
-  const hasItemDimensions = item.length && item.width && item.height;
-  const hasProductDimensions = product.length && product.width && product.height;
-  if (hasItemDimensions || hasProductDimensions) {
-    const source = hasItemDimensions ? item : product;
-    return [{
-      lineId: item.id, name, cartons, dimsSource: hasItemDimensions ? 'line' : 'product',
-      cartonMm: { length: toNumber(source.length), width: toNumber(source.width), height: toNumber(source.height) },
-    }];
-  }
-
-  const itemVolume = toNumber(item.volume);
-  const productVolume = toNumber(product.volume);
-  const perCartonCbm = itemVolume > 0
-    ? itemVolume / cartons
-    : productVolume > 0 ? (productVolume * toNumber(item.quantity)) / cartons : 0;
-  if (perCartonCbm <= 0) return [{ lineId: item.id, name, cartons, dimsSource: 'missing', cartonMm: null }];
-  return [{ lineId: item.id, name, cartons, dimsSource: 'estimated', cartonMm: inferBoxDimensions(perCartonCbm, inner) }];
-});
-
-const packBoxes = (boxes, inner) => {
-  const placed = [];
-  const unplaced = [];
-  const spaces = [{ x: 0, y: 0, z: 0, length: inner.length, width: inner.width, height: inner.height }];
-
-  const sorted = [...boxes].sort((a, b) => (
-    (b.length * b.width * b.height) - (a.length * a.width * a.height)
-  ));
-
-  for (const box of sorted) {
-    let wasPlaced = false;
-    spaces.sort((a, b) => a.z - b.z || a.y - b.y || a.x - b.x);
-    const orientations = [
-      { length: box.length, width: box.width },
-      { length: box.width, width: box.length },
-    ];
-
-    for (let index = 0; index < spaces.length && !wasPlaced; index += 1) {
-      const space = spaces[index];
-      for (const orientation of orientations) {
-        if (orientation.length > space.length || orientation.width > space.width || box.height > space.height) continue;
-
-        placed.push(box);
-        spaces.splice(index, 1);
-        if (space.length - orientation.length - BOX_GAP_MM > 100) {
-          spaces.push({
-            x: space.x + orientation.length + BOX_GAP_MM, y: space.y, z: space.z,
-            length: space.length - orientation.length - BOX_GAP_MM, width: space.width, height: space.height,
-          });
-        }
-        if (space.width - orientation.width - BOX_GAP_MM > 100) {
-          spaces.push({
-            x: space.x, y: space.y + orientation.width + BOX_GAP_MM, z: space.z,
-            length: orientation.length, width: space.width - orientation.width - BOX_GAP_MM, height: space.height,
-          });
-        }
-        if (space.height - box.height - BOX_GAP_MM > 100) {
-          spaces.push({
-            x: space.x, y: space.y, z: space.z + box.height + BOX_GAP_MM,
-            length: orientation.length, width: orientation.width, height: space.height - box.height - BOX_GAP_MM,
-          });
-        }
-        wasPlaced = true;
-        break;
-      }
-    }
-    if (!wasPlaced) unplaced.push(box);
-  }
-  return { placed, unplaced };
-};
-
-const fitsEmptyContainer = (dims, inner) => (
-  dims.height <= inner.height
-  && ((dims.length <= inner.length && dims.width <= inner.width)
-    || (dims.width <= inner.length && dims.length <= inner.width))
-);
-
 /** 汇总量取自装箱明细（与 recalculateContractStats 一致），不信任可编辑的合同头。 */
 const sumTotals = (packingItems) => ({
   cartons: packingItems.reduce((sum, item) => sum + Math.max(0, Math.trunc(toNumber(item.boxes))), 0),
@@ -223,64 +140,71 @@ const sumTotals = (packingItems) => ({
 });
 
 /**
- * 兼容 salesService / tradeWorkflowService：返回旧字段并附带 check。
+ * 装柜计划（含检查）。utilisationOnly：历史数据只看汇总利用率，不排柜。
  * @param {{ packingItems?: object[] }} salesContract
- * @param {{ containerType?: string, utilisationOnly?: boolean }} options utilisationOnly：历史数据不排柜
+ * @param {{ containerType?: string, utilisationOnly?: boolean }} options
  */
-const evaluateShipmentReadiness = (salesContract, { containerType, utilisationOnly = false } = {}) => {
+const buildLoadingPlan = (salesContract, { containerType, utilisationOnly = false } = {}) => {
+  const config = loadContainerConfig();
   const spec = getContainerSpec(containerType);
   const packingItems = salesContract.packingItems || [];
   const totals = sumTotals(packingItems);
   const linesMissingBoxes = packingItems.filter((item) => toNumber(item.boxes) <= 0).length;
 
-  const lines = utilisationOnly ? [] : buildPlanLines(packingItems, spec.innerMm);
-  const boxes = lines.filter((line) => line.cartonMm).flatMap((line) => Array.from({ length: line.cartons }, () => ({
-    ...line.cartonMm, lineId: line.lineId, name: line.name,
-  })));
-  const packed = packBoxes(boxes, spec.innerMm);
-
-  const unplacedByLine = new Map();
-  for (const box of packed.unplaced) {
-    const reason = fitsEmptyContainer(box, spec.innerMm) ? 'no-space' : 'oversize';
-    const key = `${box.lineId}:${reason}`;
-    const entry = unplacedByLine.get(key) || {
-      lineId: box.lineId, name: box.name, reason, cartons: 0,
-      cartonMm: { length: box.length, width: box.width, height: box.height },
-    };
-    entry.cartons += 1;
-    unplacedByLine.set(key, entry);
-  }
-
+  const lines = utilisationOnly ? [] : toCartonLines(packingItems, spec, config);
+  const packed = packContainers(lines, spec, config);
+  const plan = {
+    algorithm: 'block-ep-v1',
+    containerType: spec.code,
+    container: { ...spec, usableMm: usableMm(spec, config) },
+    availableTypes: listContainerTypes(),
+    lines,
+    containers: packed.containers,
+    unplaced: packed.unplaced,
+    totals,
+  };
   const check = evaluateLoadingCheck(
-    { spec, totals, lines, unplaced: [...unplacedByLine.values()] },
+    { spec, totals, lines, containers: packed.containers, unplaced: packed.unplaced },
     { packingLineCount: packingItems.length, linesMissingBoxes },
   );
-  const overloadReasons = [];
-  if (check.blockers.some((item) => item.code === 'over-weight')) overloadReasons.push('weight');
-  if (check.blockers.some((item) => item.code === 'over-volume')) overloadReasons.push('volume');
+  return { plan: { ...plan, check }, spec, linesMissingBoxes };
+};
+
+/**
+ * 兼容 salesService / tradeWorkflowService：返回旧字段并附带 check 与 plan。
+ * 门槛按单个柜判定：首柜之外的箱都算“没装下”。
+ */
+const evaluateShipmentReadiness = (salesContract, options = {}) => {
+  const { plan, spec, linesMissingBoxes } = buildLoadingPlan(salesContract, options);
+  const { check, totals, lines } = plan;
   const util = checkUtilisation(totals, spec, check.thresholdPct);
+  const placedBoxCount = plan.containers.reduce((sum, container) => sum + container.cartons, 0);
+  const firstContainerCartons = plan.containers[0]?.cartons ?? 0;
+  const unplacedBoxCount = plan.unplaced.reduce((sum, item) => sum + item.cartons, 0) + placedBoxCount - firstContainerCartons;
 
   return {
     weightPct: check.weightPct,
     volumePct: check.volumePct,
     utilizationReady: util.utilisationReady,
-    overloaded: overloadReasons.length > 0,
-    overloadReasons,
-    physicalFit: packed.unplaced.length === 0 && totals.cartons > 0 && linesMissingBoxes === 0
+    overloaded: util.overReasons.length > 0,
+    overloadReasons: util.overReasons,
+    physicalFit: unplacedBoxCount === 0 && totals.cartons > 0 && linesMissingBoxes === 0
       && !lines.some((line) => line.dimsSource === 'missing'),
-    placedBoxCount: packed.placed.length,
-    unplacedBoxCount: packed.unplaced.length,
+    placedBoxCount: firstContainerCartons,
+    unplacedBoxCount,
     estimatedDimensionCount: lines.filter((line) => line.dimsSource === 'estimated')
       .reduce((sum, line) => sum + line.cartons, 0),
     missingBoxItemCount: linesMissingBoxes,
     blockers: check.blockers.map((item) => item.code),
     ready: check.ready,
     check,
+    plan,
   };
 };
 
 module.exports = {
   checkUtilisation,
   evaluateLoadingCheck,
+  buildLoadingPlan,
   evaluateShipmentReadiness,
 };

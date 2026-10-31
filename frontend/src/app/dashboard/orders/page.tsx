@@ -1,6 +1,6 @@
 /**
  * Input: 出口订单服务、列表 URL 状态（q/status/shipped/shippedFrom/shippedTo/storeId/page/pageSize，沿用旧 /sales 参数名）
- * Output: 出口订单表格（服务端分页、状态 chip、关键词），行点击进入订单详情
+ * Output: 出口订单表格（服务端分页、状态 chip、关键词、发运前利用率徽章），行点击进入订单详情
  * Pos: 业务 > 出口订单；旧 /dashboard/sales 列表重定向到这里。详情在 /dashboard/orders/[id]，新建在 /dashboard/orders/new
  */
 "use client";
@@ -14,7 +14,7 @@ import { AmountText } from "@/components/ui/amount-text";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { SemanticBadge, StatusBadge } from "@/components/ui/status-badge";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { formatMoney } from "@/lib/format";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
@@ -30,6 +30,40 @@ const STATUS_FILTERS: { status: SalesStatus; label: string }[] = [
   { status: SalesStatus.ARRIVED, label: "已到达" },
   { status: SalesStatus.COMPLETED, label: "已完成" },
 ];
+
+// 后端列表附带的 40HQ 汇总利用率（毛重或体积任一 ≥ 阈值）；能否装得下以详情页排柜为准
+type OrderRow = SalesContract & {
+  loadingUtilisation?: {
+    thresholdPct: number;
+    weightPct: number;
+    volumePct: number;
+    utilisationReady: boolean;
+  };
+};
+
+const BEFORE_SHIPMENT: SalesStatus[] = [
+  SalesStatus.DRAFT,
+  SalesStatus.CONFIRMED,
+  SalesStatus.PACKING,
+];
+
+const pctText = (pct: number) => (Math.floor(pct * 10) / 10).toFixed(1);
+
+/** 职责：发运前订单的利用率徽章「利用率达标」/「未达80%」；不称「可出柜」 */
+function UtilisationBadge({ order }: { order: OrderRow }) {
+  const utilisation = order.loadingUtilisation;
+  if (!utilisation || !BEFORE_SHIPMENT.includes(order.status)) return null;
+  return utilisation.utilisationReady ? (
+    <SemanticBadge tone="success">利用率达标</SemanticBadge>
+  ) : (
+    <SemanticBadge
+      tone="warning"
+      title={`毛重 ${pctText(utilisation.weightPct)}% / 体积 ${pctText(utilisation.volumePct)}%，任一 ≥ ${utilisation.thresholdPct}% 视为利用率达标；是否装得下以详情页排柜为准`}
+    >
+      未达{utilisation.thresholdPct}%
+    </SemanticBadge>
+  );
+}
 
 const dateText = (value?: string) => (value ? value.slice(0, 10) : "—");
 
@@ -47,7 +81,7 @@ function OrdersList() {
     shippedTo,
     storeId,
   } = filters;
-  const [items, setItems] = useState<SalesContract[]>([]);
+  const [items, setItems] = useState<OrderRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
@@ -94,7 +128,7 @@ function OrdersList() {
     void load();
   }, [load]);
 
-  const columns: DataTableColumn<SalesContract>[] = [
+  const columns: DataTableColumn<OrderRow>[] = [
     {
       key: "contractNo",
       header: "订单号",
@@ -120,6 +154,11 @@ function OrdersList() {
       header: "状态",
       cell: (order) => <StatusBadge status={order.status} />,
       hideable: false,
+    },
+    {
+      key: "utilisation",
+      header: "装柜利用率",
+      cell: (order) => <UtilisationBadge order={order} />,
     },
     {
       key: "totalAmount",
@@ -178,7 +217,12 @@ function OrdersList() {
                   {order.stores?.length ? order.stores.join("、") : "—"} ·{" "}
                   {order.port?.name ?? "—"}
                 </p>
-                <AmountText>{formatMoney(order.totalAmount, "USD")}</AmountText>
+                <div className="flex items-center justify-between gap-2">
+                  <AmountText>
+                    {formatMoney(order.totalAmount, "USD")}
+                  </AmountText>
+                  <UtilisationBadge order={order} />
+                </div>
               </CardContent>
             </Card>
           </Link>

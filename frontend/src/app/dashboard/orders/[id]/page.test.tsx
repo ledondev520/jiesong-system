@@ -10,6 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
+import { twoContainerPlan } from "@/components/container/containerFixtures";
+import type { LoadingPlan } from "@/lib/containerLoading";
 import SalesDetailPage from "./page";
 
 let mockSearch = new URLSearchParams("tab=container");
@@ -19,6 +21,48 @@ const mockIsMobile = vi.fn(() => false);
 vi.mock("@/lib/hooks/useMobile", () => ({ useMobile: () => mockIsMobile() }));
 
 const mockGetById = vi.fn();
+const mockGetLoadingPlan = vi.fn();
+
+/** 后端 loading-plan 的合成响应：排柜与门槛只由后端给出，前端只渲染 check */
+const planWith = (
+  check: Partial<LoadingPlan["check"]>,
+  unplacedCartons = 0,
+): LoadingPlan => {
+  const base = twoContainerPlan();
+  return {
+    ...base,
+    containers: [base.containers[0]],
+    unplaced: unplacedCartons
+      ? [
+          {
+            lineId: "l1",
+            name: "合成货物",
+            cartons: unplacedCartons,
+            reason: "no-space",
+            cartonMm: null,
+          },
+        ]
+      : [],
+    check: { ...base.check, warnings: [], blockers: [], ...check },
+  };
+};
+const READY_PLAN = planWith({
+  ready: true,
+  status: "ready",
+  weightPct: 81,
+  volumePct: 50,
+  reachedBy: "weight",
+  headline: "满足出柜条件且全部箱件可装下",
+});
+const BLOCKED_OVERSIZE = planWith(
+  {
+    ready: false,
+    status: "blocked",
+    blockers: [{ code: "oversize", message: "x" }],
+    headline: "超长货物 箱规 13000×1000×1000 mm 超过40HQ内尺寸，无法装入",
+  },
+  1,
+);
 const mockProductGetAll = vi.fn();
 const mockStoreGetAll = vi.fn();
 const mockInventoryGetAll = vi.fn();
@@ -57,6 +101,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/services/sales.service", () => ({
   salesService: {
     getById: (...args: unknown[]) => mockGetById(...args),
+    getLoadingPlan: (...args: unknown[]) => mockGetLoadingPlan(...args),
     update: (...args: unknown[]) => mockUpdateSales(...args),
     addPackingItem: vi.fn(),
     updatePackingItem: vi.fn(),
@@ -139,6 +184,8 @@ describe("OrderDetailPage 交互逻辑", () => {
     mockIsMobile.mockReturnValue(false);
     mockSearch = new URLSearchParams("tab=container");
     mockGetById.mockReset();
+    mockGetLoadingPlan.mockReset();
+    mockGetLoadingPlan.mockResolvedValue({ data: READY_PLAN });
     mockProductGetAll.mockReset();
     mockStoreGetAll.mockReset();
     mockInventoryGetAll.mockReset();
@@ -365,7 +412,7 @@ describe("OrderDetailPage 交互逻辑", () => {
     });
   });
 
-  it("导出 PDF 按钮已移除，页面只保留保存为图片", async () => {
+  it("导出合同 PDF 按钮已移除", async () => {
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -563,6 +610,7 @@ describe("OrderDetailPage 交互逻辑", () => {
   });
 
   it("商业利用率达标但有箱件未装下时禁止登记发运", async () => {
+    mockGetLoadingPlan.mockResolvedValue({ data: BLOCKED_OVERSIZE });
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -592,12 +640,24 @@ describe("OrderDetailPage 交互逻辑", () => {
     renderPage("s-1");
 
     expect(
-      await screen.findByText("不可出货：仍有 1 箱未装下"),
+      await screen.findByText(
+        "不可出货：超长货物 箱规 13000×1000×1000 mm 超过40HQ内尺寸，无法装入",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled();
   });
 
   it("合同头虚高但明细合计未达标时禁止登记发运（与后端同源取明细合计）", async () => {
+    mockGetLoadingPlan.mockResolvedValue({
+      data: planWith({
+        ready: false,
+        status: "under-utilised",
+        weightPct: 22.7,
+        volumePct: 1.5,
+        reachedBy: "none",
+        headline: "未达出柜标准",
+      }),
+    });
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -641,6 +701,35 @@ describe("OrderDetailPage 交互逻辑", () => {
     expect(screen.getByText("1 箱，1.00 CBM")).toBeInTheDocument();
   });
 
+  it("装柜计划取不到时 fail closed：不可登记发运并提示正在核对", async () => {
+    mockGetLoadingPlan.mockRejectedValue(new Error("boom"));
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 1,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-1",
+            productId: "p-1",
+            boxes: 1,
+            quantity: 1,
+            volume: 60,
+            grossWeight: 18000,
+            product: { id: "p-1", customsName: "大宗货物" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+    renderPage("s-1");
+
+    expect(await screen.findByText("正在核对装柜…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled();
+  });
+
   it("合同头偏低但明细合计达标时允许登记发运（与后端同源取明细合计）", async () => {
     mockGetById.mockResolvedValue({
       data: {
@@ -671,12 +760,20 @@ describe("OrderDetailPage 交互逻辑", () => {
 
     renderPage("s-1");
 
-    expect(
-      await screen.findByRole("button", { name: "登记发运" }),
-    ).toBeEnabled();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "登记发运" })).toBeEnabled(),
+    );
   });
 
   it("商业利用率达标但有明细未填箱数时禁止登记发运，与后端一致", async () => {
+    mockGetLoadingPlan.mockResolvedValue({
+      data: planWith({
+        ready: false,
+        status: "blocked",
+        blockers: [{ code: "missing-box-count", message: "x" }],
+        headline: "1 行装箱明细未填写箱数",
+      }),
+    });
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -714,6 +811,7 @@ describe("OrderDetailPage 交互逻辑", () => {
   it.each(["SHIPPED", "ARRIVED", "COMPLETED"])(
     "已发运阶段 %s 的模拟异常明确标为历史核对",
     async (status) => {
+      mockGetLoadingPlan.mockResolvedValue({ data: BLOCKED_OVERSIZE });
       mockGetById.mockResolvedValue({
         data: {
           id: "s-1",
@@ -741,7 +839,9 @@ describe("OrderDetailPage 交互逻辑", () => {
       });
       renderPage("s-1");
       expect(
-        await screen.findByText("历史装箱数据待核对：仍有 1 箱未装下"),
+        await screen.findByText(
+          "历史装箱数据待核对：超长货物 箱规 13000×1000×1000 mm 超过40HQ内尺寸，无法装入",
+        ),
       ).toBeInTheDocument();
       expect(
         screen.getByText("当前资料的模拟结果，不代表实际发运结果"),
@@ -785,7 +885,7 @@ describe("OrderDetailPage 交互逻辑", () => {
     renderPage("s-1");
 
     const shipButton = await screen.findByRole("button", { name: "登记发运" });
-    expect(shipButton).toBeEnabled();
+    await waitFor(() => expect(shipButton).toBeEnabled());
     await user.click(shipButton);
     expect(mockUpdateSalesStatus).not.toHaveBeenCalled();
     await user.click(
@@ -880,7 +980,7 @@ describe("OrderDetailPage 交互逻辑", () => {
     ).toBeInTheDocument();
   });
 
-  it("手机上 3D 装箱不渲染 3D 场景，只给出说明；桌面照常渲染", async () => {
+  it("手机上装柜面板不渲染 3D 场景而用 2D 回退；桌面照常渲染 3D", async () => {
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -911,7 +1011,9 @@ describe("OrderDetailPage 交互逻辑", () => {
     const { unmount } = renderPage("s-1");
     await user.click(await screen.findByRole("tab", { name: "货柜" }));
     expect(
-      await screen.findByText(/3D 装箱视图仅在电脑上提供/),
+      within(await screen.findByTestId("container-view")).getByTestId(
+        "container-plan-2d",
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText("3D容器视图")).not.toBeInTheDocument();
     unmount();

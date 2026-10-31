@@ -457,14 +457,6 @@ export interface SalesContract {
   stores?: string[]; // 关联门店名称列表（由后端聚合自 packingItems）
   hasThirdPartyCargo?: boolean;
   sourceParties?: string[];
-  /** 列表接口返回的 40HQ 汇总利用率（未排柜；百分比未取整），装得下与否仅在详情页判定 */
-  loadingUtilisation?: {
-    weightPct: number;
-    volumePct: number;
-    reachedBy: "weight" | "volume" | "both" | "none";
-    utilisationReady: boolean;
-    overReasons: Array<"weight" | "volume">;
-  };
 }
 
 export interface LinkedPurchaseContract {

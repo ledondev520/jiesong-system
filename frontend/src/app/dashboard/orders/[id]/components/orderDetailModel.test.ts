@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { PurchaseStatus, SalesStatus, type SalesContract } from "@/types";
+import {
+  PurchaseStatus,
+  SalesStatus,
+  type PackingItem,
+  type SalesContract,
+} from "@/types";
 import {
   buildStoreFulfilment,
   getNextStep,
   pendingPurchaseItems,
   resolveOrderTab,
+  sumPackingTotals,
 } from "./orderDetailModel";
 
 const order = (overrides: Partial<SalesContract> = {}) =>
@@ -155,5 +161,28 @@ describe("buildStoreFulfilment", () => {
     );
     expect(rows.find((r) => r.storeId === "st1")?.packed).toBe(6);
     expect(rows.find((r) => r.storeId === "")?.packed).toBe(3);
+  });
+});
+
+describe("sumPackingTotals", () => {
+  it("按明细行合计毛重与体积，忽略空值与负数", () => {
+    expect(
+      sumPackingTotals([
+        { id: "a", productId: "p", boxes: 3, grossWeight: 5000, volume: 1.5 },
+        { id: "b", productId: "p", boxes: -2, grossWeight: null, volume: -3 },
+        {
+          id: "c",
+          productId: "p",
+          boxes: 2.9,
+          grossWeight: 10,
+          volume: undefined,
+        },
+      ] as unknown as PackingItem[]),
+    ).toEqual({ cartons: 5, grossKg: 5010, cargoCbm: 1.5 });
+    expect(sumPackingTotals([])).toEqual({
+      cartons: 0,
+      grossKg: 0,
+      cargoCbm: 0,
+    });
   });
 });

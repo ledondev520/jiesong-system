@@ -7,6 +7,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  buildLoadingPlan,
   checkUtilisation,
   evaluateLoadingCheck,
   evaluateShipmentReadiness,
@@ -159,4 +160,46 @@ test('evaluateLoadingCheck: 任一阻塞时 status 为 blocked，仅未达标时
   const blocked = evaluateLoadingCheck(plan, { packingLineCount: 1, linesMissingBoxes: 2 });
   assert.equal(blocked.status, 'blocked');
   assert.equal(blocked.headline, '2 行装箱明细未填写箱数');
+});
+
+test('buildLoadingPlan: 汇总未超限但几何上装不下时，溢出柜计入 unplaced 阻塞并给出所需柜数', () => {
+  const chairs = {
+    id: 'c1', productId: 'c1', boxes: 200, quantity: 200, grossWeight: 2800, volume: 40,
+    length: 650, width: 600, height: 950, product: { customsName: '餐椅', category: { name: '家具' } },
+  };
+  const { plan } = buildLoadingPlan({ packingItems: [chairs] });
+  assert.equal(plan.algorithm, 'block-ep-v1');
+  assert.equal(plan.containers.length, 2);
+  assert.equal(plan.lines[0].profile, 'furniture');
+  const unplaced = plan.check.blockers.find((item) => item.code === 'unplaced');
+  assert.match(unplaced.message, /^仍有 80 箱装不下，共需 2 个40HQ/);
+  assert.equal(plan.check.status, 'blocked');
+  assert.deepEqual(plan.availableTypes[0], { code: '40HQ', label: '40HQ 高柜' });
+  assert.equal(plan.container.usableMm.length, 12000);
+});
+
+test('buildLoadingPlan: 汇总已超重时只报超重，不重复提示溢出', () => {
+  const tiles = {
+    id: 't1', productId: 't1', boxes: 800, quantity: 800, grossWeight: 800 * 31, volume: 15,
+    length: 620, width: 620, height: 50, product: { customsName: '瓷砖', category: { name: '瓷砖' } },
+  };
+  const { plan } = buildLoadingPlan({ packingItems: [tiles] });
+  assert.equal(plan.containers.length, 2);
+  assert.deepEqual(plan.check.blockers.map((item) => item.code).filter((code) => code !== 'under-utilised'), ['over-weight']);
+});
+
+test('buildLoadingPlan: 指定 20GP 仅模拟，用 20GP 的内尺寸与限值', () => {
+  const { plan } = buildLoadingPlan({ packingItems: [{ ...fitItem, volume: 20 }] }, { containerType: '20GP' });
+  assert.equal(plan.containerType, '20GP');
+  assert.equal(plan.container.safeVolumeCbm, 28);
+});
+
+test('evaluateLoadingCheck: 重心偏离超过柜长 20% 给出提示但不阻塞', () => {
+  const plan = {
+    spec, totals: { cartons: 1, grossKg: 18000, cargoCbm: 55 }, lines: [], unplaced: [],
+    containers: [{ index: 0, cartons: 1, cogXmm: 2500 }],
+  };
+  const check = evaluateLoadingCheck(plan, { packingLineCount: 1, linesMissingBoxes: 0 });
+  assert.equal(check.ready, true);
+  assert.match(check.warnings.find((item) => item.code === 'cog-offset').message, /^重心偏后 3\.50 m/);
 });

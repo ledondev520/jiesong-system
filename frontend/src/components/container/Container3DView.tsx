@@ -1,160 +1,200 @@
 /**
- * Input: 装箱明细（PackingItem[]）、商品信息（Product[]）
- * Output: 3D货柜可视化组件（含悬浮提示 + 尺寸自动推算）
- * Pos: 货柜管理组件，展示3D装箱效果
- * 
+ * Input: 后端装柜计划 LoadingPlan（块状装柜结果）及可选柜序号
+ * Output: 3D货柜可视化组件（每个块一个 InstancedMesh、悬浮提示、「估算」标注）
+ * Pos: 货柜管理组件，只渲染后端计划，不再自行排柜
+ *
  * 2026-01-26: 新增悬浮提示功能，鼠标移到箱子上显示商品名称和尺寸
- * 2026-03-29: 当 PackingItem/Product 未填写长宽高时，自动从体积（volume/boxes）反推尺寸
- *             推算的箱子以虚线边框区分，悬浮提示中注明"尺寸已预估"
- * 
+ * 2026-03-29: 箱规由体积推算的行用橙色边框区分，悬浮提示中注明"尺寸已预估"
+ * 2026-10-31: 排柜移到后端（containerPacking.js）；本组件改为接收 plan，一个块用一个 InstancedMesh，
+ *             柜体尺寸取自 plan.container（不再硬编码）
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useRef, useMemo, Suspense, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Text, PerspectiveCamera, Html } from '@react-three/drei';
-import * as THREE from 'three';
-import { PackingItem, Product } from '@/types';
-import { 
-  buildPackingBoxes,
-  packBoxes, 
-  PlacedBox, 
-  CONTAINER_40HQ, 
+import { useLayoutEffect, useMemo, useRef, Suspense, useState } from "react";
+import { Canvas } from "@react-three/fiber";
+import {
+  OrbitControls,
+  Text,
+  PerspectiveCamera,
+  Html,
+} from "@react-three/drei";
+import * as THREE from "three";
+import {
   mmToM,
-} from '@/lib/binPacking';
+  type LoadingPlan,
+  type PlacedBlock,
+  type PlanLine,
+} from "@/lib/containerLoading";
 
 interface Container3DViewProps {
-  packingItems: PackingItem[];
-  products: Product[];
+  plan: LoadingPlan;
+  /** 溢出柜序号，默认 0（本合同的柜） */
+  containerIndex?: number;
 }
 
+const CARTON_SHRINK = 0.985; // 箱间留出视觉缝隙
+
 /**
- * 职责：渲染单个箱子（含悬浮提示）
- * 思路：isEstimated 箱子用橙色虚线边框区分，悬浮提示中注明尺寸来源
+ * 职责：渲染一个块（nx×ny×nz 个相同纸箱）：InstancedMesh + 一个块外框
+ * 思路：坐标映射 毫米(x,y,z) → Three(x, z, y)，即 z 向上；估算行外框用橙色
  */
-function BoxMesh({ 
-  box, 
-  onClick,
+function BlockMesh({
+  block,
+  line,
+  hovered,
   onHover,
-  isHovered,
-}: { 
-  box: PlacedBox; 
-  onClick?: () => void;
-  onHover?: (hovered: boolean) => void;
-  isHovered?: boolean;
+}: {
+  block: PlacedBlock;
+  line: PlanLine | undefined;
+  hovered: boolean;
+  onHover: (hovered: boolean) => void;
 }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  
-  // 转换尺寸到米
-  const size = useMemo(() => ({
-    x: mmToM(box.length),
-    y: mmToM(box.height),
-    z: mmToM(box.width),
-  }), [box]);
-  
-  // 转换位置到米（Three.js 坐标系）
-  const position = useMemo(() => ({
-    x: mmToM(box.posX + box.length / 2),
-    y: mmToM(box.posZ + box.height / 2),
-    z: mmToM(box.posY + box.width / 2),
-  }), [box]);
-  
-  // 悬浮时轻微高亮；预估箱子边框用橙色区分
-  const color = isHovered 
-    ? new THREE.Color(box.color || '#4ECDC4').lerp(new THREE.Color('#ffffff'), 0.15)
-    : box.color || '#4ECDC4';
-  const edgeColor = box.isEstimated ? '#F59E0B' : '#333';
-  
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const { cartonMm: c } = block;
+  const estimated = line?.dimsSource === "estimated";
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh || typeof mesh.setMatrixAt !== "function") return;
+    const dummy = new THREE.Object3D();
+    let index = 0;
+    for (let k = 0; k < block.nz; k += 1) {
+      for (let j = 0; j < block.ny; j += 1) {
+        for (let i = 0; i < block.nx; i += 1) {
+          dummy.position.set(
+            mmToM(block.x + (i + 0.5) * c.length),
+            mmToM(block.z + (k + 0.5) * c.height),
+            mmToM(block.y + (j + 0.5) * c.width),
+          );
+          dummy.updateMatrix();
+          mesh.setMatrixAt(index, dummy.matrix);
+          index += 1;
+        }
+      }
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [block, c.length, c.width, c.height]);
+
+  const outline = useMemo(() => {
+    const geometry = new THREE.BoxGeometry(
+      mmToM(block.nx * c.length),
+      mmToM(block.nz * c.height),
+      mmToM(block.ny * c.width),
+    );
+    const edges = new THREE.EdgesGeometry(geometry);
+    geometry.dispose();
+    return edges;
+  }, [block.nx, block.ny, block.nz, c.length, c.width, c.height]);
+
+  const center: [number, number, number] = [
+    mmToM(block.x + (block.nx * c.length) / 2),
+    mmToM(block.z + (block.nz * c.height) / 2),
+    mmToM(block.y + (block.ny * c.width) / 2),
+  ];
+  const color = hovered
+    ? new THREE.Color(line?.color || "#4ECDC4").lerp(
+        new THREE.Color("#ffffff"),
+        0.15,
+      )
+    : line?.color || "#4ECDC4";
+
   return (
-    <mesh
-      ref={meshRef}
-      position={[position.x, position.y, position.z]}
-      onClick={onClick}
-      onPointerEnter={(e) => {
-        e.stopPropagation();
-        onHover?.(true);
-        document.body.style.cursor = 'pointer';
-      }}
-      onPointerLeave={(e) => {
-        e.stopPropagation();
-        onHover?.(false);
-        document.body.style.cursor = 'auto';
-      }}
-    >
-      <boxGeometry args={[size.x, size.y, size.z]} />
-      <meshStandardMaterial 
-        color={color} 
-        transparent 
-        opacity={isHovered ? 0.9 : 0.85}
-      />
-      {/* 边框：预估箱子用橙色高亮边框 */}
-      <lineSegments>
-        <edgesGeometry args={[new THREE.BoxGeometry(size.x, size.y, size.z)]} />
-        <lineBasicMaterial color={edgeColor} linewidth={1} />
+    <group>
+      <instancedMesh
+        ref={meshRef}
+        args={[undefined, undefined, block.cartons]}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          onHover(true);
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={(e) => {
+          e.stopPropagation();
+          onHover(false);
+          document.body.style.cursor = "auto";
+        }}
+      >
+        <boxGeometry
+          args={[
+            mmToM(c.length) * CARTON_SHRINK,
+            mmToM(c.height) * CARTON_SHRINK,
+            mmToM(c.width) * CARTON_SHRINK,
+          ]}
+        />
+        <meshStandardMaterial
+          color={color}
+          transparent
+          opacity={hovered ? 0.9 : 0.85}
+        />
+      </instancedMesh>
+      <lineSegments position={center} geometry={outline}>
+        <lineBasicMaterial color={estimated ? "#F59E0B" : "#333"} />
       </lineSegments>
-      
-      {/* 悬浮提示 - 显示商品名称及尺寸来源 */}
-      {isHovered && (
+      {hovered && (
         <Html
-          position={[0, size.y / 2 + 0.05, 0]}
+          position={[
+            center[0],
+            center[1] + mmToM((block.nz * c.height) / 2) + 0.05,
+            center[2],
+          ]}
           center
-          style={{ pointerEvents: 'none' }}
+          style={{ pointerEvents: "none" }}
         >
           <div className="bg-popover/92 text-popover-foreground px-2 py-1 rounded text-xs whitespace-nowrap border border-border/60">
-            <div>{box.name}</div>
-            {box.isEstimated && (
+            <div>{line?.name ?? block.lineId}</div>
+            <div className="text-muted-foreground">
+              {block.cartons} 箱 · {c.length}×{c.width}×{c.height} mm
+            </div>
+            {estimated && (
               <div className="text-amber-500 mt-0.5">⚠ 尺寸已根据体积预估</div>
             )}
           </div>
         </Html>
       )}
-    </mesh>
+    </group>
   );
 }
 
-/**
- * 职责：渲染货柜框架
- */
-function ContainerFrame() {
-  const size = useMemo(() => ({
-    x: mmToM(CONTAINER_40HQ.length),
-    y: mmToM(CONTAINER_40HQ.height),
-    z: mmToM(CONTAINER_40HQ.width),
-  }), []);
-  
-  const position = useMemo(() => ({
-    x: size.x / 2,
-    y: size.y / 2,
-    z: size.z / 2,
-  }), [size]);
-  
+/** 职责：渲染货柜框架与尺寸标注（尺寸来自计划，不硬编码）。 */
+function ContainerFrame({ plan }: { plan: LoadingPlan }) {
+  const { length, width, height } = plan.container.innerMm;
+  const size = useMemo(
+    () => ({ x: mmToM(length), y: mmToM(height), z: mmToM(width) }),
+    [length, width, height],
+  );
+  const frameEdges = useMemo(() => {
+    const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+    const edges = new THREE.EdgesGeometry(geometry);
+    geometry.dispose();
+    return edges;
+  }, [size]);
+  const position = { x: size.x / 2, y: size.y / 2, z: size.z / 2 };
+
   return (
     <group>
-      {/* 货柜底面 */}
-      <mesh 
-        position={[position.x, 0.01, position.z]} 
+      <mesh
+        position={[position.x, 0.01, position.z]}
         rotation={[-Math.PI / 2, 0, 0]}
       >
         <planeGeometry args={[size.x, size.z]} />
         <meshStandardMaterial color="#e0e0e0" side={THREE.DoubleSide} />
       </mesh>
-      
-      {/* 货柜线框 */}
-      <lineSegments position={[position.x, position.y, position.z]}>
-        <edgesGeometry args={[new THREE.BoxGeometry(size.x, size.y, size.z)]} />
-        <lineBasicMaterial color="#666" linewidth={2} />
+      <lineSegments
+        position={[position.x, position.y, position.z]}
+        geometry={frameEdges}
+      >
+        <lineBasicMaterial color="#666" />
       </lineSegments>
-      
-      {/* 尺寸标注 */}
       <Text
         position={[position.x, -0.3, -0.5]}
         fontSize={0.3}
         color="#333"
         anchorX="center"
       >
-        {`${CONTAINER_40HQ.length}mm`}
+        {`${length}mm`}
       </Text>
       <Text
         position={[-0.5, position.y, position.z]}
@@ -163,7 +203,7 @@ function ContainerFrame() {
         rotation={[0, Math.PI / 2, 0]}
         anchorX="center"
       >
-        {`${CONTAINER_40HQ.height}mm`}
+        {`${height}mm`}
       </Text>
       <Text
         position={[size.x + 0.5, -0.3, position.z]}
@@ -172,143 +212,126 @@ function ContainerFrame() {
         rotation={[0, -Math.PI / 2, 0]}
         anchorX="center"
       >
-        {`${CONTAINER_40HQ.width}mm`}
+        {`${width}mm`}
       </Text>
     </group>
   );
 }
 
-// 货柜中心点（Three.js 坐标系，单位米）——用作 OrbitControls target
-// 货柜从原点延伸，中心约在 (length/2, height/2, width/2) 处
-const CONTAINER_CENTER: [number, number, number] = [
-  mmToM(CONTAINER_40HQ.length / 2),
-  mmToM(CONTAINER_40HQ.height / 2),
-  mmToM(CONTAINER_40HQ.width / 2),
-];
-
-/**
- * 职责：3D场景主组件（含悬浮状态管理）
- * 思路：OrbitControls target 指向货柜中心，避免锁死在货柜角点
- */
-function Scene({ 
-  placedBoxes, 
-  onBoxClick,
-  hoveredBoxId,
-  onBoxHover,
-}: { 
-  placedBoxes: PlacedBox[];
-  onBoxClick?: (box: PlacedBox) => void;
-  hoveredBoxId: string | null;
-  onBoxHover: (boxId: string | null) => void;
+/** 职责：3D 场景；OrbitControls 指向货柜中心，避免锁死在货柜角点。 */
+function Scene({
+  plan,
+  blocks,
+  hoveredStep,
+  onHover,
+}: {
+  plan: LoadingPlan;
+  blocks: PlacedBlock[];
+  hoveredStep: number | null;
+  onHover: (step: number | null) => void;
 }) {
-  // 初始相机位置：从货柜中心偏移，给出斜侧视角
-  const camPos: [number, number, number] = [
-    CONTAINER_CENTER[0] + 8,
-    CONTAINER_CENTER[1] + 6,
-    CONTAINER_CENTER[2] + 10,
+  const { length, width, height } = plan.container.innerMm;
+  const center: [number, number, number] = [
+    mmToM(length / 2),
+    mmToM(height / 2),
+    mmToM(width / 2),
   ];
+  const camPos: [number, number, number] = [
+    center[0] + 8,
+    center[1] + 6,
+    center[2] + 10,
+  ];
+  const lineById = useMemo(
+    () => new Map(plan.lines.map((line) => [line.lineId, line])),
+    [plan.lines],
+  );
+
   return (
     <>
       <PerspectiveCamera makeDefault position={camPos} fov={50} />
-      <OrbitControls 
-        target={CONTAINER_CENTER}
-        enablePan={true}
-        enableZoom={true}
-        enableRotate={true}
+      <OrbitControls
+        target={center}
+        enablePan
+        enableZoom
+        enableRotate
         minDistance={3}
         maxDistance={40}
       />
-      
-      {/* 光源 */}
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
       <directionalLight position={[-10, 10, -5]} intensity={0.5} />
-      
-      {/* 货柜框架 */}
-      <ContainerFrame />
-      
-      {/* 箱子 */}
-      {placedBoxes.map((box, index) => {
-        const boxKey = `${box.id}-${index}`;
-        return (
-          <BoxMesh 
-            key={boxKey} 
-            box={box}
-            onClick={() => onBoxClick?.(box)}
-            isHovered={hoveredBoxId === boxKey}
-            onHover={(hovered) => onBoxHover(hovered ? boxKey : null)}
-          />
-        );
-      })}
-      
-      {/* 地面网格 */}
-      <gridHelper args={[20, 20, '#ccc', '#eee']} position={[6, 0, 1.2]} />
+      <ContainerFrame plan={plan} />
+      {blocks.map((block) => (
+        <BlockMesh
+          key={block.step}
+          block={block}
+          line={lineById.get(block.lineId)}
+          hovered={hoveredStep === block.step}
+          onHover={(hovered) => onHover(hovered ? block.step : null)}
+        />
+      ))}
+      <gridHelper
+        args={[20, 20, "#ccc", "#eee"]}
+        position={[mmToM(length / 2), 0, mmToM(width / 2)]}
+      />
     </>
   );
 }
 
-/**
- * 职责：主导出组件（含悬浮提示功能）
- */
-export default function Container3DView({ 
-  packingItems, 
-  products 
+/** 职责：主导出组件；统计面板显示本柜装箱数、利用率、未装与估算提示。 */
+export default function Container3DView({
+  plan,
+  containerIndex = 0,
 }: Container3DViewProps) {
-  // 悬浮状态
-  const [hoveredBoxId, setHoveredBoxId] = useState<string | null>(null);
-  
-  // 统一复用详情页的箱型构建规则，避免 3D 图与出货门槛各算一套。
-  const boxes = useMemo(
-    () => buildPackingBoxes(packingItems, products),
-    [packingItems, products],
-  );
-  
-  // 执行装箱算法
-  const packingResult = useMemo(() => {
-    return packBoxes(boxes);
-  }, [boxes]);
+  const [hoveredStep, setHoveredStep] = useState<number | null>(null);
+  const container = plan.containers[containerIndex];
+  const blocks = useMemo(() => container?.blocks ?? [], [container]);
+  const unplacedCartons =
+    plan.unplaced.reduce((sum, entry) => sum + entry.cartons, 0) +
+    plan.containers
+      .filter((entry) => entry.index !== containerIndex)
+      .reduce((sum, entry) => sum + entry.cartons, 0);
+  const estimatedCount = plan.lines.filter(
+    (line) => line.dimsSource === "estimated",
+  ).length;
 
-  // 统计尺寸预估的商品行数（用于提示）
-  const estimatedCount = useMemo(() => {
-    return boxes.filter(b => b.isEstimated).length;
-  }, [boxes]);
-  
   return (
     <div className="w-full h-[420px] md:h-[520px] bg-muted rounded-lg overflow-hidden relative">
-      {/* 利用率信息 */}
       <div className="absolute top-4 left-4 z-10 bg-card/92 rounded-lg p-3 shadow border border-border/60">
         <div className="text-sm font-medium">装箱统计</div>
         <div className="text-xs text-muted-foreground mt-1">
-          已装: {packingResult.placedBoxes.length} 箱
+          已装: {container?.cartons ?? 0} 箱
         </div>
         <div className="text-xs text-muted-foreground">
-          未装: {packingResult.unplacedBoxes.length} 箱
+          未装: {unplacedCartons} 箱
         </div>
         <div className="text-xs font-medium mt-1">
-          利用率: {packingResult.utilizationRate.toFixed(1)}%
+          体积: {(container?.volumePct ?? 0).toFixed(1)}% · 毛重:{" "}
+          {(container?.weightPct ?? 0).toFixed(1)}%
         </div>
+        {plan.containers.length > 1 && (
+          <div className="text-xs text-muted-foreground">
+            第 {containerIndex + 1} / {plan.containers.length} 柜
+          </div>
+        )}
         {estimatedCount > 0 && (
           <div className="text-xs text-amber-500 mt-1 border-t border-border/40 pt-1">
             ⚠ {estimatedCount} 项尺寸已预估
           </div>
         )}
       </div>
-      
-      {/* 操作提示 */}
+
       <div className="absolute bottom-4 left-4 z-10 bg-card/92 rounded-lg p-2 text-xs text-muted-foreground border border-border/60">
         拖拽旋转 | 滚轮缩放 | 右键平移
       </div>
-      
-      {/* 3D Canvas */}
-      <Canvas 
-        shadows 
-        gl={{ preserveDrawingBuffer: true }} // 允许截图
-      >
+
+      <Canvas shadows gl={{ preserveDrawingBuffer: true }}>
         <Suspense fallback={null}>
-          <Scene 
-            placedBoxes={packingResult.placedBoxes}
-            hoveredBoxId={hoveredBoxId}
-            onBoxHover={setHoveredBoxId}
+          <Scene
+            plan={plan}
+            blocks={blocks}
+            hoveredStep={hoveredStep}
+            onHover={setHoveredStep}
           />
         </Suspense>
       </Canvas>

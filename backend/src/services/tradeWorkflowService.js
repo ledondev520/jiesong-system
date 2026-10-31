@@ -346,7 +346,7 @@ const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
     ...(scope === 'recent' ? { take: safeLimit } : {}),
     orderBy: [{ updatedAt: 'desc' }, { contractNo: 'desc' }],
     include: {
-      packingItems: { include: { product: true } },
+      packingItems: { include: { product: { include: { category: true } } } },
       files: true,
       customsDeclarations: { select: { id: true, status: true } },
       taxRefunds: { select: { id: true, status: true } },

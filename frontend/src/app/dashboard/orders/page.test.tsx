@@ -95,3 +95,40 @@ it("browser back/forward to another URL shows only that URL's rows", async () =>
     expect.objectContaining({ keyword: "b" }),
   );
 });
+
+it("发运前订单显示利用率徽章：达标「利用率达标」、未达「未达80%」，已发运不显示（#124）", async () => {
+  const util = (ready: boolean, volumePct: number) => ({
+    containerType: "40HQ",
+    thresholdPct: 80,
+    weightPct: 4.5,
+    volumePct,
+    utilisationReady: ready,
+  });
+  const row = (id: string, status: string, loadingUtilisation: unknown) => ({
+    id,
+    contractNo: id,
+    status,
+    totalAmount: 1,
+    receivedAmount: 0,
+    createdAt: "2026-10-01T00:00:00.000Z",
+    loadingUtilisation,
+  });
+  mocks.getAll.mockResolvedValue({
+    data: {
+      items: [
+        row("EXP-OK", "PACKING", util(true, 88.2)),
+        row("EXP-LOW", "CONFIRMED", util(false, 14.7)),
+        row("EXP-SHIPPED", "SHIPPED", util(false, 14.7)),
+      ],
+      pagination: { total: 3, page: 1, pageSize: 20, totalPages: 1 },
+    },
+  });
+  render(<OrdersPage />);
+
+  expect((await screen.findAllByText("利用率达标")).length).toBeGreaterThan(0);
+  // 3 行中仅发运前两行有徽章（桌面表格 + 手机卡片各渲染一次，故按行数的倍数断言下限）
+  expect(screen.getAllByText("未达80%").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("利用率达标")).toHaveLength(
+    screen.getAllByText("未达80%").length,
+  );
+});

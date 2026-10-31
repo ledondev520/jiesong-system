@@ -14,15 +14,7 @@ import {
   type SalesContract,
   type SalesItem,
 } from "@/types";
-import {
-  CONTAINER_40HQ,
-  buildPackingBoxes,
-  countItemsMissingBoxes,
-  countItemsMissingDimensions,
-  evaluateShippingReadiness,
-  packBoxes,
-  sumPackingTotals,
-} from "@/lib/binPacking";
+import { summarizeLoadingPlan, type LoadingPlan } from "@/lib/containerLoading";
 
 export const ORDER_TABS = [
   { value: "overview", label: "概览" },
@@ -203,67 +195,52 @@ export const hasOrderShipped = (status: SalesStatus) =>
   SHIPPED_STATUSES.includes(status);
 
 /**
- * 职责：出柜判定（与原详情页一致）：取装箱明细行合计而非合同头，与后端出货门槛同源
+ * 职责：毛重/体积/箱数取自装箱明细行（与后端 sumTotals 一致），不信任可编辑的合同头
+ */
+export const sumPackingTotals = (packingRows: PackingItem[]) => {
+  const sum = (pick: (item: PackingItem) => number | null | undefined) =>
+    packingRows.reduce(
+      (total, item) => total + Math.max(0, Number(pick(item)) || 0),
+      0,
+    );
+  return {
+    cartons: packingRows.reduce(
+      (total, item) => total + Math.max(0, Math.trunc(Number(item.boxes) || 0)),
+      0,
+    ),
+    grossKg: sum((item) => item.grossWeight),
+    cargoCbm: sum((item) => item.volume),
+  };
+};
+
+/**
+ * 职责：出柜判定。排柜与门槛（40HQ、毛重/体积任一 ≥80%、全部可装）完全来自后端 loading-plan，
+ * 前端只做文案；plan 未取到时 fail closed（不可登记发运）
  */
 export const evaluateOrderReadiness = (
   status: SalesStatus,
   packingRows: PackingItem[],
-  products: Product[],
+  plan: LoadingPlan | null,
 ) => {
   const totals = sumPackingTotals(packingRows);
-  const packingBoxes = buildPackingBoxes(packingRows, products);
-  const packingPlan = packBoxes(packingBoxes);
-  const estimatedDimensionCount = packingBoxes.filter(
-    (box) => box.isEstimated,
-  ).length;
-  const readiness = evaluateShippingReadiness(totals.grossKg, totals.cargoCbm, {
-    unplacedBoxCount: packingPlan.unplacedBoxes.length,
-    packingItemCount: packingRows.length,
-    missingBoxItemCount: countItemsMissingBoxes(packingRows),
-    missingDimensionItemCount: countItemsMissingDimensions(
-      packingRows,
-      products,
-    ),
-  });
+  const summary = summarizeLoadingPlan(plan);
   const hasShipped = hasOrderShipped(status);
-  const overloadText = [
-    readiness.overloadReasons.includes("weight")
-      ? `毛重超过 ${CONTAINER_40HQ.maxWeight / 1000}t`
-      : "",
-    readiness.overloadReasons.includes("volume")
-      ? `体积超过 ${CONTAINER_40HQ.maxVolume} CBM`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("、");
-  const problem =
-    packingRows.length === 0
-      ? "尚未录入装箱明细"
-      : readiness.missingBoxItemCount > 0
-        ? `${readiness.missingBoxItemCount} 行装箱明细未填写箱数`
-        : readiness.missingDimensionItemCount > 0
-          ? `${readiness.missingDimensionItemCount} 行缺少箱规和体积，无法排柜`
-          : readiness.overloaded
-            ? overloadText
-            : !readiness.physicalFit
-              ? `仍有 ${readiness.unplacedBoxCount} 箱未装下`
-              : readiness.ready
-                ? "满足出柜条件且全部箱件可装下"
-                : "未达出柜标准";
-  const isBlocking =
-    packingRows.length === 0 ||
-    readiness.missingBoxItemCount > 0 ||
-    readiness.overloaded ||
-    !readiness.physicalFit;
+  const isBlocking = summary.blocking;
   const headline = hasShipped
-    ? `历史装箱数据${readiness.ready ? "模拟核对" : "待核对"}：${problem}`
-    : `${isBlocking ? "不可出货：" : ""}${problem}`;
+    ? `历史装箱数据${summary.ready ? "模拟核对" : "待核对"}：${summary.headline}`
+    : `${isBlocking ? "不可出货：" : ""}${summary.headline}`;
 
   return {
     totals,
-    packingPlan,
-    estimatedDimensionCount,
-    readiness,
+    plan,
+    summary,
+    estimatedDimensionCount: summary.estimatedLineCount,
+    readiness: {
+      ready: summary.ready,
+      weightPct: summary.weightPct,
+      volumePct: summary.volumePct,
+      physicalFit: summary.physicalFit,
+    },
     hasShipped,
     isBlocking,
     headline,
