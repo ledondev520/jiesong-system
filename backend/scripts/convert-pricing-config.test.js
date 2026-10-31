@@ -15,7 +15,7 @@ test('旧 tiered 取可退税加价为默认加价，multiplier 取 乘数-1，�
   assert.deepEqual(convertPricingConfig(oldTiered, 6.72), {
     exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: shipped.roundUpTo,
   });
-  assert.equal(shipped.roundUpTo, 5, '锁定规则：整美元后再向上取整到 5 的倍数');
+  assert.equal(shipped.roundUpTo, 5, '锁定规则：步长 5（≥5 美元整美元后取最近的 5 的倍数）');
   assert.equal(convertPricingConfig({ ...oldTiered, mode: 'multiplier', multiplier: 1.4 }, 7).defaultMarkup, 0.4);
 });
 
