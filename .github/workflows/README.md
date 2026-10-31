@@ -13,6 +13,7 @@ GitHub Actions 工作流配置，实现完整的自动化开发循环。
 | **QA & Health** | `qa.yml` | Daily / Push | 自动化测试 + 健康度检查 |
 | **PR Review** | `pr-review.yml` | PR | 类型、ESLint、锁定 Prettier 的 PR 源码检查与 Actions 摘要 |
 | **Review Freshness** | `review-freshness.yml` | 指向 main 的 PR opened / synchronize / reopened / edited | 只读检查复核标记与 base 后续改动，过期或信息不足则失败 |
+| **UI-only Label Check** | `ui-only.yml` | 指向 main 的 PR opened / synchronize / reopened / labeled / unlabeled | 带 `ui-only` 标签时运行 `scripts/check-ui-only.cjs`；非必过检查 |
 | **Security** | `security.yml` | PR / Weekly | 安全扫描 |
 | **Weekly Retro** | `weekly-retro.yml` | Weekly | 每周工程回顾 |
 | **Deploy** | `deploy.yml` | main Push / Tag / Manual | 部署并核对 PM2 运行目录与公网构建 |
@@ -128,3 +129,17 @@ act -j test
 发布流程固定触发提交 SHA，并以 `scripts/verify-vps-runtime.cjs` 验证运行目录、健康、公网 BUILD_ID 和 API 登录边界；PM2 启动成功不能单独作为新版生效的证据。
 
 PR 格式检查使用 `fetch-depth: 0` 和事件的完整 base/head SHA，运行 `scripts/check-pr-format.cjs`；NUL 路径支持空格/换行文件名，重命名目标会检查，历史缺失不能当作无改动。仅修改源码接受 Prettier 3.9.9 格式检查，全部单测/验收照常运行。报告任务使用 `permissions: {}`，通过 `GITHUB_STEP_SUMMARY` 输出结果；上游失败或取消时仍保留失败状态，不调用评论写入 API。
+
+### 轻量 UI-only PR 流程
+
+规范见 `docs/redesign/UX-REDESIGN-2026.md` §14。`scripts/check-ui-only.cjs` 用完整历史与事件 SHA 校验整个 PR diff：全部路径须在允许清单（`frontend/src/app|components`、`lib/format*`、`e2e`、`public`、`docs/redesign`、`DESIGN.md`）内，且不命中拒绝项（鉴权/axios/services/middleware/next.config、package.json 与锁文件、`backend/ config/ scripts/ lifecycle/ .github/`、Prisma）。`ui-only.yml` 在 PR 带 `ui-only` 标签时运行它；该 job 不在 ruleset 的 9 项必过检查中，合并前人工确认通过。
+
+9 项必过检查在 UI-only PR 与后端 PR 上都会上报（未使用 workflow 级 `paths` 过滤）：
+
+| 必过检查 | UI-only PR（gate: `backend_changed=false`） | 其他 PR / push |
+|---|---|---|
+| Code Quality, Type Safety Check, Lint Check, Build Test, Frontend Unit And Coverage, Frontend E2E Acceptance, Secret Detection | 完整运行（Lint Check 另跑本脚本的回归测试） | 同左 |
+| Backend Unit Tests (`test-and-acceptance.yml`) | 仅 `npm ci` + `check-lifecycle.cjs`，跳过 prisma 与 `test:all` | 全部后端测试 |
+| Unit Tests (`ci.yml`) | 前端单测照常，后端仅 `check-lifecycle.cjs` | 前端 + 后端全测 |
+
+生命周期合同检查扫描前端列表页，UI 改动可能使其失败，所以门禁跳过时它仍会运行。gate 只在整个 diff 被证明为 UI-only 时为 false；push 事件、SHA 缺失、浅历史或脚本异常都视为有后端改动。标签本身不会放宽任何检查。UI-only PR 正文用 `.github/PULL_REQUEST_TEMPLATE/ui-only.md`（新建 PR 时加 `?template=ui-only.md`）；复核标记与本地 `check-review-freshness.cjs` 仍必需。
