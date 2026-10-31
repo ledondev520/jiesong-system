@@ -39,7 +39,7 @@ router.put('/:id', withIdValidation, accessAuth({ roles: ['ADMIN', 'PURCHASE', '
 ));
 
 // DELETE /api/v1/suppliers/:id - 删除供应商
-router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE'), withAuditLog(
   { entity: 'Supplier', action: 'DELETE', model: 'supplier' },
   supplierController.remove
 ));

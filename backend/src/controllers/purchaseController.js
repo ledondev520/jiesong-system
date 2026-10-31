@@ -286,9 +286,19 @@ const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
     
-    const contract = await prisma.purchaseContract.findUnique({ where: { id }, select: { _count: { select: { receipts: true } } } });
+    // Code-level guard: Payment.purchaseContract has no onDelete rule (default SetNull would orphan ledger rows).
+    const contract = await prisma.purchaseContract.findUnique({
+      where: { id },
+      select: { invoiceNo: true, _count: { select: { receipts: true, payments: true } } },
+    });
     if (!contract) throw createError('采购合同不存在', 404);
-    if (contract._count.receipts > 0) throw createError('已有到货记录的合同不可删除', 400);
+    const [invoiceFiles, matchedInvoices] = await Promise.all([
+      prisma.contractFile.count({ where: { purchaseContractId: id, category: 'SUPPLIER_INVOICE' } }),
+      prisma.invoiceRecord.count({ where: { matchedContractId: id, matchedContractType: 'PURCHASE' } }),
+    ]);
+    if (contract._count.receipts > 0 || contract._count.payments > 0 || contract.invoiceNo || invoiceFiles > 0 || matchedInvoices > 0) {
+      throw createError('已有到货、付款、发票或核销记录的合同不可删除', 409);
+    }
     await prisma.purchaseContract.delete({ where: { id } });
     
     success(res, null, '采购合同删除成功');

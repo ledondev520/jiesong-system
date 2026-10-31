@@ -126,7 +126,11 @@ const update = async (req, res, next) => {
 const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
+    const supplier = await prisma.supplier.findUnique({ where: { id }, select: { _count: { select: { purchaseContracts: true } } } });
+    if (!supplier) throw createError('供应商不存在', 404);
+    if (supplier._count.purchaseContracts > 0) throw createError('已有采购合同的供应商不可删除', 409);
+
     await prisma.supplier.update({
       where: { id },
       data: { isActive: false },
