@@ -5,7 +5,7 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { markupFor, priceFor, roundUp, historicalQuoteAllowed } = require('./exportPricing');
+const { snapPrice, markupFor, priceFor, roundUp, historicalQuoteAllowed } = require('./exportPricing');
 const { chainFor } = require('./productCategoryChain');
 
 // 规范 §7.2 示例：现汇 7.2、不加调整，便于对照
@@ -50,18 +50,31 @@ test('负责人示例：成本 10000 ¥、现汇 6.72、调整 -0.2 → 13000/6.
   assert.equal(result.effectiveRate, 6.52);
   assert.ok(Math.abs(result.rawUnitPriceUsd - 1993.865) < 0.001);
   assert.equal(result.unitPriceUsd, 1994); // 步长 1：只取整到整美元
-  // 负责人终版：整美元后再向上取整到 5 的倍数，1993.87 → 1994 → 1995
+  // 负责人终版：整美元后取最近的 5 的倍数，1993.87 → 1994 → 1995
   assert.equal(priceFor({ costCny: 10000 }, { ...owner, roundUpTo: 5 }).unitPriceUsd, 1995);
 });
 
-test('负责人终版：整美元后再取整到 5 的倍数（1996→2000，2000 不变，2001→2005）', () => {
+test('负责人终版（14:33/14:36）：整美元后，不足 5 就停，否则按个位取最近的 5 的倍数', () => {
+  // 个位 1、2 舍到 0；3–7 到 5；8、9 进到 10；0、5 不变
+  for (const [whole, expected] of [[1990, 1990], [1991, 1990], [1992, 1990], [1993, 1995], [1994, 1995], [1995, 1995],
+    [1996, 1995], [1997, 1995], [1998, 2000], [1999, 2000], [2000, 2000], [2001, 2000], [2003, 2005]]) {
+    assert.equal(snapPrice(whole, 5), expected, String(whole));
+  }
+  // 负责人示例：1993.87→1994→1995；5.01→6→5；整美元不足 5 就停在整美元
+  assert.equal(snapPrice(1993.87, 5), 1995);
+  assert.equal(snapPrice(5.01, 5), 5);
+  assert.equal(snapPrice(0.4, 5), 1);
+  assert.equal(snapPrice(3.2, 5), 4);
+  assert.equal(snapPrice(4.2, 5), 5);
+  // 整美元先于步长：浮点噪声 13.000000000000002 → 13 → 15；步长 1 只取整
+  assert.equal(snapPrice(13.000000000000002, 5), 15);
+  assert.equal(snapPrice(1993.87, 1), 1994);
   const five = { ...spec, exchangeRate: 6.5, exchangeAdjustment: 0, defaultMarkup: 0, roundUpTo: 5 };
-  for (const [usd, expected] of [[1996, 2000], [2000, 2000], [2001, 2005], [1995, 1995], [1, 5]]) {
+  for (const [usd, expected] of [[1996, 1995], [2000, 2000], [2001, 2000], [1998, 2000], [1, 1]]) {
     assert.equal(priceFor({ costCny: usd * 6.5 }, five).unitPriceUsd, expected, String(usd));
   }
-  // 整美元先于步长：18.0556 → 19 → 20；浮点噪声 13.000000000000002 → 13 → 15
-  assert.equal(priceFor({ costCny: 100 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 20);
-  assert.equal(priceFor({ costCny: 72 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 15);
+  assert.equal(priceFor({ costCny: 100 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 20); // 18.06 → 19 → 20
+  assert.equal(priceFor({ costCny: 72 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 15); // 13 → 15
 });
 
 test('仓库默认配置步长为 5', () => {

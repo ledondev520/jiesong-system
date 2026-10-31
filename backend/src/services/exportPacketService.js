@@ -133,7 +133,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     let unitPriceUsd = formula?.unitPriceUsd || 0;
     let totalUsd = formula?.totalUsd || 0;
     let pricingSource = 'formula';
-    let pricingReference = `目标加价 ${round(targetMarkup * 100, 6)}%，单价向上取整到 ${config.roundUpTo}`;
+    let pricingReference = `目标加价 ${round(targetMarkup * 100, 6)}%，单价先向上取整到整美元，再取最近的 ${config.roundUpTo} 的倍数`;
     let roundingMethod = formula?.roundingMethod || '';
     if (historical && historicalCheck?.allowed) {
       unitPriceUsd = historical.unitPriceUsd;

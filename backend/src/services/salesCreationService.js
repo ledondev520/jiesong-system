@@ -45,7 +45,7 @@ const normalizeCreation = (data) => {
         quantity: number(item.quantity, '数量'),
         unit: text(item.unit, '单位', false, 50),
         costPrice,
-        // 未给售价时由统一报价规则（priceFor，整美元后取整到 5 的倍数）在事务内计算
+        // 未给售价时由统一报价规则（priceFor：整美元后取最近的 5 的倍数，不足 5 不取）在事务内计算
         sellingPrice: item.sellingPrice === undefined ? undefined : number(item.sellingPrice, '售价'),
         specification: text(item.specification, '规格'),
         note: text(item.note, '明细备注'),

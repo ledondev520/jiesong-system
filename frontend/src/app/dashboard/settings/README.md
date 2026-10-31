@@ -22,7 +22,7 @@
 
 `export/page.tsx` 复用原数据工具入口，现展示「数据导入导出」。`DataImportTab.tsx` 提供四类 CSV/xlsx 模板、只读预览、逐行错误及库存期初确认。切换文件或类型清除旧预览。组件测试验证预览不会执行导入及期初确认门禁。
 
-`components/PricingConfigCard.tsx` 是 ADMIN-only 的「报价规则」卡片：现汇、汇率调整、默认加价(%)、向上取整步长、分类加价列表，
+`components/PricingConfigCard.tsx` 是 ADMIN-only 的「报价规则」卡片：现汇、汇率调整、默认加价(%)、取整步长（整美元后取最近的步长倍数）、分类加价列表，
 独立保存完整版本到 `/system/pricing-config`；预览(成本 ¥100 → $x)由服务端 `GET /system/pricing-config/preview`
 调用同一个 `priceFor()` 计算，前端不重复公式。百分比界面与小数存储显式转换，范围以服务端校验为准。
 `PricingConfigCard.test.tsx` 验证角色、加载、保存换算、分类加价、非法输入及加载失败。

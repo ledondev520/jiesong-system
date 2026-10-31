@@ -3,10 +3,14 @@
  * Output: 唯一的报价规则实现 priceFor()，以及加价/汇率/实现加价辅助函数
  * Pos: 出口备单与单据生成共用；Node 内不再有第二份公式（UX 规范 §7.2，负责人 2026-10-31 取整决定）
  *
- * 规则：单价(USD) = 先向上取整到整美元，再向上取整到 roundUpTo(默认 5) 的倍数( 成本¥ × (1+加价) ÷ (现汇 + 调整) )
+ * 规则：单价(USD) = snapPrice( 成本¥ × (1+加价) ÷ (现汇 + 调整) )：先向上取整到整美元；不足 roundUpTo(默认 5) 就停，
+ *       否则取最近的 roundUpTo 倍数（步长 5 时按个位：1、2 舍到 0，3–7 到 5，8、9 进到 10）。负责人终版 2026-10-31 14:33/14:36。
  * 加价取商品分类、其最近祖先分类的 categoryMarkups，否则 defaultMarkup。
  */
 const { loadPricingConfig } = require('./pricingConfigService');
+
+// 取整步长的仓库默认值（负责人终版 2026-10-31：整美元后取最近的 5 的倍数）；config/pricing.json 与迁移脚本都用它。
+const DEFAULT_ROUND_UP_TO = 5;
 
 // 历史报价/人工单价允许偏离目标加价的幅度（百分点/100）。是否保留此闸门待负责人确认（规范 Q5e）。
 const PRICE_TOLERANCE = 0.05;
@@ -23,6 +27,15 @@ const round = (value, digits = 2) => {
 
 /** 向上取整到 step 的倍数；toFixed(6) 浮点保护使 19.0000000001 仍为 19 */
 const roundUp = (value, step) => Math.ceil(Number((value / step).toFixed(6))) * step;
+
+/**
+ * 负责人终版取整（2026-10-31 14:33/14:36）：先向上取整到整美元；小于 step 就停；否则取最近的 step 倍数。
+ * step=5 时等价于按个位 1、2→0，3–7→5，8、9→10（整数不会出现 .5 平局）。例：1993.87→1994→1995，1991→1990，1998→2000，5.01→6→5。
+ */
+const snapPrice = (rawUsd, step) => {
+  const whole = roundUp(rawUsd, 1);
+  return whole < step ? whole : Math.round(whole / step) * step;
+};
 
 /** 现汇 + 调整 = 报价用汇率；现汇缺失/非法时返回 0（调用方据此拒绝报价） */
 const effectiveRateFor = (spotRate, config = loadPricingConfig()) => {
@@ -59,8 +72,7 @@ const priceFor = ({ costCny, categoryIds = [], spotRate } = {}, config = loadPri
   const rawUnitPriceUsd = pricedCny / rate;
   return {
     status: 'OK',
-    // 负责人终版（2026-10-31）：先向上取整到整美元，再向上取整到 roundUpTo（默认 5）的倍数
-    unitPriceUsd: roundUp(roundUp(rawUnitPriceUsd, 1), config.roundUpTo),
+    unitPriceUsd: snapPrice(rawUnitPriceUsd, config.roundUpTo),
     rawUnitPriceUsd,
     pricedCny,
     markup,
@@ -75,5 +87,5 @@ const historicalQuoteAllowed = ({ unitPriceUsd, quantity, effectiveRate, costCny
 };
 
 module.exports = {
-  PRICE_TOLERANCE, effectiveRateFor, historicalQuoteAllowed, markupFor, priceFor, realizedMarkup, round, roundUp,
+  DEFAULT_ROUND_UP_TO, PRICE_TOLERANCE, effectiveRateFor, historicalQuoteAllowed, markupFor, priceFor, realizedMarkup, round, roundUp, snapPrice,
 };

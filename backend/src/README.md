@@ -195,7 +195,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 原子替换、版本冲突及无参数值日志由真实文件/HTTP测试验证；保存时核对分类 ID 存在。
 `routes/pricingConfig.test.js` 的认证身份为合成桩，角色中间件与文件写入为真实实现。
 
-`services/exportPricing.js` 是唯一报价规则 `priceFor()`（向上取整、浮点保护、分类/祖先加价、缺成本），
+`services/exportPricing.js` 是唯一报价规则 `priceFor()`（整美元向上取整后取最近的 roundUpTo 倍数 `snapPrice`、浮点保护、分类/祖先加价、缺成本），
 `productCategoryChain.js` 给明细附分类链。`exportPricing.test.js` 覆盖规范示例和负责人示例。
 `scripts/convert-pricing-config.js` 把旧结构 pricing.json 转成新结构（dry-run 默认，--confirm 先备份）。
 `routes/pricingConfig.auth.test.js` 另以真实应用认证、合成 JWT 和临时迁移 SQLite

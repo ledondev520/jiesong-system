@@ -27,7 +27,7 @@ const fields: { key: ScalarKey; label: string; scale: number; step: number }[] =
     { key: "exchangeRate", label: "现汇 (¥/$)", scale: 1, step: 0.0001 },
     { key: "exchangeAdjustment", label: "汇率调整", scale: 1, step: 0.01 },
     { key: "defaultMarkup", label: "默认加价 (%)", scale: 100, step: 0.1 },
-    { key: "roundUpTo", label: "向上取整步长 ($)", scale: 1, step: 1 },
+    { key: "roundUpTo", label: "取整步长 ($)", scale: 1, step: 1 },
   ];
 
 const snapshotResponse = z.object({
@@ -230,7 +230,7 @@ function AdminPricingConfigCard() {
         <CardTitle>报价规则</CardTitle>
         <CardDescription>
           单价 = 采购成本(¥) × (1 + 加价) ÷ (现汇 +
-          调整)，再向上取整到步长（默认整美元）。普通商品用默认加价，分类可单独设置（含其子分类）。已保存的订单和报价不会被重新计算。
+          调整)，先向上取整到整美元；不足步长就停，否则取最近的步长倍数（步长 5 时个位 1、2 舍到 0，3–7 到 5，8、9 进到 10）。普通商品用默认加价，分类可单独设置（含其子分类）。已保存的订单和报价不会被重新计算。
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -236,7 +236,7 @@ const evaluateExportReadiness = (contract = {}, {
       totalPriceUsd: calculatedTotalPriceUsd || 0,
       storedTotalPriceUsd: storedTotalPriceUsd || 0,
       recommendedUnitPriceUsd: formula?.status === 'OK' ? formula.unitPriceUsd : null,
-      pricingFormula: `单位采购成本¥ × ${round(1 + targetMarkup, 6)} ÷ 报价汇率（现汇${config.exchangeAdjustment}），向上取整到 ${config.roundUpTo}`,
+      pricingFormula: `单位采购成本¥ × ${round(1 + targetMarkup, 6)} ÷ 报价汇率（现汇${config.exchangeAdjustment}），先向上取整到整美元，再取最近的 ${config.roundUpTo} 的倍数（不足 ${config.roundUpTo} 不再取）`,
       pricingProfitRate: 1 + targetMarkup,
       effectiveExchangeRate,
       exchangeRate: exchangeRate || 0,

@@ -591,13 +591,16 @@ markup      = markup of the product's category, else the nearest ancestor catego
 sellCny     = costCny × (1 + markup)                  // costCny = unit purchase cost ¥ (basis: Q5c)
 step        = pricing.roundUpTo                       // default 5
 wholeUsd    = Math.ceil(Number((sellCny / fxUsed).toFixed(6)))      // 1 — round up to whole USD
-unitPrice   = Math.ceil(Number((wholeUsd / step).toFixed(6))) * step // 2 — round up to a multiple of step
-              // float guard: 13.000000000000002 stays 13, then 15 (not 14 → 15 by chance)
+unitPrice   = wholeUsd < step ? wholeUsd                             // 2 — below the step: stop
+            : Math.round(wholeUsd / step) * step                     //     else the NEAREST multiple of step
+              // step 5, by ones digit: 1,2 → down to 0; 3–7 → 5; 8,9 → up to 10 (integers never tie)
+              // float guard: 13.000000000000002 stays 13, then 15
 lineTotal   = round2(unitPrice × quantity)
 ```
 - **Markup is on cost** (× 1.3 / × 1.1), not a margin on price.
 - **The 0.2 adjustment stays**, as one config value next to the spot rate. Nothing else adjusts the rate.
-- **Rounding happens in USD, after conversion** — not to whole yuan before converting. Two steps: up to whole USD, then up to the next multiple of 5. Exact multiples stay (2,000 stays 2,000; 1,996 → 2,000).
+- **Rounding happens in USD, after conversion** — not to whole yuan before converting. Two steps: up to whole USD; then, if that is ≥ 5, to the **nearest** multiple of 5 by the ones digit (1,2 → down to 0; 3–7 → 5; 8,9 → up to 10). Examples: 1,991 → 1,990; 1,996 → 1,995; 1,998 → 2,000; 5.01 → 6 → 5; below 5 stays whole. Owner's final rule, 2026-10-31 14:33/14:36 (supersedes "always up to the next multiple of 5").
+- **Order margin:** the overall order should land at 30–35 % markup on cost (tiles excluded). Snapping down can pull a cheap line below 30 %; this is flagged to the owner, not compensated by another rule.
 - **Owner example (final, 2026-10-31):** cost ¥10,000 → ¥13,000; spot 6.72 → 6.52; 13,000 ÷ 6.52 = 1,993.87 → **1,994** → **1,995**. The 1,995 is intentional. `roundUpTo` stays a config value (default 5; 1 gives plain whole-USD rounding).
 - **No zero-refund tier.** The × 1.1 multiplier keys off the product's **category**, not its tax-refund rate. Products with a 0% refund rate get × 1.3 unless their category is listed (Q5d).
 - **Unit price does not depend on quantity.** The old "line total ends in 0/5" logic is dropped; the multiple-of-5 rule applies to the **unit price**.

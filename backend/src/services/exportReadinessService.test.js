@@ -90,8 +90,8 @@ test('缺 HS 或出口售价时禁止生成完整单证，但给出基于采购�
 
   assert.equal(result.customsReady, false);
   assert.equal(result.taxRefundReady, false);
-  assert.equal(result.lines[0].recommendedUnitPriceUsd, 25); // ceil(…)=21 USD, then up to the next multiple of 5 (roundUpTo 5)
-  assert.equal(result.lines[0].pricingFormula, '单位采购成本¥ × 1.3 ÷ 报价汇率（现汇-0.2），向上取整到 5');
+  assert.equal(result.lines[0].recommendedUnitPriceUsd, 20); // ceil(…)=21 USD, then the nearest multiple of 5 (ones digit 1 → down to 20)
+  assert.equal(result.lines[0].pricingFormula, '单位采购成本¥ × 1.3 ÷ 报价汇率（现汇-0.2），先向上取整到整美元，再取最近的 5 的倍数（不足 5 不再取）');
   assert.deepEqual(
     result.lines[0].issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code),
     ['MISSING_HS_CODE', 'MISSING_EXPORT_PRICE', 'MISSING_DECLARATION_ELEMENTS', 'MISSING_REFUND_RATE'],
