@@ -94,6 +94,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | aiService.js | OpenAI/DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量；可选 `AI_FALLBACK_PROVIDER=deepseek` 经唯一的 `getOpenAIClient` 接入，用量记录实际作答模型 |
 | ai/fallbackClient.js | 主 AI 调用失败（网络/超时/429/5xx/提供方 4xx）时同一请求透明改发 DeepSeek 一次：流已输出正文/推理/工具调用则不拼接、总预算 50s、取消与本地错误不回退、双失败抛主错误；进程内熔断（连续失败直连、冷却后半开探测）；聊天/SSE/解析/HS/Agent 共用 |
 | anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |
+| agentPendingActionService.js | Agent 待确认写操作的 SQLite 持久层：原子抢占 pending→executing，30 分钟过期，创建时惰性清理 |
 | openAgentService.js | 出口详情复用销售服务从装箱行计算拼柜来源；内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放；SDK 错误终止传播为 503/SSE error，不写成功记录 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
 | importService.js | 仅内存CSV/xlsx字节导入，拒绝字符串路径与磁盘上传对象，避免路径穿越/绝对路径/符号链接读取；导入记录文件名去控制字符并按 `/` 与 `\` 取末段，仅作展示 |

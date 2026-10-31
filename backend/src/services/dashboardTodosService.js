@@ -19,6 +19,8 @@ const { PAYABLE_SELECT, payableWhere, outstandingOf, getPayablesSummary } = requ
 const { roundMoney } = require('../utils/money');
 
 const TOP = 5;
+// shortcut: CONFIRMED orders are scanned oldest-first up to this cap (count undercounts beyond it); upgrade to SQL NOT EXISTS if volumes reach it.
+const CONFIRMED_SCAN_CAP = 500;
 const { ADMIN, BOSS, PURCHASE, SALES, FINANCE, WAREHOUSE } = ROLES;
 
 const item = (id, contractNo, party, amount, date) => ({
@@ -32,7 +34,7 @@ const quotesByStatus = (status, dateField) => async (db) => {
   const [count, rows] = await Promise.all([
     db.quote.count({ where }),
     db.quote.findMany({
-      where, take: TOP, orderBy: { createdAt: 'asc' },
+      where, take: TOP, orderBy: { [dateField]: 'asc' }, // list order = the date shown (SENT by sentAt)
       select: { id: true, quoteNo: true, totalAmount: true, createdAt: true, sentAt: true, customer: { select: { name: true } } },
     }),
   ]);
@@ -44,7 +46,7 @@ const LISTS = {
     label: '订单待采购', roles: [PURCHASE, ADMIN],
     async load(db) {
       const orders = await db.salesContract.findMany({
-        where: { status: SALES_STATUS.CONFIRMED }, orderBy: { createdAt: 'asc' },
+        where: { status: SALES_STATUS.CONFIRMED }, orderBy: { createdAt: 'asc' }, take: CONFIRMED_SCAN_CAP,
         select: { id: true, contractNo: true, totalAmount: true, signedAt: true, items: { select: { productId: true, storeId: true } } },
       });
       const purchased = await db.purchaseItem.findMany({

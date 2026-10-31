@@ -137,6 +137,8 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
     db.quote.create({ data: { quoteNo, status, customerId: customer.id, createdById: creator.id, totalAmount: 500, ...extra } });
   for (let n = 1; n <= 6; n += 1) await quote(`SYN-Q-D${n}`, "DRAFT");
   await quote("SYN-Q-SENT", "SENT", { sentAt: new Date() });
+  // Created later but sent earlier: the list is ordered by the shown date (sentAt), so this one comes first.
+  await quote("SYN-Q-SENT-OLD", "SENT", { sentAt: new Date(Date.now() - 86400000) });
   await quote("SYN-Q-ACCEPTED", "ACCEPTED");
 
   const todos = (role, expected = 200) => call("GET", "/dashboard/todos", undefined, role, expected);
@@ -158,8 +160,8 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   assert.equal(admin.lists.quotesToSend.items.length, 5);
   assert.equal(admin.lists.quotesToSend.items[0].party, "Synthetic customer");
   assert.equal(admin.lists.quotesToSend.items[0].amount, 500);
-  assert.equal(admin.lists.quotesAwaitingCustomer.count, 1);
-  assert.equal(admin.lists.quotesAwaitingCustomer.items[0].contractNo, "SYN-Q-SENT");
+  assert.equal(admin.lists.quotesAwaitingCustomer.count, 2);
+  assert.deepEqual(admin.lists.quotesAwaitingCustomer.items.map((i) => i.contractNo), ["SYN-Q-SENT-OLD", "SYN-Q-SENT"]);
   // Payables: draft excluded, SIGNED outstanding 600, fully paid SHIPPED excluded.
   assert.equal(admin.lists.paymentsDue.count, 1);
   assert.equal(admin.lists.paymentsDue.items[0].contractNo, "SYN-P-SIGNED");
