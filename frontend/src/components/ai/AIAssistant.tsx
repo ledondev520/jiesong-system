@@ -107,6 +107,10 @@ export const withPageContext = (message: string, context?: AIPageContext) =>
       }】\n${message}`
     : message;
 
+/** 去掉历史消息开头的页面上下文行（withPageContext 加的），恢复历史时只显示用户原文 */
+export const stripPageContext = (content: string) =>
+  content.replace(/^【当前页面：[^】\n]*】\r?\n/, "");
+
 const formatRecommendationPriority = (
   priority?: AiActionRecommendation["priority"],
 ) => {
@@ -327,7 +331,10 @@ export function AIAssistant({
         (item: AiChatHistoryItem) => ({
           id: item.id,
           role: item.role,
-          content: item.content,
+          content:
+            item.role === "user"
+              ? stripPageContext(item.content)
+              : item.content,
           imageUrl: item.imageUrl,
           model: item.modelUsed,
           actionRecommendations: item.actionRecommendations,

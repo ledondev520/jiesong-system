@@ -15,16 +15,20 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AIAssistant, withPageContext } from "./AIAssistant";
+import { AIAssistant, stripPageContext, withPageContext } from "./AIAssistant";
 
 const OriginalFileReader = globalThis.FileReader;
 const mockExecuteAgentAction = vi.fn();
 const mockCancelAgentAction = vi.fn();
+const mockGetSessions = vi.fn();
+const mockGetChatHistory = vi.fn();
 
 vi.mock("@/services/ai.service", () => ({
   aiService: {
     executeAgentAction: (...args: unknown[]) => mockExecuteAgentAction(...args),
     cancelAgentAction: (...args: unknown[]) => mockCancelAgentAction(...args),
+    getSessions: (...args: unknown[]) => mockGetSessions(...args),
+    getChatHistory: (...args: unknown[]) => mockGetChatHistory(...args),
   },
 }));
 
@@ -113,6 +117,52 @@ describe("AIAssistant", () => {
     expect(withPageContext("你好", { route: "/dashboard/finance" })).toBe(
       "【当前页面：/dashboard/finance】\n你好",
     );
+  });
+
+  it("恢复历史时去掉页面上下文行，只显示用户原文", () => {
+    const sent = withPageContext("这个订单还缺什么？", {
+      route: "/dashboard/sales/EXP260012",
+      recordId: "EXP260012",
+    });
+    expect(stripPageContext(sent)).toBe("这个订单还缺什么？");
+    expect(stripPageContext("普通问题")).toBe("普通问题");
+    expect(stripPageContext("我想问【当前页面：x】\n是什么")).toBe(
+      "我想问【当前页面：x】\n是什么",
+    );
+  });
+
+  it("历史对话恢复时用户消息不带页面上下文前缀", async () => {
+    mockGetSessions.mockResolvedValue({
+      data: [{ sessionId: "s-1", preview: "这个订单还缺什么？" }],
+    });
+    mockGetChatHistory.mockResolvedValue({
+      data: [
+        {
+          id: "h-1",
+          role: "user",
+          content:
+            "【当前页面：/dashboard/sales/EXP260012，记录 ID：EXP260012】\n这个订单还缺什么？",
+          createdAt: "2026-10-31T00:00:00.000Z",
+        },
+        {
+          id: "h-2",
+          role: "assistant",
+          content: "还缺装箱单。",
+          createdAt: "2026-10-31T00:00:01.000Z",
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    render(<AIAssistant presentation="docked" />);
+
+    await user.click(screen.getByRole("button", { name: "历史对话" }));
+    await user.click(
+      await screen.findByRole("button", { name: /这个订单还缺什么/ }),
+    );
+
+    expect(await screen.findByText("还缺装箱单。")).toBeInTheDocument();
+    expect(screen.queryByText(/当前页面/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("这个订单还缺什么？").length).toBeGreaterThan(0);
   });
 
   it("工作区模式直接展示完整对话面板且不渲染悬浮触发器", async () => {
