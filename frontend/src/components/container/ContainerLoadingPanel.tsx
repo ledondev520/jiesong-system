@@ -12,7 +12,13 @@ import { Suspense, lazy, useRef, useState } from "react";
 import { Download, FileText, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useMobile } from "@/lib/hooks/useMobile";
 import { salesService } from "@/services/sales.service";
 import type { ContainerTypeCode, LoadingPlan } from "@/lib/containerLoading";
@@ -37,7 +43,11 @@ const PRINT_CSS = `@media print {
   #container-print-root { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
 }`;
 
-export default function ContainerLoadingPanel({ plan, salesContractId, contractNo }: ContainerLoadingPanelProps) {
+export default function ContainerLoadingPanel({
+  plan,
+  salesContractId,
+  contractNo,
+}: ContainerLoadingPanelProps) {
   const isMobile = useMobile();
   const [simPlan, setSimPlan] = useState<LoadingPlan | null>(null);
   const [containerIndex, setContainerIndex] = useState(0);
@@ -45,7 +55,10 @@ export default function ContainerLoadingPanel({ plan, salesContractId, contractN
   const printRoot = useRef<HTMLDivElement>(null);
   const active = simPlan ?? plan;
   const simulating = active.containerType !== plan.containerType;
-  const index = Math.min(containerIndex, Math.max(0, active.containers.length - 1));
+  const index = Math.min(
+    containerIndex,
+    Math.max(0, active.containers.length - 1),
+  );
 
   // 柜型切换只是模拟：重新向后端取该柜型的计划，确认发运仍按默认柜型校验。
   const changeType = async (code: ContainerTypeCode) => {
@@ -62,7 +75,12 @@ export default function ContainerLoadingPanel({ plan, salesContractId, contractN
     }
   };
 
-  const pages = () => Array.from(printRoot.current?.querySelectorAll<HTMLElement>('[data-testid="container-print-page"]') ?? []);
+  const pages = () =>
+    Array.from(
+      printRoot.current?.querySelectorAll<HTMLElement>(
+        '[data-testid="container-print-page"]',
+      ) ?? [],
+    );
   const runExport = async (task: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -79,7 +97,10 @@ export default function ContainerLoadingPanel({ plan, salesContractId, contractN
       <ContainerSummary plan={active} />
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={active.containerType} onValueChange={(value) => void changeType(value as ContainerTypeCode)}>
+        <Select
+          value={active.containerType}
+          onValueChange={(value) => void changeType(value as ContainerTypeCode)}
+        >
           <SelectTrigger className="w-40" aria-label="柜型">
             <SelectValue />
           </SelectTrigger>
@@ -92,7 +113,9 @@ export default function ContainerLoadingPanel({ plan, salesContractId, contractN
           </SelectContent>
         </Select>
         {simulating && (
-          <span className="text-xs text-amber-700 dark:text-amber-400">柜型切换仅用于模拟，确认发运按 {plan.containerType} 校验</span>
+          <span className="text-xs text-amber-700 dark:text-amber-400">
+            柜型切换仅用于模拟，确认发运按 {plan.containerType} 校验
+          </span>
         )}
         {active.containers.length > 1 &&
           active.containers.map((container) => (
@@ -115,7 +138,14 @@ export default function ContainerLoadingPanel({ plan, salesContractId, contractN
               size="sm"
               variant="outline"
               disabled={busy}
-              onClick={() => runExport(async () => exportPagePng(pages()[index], `${contractNo}-装柜图-柜${index + 1}.png`))}
+              onClick={() =>
+                runExport(async () =>
+                  exportPagePng(
+                    pages()[index],
+                    `${contractNo}-装柜图-柜${index + 1}.png`,
+                  ),
+                )
+              }
             >
               <Download className="mr-1 h-4 w-4" />
               保存图片
@@ -124,7 +154,11 @@ export default function ContainerLoadingPanel({ plan, salesContractId, contractN
               size="sm"
               variant="outline"
               disabled={busy}
-              onClick={() => runExport(async () => exportPagesPdf(pages(), `${contractNo}-装柜图.pdf`))}
+              onClick={() =>
+                runExport(async () =>
+                  exportPagesPdf(pages(), `${contractNo}-装柜图.pdf`),
+                )
+              }
             >
               <FileText className="mr-1 h-4 w-4" />
               导出 PDF
@@ -141,7 +175,13 @@ export default function ContainerLoadingPanel({ plan, salesContractId, contractN
         ) : isMobile ? (
           <ContainerPlan2D plan={active} containerIndex={index} />
         ) : (
-          <Suspense fallback={<div className="flex h-[500px] items-center justify-center">加载3D场景...</div>}>
+          <Suspense
+            fallback={
+              <div className="flex h-[500px] items-center justify-center">
+                加载3D场景...
+              </div>
+            }
+          >
             <Container3DView plan={active} containerIndex={index} />
           </Suspense>
         )}
@@ -156,7 +196,12 @@ export default function ContainerLoadingPanel({ plan, salesContractId, contractN
         className="pointer-events-none absolute -left-[10000px] top-0 w-[1100px] print:static print:w-full"
       >
         {active.containers.map((container) => (
-          <ContainerPrintView key={container.index} plan={active} containerIndex={container.index} contractNo={contractNo} />
+          <ContainerPrintView
+            key={container.index}
+            plan={active}
+            containerIndex={container.index}
+            contractNo={contractNo}
+          />
         ))}
       </div>
     </div>

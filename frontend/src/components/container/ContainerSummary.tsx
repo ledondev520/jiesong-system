@@ -12,7 +12,11 @@ import type { LoadingPlan } from "@/lib/containerLoading";
 
 const STATUS = {
   ready: { label: "可出柜", tone: "success" as const, Icon: CheckCircle2 },
-  "under-utilised": { label: "未达出柜标准", tone: "warning" as const, Icon: CircleDashed },
+  "under-utilised": {
+    label: "未达出柜标准",
+    tone: "warning" as const,
+    Icon: CircleDashed,
+  },
   blocked: { label: "不可出货", tone: "danger" as const, Icon: AlertTriangle },
 };
 
@@ -29,15 +33,22 @@ export default function ContainerSummary({ plan }: { plan: LoadingPlan }) {
         <span className="text-sm font-medium">{check.headline}</span>
       </div>
       <div className="text-sm text-muted-foreground">
-        {plan.container.label} · 共 {plan.containers.length} 个柜 · 任一利用率 ≥ {check.thresholdPct}% 视为达标
+        {plan.container.label} · 共 {plan.containers.length} 个柜 · 任一利用率 ≥{" "}
+        {check.thresholdPct}% 视为达标
       </div>
       {plan.containers.length > 0 && (
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {plan.containers.map((container) => (
-            <li key={container.index} className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-              <div className="font-medium">第 {container.index + 1} 柜 · {container.cartons} 箱</div>
+            <li
+              key={container.index}
+              className="rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+            >
+              <div className="font-medium">
+                第 {container.index + 1} 柜 · {container.cartons} 箱
+              </div>
               <div className="text-xs text-muted-foreground tabular-nums">
-                体积 {pct(container.volumePct)} · 毛重 {pct(container.weightPct)}
+                体积 {pct(container.volumePct)} · 毛重{" "}
+                {pct(container.weightPct)}
               </div>
             </li>
           ))}
@@ -46,12 +57,18 @@ export default function ContainerSummary({ plan }: { plan: LoadingPlan }) {
       {[...check.blockers, ...check.warnings].length > 0 && (
         <ul className="space-y-1 text-sm">
           {check.blockers.map((item) => (
-            <li key={`b-${item.code}-${item.message}`} className="text-red-700 dark:text-red-400">
+            <li
+              key={`b-${item.code}-${item.message}`}
+              className="text-red-700 dark:text-red-400"
+            >
               {item.message}
             </li>
           ))}
           {check.warnings.map((item) => (
-            <li key={`w-${item.code}-${item.message}`} className="text-amber-700 dark:text-amber-400">
+            <li
+              key={`w-${item.code}-${item.message}`}
+              className="text-amber-700 dark:text-amber-400"
+            >
               ⚠ {item.message}
             </li>
           ))}

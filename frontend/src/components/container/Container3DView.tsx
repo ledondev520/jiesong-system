@@ -15,9 +15,19 @@
 
 import { useLayoutEffect, useMemo, useRef, Suspense, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Text, PerspectiveCamera, Html } from "@react-three/drei";
+import {
+  OrbitControls,
+  Text,
+  PerspectiveCamera,
+  Html,
+} from "@react-three/drei";
 import * as THREE from "three";
-import { mmToM, type LoadingPlan, type PlacedBlock, type PlanLine } from "@/lib/containerLoading";
+import {
+  mmToM,
+  type LoadingPlan,
+  type PlacedBlock,
+  type PlanLine,
+} from "@/lib/containerLoading";
 
 interface Container3DViewProps {
   plan: LoadingPlan;
@@ -85,7 +95,10 @@ function BlockMesh({
     mmToM(block.y + (block.ny * c.width) / 2),
   ];
   const color = hovered
-    ? new THREE.Color(line?.color || "#4ECDC4").lerp(new THREE.Color("#ffffff"), 0.15)
+    ? new THREE.Color(line?.color || "#4ECDC4").lerp(
+        new THREE.Color("#ffffff"),
+        0.15,
+      )
     : line?.color || "#4ECDC4";
 
   return (
@@ -111,19 +124,33 @@ function BlockMesh({
             mmToM(c.width) * CARTON_SHRINK,
           ]}
         />
-        <meshStandardMaterial color={color} transparent opacity={hovered ? 0.9 : 0.85} />
+        <meshStandardMaterial
+          color={color}
+          transparent
+          opacity={hovered ? 0.9 : 0.85}
+        />
       </instancedMesh>
       <lineSegments position={center} geometry={outline}>
         <lineBasicMaterial color={estimated ? "#F59E0B" : "#333"} />
       </lineSegments>
       {hovered && (
-        <Html position={[center[0], center[1] + mmToM((block.nz * c.height) / 2) + 0.05, center[2]]} center style={{ pointerEvents: "none" }}>
+        <Html
+          position={[
+            center[0],
+            center[1] + mmToM((block.nz * c.height) / 2) + 0.05,
+            center[2],
+          ]}
+          center
+          style={{ pointerEvents: "none" }}
+        >
           <div className="bg-popover/92 text-popover-foreground px-2 py-1 rounded text-xs whitespace-nowrap border border-border/60">
             <div>{line?.name ?? block.lineId}</div>
             <div className="text-muted-foreground">
               {block.cartons} 箱 · {c.length}×{c.width}×{c.height} mm
             </div>
-            {estimated && <div className="text-amber-500 mt-0.5">⚠ 尺寸已根据体积预估</div>}
+            {estimated && (
+              <div className="text-amber-500 mt-0.5">⚠ 尺寸已根据体积预估</div>
+            )}
           </div>
         </Html>
       )}
@@ -148,20 +175,43 @@ function ContainerFrame({ plan }: { plan: LoadingPlan }) {
 
   return (
     <group>
-      <mesh position={[position.x, 0.01, position.z]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh
+        position={[position.x, 0.01, position.z]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
         <planeGeometry args={[size.x, size.z]} />
         <meshStandardMaterial color="#e0e0e0" side={THREE.DoubleSide} />
       </mesh>
-      <lineSegments position={[position.x, position.y, position.z]} geometry={frameEdges}>
+      <lineSegments
+        position={[position.x, position.y, position.z]}
+        geometry={frameEdges}
+      >
         <lineBasicMaterial color="#666" />
       </lineSegments>
-      <Text position={[position.x, -0.3, -0.5]} fontSize={0.3} color="#333" anchorX="center">
+      <Text
+        position={[position.x, -0.3, -0.5]}
+        fontSize={0.3}
+        color="#333"
+        anchorX="center"
+      >
         {`${length}mm`}
       </Text>
-      <Text position={[-0.5, position.y, position.z]} fontSize={0.3} color="#333" rotation={[0, Math.PI / 2, 0]} anchorX="center">
+      <Text
+        position={[-0.5, position.y, position.z]}
+        fontSize={0.3}
+        color="#333"
+        rotation={[0, Math.PI / 2, 0]}
+        anchorX="center"
+      >
         {`${height}mm`}
       </Text>
-      <Text position={[size.x + 0.5, -0.3, position.z]} fontSize={0.3} color="#333" rotation={[0, -Math.PI / 2, 0]} anchorX="center">
+      <Text
+        position={[size.x + 0.5, -0.3, position.z]}
+        fontSize={0.3}
+        color="#333"
+        rotation={[0, -Math.PI / 2, 0]}
+        anchorX="center"
+      >
         {`${width}mm`}
       </Text>
     </group>
@@ -181,14 +231,32 @@ function Scene({
   onHover: (step: number | null) => void;
 }) {
   const { length, width, height } = plan.container.innerMm;
-  const center: [number, number, number] = [mmToM(length / 2), mmToM(height / 2), mmToM(width / 2)];
-  const camPos: [number, number, number] = [center[0] + 8, center[1] + 6, center[2] + 10];
-  const lineById = useMemo(() => new Map(plan.lines.map((line) => [line.lineId, line])), [plan.lines]);
+  const center: [number, number, number] = [
+    mmToM(length / 2),
+    mmToM(height / 2),
+    mmToM(width / 2),
+  ];
+  const camPos: [number, number, number] = [
+    center[0] + 8,
+    center[1] + 6,
+    center[2] + 10,
+  ];
+  const lineById = useMemo(
+    () => new Map(plan.lines.map((line) => [line.lineId, line])),
+    [plan.lines],
+  );
 
   return (
     <>
       <PerspectiveCamera makeDefault position={camPos} fov={50} />
-      <OrbitControls target={center} enablePan enableZoom enableRotate minDistance={3} maxDistance={40} />
+      <OrbitControls
+        target={center}
+        enablePan
+        enableZoom
+        enableRotate
+        minDistance={3}
+        maxDistance={40}
+      />
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
       <directionalLight position={[-10, 10, -5]} intensity={0.5} />
@@ -202,28 +270,44 @@ function Scene({
           onHover={(hovered) => onHover(hovered ? block.step : null)}
         />
       ))}
-      <gridHelper args={[20, 20, "#ccc", "#eee"]} position={[mmToM(length / 2), 0, mmToM(width / 2)]} />
+      <gridHelper
+        args={[20, 20, "#ccc", "#eee"]}
+        position={[mmToM(length / 2), 0, mmToM(width / 2)]}
+      />
     </>
   );
 }
 
 /** 职责：主导出组件；统计面板显示本柜装箱数、利用率、未装与估算提示。 */
-export default function Container3DView({ plan, containerIndex = 0 }: Container3DViewProps) {
+export default function Container3DView({
+  plan,
+  containerIndex = 0,
+}: Container3DViewProps) {
   const [hoveredStep, setHoveredStep] = useState<number | null>(null);
   const container = plan.containers[containerIndex];
   const blocks = useMemo(() => container?.blocks ?? [], [container]);
-  const unplacedCartons = plan.unplaced.reduce((sum, entry) => sum + entry.cartons, 0)
-    + plan.containers.filter((entry) => entry.index !== containerIndex).reduce((sum, entry) => sum + entry.cartons, 0);
-  const estimatedCount = plan.lines.filter((line) => line.dimsSource === "estimated").length;
+  const unplacedCartons =
+    plan.unplaced.reduce((sum, entry) => sum + entry.cartons, 0) +
+    plan.containers
+      .filter((entry) => entry.index !== containerIndex)
+      .reduce((sum, entry) => sum + entry.cartons, 0);
+  const estimatedCount = plan.lines.filter(
+    (line) => line.dimsSource === "estimated",
+  ).length;
 
   return (
     <div className="w-full h-[420px] md:h-[520px] bg-muted rounded-lg overflow-hidden relative">
       <div className="absolute top-4 left-4 z-10 bg-card/92 rounded-lg p-3 shadow border border-border/60">
         <div className="text-sm font-medium">装箱统计</div>
-        <div className="text-xs text-muted-foreground mt-1">已装: {container?.cartons ?? 0} 箱</div>
-        <div className="text-xs text-muted-foreground">未装: {unplacedCartons} 箱</div>
+        <div className="text-xs text-muted-foreground mt-1">
+          已装: {container?.cartons ?? 0} 箱
+        </div>
+        <div className="text-xs text-muted-foreground">
+          未装: {unplacedCartons} 箱
+        </div>
         <div className="text-xs font-medium mt-1">
-          体积: {(container?.volumePct ?? 0).toFixed(1)}% · 毛重: {(container?.weightPct ?? 0).toFixed(1)}%
+          体积: {(container?.volumePct ?? 0).toFixed(1)}% · 毛重:{" "}
+          {(container?.weightPct ?? 0).toFixed(1)}%
         </div>
         {plan.containers.length > 1 && (
           <div className="text-xs text-muted-foreground">
@@ -243,7 +327,12 @@ export default function Container3DView({ plan, containerIndex = 0 }: Container3
 
       <Canvas shadows gl={{ preserveDrawingBuffer: true }}>
         <Suspense fallback={null}>
-          <Scene plan={plan} blocks={blocks} hoveredStep={hoveredStep} onHover={setHoveredStep} />
+          <Scene
+            plan={plan}
+            blocks={blocks}
+            hoveredStep={hoveredStep}
+            onHover={setHoveredStep}
+          />
         </Suspense>
       </Canvas>
     </div>

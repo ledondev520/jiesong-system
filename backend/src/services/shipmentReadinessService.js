@@ -85,7 +85,8 @@ const evaluateLoadingCheck = (plan, facts) => {
   // 首柜之外的箱子（溢出柜 + 任何柜都放不进的箱）都意味着一个柜装不下。
   const overflowCartons = containers.slice(1).reduce((sum, container) => sum + container.cartons, 0)
     + plan.unplaced.filter((item) => item.reason === 'no-space').reduce((sum, item) => sum + item.cartons, 0);
-  if (overflowCartons > 0) {
+  // 汇总已超限时“超重/超体积”已说明一个柜装不下，不再重复提示溢出。
+  if (overflowCartons > 0 && util.overReasons.length === 0) {
     add('unplaced', `仍有 ${overflowCartons} 箱装不下，共需 ${Math.max(2, containers.length)} 个${type}，请拆分订单或更换柜型`);
   }
   if (!util.utilisationReady) {

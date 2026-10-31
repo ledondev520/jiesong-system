@@ -131,7 +131,6 @@ vi.mock("@/components/finance/ForexVerificationPanel", () => ({
   },
 }));
 
-
 type PlanOverrides = {
   ready?: boolean;
   status?: "ready" | "under-utilised" | "blocked";

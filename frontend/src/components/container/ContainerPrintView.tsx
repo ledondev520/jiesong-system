@@ -17,7 +17,11 @@ interface ContainerPrintViewProps {
 
 const kg = (value: number) => `${Math.round(value * 10) / 10} kg`;
 
-export default function ContainerPrintView({ plan, containerIndex, contractNo }: ContainerPrintViewProps) {
+export default function ContainerPrintView({
+  plan,
+  containerIndex,
+  contractNo,
+}: ContainerPrintViewProps) {
   const container = plan.containers[containerIndex];
   if (!container) return null;
   const lineById = new Map(plan.lines.map((line) => [line.lineId, line]));
@@ -28,9 +32,15 @@ export default function ContainerPrintView({ plan, containerIndex, contractNo }:
   const layers = new Map<number, { cartons: number; kg: number }>();
   for (const block of container.blocks) {
     const entry = legend.get(block.lineId) ?? { cartons: 0, kg: 0 };
-    legend.set(block.lineId, { cartons: entry.cartons + block.cartons, kg: entry.kg + block.kg });
+    legend.set(block.lineId, {
+      cartons: entry.cartons + block.cartons,
+      kg: entry.kg + block.kg,
+    });
     const layer = layers.get(block.z) ?? { cartons: 0, kg: 0 };
-    layers.set(block.z, { cartons: layer.cartons + block.cartons, kg: layer.kg + block.kg });
+    layers.set(block.z, {
+      cartons: layer.cartons + block.cartons,
+      kg: layer.kg + block.kg,
+    });
   }
   const layerRows = [...layers].sort((a, b) => a[0] - b[0]);
 
@@ -41,11 +51,13 @@ export default function ContainerPrintView({ plan, containerIndex, contractNo }:
     >
       <header className="space-y-1 border-b pb-3">
         <h2 className="text-lg font-semibold">
-          {contractNo} · 装柜图 · 第 {containerIndex + 1} / {plan.containers.length} 柜
+          {contractNo} · 装柜图 · 第 {containerIndex + 1} /{" "}
+          {plan.containers.length} 柜
         </h2>
         <p className="tabular-nums">
-          {plan.container.label} · {container.cartons} 箱 · {kg(container.grossKg)} ·{" "}
-          {container.cargoCbm.toFixed(2)} CBM · 体积 {container.volumePct.toFixed(1)}% · 毛重{" "}
+          {plan.container.label} · {container.cartons} 箱 ·{" "}
+          {kg(container.grossKg)} · {container.cargoCbm.toFixed(2)} CBM · 体积{" "}
+          {container.volumePct.toFixed(1)}% · 毛重{" "}
           {container.weightPct.toFixed(1)}%
         </p>
       </header>
@@ -81,7 +93,9 @@ export default function ContainerPrintView({ plan, containerIndex, contractNo }:
                   {line?.cartonMm
                     ? `${line.cartonMm.length}×${line.cartonMm.width}×${line.cartonMm.height}`
                     : "—"}
-                  {line?.dimsSource === "estimated" && <span className="ml-1 text-amber-600">估算</span>}
+                  {line?.dimsSource === "estimated" && (
+                    <span className="ml-1 text-amber-600">估算</span>
+                  )}
                 </td>
               </tr>
             );
@@ -90,7 +104,9 @@ export default function ContainerPrintView({ plan, containerIndex, contractNo }:
       </table>
 
       <table className="w-full border-collapse text-left">
-        <caption className="mb-1 text-left font-medium">分层（自下而上）</caption>
+        <caption className="mb-1 text-left font-medium">
+          分层（自下而上）
+        </caption>
         <thead>
           <tr className="border-b">
             <th className="py-1">层</th>
@@ -128,7 +144,9 @@ export default function ContainerPrintView({ plan, containerIndex, contractNo }:
             <tr key={block.step} className="border-b break-inside-avoid">
               <td className="py-1 tabular-nums">{block.step}</td>
               <td>{lineById.get(block.lineId)?.name ?? block.lineId}</td>
-              <td className="tabular-nums">{block.nx}×{block.ny}×{block.nz}</td>
+              <td className="tabular-nums">
+                {block.nx}×{block.ny}×{block.nz}
+              </td>
               <td className="tabular-nums">{block.cartons}</td>
               <td className="tabular-nums">{kg(block.kg)}</td>
               <td className="tabular-nums">{(block.x / 1000).toFixed(2)} m</td>

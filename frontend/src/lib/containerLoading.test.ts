@@ -5,7 +5,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { mmToM, summarizeLoadingPlan, type LoadingPlan } from "./containerLoading";
+import {
+  mmToM,
+  summarizeLoadingPlan,
+  type LoadingPlan,
+} from "./containerLoading";
 
 const basePlan = (overrides: Partial<LoadingPlan> = {}): LoadingPlan => ({
   algorithm: "block-ep-v1",
@@ -78,7 +82,13 @@ describe("summarizeLoadingPlan", () => {
     const plan = basePlan({
       containers: [container(0, 700), container(1, 91)],
       unplaced: [
-        { lineId: "l1", name: "大箱", cartons: 2, reason: "oversize", cartonMm: null },
+        {
+          lineId: "l1",
+          name: "大箱",
+          cartons: 2,
+          reason: "oversize",
+          cartonMm: null,
+        },
       ],
       check: {
         ...basePlan().check,
@@ -116,12 +126,25 @@ describe("summarizeLoadingPlan", () => {
 
   it("estimatedLineCount 统计「估算」箱规行数", () => {
     const line = {
-      lineId: "l1", productId: "p", name: "估算货", color: "#000", cartons: 1, kgPerCarton: 1,
-      cartonMm: null, dimsSource: "estimated" as const, profile: "default", heavy: false, upright: true, maxStackKg: 300,
+      lineId: "l1",
+      productId: "p",
+      name: "估算货",
+      color: "#000",
+      cartons: 1,
+      kgPerCarton: 1,
+      cartonMm: null,
+      dimsSource: "estimated" as const,
+      profile: "default",
+      heavy: false,
+      upright: true,
+      maxStackKg: 300,
     };
     expect(
-      summarizeLoadingPlan(basePlan({ lines: [line, { ...line, lineId: "l2", dimsSource: "line" }] }))
-        .estimatedLineCount,
+      summarizeLoadingPlan(
+        basePlan({
+          lines: [line, { ...line, lineId: "l2", dimsSource: "line" }],
+        }),
+      ).estimatedLineCount,
     ).toBe(1);
   });
 

@@ -19,7 +19,9 @@ const mockExportPng = vi.fn();
 const mockExportPdf = vi.fn();
 
 vi.mock("@/lib/hooks/useMobile", () => ({ useMobile: () => mockIsMobile() }));
-vi.mock("@/services/sales.service", () => ({ salesService: { getLoadingPlan: vi.fn() } }));
+vi.mock("@/services/sales.service", () => ({
+  salesService: { getLoadingPlan: vi.fn() },
+}));
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("./Container3DView", () => ({
   default: (props: { containerIndex?: number }) => {
@@ -33,7 +35,13 @@ vi.mock("./containerExport", () => ({
 }));
 
 const renderPanel = () =>
-  render(<ContainerLoadingPanel plan={twoContainerPlan()} salesContractId="s-1" contractNo="EXP001" />);
+  render(
+    <ContainerLoadingPanel
+      plan={twoContainerPlan()}
+      salesContractId="s-1"
+      contractNo="EXP001"
+    />,
+  );
 
 describe("ContainerLoadingPanel", () => {
   beforeEach(() => {
@@ -49,8 +57,12 @@ describe("ContainerLoadingPanel", () => {
     expect(within(summary).getByText("不可出货")).toBeInTheDocument();
     expect(within(summary).getByText(/共 2 个柜/)).toBeInTheDocument();
     expect(within(summary).getByText("第 1 柜 · 3 箱")).toBeInTheDocument();
-    expect(within(summary).getByText("体积 52.5% · 毛重 0.1%")).toBeInTheDocument();
-    expect(within(summary).getByText(/仍有 2 箱装不下/, { selector: "li" })).toBeInTheDocument();
+    expect(
+      within(summary).getByText("体积 52.5% · 毛重 0.1%"),
+    ).toBeInTheDocument();
+    expect(
+      within(summary).getByText(/仍有 2 箱装不下/, { selector: "li" }),
+    ).toBeInTheDocument();
     expect(within(summary).getByText(/1 行箱规为估算/)).toBeInTheDocument();
   });
 
@@ -59,7 +71,9 @@ describe("ContainerLoadingPanel", () => {
     renderPanel();
     expect(await screen.findByText("3D视图 第1柜")).toBeInTheDocument();
     const view = screen.getByTestId("container-view");
-    expect(within(view).queryByTestId("container-plan-2d")).not.toBeInTheDocument();
+    expect(
+      within(view).queryByTestId("container-plan-2d"),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "第 2 柜" }));
     expect(await screen.findByText("3D视图 第2柜")).toBeInTheDocument();
   });
@@ -78,7 +92,9 @@ describe("ContainerLoadingPanel", () => {
     renderPanel();
     const pages = screen.getAllByTestId("container-print-page");
     expect(pages).toHaveLength(2);
-    expect(within(pages[0]).getByText(/EXP001 · 装柜图 · 第 1 \/ 2 柜/)).toBeInTheDocument();
+    expect(
+      within(pages[0]).getByText(/EXP001 · 装柜图 · 第 1 \/ 2 柜/),
+    ).toBeInTheDocument();
     expect(within(pages[0]).getAllByText("测试瓷砖").length).toBeGreaterThan(0);
     expect(within(pages[0]).getByText("估算")).toBeInTheDocument();
     expect(within(pages[1]).getAllByText("溢出餐椅").length).toBeGreaterThan(0);
@@ -99,15 +115,29 @@ describe("ContainerLoadingPanel", () => {
 
   it("没有装柜结果时给出空态且不提供导出", () => {
     const empty = { ...twoContainerPlan(), containers: [] };
-    render(<ContainerLoadingPanel plan={empty} salesContractId="s-1" contractNo="EXP001" />);
+    render(
+      <ContainerLoadingPanel
+        plan={empty}
+        salesContractId="s-1"
+        contractNo="EXP001"
+      />,
+    );
     expect(screen.getByText(/请先添加装箱商品/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "导出 PDF" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "导出 PDF" }),
+    ).not.toBeInTheDocument();
   });
 });
 
 describe("ContainerPrintView", () => {
   it("分层与装货顺序表列出每个块的排列、箱数、重量和距后墙距离", () => {
-    render(<ContainerPrintView plan={twoContainerPlan()} containerIndex={0} contractNo="EXP001" />);
+    render(
+      <ContainerPrintView
+        plan={twoContainerPlan()}
+        containerIndex={0}
+        contractNo="EXP001"
+      />,
+    );
     expect(screen.getByText("第 1 层")).toBeInTheDocument();
     expect(screen.getByText("3×1×1")).toBeInTheDocument();
     expect(screen.getByText("0.00 m")).toBeInTheDocument();
@@ -115,7 +145,13 @@ describe("ContainerPrintView", () => {
   });
 
   it("柜序号越界时不渲染", () => {
-    const { container } = render(<ContainerPrintView plan={twoContainerPlan()} containerIndex={5} contractNo="EXP001" />);
+    const { container } = render(
+      <ContainerPrintView
+        plan={twoContainerPlan()}
+        containerIndex={5}
+        contractNo="EXP001"
+      />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 });

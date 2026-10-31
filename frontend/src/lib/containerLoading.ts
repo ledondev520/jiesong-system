@@ -137,7 +137,9 @@ export function summarizeLoadingPlan(plan: LoadingPlan | null) {
     unplacedBoxCount: unplaced + placed - first,
     estimatedLineCount: plan.lines.filter((l) => l.dimsSource === "estimated")
       .length,
-    physicalFit: !check.blockers.some((b) => PHYSICAL_BLOCKERS.includes(b.code)),
+    physicalFit: !check.blockers.some((b) =>
+      PHYSICAL_BLOCKERS.includes(b.code),
+    ),
   };
 }
 

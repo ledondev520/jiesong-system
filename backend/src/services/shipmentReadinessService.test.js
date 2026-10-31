@@ -160,21 +160,30 @@ test('evaluateLoadingCheck: 任一阻塞时 status 为 blocked，仅未达标时
   assert.equal(blocked.headline, '2 行装箱明细未填写箱数');
 });
 
-test('buildLoadingPlan: 一个柜装不下时溢出柜计入 unplaced 阻塞并给出所需柜数', () => {
-  const tile = (id, boxes) => ({
-    id, productId: id, boxes, quantity: boxes, grossWeight: boxes * 31, volume: boxes * 0.0192,
-    length: 620, width: 620, height: 50, product: { customsName: '瓷砖', category: { name: '瓷砖' } },
-  });
-  const { plan } = buildLoadingPlan({ packingItems: [tile('t1', 800)] });
+test('buildLoadingPlan: 汇总未超限但几何上装不下时，溢出柜计入 unplaced 阻塞并给出所需柜数', () => {
+  const chairs = {
+    id: 'c1', productId: 'c1', boxes: 200, quantity: 200, grossWeight: 2800, volume: 40,
+    length: 650, width: 600, height: 950, product: { customsName: '餐椅', category: { name: '家具' } },
+  };
+  const { plan } = buildLoadingPlan({ packingItems: [chairs] });
   assert.equal(plan.algorithm, 'block-ep-v1');
   assert.equal(plan.containers.length, 2);
-  assert.equal(plan.lines[0].profile, 'tile');
-  assert.ok(plan.check.blockers.some((item) => item.code === 'over-weight'));
+  assert.equal(plan.lines[0].profile, 'furniture');
   const unplaced = plan.check.blockers.find((item) => item.code === 'unplaced');
-  assert.match(unplaced.message, /^仍有 \d+ 箱装不下，共需 2 个40HQ/);
+  assert.match(unplaced.message, /^仍有 80 箱装不下，共需 2 个40HQ/);
   assert.equal(plan.check.status, 'blocked');
   assert.deepEqual(plan.availableTypes[0], { code: '40HQ', label: '40HQ 高柜' });
   assert.equal(plan.container.usableMm.length, 12000);
+});
+
+test('buildLoadingPlan: 汇总已超重时只报超重，不重复提示溢出', () => {
+  const tiles = {
+    id: 't1', productId: 't1', boxes: 800, quantity: 800, grossWeight: 800 * 31, volume: 15,
+    length: 620, width: 620, height: 50, product: { customsName: '瓷砖', category: { name: '瓷砖' } },
+  };
+  const { plan } = buildLoadingPlan({ packingItems: [tiles] });
+  assert.equal(plan.containers.length, 2);
+  assert.deepEqual(plan.check.blockers.map((item) => item.code).filter((code) => code !== 'under-utilised'), ['over-weight']);
 });
 
 test('buildLoadingPlan: 指定 20GP 仅模拟，用 20GP 的内尺寸与限值', () => {

@@ -644,7 +644,8 @@ export default function SalesDetailPage({ params }: PageProps) {
     salesService
       .getLoadingPlan(id)
       .then((res) => {
-        if (!cancelled) setPlanState({ forContract: contract, plan: res.data ?? null });
+        if (!cancelled)
+          setPlanState({ forContract: contract, plan: res.data ?? null });
       })
       .catch(() => {
         if (!cancelled) setPlanState({ forContract: contract, plan: null });
@@ -653,7 +654,8 @@ export default function SalesDetailPage({ params }: PageProps) {
       cancelled = true;
     };
   }, [contract, id]);
-  const loadingPlan = planState?.forContract === contract ? planState.plan : null;
+  const loadingPlan =
+    planState?.forContract === contract ? planState.plan : null;
   const readiness = summarizeLoadingPlan(loadingPlan);
   const estimatedDimensionCount = readiness.estimatedLineCount;
 
@@ -983,9 +985,7 @@ export default function SalesDetailPage({ params }: PageProps) {
           >
             {readiness.weightPct.toFixed(1)}%
           </span>
-          <span className="text-muted-foreground">
-            / {maxWeight / 1000}t
-          </span>
+          <span className="text-muted-foreground">/ {maxWeight / 1000}t</span>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <Container className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1020,9 +1020,7 @@ export default function SalesDetailPage({ params }: PageProps) {
           >
             {readiness.volumePct.toFixed(1)}%
           </span>
-          <span className="text-muted-foreground">
-            / {maxCBM} CBM
-          </span>
+          <span className="text-muted-foreground">/ {maxCBM} CBM</span>
         </div>
       </div>
 

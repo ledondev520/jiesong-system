@@ -30,7 +30,9 @@ function PlanSvg({
   const colorOf = new Map(plan.lines.map((line) => [line.lineId, line]));
   // 俯视：低层先画，高层盖在上面；侧视：远（y 大）先画，近处盖在上面。
   const ordered = [...blocks].sort((a, b) =>
-    view === "top" ? a.z - b.z || a.step - b.step : b.y - a.y || a.step - b.step,
+    view === "top"
+      ? a.z - b.z || a.step - b.step
+      : b.y - a.y || a.step - b.step,
   );
   const fontSize = length / 60;
 
@@ -41,7 +43,15 @@ function PlanSvg({
       aria-label={view === "top" ? "装柜俯视图" : "装柜侧视图"}
       className="h-auto w-full"
     >
-      <rect x={0} y={0} width={length} height={depth} fill="#f8fafc" stroke="#334155" strokeWidth={length / 400} />
+      <rect
+        x={0}
+        y={0}
+        width={length}
+        height={depth}
+        fill="#f8fafc"
+        stroke="#334155"
+        strokeWidth={length / 400}
+      />
       {ordered.map((block) => {
         const line = colorOf.get(block.lineId);
         const { cartonMm: c } = block;
@@ -59,10 +69,19 @@ function PlanSvg({
               fillOpacity={0.85}
               stroke={line?.dimsSource === "estimated" ? "#F59E0B" : "#334155"}
               strokeWidth={length / 600}
-              strokeDasharray={line?.dimsSource === "estimated" ? `${length / 150}` : undefined}
+              strokeDasharray={
+                line?.dimsSource === "estimated" ? `${length / 150}` : undefined
+              }
             />
             {w > length * 0.04 && h > depth * 0.1 && (
-              <text x={block.x + w / 2} y={y + h / 2} fontSize={fontSize} textAnchor="middle" dominantBaseline="middle" fill="#0f172a">
+              <text
+                x={block.x + w / 2}
+                y={y + h / 2}
+                fontSize={fontSize}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="#0f172a"
+              >
                 {block.step}
               </text>
             )}
@@ -72,7 +91,13 @@ function PlanSvg({
       <text x={0} y={-depth * 0.015} fontSize={fontSize} fill="#475569">
         后墙
       </text>
-      <text x={length} y={-depth * 0.015} fontSize={fontSize} fill="#475569" textAnchor="end">
+      <text
+        x={length}
+        y={-depth * 0.015}
+        fontSize={fontSize}
+        fill="#475569"
+        textAnchor="end"
+      >
         柜门 →
       </text>
     </svg>
@@ -80,15 +105,24 @@ function PlanSvg({
 }
 
 /** 职责：同时给出俯视与侧视；无装柜块时给出空态文案。 */
-export default function ContainerPlan2D({ plan, containerIndex = 0 }: ContainerPlan2DProps) {
+export default function ContainerPlan2D({
+  plan,
+  containerIndex = 0,
+}: ContainerPlan2DProps) {
   const container = plan.containers[containerIndex];
   if (!container) {
-    return <div className="py-10 text-center text-muted-foreground">暂无装柜结果</div>;
+    return (
+      <div className="py-10 text-center text-muted-foreground">
+        暂无装柜结果
+      </div>
+    );
   }
   return (
     <div className="space-y-3" data-testid="container-plan-2d">
       <div>
-        <p className="mb-1 text-xs text-muted-foreground">俯视图（数字为装货顺序）</p>
+        <p className="mb-1 text-xs text-muted-foreground">
+          俯视图（数字为装货顺序）
+        </p>
         <PlanSvg plan={plan} blocks={container.blocks} view="top" />
       </div>
       <div>

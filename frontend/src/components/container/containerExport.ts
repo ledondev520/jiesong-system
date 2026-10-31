@@ -26,18 +26,28 @@ export async function exportPagePng(element: HTMLElement, filename: string) {
 }
 
 /** 职责：每个元素一页（A4，按页面长宽比选横/竖，等比缩放居中）合成 PDF 并下载。 */
-export async function exportPagesPdf(elements: HTMLElement[], filename: string) {
+export async function exportPagesPdf(
+  elements: HTMLElement[],
+  filename: string,
+) {
   const { jsPDF } = await import("jspdf");
   const orientationOf = (el: HTMLElement) =>
     el.offsetHeight > el.offsetWidth ? "portrait" : "landscape";
-  const doc = new jsPDF({ orientation: orientationOf(elements[0]), unit: "mm", format: "a4" });
+  const doc = new jsPDF({
+    orientation: orientationOf(elements[0]),
+    unit: "mm",
+    format: "a4",
+  });
   for (let index = 0; index < elements.length; index += 1) {
     const element = elements[index];
     const dataUrl = await capture(element);
     if (index > 0) doc.addPage("a4", orientationOf(element));
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
-    const ratio = Math.min(pageW / element.offsetWidth, pageH / element.offsetHeight);
+    const ratio = Math.min(
+      pageW / element.offsetWidth,
+      pageH / element.offsetHeight,
+    );
     const w = element.offsetWidth * ratio;
     const h = element.offsetHeight * ratio;
     doc.addImage(dataUrl, "PNG", (pageW - w) / 2, (pageH - h) / 2, w, h);
