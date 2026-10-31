@@ -252,6 +252,11 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   const before = readDomain(fixture);
   const rejected = mutation(page, `/sales/${fixture.salesId}/status`, "PUT");
   await ship.click();
+  // 状态点击先确认（手机与桌面一致）
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "确认", exact: true })
+    .click();
   const response = await rejected;
   expect(response.status()).toBe(400);
   expect((await response.json()).message).toContain("库存不足");
