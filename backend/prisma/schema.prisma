@@ -222,6 +222,31 @@ model SupplierAlias {
   @@map("supplier_aliases")
 }
 
+// Confidential: customer contact data. One row per buying customer; Seapot is the only active one in v1.
+model Customer {
+  id                   String   @id @default(cuid())
+  name                 String   @unique // "Seapot"
+  legalName            String? // buyer name printed on PI / export documents (spec Q16)
+  country              String? // ISO-3166 alpha-2, e.g. "US"
+  address              String?
+  contactName          String?
+  contactEmail         String?
+  contactPhone         String?
+  defaultCurrency      String   @default("USD") // v1 accepts only "USD"
+  defaultIncoterm      String   @default("FOB") // owner decision: Seapot buys FOB
+  defaultPaymentTerms  String?
+  defaultPortOfLoading String? // free text, e.g. "Shanghai"; prints as "FOB <port>" (spec Q7)
+  note                 String?
+  isActive             Boolean  @default(true) // archive flag; customers are never hard-deleted
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  stores         Store[]
+  salesContracts SalesContract[]
+
+  @@map("customers")
+}
+
 model Store {
   id           String   @id @default(cuid())
   name         String   @unique
@@ -231,13 +256,18 @@ model Store {
   contactEmail String?
   address      String?
   isActive     Boolean  @default(true)
+  customerId   String? // nullable for the migration; new stores must set it (API rule, J12)
+  code         String?  @unique // short code for shipping marks / PI lines, e.g. "SAC" (spec Q17)
+  legalName    String? // the store's operating entity (spec Q16)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   port         Port          @relation(fields: [portId], references: [id])
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
   salesItems   SalesItem[]
   packingItems PackingItem[]
 
+  @@index([customerId])
   @@map("stores")
 }
 
@@ -484,11 +514,18 @@ model SalesContract {
   isFumigated      Boolean?
   hasTaxRefund     Boolean?
   containerLabel   String? // 物理货柜编号（如 "02-振宗"），与 EXP 合同号区分
+  // 订单级条款（迁移 A）
+  customerId       String?
+  currency         String    @default("USD") // v1 仅 USD
+  incoterm         String? // 新订单复制 Customer.defaultIncoterm；旧订单为空 = 显示客户默认
+  paymentTerms     String?
+  portOfLoading    String? // 自由文本，复制自 Customer.defaultPortOfLoading
   // 时间戳
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   port                Port?                @relation(fields: [portId], references: [id])
+  customer            Customer?            @relation(fields: [customerId], references: [id], onDelete: Restrict)
   customsDeclarations CustomsDeclaration[]
   forexVerifications  ForexVerification[]
   items               SalesItem[]
@@ -502,6 +539,7 @@ model SalesContract {
   @@index([status])
   @@index([amountSource])
   @@index([portId])
+  @@index([customerId])
   @@index([createdAt])
   @@map("sales_contracts")
 }

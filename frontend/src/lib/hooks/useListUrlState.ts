@@ -17,6 +17,12 @@ type State<T extends Fields> = {
 };
 
 export const listUrlFields = {
+  customers: {
+    keyword: { default: "", resetPage: true },
+    archived: { default: "no", values: ["no", "yes"], resetPage: true },
+    page: { default: 1 },
+    pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
+  },
   customs: {
     keyword: { default: "", resetPage: true },
     status: {

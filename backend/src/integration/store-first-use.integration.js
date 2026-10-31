@@ -36,6 +36,8 @@ test('HTTP/SQLite: SALES creates the first store and uses it on a contract witho
   }
   const port = await db.port.create({ data: { name: '合成有效港口', code: 'QA-STORE' } });
   await db.port.create({ data: { name: '合成停用港口', code: 'QA-OFF', isActive: false } });
+  // POST /stores 无 customerId 时采用唯一启用客户（DATA-MODEL-2026 §2.4）
+  const customer = await db.customer.create({ data: { name: '合成客户' } });
   const app = require('../app');
   server = await new Promise((resolve) => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
@@ -61,6 +63,7 @@ test('HTTP/SQLite: SALES creates the first store and uses it on a contract witho
   const store = await call('POST', '/stores', input, 'SALES', 201);
   assert.ok(store.id);
   assert.equal(store.port.id, port.id);
+  assert.equal(store.customerId, customer.id, 'the only active customer is used when customerId is omitted');
   for (const [key, value] of Object.entries(input)) assert.equal(store[key], value);
   const catalog = await call('GET', '/stores?lite=true');
   assert.equal(catalog.items.length, 1);
