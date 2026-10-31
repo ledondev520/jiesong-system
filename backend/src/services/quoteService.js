@@ -218,7 +218,8 @@ const convertToOrder = async (tx, quote) => {
   const order = await tx.salesContract.create({ data: {
     contractNo, status: 'DRAFT', customerId: quote.customerId, currency: quote.currency, incoterm: quote.incoterm,
     paymentTerms: quote.paymentTerms, portOfLoading: quote.portOfLoading, quoteId: quote.id,
-    exchangeRate: quote.spotRate, portId: ports.size === 1 ? [...ports][0] : null,
+    // Owner decision 2026-10-31: order FX = spot − 0.2, i.e. the rate the quote was priced with.
+    exchangeRate: quote.pricingRate, portId: ports.size === 1 ? [...ports][0] : null,
     totalAmount: round(quote.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0), 2),
   } });
   await tx.salesItem.createMany({ data: quote.items.map((i) => ({
