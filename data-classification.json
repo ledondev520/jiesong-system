@@ -20,6 +20,7 @@
         "generated shipment tax-refund confirmation checklists and material-version references",
         "supplier bank account names, account numbers, branches, and bank routing codes",
         "company bank statements, transaction identifiers, account balances, and even masked account identifiers when combined with transaction rows",
+        "seller company bank details printed on quotes/PIs (SystemConfig companyBankInfo): read only by ADMIN/FINANCE via the API, value never written to audit logs",
         "carrier packing-list originals and persistent packing-list review records",
         "email verification code hashes and Alibaba Cloud mail credentials",
         "password reset code hashes, bound recovery email and persistent requester HMAC digests",

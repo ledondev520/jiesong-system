@@ -183,3 +183,6 @@ operator to confirm no writer is active before removing it.
 
 - 采购 Excel 导入 `/api/v1/purchases/import` 在原认证/角色鉴权后使用 `backend/src/utils/purchaseExcelUpload.js` 的 memoryStorage，仅允许 .xlsx/.xls，沿用 config.upload.maxSize；`purchaseImportExportController.js` 只传文件名标签/Buffer，`purchaseImportExportService.js` 在解析/数据库访问前拒绝路径，仅解析内存字节，不留存 Confidential 原始工作簿于普通附件存储。
 - `backend/src/middleware/errorHandler.js` 将无 statusCode 的 Busboy 请求解析错误按精确消息白名单（七条消息及 `Unsupported content type: ` 前缀）返回中文400，含 NUL 的畸形 multipart 因此不再返回500。显式状态、Multer处理及原始错误日志保持，畸形上传解析错误即使开发环境也不返回英文堆栈，未知内部错误仍500；回归见 `backend/src/routes/purchases.import-upload.test.js` 和 `backend/src/middleware/errorHandler.test.js`。
+
+## Company info settings (J34)
+`companyName`/`companyAddress`/`companyBankInfo` (SystemConfig) feed the quote/PI seller block. Writes: ADMIN only via `PUT /system/configs/:key` with text validation (`utils/companyConfig.js`). `companyBankInfo` is Restricted: flat `GET /system/configs` hides it from every role except ADMIN and FINANCE, and operation-log entries for that key keep who/when but never the value. No real company or bank data is stored in the repository, fixtures or examples; defaults are empty.

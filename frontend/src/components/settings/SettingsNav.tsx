@@ -16,6 +16,7 @@ import {
   Anchor,
   Tag,
   Building2,
+  Landmark,
   Download,
   History,
   Bot,
@@ -47,6 +48,7 @@ const navGroups: NavGroup[] = [
         icon: SlidersHorizontal,
       },
       { href: "/dashboard/settings/users", label: "用户", icon: Users },
+      { href: "/dashboard/settings/company", label: "公司信息", icon: Landmark },
     ],
   },
   {
