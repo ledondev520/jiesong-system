@@ -42,7 +42,7 @@ const kimiGreetingTimeoutMs = parsePositiveIntEnv(process.env.KIMI_GREETING_TIME
 
 // DeepSeek 统一四个场景；Kimi 保留既有模型配置。
 const MODELS = isOpenAI() ? {
-  // OPENAI_MODEL 同时服务聊天、视觉（需选支持图像的模型）、快速与"思考"场景。
+  // OPENAI_MODEL（默认 gpt-6.1-terra）同时服务聊天、视觉、快速与"思考"场景；无回退模型。
   default: getActiveAIConfig().model,
   vision: getActiveAIConfig().model,
   fast: getActiveAIConfig().model,

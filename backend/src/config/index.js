@@ -110,14 +110,15 @@ const openai = {
   provider: 'openai',
   apiKey: (process.env.OPENAI_API_KEY || '').trim(),
   baseUrl: (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').trim(),
-  model: (process.env.OPENAI_MODEL || '').trim(),
+  // 负责人决定（2026-10-31）：所有 OpenAI 调用（聊天、推荐、视觉、Agent）统一 gpt-6.1-terra，无廉价回退模型。
+  model: (process.env.OPENAI_MODEL || '').trim() || 'gpt-6.1-terra',
   // 429/5xx 的有限重试次数（共用同一完整响应 deadline）；0 = 单次调用
   maxRetries: boundedInt(process.env.OPENAI_MAX_RETRIES, 1, 0, 2),
   maxOutputTokens: boundedInt(process.env.OPENAI_MAX_OUTPUT_TOKENS, 16000, 256, 128000),
 };
 if (aiProvider === 'openai') {
-  if (!openai.apiKey || !openai.model) {
-    throw new Error('AI_PROVIDER=openai 需要同时配置 OPENAI_API_KEY 与 OPENAI_MODEL');
+  if (!openai.apiKey) {
+    throw new Error('AI_PROVIDER=openai 需要配置 OPENAI_API_KEY（OPENAI_MODEL 默认 gpt-6.1-terra）');
   }
   // 密钥只发往 https；http 仅允许本机回环（本地模拟服务）。
   let endpoint;
