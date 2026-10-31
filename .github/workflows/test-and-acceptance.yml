@@ -17,10 +17,19 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22.23.4'
+      # 变更门禁：只有整个 diff 都在 UI-only 清单内才为 false；push、历史缺失或任何错误一律 true（照常全测）。
+      - name: Change gate
+        id: gate
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-ui-only.cjs backend-gate
+      # 依赖始终安装：生命周期合同检查扫描前端列表页，需要后端 acorn。
       - name: Install backend dependencies
         run: npm ci
         working-directory: backend
       - name: Run backend all tests (unit + db integration)
+        if: steps.gate.outputs.backend_changed != 'false'
         run: |
           npx prisma generate
           npx prisma migrate deploy
@@ -28,6 +37,9 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: file:./dev.db
+      - name: UI-only change - lifecycle contract only
+        if: steps.gate.outputs.backend_changed == 'false'
+        run: node scripts/check-lifecycle.cjs
 
   frontend-unit:
     name: Frontend Unit And Coverage
