@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Input: --database <abs path> --customer-name <name> [--dry-run | --confirm --backup-dir <dir> --receipt <file>].
+ * Input: --database <abs path> [--customer-name <name>, default Seapot] [--dry-run | --confirm --backup-dir <dir> --receipt <file>].
  * Output: one JSON line of counts and ids (no names, contacts or amounts).
  * Pos: one-off backfill after migration A (docs/redesign/DATA-MODEL-2026.md §2.3). Dry-run is the default and writes nothing.
  * Prerequisite: existing private SQLite (migration A applied), private backup directory, Python3 for the online backup.
@@ -10,6 +10,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { configuredDatabase, targetIdentity, backupDatabase, reservePrivateFile, writeJson } = require('./financial-sqlite-safety');
 
+// Owner decision 2026-10-31: every existing store belongs to Seapot, the only customer this system serves.
+const DEFAULT_CUSTOMER_NAME = 'Seapot';
 const VALUE_OPTIONS = ['database', 'customer-name', 'backup-dir', 'receipt'];
 
 function parseArguments(args) {
@@ -26,7 +28,7 @@ function parseArguments(args) {
     } else throw new Error('参数无效');
   }
   const confirm = Boolean(options.confirm);
-  const name = (options['customer-name'] ?? '').trim();
+  const name = (options['customer-name'] ?? DEFAULT_CUSTOMER_NAME).trim();
   if (!options.database || !path.isAbsolute(options.database) || options.database.includes('?')
     || !name || name.length > 100
     || (confirm && options['dry-run'])
