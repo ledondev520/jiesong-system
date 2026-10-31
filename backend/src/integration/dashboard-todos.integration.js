@@ -106,11 +106,38 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   const allocated = await sale("SYN-S-ALLOCATED", "CONFIRMED");
   const allocatedItem = await line(allocated.id);
   await db.inventory.create({ data: { productId: product.id, quantity: 1, salesItemId: allocatedItem.id } });
+  // R1-6: coverage is by non-cancelled purchase lines (order+product+store), not inventory.
+  const otherProduct = await db.product.create({ data: { customsName: "Synthetic product 2" } });
+  const purchaseLine = (salesContractId, productId, status, contractNo) =>
+    db.purchaseContract.create({
+      data: {
+        contractNo, supplierId: supplier.id, status, totalAmount: 0, paidAmount: 0, salesContractId,
+        items: { create: [{ productId, storeId: store.id, quantity: 1, unitPrice: 1, totalPrice: 1 }] },
+      },
+    });
+  const fullyPurchased = await sale("SYN-S-PURCHASED", "CONFIRMED");
+  await line(fullyPurchased.id);
+  await purchaseLine(fullyPurchased.id, product.id, "DRAFT", "SYN-P-COVER-1");
+  const partial = await sale("SYN-S-PARTIAL", "CONFIRMED");
+  await line(partial.id);
+  await db.salesItem.create({ data: { salesContractId: partial.id, productId: otherProduct.id, storeId: store.id, quantity: 1, costPrice: 1, sellingPrice: 2 } });
+  await purchaseLine(partial.id, product.id, "DRAFT", "SYN-P-COVER-2");
+  const cancelledCover = await sale("SYN-S-CANCELLED-PURCHASE", "CONFIRMED");
+  await line(cancelledCover.id);
+  await purchaseLine(cancelledCover.id, product.id, "CANCELLED", "SYN-P-COVER-3");
   await sale("SYN-S-PACKING", "PACKING");
   const overdue = await sale("SYN-S-OVERDUE", "SHIPPED", { shippedAt: new Date(Date.now() - 60 * 86400000) });
   const declaration = await db.customsDeclaration.create({ data: { declarationNo: "SYN-D-1", salesContractId: overdue.id } });
   await db.taxRefund.create({ data: { refundNo: "SYN-R-1", salesContractId: overdue.id, customsDeclarationId: declaration.id, match_status: "passed", refundableAmount: 130 } });
   await db.taxRefund.create({ data: { refundNo: "SYN-R-2", salesContractId: overdue.id, customsDeclarationId: declaration.id, match_status: "blocked" } });
+
+  const customer = await db.customer.create({ data: { name: "Synthetic customer" } });
+  const creator = await db.user.findFirst({ where: { role: "SALES" } });
+  const quote = (quoteNo, status, extra = {}) =>
+    db.quote.create({ data: { quoteNo, status, customerId: customer.id, createdById: creator.id, totalAmount: 500, ...extra } });
+  for (let n = 1; n <= 6; n += 1) await quote(`SYN-Q-D${n}`, "DRAFT");
+  await quote("SYN-Q-SENT", "SENT", { sentAt: new Date() });
+  await quote("SYN-Q-ACCEPTED", "ACCEPTED");
 
   const todos = (role, expected = 200) => call("GET", "/dashboard/todos", undefined, role, expected);
   const keys = (data) => Object.keys(data.lists).sort();
@@ -118,16 +145,27 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   await call("GET", "/dashboard/todos", undefined, "ANONYMOUS", 401);
 
   const admin = await todos("ADMIN");
-  assert.deepEqual(keys(admin), ["missingInvoice", "ordersToPurchase", "overdueReceivables", "paymentsDue", "receiptsToInspect", "refundable", "toLoad", "toShip"]);
+  assert.deepEqual(keys(admin), ["missingInvoice", "ordersToPurchase", "overdueReceivables", "paymentsDue", "quotesAwaitingCustomer", "quotesToSend", "receiptsToInspect", "refundable", "toLoad", "toShip"]);
   assert.equal(admin.figures, undefined);
-  assert.equal(admin.lists.ordersToPurchase.count, 1);
-  assert.equal(admin.lists.ordersToPurchase.items[0].contractNo, "SYN-S-OPEN");
+  // Unpurchased, inventory-allocated (no purchase line), partially purchased and cancelled-purchase orders wait; fully purchased does not.
+  assert.deepEqual(
+    admin.lists.ordersToPurchase.items.map((i) => i.contractNo).sort(),
+    ["SYN-S-ALLOCATED", "SYN-S-CANCELLED-PURCHASE", "SYN-S-OPEN", "SYN-S-PARTIAL"],
+  );
+  assert.equal(admin.lists.ordersToPurchase.count, 4);
+  // Quotes: DRAFT awaiting send (top five of six), SENT awaiting customer; other statuses excluded.
+  assert.equal(admin.lists.quotesToSend.count, 6);
+  assert.equal(admin.lists.quotesToSend.items.length, 5);
+  assert.equal(admin.lists.quotesToSend.items[0].party, "Synthetic customer");
+  assert.equal(admin.lists.quotesToSend.items[0].amount, 500);
+  assert.equal(admin.lists.quotesAwaitingCustomer.count, 1);
+  assert.equal(admin.lists.quotesAwaitingCustomer.items[0].contractNo, "SYN-Q-SENT");
   // Payables: draft excluded, SIGNED outstanding 600, fully paid SHIPPED excluded.
   assert.equal(admin.lists.paymentsDue.count, 1);
   assert.equal(admin.lists.paymentsDue.items[0].contractNo, "SYN-P-SIGNED");
   assert.equal(admin.lists.paymentsDue.items[0].amount, 600);
   assert.equal(admin.lists.receiptsToInspect.count, 1);
-  assert.equal(admin.lists.toLoad.count, 2);
+  assert.equal(admin.lists.toLoad.count, 5);
   assert.equal(admin.lists.toShip.count, 1);
   assert.equal(admin.lists.missingInvoice.count, 1);
   assert.equal(admin.lists.missingInvoice.items[0].contractNo, "SYN-P-SHIPPED");
@@ -137,19 +175,25 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   assert.equal(admin.lists.refundable.items[0].contractNo, "SYN-R-1");
 
   assert.deepEqual(keys(await todos("PURCHASE")), ["ordersToPurchase", "paymentsDue", "receiptsToInspect"]);
-  assert.deepEqual(keys(await todos("SALES")), ["overdueReceivables", "toLoad", "toShip"]);
+  assert.deepEqual(keys(await todos("SALES")), ["overdueReceivables", "quotesAwaitingCustomer", "quotesToSend", "toLoad", "toShip"]);
   assert.deepEqual(keys(await todos("WAREHOUSE")), ["receiptsToInspect", "toLoad", "toShip"]);
   assert.deepEqual(keys(await todos("FINANCE")), ["missingInvoice", "overdueReceivables", "paymentsDue", "refundable"]);
 
   const boss = await todos("BOSS");
   assert.deepEqual(keys(boss), ["overdueReceivables"]);
   assert.equal(boss.figures.payable, 600, "BOSS payable uses the shared in-effect basis");
-  // Four non-cancelled export contracts of 1000 each, nothing received: finance-overview basis.
-  assert.equal(boss.figures.receivable, 4000, "BOSS receivable equals the finance overview unreceived total");
+  // Seven non-cancelled export contracts of 1000 each, nothing received: finance-overview basis.
+  assert.equal(boss.figures.receivable, 7000, "BOSS receivable equals the finance overview unreceived total");
   assert.ok("monthGrossProfit" in boss.figures);
   assert.ok(boss.figures.definitions.payable);
 
+  // Empty state: once every quote is moved on, the quote lists are empty (not absent).
+  await db.quote.updateMany({ where: { status: { in: ["DRAFT", "SENT"] } }, data: { status: "CANCELLED" } });
+  const emptied = await todos("SALES");
+  assert.equal(emptied.lists.quotesToSend.count, 0);
+  assert.deepEqual(emptied.lists.quotesAwaitingCustomer.items, []);
+
   // Read-only: the reads above changed no business rows.
-  assert.equal(await db.purchaseContract.count(), 3);
+  assert.equal(await db.purchaseContract.count(), 6);
   assert.equal((await db.purchaseContract.findUnique({ where: { id: signed.id } })).paidAmount, 400);
 });
