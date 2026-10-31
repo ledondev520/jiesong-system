@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { ensureWalJournal } = require('../utils/sqliteConcurrency');
 
 test('agent pending actions are shared across processes and claimed atomically', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-agent-pending-'));
@@ -25,6 +26,7 @@ test('agent pending actions are shared across processes and claimed atomically',
   const procA = load();
   const procB = load();
   assert.notEqual(procA.db, procB.db);
+  assert.equal(await ensureWalJournal(procA.db), 'wal'); // production journal mode; persisted in the file, so procB shares it
   t.after(async () => {
     await procA.db.$disconnect();
     await procB.db.$disconnect();
