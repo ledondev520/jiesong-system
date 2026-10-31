@@ -1099,12 +1099,13 @@ const READ_TOOL_SPECS = [
       const keyword = typeof input?.keyword === 'string' ? input.keyword.trim() : '';
       const where = keyword
         ? {
+            isActive: true,
             OR: [
               { name: { contains: keyword } },
               { shortName: { contains: keyword } },
             ],
           }
-        : {};
+        : { isActive: true };
 
       const items = await prisma.supplier.findMany({
         where,

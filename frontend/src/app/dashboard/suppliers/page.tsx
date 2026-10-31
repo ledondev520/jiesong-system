@@ -38,6 +38,7 @@ import {
 import type { Supplier } from "@/types";
 import { supplierService } from "@/services/supplier.service";
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/auth.store";
 import { useMobile } from "@/lib/hooks/useMobile";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -91,7 +92,7 @@ const supplierSchema = z.object({
 });
 
 type SupplierFormValues = z.infer<typeof supplierSchema>;
-type SupplierStatusFilter = "all" | "normal" | "issue";
+type SupplierStatusFilter = "all" | "normal" | "issue" | "archived";
 
 const emptySupplierValues: SupplierFormValues = {
   name: "",
@@ -204,7 +205,7 @@ export default function SuppliersPage() {
       () =>
         cachedFetch("suppliers-list", () =>
           loadPaginatedCatalog((page) =>
-            supplierService.getAll({ page, pageSize: 100 }),
+            supplierService.getAll({ page, pageSize: 100, status: "all" }),
           ),
         ),
       (items) => {
@@ -257,19 +258,31 @@ export default function SuppliersPage() {
           ...(supplier.aliases?.map((alias) => alias.alias) || []),
         ].some((value) => (value || "").toLowerCase().includes(kw));
 
+      // 归档沿用 isActive=false；默认视图隐藏已归档，「已归档」视图仅列出它们。
+      const archived = supplier.isActive === false;
       const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "normal" && !supplier.hasQualityIssue) ||
-        (statusFilter === "issue" && supplier.hasQualityIssue);
+        statusFilter === "archived"
+          ? archived
+          : !archived &&
+            (statusFilter === "all" ||
+              (statusFilter === "normal" && !supplier.hasQualityIssue) ||
+              (statusFilter === "issue" && supplier.hasQualityIssue));
 
       return matchesKeyword && matchesStatus;
     });
   }, [keyword, statusFilter, suppliers]);
 
-  const normalCount = suppliers.filter(
+  const archivedCount = suppliers.filter(
+    (supplier) => supplier.isActive === false,
+  ).length;
+  const liveSuppliers = suppliers.filter(
+    (supplier) => supplier.isActive !== false,
+  );
+  const normalCount = liveSuppliers.filter(
     (supplier) => !supplier.hasQualityIssue,
   ).length;
-  const issueCount = suppliers.length - normalCount;
+  const issueCount = liveSuppliers.length - normalCount;
+  const isAdmin = useAuthStore((state) => state.user?.role === "ADMIN");
   const hasActiveFilters = keyword.trim() || statusFilter !== "all";
 
   const resetFilters = () => {
@@ -349,11 +362,41 @@ export default function SuppliersPage() {
     }
   };
 
+  const handleRestoreActive = async () => {
+    const supplier = activeSupplier;
+    const session = editorSession.current;
+    if (!supplier || pendingSave.current === session) return;
+    pendingSave.current = session;
+    setSaving(true);
+    const isCurrent = () =>
+      mounted.current && session === editorSession.current;
+    try {
+      await supplierService.update(supplier.id, { isActive: true });
+      invalidateCache("suppliers-list");
+      if (isCurrent()) {
+        setActiveSupplier(null);
+        form.reset(emptySupplierValues);
+        toast.success("供应商已恢复");
+      }
+      if (mounted.current) await loadSuppliers();
+    } catch {
+      if (isCurrent()) toast.error("恢复失败");
+    } finally {
+      if (pendingSave.current === session) pendingSave.current = null;
+      if (isCurrent()) setSaving(false);
+    }
+  };
+
   const handleDeleteActive = async () => {
     const supplier = activeSupplier;
     const session = editorSession.current;
     if (!supplier || pendingSave.current === session) return;
-    if (!confirm(`确定要删除供应商「${supplier.name}」吗？`)) return;
+    if (
+      !confirm(
+        `确定要归档供应商「${supplier.name}」吗？历史单据保持不变，可由管理员恢复。`,
+      )
+    )
+      return;
     pendingSave.current = session;
     setSaving(true);
     const isCurrent = () =>
@@ -365,11 +408,11 @@ export default function SuppliersPage() {
       if (isCurrent()) {
         setActiveSupplier(null);
         form.reset(emptySupplierValues);
-        toast.success("供应商已删除");
+        toast.success("供应商已归档");
       }
       if (mounted.current) await loadSuppliers();
     } catch {
-      if (isCurrent()) toast.error("删除失败");
+      if (isCurrent()) toast.error("归档失败");
     } finally {
       if (pendingSave.current === session) pendingSave.current = null;
       if (isCurrent()) setSaving(false);
@@ -400,8 +443,8 @@ export default function SuppliersPage() {
             <div>
               <p className="text-sm font-semibold">供应商索引</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                共 {suppliers.length} 家，正常 {normalCount} 家，质量问题{" "}
-                {issueCount} 家。
+                共 {liveSuppliers.length} 家，正常 {normalCount} 家，质量问题{" "}
+                {issueCount} 家，已归档 {archivedCount} 家。
               </p>
             </div>
 
@@ -415,11 +458,12 @@ export default function SuppliersPage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-1 rounded-lg border border-border/60 bg-muted/30 p-1">
+            <div className="grid grid-cols-4 gap-1 rounded-lg border border-border/60 bg-muted/30 p-1">
               {[
                 ["all", "全部"],
                 ["normal", "正常"],
                 ["issue", "质量问题"],
+                ["archived", "已归档"],
               ].map(([value, label]) => (
                 <button
                   key={value}
@@ -565,16 +609,34 @@ export default function SuppliersPage() {
                   清空新建
                 </Button>
               </BusinessWrite>
+              {isAdmin && activeSupplier?.isActive === false && (
+                <BusinessWrite>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-lg text-sm"
+                    disabled={saving}
+                    onClick={handleRestoreActive}
+                  >
+                    <RotateCcw className="mr-1.5 h-4 w-4" />
+                    恢复当前
+                  </Button>
+                </BusinessWrite>
+              )}
               <BusinessWrite>
                 <Button
                   type="button"
                   variant="outline"
                   className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
-                  disabled={!activeSupplier || saving}
+                  disabled={
+                    !activeSupplier ||
+                    activeSupplier.isActive === false ||
+                    saving
+                  }
                   onClick={handleDeleteActive}
                 >
                   <Trash2 className="mr-1.5 h-4 w-4" />
-                  删除当前
+                  归档当前
                 </Button>
               </BusinessWrite>
             </div>

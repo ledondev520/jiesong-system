@@ -1,21 +1,27 @@
-import type { Supplier } from '@/types';
-import { createCrudService } from './crudService';
+import type { Supplier } from "@/types";
+import { createCrudService } from "./crudService";
 
 type SupplierListQuery = {
   page?: number;
   pageSize?: number;
   keyword?: string;
   lite?: boolean;
+  status?: "active" | "archived" | "all";
 };
 
-type SupplierUpsertInput = Omit<Partial<Supplier>, 'aliases'> & {
+type SupplierUpsertInput = Omit<Partial<Supplier>, "aliases"> & {
   aliases?: Array<{ alias: string }>;
 };
 
 /**
  * 供应商服务。
  */
-const crud = createCrudService<Supplier, SupplierUpsertInput, SupplierUpsertInput, SupplierListQuery>('/suppliers');
+const crud = createCrudService<
+  Supplier,
+  SupplierUpsertInput,
+  SupplierUpsertInput,
+  SupplierListQuery
+>("/suppliers");
 
 export const supplierService = {
   ...crud,
