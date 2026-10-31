@@ -3,7 +3,7 @@
  * Output: 唯一的报价规则实现 priceFor()，以及加价/汇率/实现加价辅助函数
  * Pos: 出口备单与单据生成共用；Node 内不再有第二份公式（UX 规范 §7.2，负责人 2026-10-31 取整决定）
  *
- * 规则：单价(USD) = 向上取整到 roundUpTo( 成本¥ × (1+加价) ÷ (现汇 + 调整) )
+ * 规则：单价(USD) = 先向上取整到整美元，再向上取整到 roundUpTo(默认 5) 的倍数( 成本¥ × (1+加价) ÷ (现汇 + 调整) )
  * 加价取商品分类、其最近祖先分类的 categoryMarkups，否则 defaultMarkup。
  */
 const { loadPricingConfig } = require('./pricingConfigService');
@@ -59,7 +59,8 @@ const priceFor = ({ costCny, categoryIds = [], spotRate } = {}, config = loadPri
   const rawUnitPriceUsd = pricedCny / rate;
   return {
     status: 'OK',
-    unitPriceUsd: roundUp(rawUnitPriceUsd, config.roundUpTo),
+    // 负责人终版（2026-10-31）：先向上取整到整美元，再向上取整到 roundUpTo（默认 5）的倍数
+    unitPriceUsd: roundUp(roundUp(rawUnitPriceUsd, 1), config.roundUpTo),
     rawUnitPriceUsd,
     pricedCny,
     markup,

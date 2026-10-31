@@ -3,5 +3,5 @@
   "exchangeAdjustment": -0.2,
   "defaultMarkup": 0.3,
   "categoryMarkups": [],
-  "roundUpTo": 1
+  "roundUpTo": 5
 }

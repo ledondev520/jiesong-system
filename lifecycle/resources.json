@@ -53,14 +53,14 @@
           "exchangeAdjustment": -0.2,
           "defaultMarkup": 0.3,
           "categoryMarkups": [],
-          "roundUpTo": 1
+          "roundUpTo": 5
         },
         "replace": {
           "exchangeRate": 7.1,
           "exchangeAdjustment": -0.1,
           "defaultMarkup": 0.25,
           "categoryMarkups": [],
-          "roundUpTo": 5
+          "roundUpTo": 1
         },
         "invalid": [
           {},

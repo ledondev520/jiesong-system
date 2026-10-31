@@ -49,9 +49,23 @@ test('负责人示例：成本 10000 ¥、现汇 6.72、调整 -0.2 → 13000/6.
   const result = priceFor({ costCny: 10000 }, owner);
   assert.equal(result.effectiveRate, 6.52);
   assert.ok(Math.abs(result.rawUnitPriceUsd - 1993.865) < 0.001);
-  // 整美元向上取整得 1994；负责人笔记写 1995（相当于步长 5），待确认，见 PR 说明
-  assert.equal(result.unitPriceUsd, 1994);
+  assert.equal(result.unitPriceUsd, 1994); // 步长 1：只取整到整美元
+  // 负责人终版：整美元后再向上取整到 5 的倍数，1993.87 → 1994 → 1995
   assert.equal(priceFor({ costCny: 10000 }, { ...owner, roundUpTo: 5 }).unitPriceUsd, 1995);
+});
+
+test('负责人终版：整美元后再取整到 5 的倍数（1996→2000，2000 不变，2001→2005）', () => {
+  const five = { ...spec, exchangeRate: 6.5, exchangeAdjustment: 0, defaultMarkup: 0, roundUpTo: 5 };
+  for (const [usd, expected] of [[1996, 2000], [2000, 2000], [2001, 2005], [1995, 1995], [1, 5]]) {
+    assert.equal(priceFor({ costCny: usd * 6.5 }, five).unitPriceUsd, expected, String(usd));
+  }
+  // 整美元先于步长：18.0556 → 19 → 20；浮点噪声 13.000000000000002 → 13 → 15
+  assert.equal(priceFor({ costCny: 100 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 20);
+  assert.equal(priceFor({ costCny: 72 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 15);
+});
+
+test('仓库默认配置步长为 5', () => {
+  assert.equal(require('../../../config/pricing.json').roundUpTo, 5);
 });
 
 test('分类加价取最近已配置的祖先，否则默认加价', () => {
