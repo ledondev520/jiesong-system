@@ -5,7 +5,7 @@
 const { createError } = require('./errorHandler');
 const READ_PATHS = [
   /^\/auth\/(me|session)$/,
-  /^\/dashboard\/(wps-sync|stats|analytics|trade-workflows|track-product)$/,
+  /^\/dashboard\/(wps-sync|stats|analytics|trade-workflows|track-product|todos)$/,
   /^\/reports\/business-overview$/,
   /^\/(suppliers|stores|products|sales|containers|inventory|customs-declarations|forex-verifications|tax-refunds)(\/[^/]+)?$/,
   /^\/purchases(\/(?!export$)[^/]+)?$/,
