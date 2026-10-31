@@ -95,7 +95,8 @@
         "supplier pricing and margins",
         "financial summary reports, cash-flow statements, account balances, general-ledger entries, payroll, social-security, and tax-return structured rows",
         "inventory and shipment operational history",
-        "customer master data (Customer name, legal name, address, contacts) and order-level customer terms (incoterm, payment terms, port of loading)"
+        "customer master data (Customer name, legal name, address, contacts) and order-level customer terms (incoterm, payment terms, port of loading)",
+        "customers API (backend/src/routes/customers.js): ADMIN/SALES write, all roles read, BOSS GET-only; contact fields excluded from audit field lists; customers are archived, never deleted"
       ],
       "controls": {
         "storage": [
