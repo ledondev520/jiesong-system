@@ -6,15 +6,15 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -23,21 +23,37 @@ import {
   FormLabel,
   FormMessage,
   FormDescription,
-} from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { Cpu, X, Save, Loader2, Key, ExternalLink, Globe } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
-import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE, UNITS as INITIAL_UNITS } from '@/lib/constants';
-import { configService } from '@/services/config.service';
-import api from '@/lib/axios';
-import type { ApiResponse } from '@/types';
+} from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Cpu, X, Save, Loader2, Key, ExternalLink, Globe } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  DEFAULT_EXCHANGE_RATE,
+  DEFAULT_PROFIT_RATE,
+  UNITS as INITIAL_UNITS,
+} from "@/lib/constants";
+import { configService } from "@/services/config.service";
+import api from "@/lib/axios";
+import type { ApiResponse } from "@/types";
 
 const configSchema = z.object({
-  exchangeRate: z.number().min(0.1, '汇率必须大于0'),
-  profitRate: z.number().min(1.0, '利润率必须大于1.0'),
+  exchangeRate: z.number().min(0.1, "汇率必须大于0"),
+  profitRate: z.number().min(1.0, "利润率必须大于1.0"),
 });
 
 type ConfigFormValues = z.infer<typeof configSchema>;
@@ -48,9 +64,9 @@ type ConfigUpdateValue = string | number | string[];
  * @param t 0–1
  */
 function getTemperatureStyleLabel(t: number): string {
-  if (t < 0.4) return '保守';
-  if (t < 0.8) return '均衡';
-  return '创意';
+  if (t < 0.4) return "保守";
+  if (t < 0.8) return "均衡";
+  return "创意";
 }
 
 /**
@@ -61,33 +77,52 @@ function getTemperatureStyleLabel(t: number): string {
  *   3. 数据字典（单位/报关公司）增删实时生效（即时 API 写入），无需手动保存
  * @param showDictOnly 若为 true，只渲染数据字典区块（用于独立 Tab）
  */
-export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boolean }) {
+export function SystemConfigTab({
+  showDictOnly = false,
+}: {
+  showDictOnly?: boolean;
+}) {
   const [units, setUnits] = useState<string[]>(INITIAL_UNITS);
-  const [newUnit, setNewUnit] = useState('');
-  const [brokers, setBrokers] = useState<string[]>(['捷淞', '埋单', '其他厂家报关', '不报关']);
-  const [newBroker, setNewBroker] = useState('');
+  const [newUnit, setNewUnit] = useState("");
+  const [brokers, setBrokers] = useState<string[]>([
+    "捷淞",
+    "埋单",
+    "其他厂家报关",
+    "不报关",
+  ]);
+  const [newBroker, setNewBroker] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   // API Key 只写式配置：后端仅返回脱敏状态，页面永不渲染完整密钥
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
-  const [apiKeyNew, setApiKeyNew] = useState('');
-  const [aiProvider, setAiProvider] = useState<'deepseek' | 'kimi'>('kimi');
-  const isDeepSeek = aiProvider === 'deepseek';
-  const providerLabel = isDeepSeek ? 'DeepSeek' : 'Kimi';
+  const [apiKeyNew, setApiKeyNew] = useState("");
+  const [aiProvider, setAiProvider] = useState<"deepseek" | "kimi" | "openai">(
+    "kimi",
+  );
+  const isDeepSeek = aiProvider === "deepseek";
+  // OpenAI 密钥与模型只来自服务器进程环境：页面不提供密钥输入，也不保存模型/采样参数。
+  const isOpenAI = aiProvider === "openai";
+  const [openaiModel, setOpenaiModel] = useState("");
+  const providerLabel = isOpenAI ? "OpenAI" : isDeepSeek ? "DeepSeek" : "Kimi";
   // 场景化模型配置
-  const [chatModel, setChatModel] = useState('kimi-k2-turbo-preview');
-  const [hsCodeModel, setHsCodeModel] = useState('kimi-k2-turbo-preview');
+  const [chatModel, setChatModel] = useState("kimi-k2-turbo-preview");
+  const [hsCodeModel, setHsCodeModel] = useState("kimi-k2-turbo-preview");
   const [temperature, setTemperature] = useState<number>(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(4096);
   // HSCIQ 海关归类 API
   const [hsciqEnabled, setHsciqEnabled] = useState(false);
-  const [hsciqUsage, setHsciqUsage] = useState<{ used: number; limit: number; remaining: number; available: boolean } | null>(null);
+  const [hsciqUsage, setHsciqUsage] = useState<{
+    used: number;
+    limit: number;
+    remaining: number;
+    available: boolean;
+  } | null>(null);
   const [hsciqToggling, setHsciqToggling] = useState(false);
   // 汇率同步
   const [syncing, setSyncing] = useState(false);
   // 业务流程参数：线上盖章平台链接 + 我方开票抬头
-  const [stampPlatformUrl, setStampPlatformUrl] = useState('');
-  const [invoiceTitleInfo, setInvoiceTitleInfo] = useState('');
+  const [stampPlatformUrl, setStampPlatformUrl] = useState("");
+  const [invoiceTitleInfo, setInvoiceTitleInfo] = useState("");
 
   const form = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -104,44 +139,79 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
         const response = await configService.getSystemConfig();
         const configs = response.data;
         if (configs) {
-          if (typeof configs.exchangeRate === 'number') form.setValue('exchangeRate', configs.exchangeRate);
-          if (typeof configs.profitRate === 'number') form.setValue('profitRate', configs.profitRate);
+          if (typeof configs.exchangeRate === "number")
+            form.setValue("exchangeRate", configs.exchangeRate);
+          if (typeof configs.profitRate === "number")
+            form.setValue("profitRate", configs.profitRate);
           if (Array.isArray(configs.units)) setUnits(configs.units);
           if (Array.isArray(configs.brokers)) setBrokers(configs.brokers);
           // 1.1. 当前供应商的只写密钥状态
-          const deepseek = configs.aiProvider === 'deepseek';
-          setAiProvider(deepseek ? 'deepseek' : 'kimi');
-          const configuredKey = deepseek ? configs.deepseekApiKey || configs.apiKey : configs.apiKey;
-          setApiKeyConfigured(typeof configuredKey === 'string' && Boolean(configuredKey));
+          const deepseek = configs.aiProvider === "deepseek";
+          const openai = configs.aiProvider === "openai";
+          setAiProvider(openai ? "openai" : deepseek ? "deepseek" : "kimi");
+          if (openai) {
+            setApiKeyConfigured(configs.openaiConfigured === true);
+            setOpenaiModel(
+              typeof configs.openaiModel === "string"
+                ? configs.openaiModel
+                : "",
+            );
+          } else {
+            const configuredKey = deepseek
+              ? configs.deepseekApiKey || configs.apiKey
+              : configs.apiKey;
+            setApiKeyConfigured(
+              typeof configuredKey === "string" && Boolean(configuredKey),
+            );
+          }
           // 1.2. 场景化模型配置（优先新 key，兼容旧 key）
           if (deepseek) {
-            setChatModel('deepseek-flash');
-            setHsCodeModel('deepseek-flash');
+            setChatModel("deepseek-flash");
+            setHsCodeModel("deepseek-flash");
           } else {
-            if (typeof configs.aiChatModel === 'string' && configs.aiChatModel) {
+            if (
+              typeof configs.aiChatModel === "string" &&
+              configs.aiChatModel
+            ) {
               setChatModel(configs.aiChatModel);
-            } else if (typeof configs.aiPrimaryModel === 'string' && configs.aiPrimaryModel) {
+            } else if (
+              typeof configs.aiPrimaryModel === "string" &&
+              configs.aiPrimaryModel
+            ) {
               setChatModel(configs.aiPrimaryModel);
             }
-            if (typeof configs.aiHsCodeModel === 'string' && configs.aiHsCodeModel) {
+            if (
+              typeof configs.aiHsCodeModel === "string" &&
+              configs.aiHsCodeModel
+            ) {
               setHsCodeModel(configs.aiHsCodeModel);
-            } else if (typeof configs.aiPrimaryModel === 'string' && configs.aiPrimaryModel) {
+            } else if (
+              typeof configs.aiPrimaryModel === "string" &&
+              configs.aiPrimaryModel
+            ) {
               setHsCodeModel(configs.aiPrimaryModel);
             }
           }
-          if (typeof configs.aiTemperature === 'number') setTemperature(configs.aiTemperature);
-          if (typeof configs.aiMaxTokens === 'number') setMaxTokens(configs.aiMaxTokens);
+          if (typeof configs.aiTemperature === "number")
+            setTemperature(configs.aiTemperature);
+          if (typeof configs.aiMaxTokens === "number")
+            setMaxTokens(configs.aiMaxTokens);
           // 1.4. HSCIQ 开关
-          if (configs.hsciqEnabled === true || configs.hsciqEnabled === 'true') {
+          if (
+            configs.hsciqEnabled === true ||
+            configs.hsciqEnabled === "true"
+          ) {
             setHsciqEnabled(true);
           }
           // 1.5. 业务流程参数
-          if (typeof configs.stampPlatformUrl === 'string') setStampPlatformUrl(configs.stampPlatformUrl);
-          if (typeof configs.invoiceTitleInfo === 'string') setInvoiceTitleInfo(configs.invoiceTitleInfo);
+          if (typeof configs.stampPlatformUrl === "string")
+            setStampPlatformUrl(configs.stampPlatformUrl);
+          if (typeof configs.invoiceTitleInfo === "string")
+            setInvoiceTitleInfo(configs.invoiceTitleInfo);
         }
       } catch (error) {
-        console.error('加载配置失败:', error);
-        toast.error('加载系统配置失败');
+        console.error("加载配置失败:", error);
+        toast.error("加载系统配置失败");
       } finally {
         setLoading(false);
       }
@@ -153,10 +223,29 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
   useEffect(() => {
     const fetchHsciqUsage = async () => {
       try {
-        const res = await api.get<ApiResponse<{ enabled: boolean; available: boolean; used: number; limit: number; remaining: number }>,
-          ApiResponse<{ enabled: boolean; available: boolean; used: number; limit: number; remaining: number }>>('/hs-codes/hsciq-usage');
+        const res = await api.get<
+          ApiResponse<{
+            enabled: boolean;
+            available: boolean;
+            used: number;
+            limit: number;
+            remaining: number;
+          }>,
+          ApiResponse<{
+            enabled: boolean;
+            available: boolean;
+            used: number;
+            limit: number;
+            remaining: number;
+          }>
+        >("/hs-codes/hsciq-usage");
         if (res.data) {
-          setHsciqUsage({ used: res.data.used, limit: res.data.limit, remaining: res.data.remaining, available: res.data.available });
+          setHsciqUsage({
+            used: res.data.used,
+            limit: res.data.limit,
+            remaining: res.data.remaining,
+            available: res.data.available,
+          });
         }
       } catch {
         // 非关键信息，静默忽略
@@ -167,39 +256,49 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
 
   /** 职责：保存单个配置键值到后端 */
   const saveConfig = async (key: string, value: ConfigUpdateValue) => {
-    await configService.updateSystemConfig({ [key]: value } as Record<string, ConfigUpdateValue>);
+    await configService.updateSystemConfig({ [key]: value } as Record<
+      string,
+      ConfigUpdateValue
+    >);
   };
 
   const onSubmit = async (data: ConfigFormValues) => {
     setSaving(true);
     try {
       const tasks: Promise<unknown>[] = [
-        saveConfig('exchangeRate', data.exchangeRate),
-        saveConfig('profitRate', data.profitRate),
-        saveConfig('units', units),
-        saveConfig('brokers', brokers),
+        saveConfig("exchangeRate", data.exchangeRate),
+        saveConfig("profitRate", data.profitRate),
+        saveConfig("units", units),
+        saveConfig("brokers", brokers),
       ];
-      // 1.1. 密钥仅写入当前供应商的专用字段
-      if (apiKeyNew.trim()) {
-        tasks.push(saveConfig(isDeepSeek ? 'deepseekApiKey' : 'apiKey', apiKeyNew.trim()));
+      // 1.1. 密钥仅写入当前供应商的专用字段；OpenAI 永不经页面保存
+      if (!isOpenAI && apiKeyNew.trim()) {
+        tasks.push(
+          saveConfig(
+            isDeepSeek ? "deepseekApiKey" : "apiKey",
+            apiKeyNew.trim(),
+          ),
+        );
       }
-      // 1.2. 场景化模型与采样参数
-      tasks.push(saveConfig('aiChatModel', chatModel));
-      tasks.push(saveConfig('aiHsCodeModel', hsCodeModel));
-      if (!isDeepSeek) tasks.push(saveConfig('aiTemperature', temperature));
-      tasks.push(saveConfig('aiMaxTokens', maxTokens));
+      // 1.2. 场景化模型与采样参数（OpenAI 由服务器环境决定，不在此保存）
+      if (!isOpenAI) {
+        tasks.push(saveConfig("aiChatModel", chatModel));
+        tasks.push(saveConfig("aiHsCodeModel", hsCodeModel));
+        if (!isDeepSeek) tasks.push(saveConfig("aiTemperature", temperature));
+        tasks.push(saveConfig("aiMaxTokens", maxTokens));
+      }
       // 1.3. 业务流程参数（盖章平台/开票抬头）
-      tasks.push(saveConfig('stampPlatformUrl', stampPlatformUrl.trim()));
-      tasks.push(saveConfig('invoiceTitleInfo', invoiceTitleInfo.trim()));
+      tasks.push(saveConfig("stampPlatformUrl", stampPlatformUrl.trim()));
+      tasks.push(saveConfig("invoiceTitleInfo", invoiceTitleInfo.trim()));
       await Promise.all(tasks);
-      if (apiKeyNew.trim()) {
+      if (!isOpenAI && apiKeyNew.trim()) {
         setApiKeyConfigured(true);
-        setApiKeyNew('');
+        setApiKeyNew("");
       }
-      toast.success('系统配置已保存');
+      toast.success("系统配置已保存");
     } catch (error) {
-      console.error('保存配置失败:', error);
-      toast.error('保存配置失败');
+      console.error("保存配置失败:", error);
+      toast.error("保存配置失败");
     } finally {
       setSaving(false);
     }
@@ -209,12 +308,12 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
     if (!newUnit || units.includes(newUnit)) return;
     const newUnits = [...units, newUnit];
     setUnits(newUnits);
-    setNewUnit('');
+    setNewUnit("");
     try {
-      await saveConfig('units', newUnits);
-      toast.success('单位添加成功');
+      await saveConfig("units", newUnits);
+      toast.success("单位添加成功");
     } catch {
-      toast.error('保存失败');
+      toast.error("保存失败");
     }
   };
 
@@ -225,11 +324,13 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
   const handleHsciqToggle = async (checked: boolean) => {
     setHsciqToggling(true);
     try {
-      await saveConfig('hsciqEnabled', checked ? 'true' : 'false');
+      await saveConfig("hsciqEnabled", checked ? "true" : "false");
       setHsciqEnabled(checked);
-      toast.success(checked ? 'HSCIQ 海关归类 API 已开启' : 'HSCIQ 海关归类 API 已关闭');
+      toast.success(
+        checked ? "HSCIQ 海关归类 API 已开启" : "HSCIQ 海关归类 API 已关闭",
+      );
     } catch {
-      toast.error('切换 HSCIQ 开关失败');
+      toast.error("切换 HSCIQ 开关失败");
     } finally {
       setHsciqToggling(false);
     }
@@ -241,16 +342,19 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
   const handleSyncRate = async () => {
     setSyncing(true);
     try {
-      const res = await api.post<ApiResponse<{ rate: number }>, ApiResponse<{ rate: number }>>(
-        '/system/exchange-rate/sync'
-      );
+      const res = await api.post<
+        ApiResponse<{ rate: number }>,
+        ApiResponse<{ rate: number }>
+      >("/system/exchange-rate/sync");
       const rate = res.data?.rate;
-      if (rate && typeof rate === 'number') {
-        form.setValue('exchangeRate', rate);
-        toast.success(`已获取实时汇率：1 USD = ${rate} CNY，请点击「保存配置」以生效`);
+      if (rate && typeof rate === "number") {
+        form.setValue("exchangeRate", rate);
+        toast.success(
+          `已获取实时汇率：1 USD = ${rate} CNY，请点击「保存配置」以生效`,
+        );
       }
     } catch {
-      toast.error('汇率同步失败，请稍后重试');
+      toast.error("汇率同步失败，请稍后重试");
     } finally {
       setSyncing(false);
     }
@@ -261,7 +365,7 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
     const newUnits = units.filter((u) => u !== unit);
     setUnits(newUnits);
     try {
-      await saveConfig('units', newUnits);
+      await saveConfig("units", newUnits);
       toast.success(`单位「${unit}」已删除`);
     } catch {
       setUnits(prev);
@@ -273,12 +377,12 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
     if (!newBroker || brokers.includes(newBroker)) return;
     const newBrokers = [...brokers, newBroker];
     setBrokers(newBrokers);
-    setNewBroker('');
+    setNewBroker("");
     try {
-      await saveConfig('brokers', newBrokers);
-      toast.success('报关公司添加成功');
+      await saveConfig("brokers", newBrokers);
+      toast.success("报关公司添加成功");
     } catch {
-      toast.error('保存失败');
+      toast.error("保存失败");
     }
   };
 
@@ -287,7 +391,7 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
     const newBrokers = brokers.filter((b) => b !== broker);
     setBrokers(newBrokers);
     try {
-      await saveConfig('brokers', newBrokers);
+      await saveConfig("brokers", newBrokers);
       toast.success(`报关公司「${broker}」已删除`);
     } catch {
       setBrokers(prev);
@@ -302,7 +406,9 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
       <Card>
         <CardHeader>
           <CardTitle className="text-base">商品单位</CardTitle>
-          <CardDescription>合同、发票中使用的计量单位，添加/删除后实时生效。</CardDescription>
+          <CardDescription>
+            合同、发票中使用的计量单位，添加/删除后实时生效。
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex gap-2">
@@ -311,13 +417,21 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
               value={newUnit}
               onChange={(e) => setNewUnit(e.target.value)}
               className="max-w-xs"
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUnit())}
+              onKeyDown={(e) =>
+                e.key === "Enter" && (e.preventDefault(), handleAddUnit())
+              }
             />
-            <Button onClick={handleAddUnit} variant="secondary" size="sm">添加</Button>
+            <Button onClick={handleAddUnit} variant="secondary" size="sm">
+              添加
+            </Button>
           </div>
           <div className="flex flex-wrap gap-2">
             {units.map((unit) => (
-              <Badge key={unit} variant="outline" className="pl-2 pr-1 py-1 text-sm">
+              <Badge
+                key={unit}
+                variant="outline"
+                className="pl-2 pr-1 py-1 text-sm"
+              >
                 {unit}
                 <Button
                   variant="ghost"
@@ -337,7 +451,9 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
       <Card>
         <CardHeader>
           <CardTitle className="text-base">报关公司</CardTitle>
-          <CardDescription>出口合同中可选的报关服务商，添加/删除后实时生效。</CardDescription>
+          <CardDescription>
+            出口合同中可选的报关服务商，添加/删除后实时生效。
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex gap-2">
@@ -346,13 +462,21 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
               value={newBroker}
               onChange={(e) => setNewBroker(e.target.value)}
               className="max-w-xs"
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddBroker())}
+              onKeyDown={(e) =>
+                e.key === "Enter" && (e.preventDefault(), handleAddBroker())
+              }
             />
-            <Button onClick={handleAddBroker} variant="secondary" size="sm">添加</Button>
+            <Button onClick={handleAddBroker} variant="secondary" size="sm">
+              添加
+            </Button>
           </div>
           <div className="flex flex-wrap gap-2">
             {brokers.map((broker) => (
-              <Badge key={broker} variant="outline" className="pl-2 pr-1 py-1 text-sm">
+              <Badge
+                key={broker}
+                variant="outline"
+                className="pl-2 pr-1 py-1 text-sm"
+              >
                 {broker}
                 <Button
                   variant="ghost"
@@ -392,7 +516,9 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
           <Card>
             <CardHeader>
               <CardTitle>基础参数</CardTitle>
-              <CardDescription>影响智能定价与汇率计算的全局参数，修改后需点击「保存配置」生效。</CardDescription>
+              <CardDescription>
+                影响智能定价与汇率计算的全局参数，修改后需点击「保存配置」生效。
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -408,7 +534,9 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                             type="number"
                             step="0.01"
                             {...field}
-                            onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                            onChange={(e) =>
+                              field.onChange(e.target.valueAsNumber || 0)
+                            }
                           />
                         </FormControl>
                         <Button
@@ -420,10 +548,16 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                           onClick={handleSyncRate}
                           title="从公开 API 自动获取实时汇率"
                         >
-                          {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : '同步'}
+                          {syncing ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "同步"
+                          )}
                         </Button>
                       </div>
-                      <FormDescription>用于出口合同的初始汇率填充。</FormDescription>
+                      <FormDescription>
+                        用于出口合同的初始汇率填充。
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -439,10 +573,14 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                           type="number"
                           step="0.1"
                           {...field}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber || 0)}
+                          onChange={(e) =>
+                            field.onChange(e.target.valueAsNumber || 0)
+                          }
                         />
                       </FormControl>
-                      <FormDescription>例如 1.3 表示 30% 利润。</FormDescription>
+                      <FormDescription>
+                        例如 1.3 表示 30% 利润。
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -458,29 +596,47 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                 <Globe className="h-4 w-4 text-muted-foreground" />
                 业务流程参数
               </CardTitle>
-              <CardDescription>采购付款与催票流程中使用的外部链接与固定文本。</CardDescription>
+              <CardDescription>
+                采购付款与催票流程中使用的外部链接与固定文本。
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium" htmlFor="stamp-platform-url">线上盖章平台链接</label>
+                <label
+                  className="text-sm font-medium"
+                  htmlFor="stamp-platform-url"
+                >
+                  线上盖章平台链接
+                </label>
                 <Input
                   id="stamp-platform-url"
                   placeholder="例如：https://xxx.esign.cn（购销合同生成后点击「在线盖章」跳转）"
                   value={stampPlatformUrl}
                   onChange={(e) => setStampPlatformUrl(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">采购合同详情页「在线盖章」按钮的跳转地址。</p>
+                <p className="text-xs text-muted-foreground">
+                  采购合同详情页「在线盖章」按钮的跳转地址。
+                </p>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium" htmlFor="invoice-title-info">我方开票抬头信息</label>
+                <label
+                  className="text-sm font-medium"
+                  htmlFor="invoice-title-info"
+                >
+                  我方开票抬头信息
+                </label>
                 <textarea
                   id="invoice-title-info"
                   className="flex min-h-[96px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                  placeholder={'公司名称：XXX有限公司\n纳税人识别号：91XXXXXXXXXXXXXXXX\n地址电话：...\n开户行及账号：...'}
+                  placeholder={
+                    "公司名称：XXX有限公司\n纳税人识别号：91XXXXXXXXXXXXXXXX\n地址电话：...\n开户行及账号：..."
+                  }
                   value={invoiceTitleInfo}
                   onChange={(e) => setInvoiceTitleInfo(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">催开发票时附在开票信息文本末尾，便于供应商开具增值税专用发票。</p>
+                <p className="text-xs text-muted-foreground">
+                  催开发票时附在开票信息文本末尾，便于供应商开具增值税专用发票。
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -493,9 +649,11 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                 AI 模型配置
               </CardTitle>
               <CardDescription>
-                {isDeepSeek
-                  ? 'DeepSeek Flash 思考模式已开启，推理强度 high；问答与 HS 推荐使用同一模型。'
-                  : '为不同使用场景选择合适的模型，配置采样参数与 API 密钥。每个场景内置自动降级，无需手动配置备用模型。'}
+                {isOpenAI
+                  ? "OpenAI 的密钥与模型由服务器环境配置（不在此保存）；问答、HS 推荐、视觉与 Agent 使用同一模型。"
+                  : isDeepSeek
+                    ? "DeepSeek Flash 思考模式已开启，推理强度 high；问答与 HS 推荐使用同一模型。"
+                    : "为不同使用场景选择合适的模型，配置采样参数与 API 密钥。每个场景内置自动降级，无需手动配置备用模型。"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -505,35 +663,81 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                 <div className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">AI 助手问答</label>
-                    <Select value={chatModel} onValueChange={setChatModel}>
+                    <Select
+                      value={isOpenAI ? openaiModel || "openai" : chatModel}
+                      onValueChange={setChatModel}
+                      disabled={isOpenAI}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {isDeepSeek ? <SelectItem value="deepseek-flash">deepseek-flash（思考模式）</SelectItem> : <>
-                        <SelectItem value="kimi-k2-turbo-preview">kimi-k2-turbo-preview（均衡）</SelectItem>
-                        <SelectItem value="moonshot-v1-8k">moonshot-v1-8k（快速）</SelectItem>
-                        <SelectItem value="kimi-k2-thinking-turbo">kimi-k2-thinking-turbo（深度推理）</SelectItem>
-                        </>}
+                        {isOpenAI ? (
+                          <SelectItem value={openaiModel || "openai"}>
+                            {openaiModel || "由服务器环境决定"}
+                          </SelectItem>
+                        ) : isDeepSeek ? (
+                          <SelectItem value="deepseek-flash">
+                            deepseek-flash（思考模式）
+                          </SelectItem>
+                        ) : (
+                          <>
+                            <SelectItem value="kimi-k2-turbo-preview">
+                              kimi-k2-turbo-preview（均衡）
+                            </SelectItem>
+                            <SelectItem value="moonshot-v1-8k">
+                              moonshot-v1-8k（快速）
+                            </SelectItem>
+                            <SelectItem value="kimi-k2-thinking-turbo">
+                              kimi-k2-thinking-turbo（深度推理）
+                            </SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">用于 AI 聊天助手的日常问答。</p>
+                    <p className="text-xs text-muted-foreground">
+                      用于 AI 聊天助手的日常问答。
+                    </p>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium">HS Code 推荐与申报要素</label>
-                    <Select value={hsCodeModel} onValueChange={setHsCodeModel}>
+                    <label className="text-sm font-medium">
+                      HS Code 推荐与申报要素
+                    </label>
+                    <Select
+                      value={isOpenAI ? openaiModel || "openai" : hsCodeModel}
+                      onValueChange={setHsCodeModel}
+                      disabled={isOpenAI}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {isDeepSeek ? <SelectItem value="deepseek-flash">deepseek-flash（思考模式）</SelectItem> : <>
-                        <SelectItem value="kimi-k2-turbo-preview">kimi-k2-turbo-preview（均衡）</SelectItem>
-                        <SelectItem value="moonshot-v1-8k">moonshot-v1-8k（快速）</SelectItem>
-                        <SelectItem value="kimi-k2-thinking-turbo">kimi-k2-thinking-turbo（深度推理）</SelectItem>
-                        </>}
+                        {isOpenAI ? (
+                          <SelectItem value={openaiModel || "openai"}>
+                            {openaiModel || "由服务器环境决定"}
+                          </SelectItem>
+                        ) : isDeepSeek ? (
+                          <SelectItem value="deepseek-flash">
+                            deepseek-flash（思考模式）
+                          </SelectItem>
+                        ) : (
+                          <>
+                            <SelectItem value="kimi-k2-turbo-preview">
+                              kimi-k2-turbo-preview（均衡）
+                            </SelectItem>
+                            <SelectItem value="moonshot-v1-8k">
+                              moonshot-v1-8k（快速）
+                            </SelectItem>
+                            <SelectItem value="kimi-k2-thinking-turbo">
+                              kimi-k2-thinking-turbo（深度推理）
+                            </SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">用于智能 HS 编码推荐与申报要素自动填写。</p>
+                    <p className="text-xs text-muted-foreground">
+                      用于智能 HS 编码推荐与申报要素自动填写。
+                    </p>
                   </div>
                 </div>
 
@@ -546,7 +750,13 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                         {providerLabel} API Key
                       </label>
                       <a
-                        href={isDeepSeek ? 'https://platform.deepseek.com/api_keys' : 'https://platform.moonshot.cn/console/account'}
+                        href={
+                          isOpenAI
+                            ? "https://platform.openai.com/api-keys"
+                            : isDeepSeek
+                              ? "https://platform.deepseek.com/api_keys"
+                              : "https://platform.moonshot.cn/console/account"
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 text-xs text-primary hover:underline"
@@ -555,17 +765,47 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                         控制台
                       </a>
                     </div>
-                    {apiKeyConfigured && (
-                      <Badge variant="secondary" className="w-fit text-[10px]">已配置（只写）</Badge>
+                    {isOpenAI ? (
+                      <>
+                        <Badge
+                          variant={
+                            apiKeyConfigured ? "secondary" : "destructive"
+                          }
+                          className="w-fit text-[10px]"
+                        >
+                          {apiKeyConfigured ? "服务器已配置" : "服务器未配置"}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground">
+                          OpenAI
+                          密钥只存在于服务器进程环境，不能在此输入或保存，也不会写入数据库。
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        {apiKeyConfigured && (
+                          <Badge
+                            variant="secondary"
+                            className="w-fit text-[10px]"
+                          >
+                            已配置（只写）
+                          </Badge>
+                        )}
+                        <Input
+                          type="password"
+                          placeholder={
+                            apiKeyConfigured
+                              ? "输入新 Key 以覆盖"
+                              : `输入 ${providerLabel} API Key (sk-...)`
+                          }
+                          value={apiKeyNew}
+                          onChange={(e) => setApiKeyNew(e.target.value)}
+                          autoComplete="new-password"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          密钥只允许覆盖写入，保存后不会再从系统读回或显示。
+                        </p>
+                      </>
                     )}
-                    <Input
-                      type="password"
-                      placeholder={apiKeyConfigured ? '输入新 Key 以覆盖' : `输入 ${providerLabel} API Key (sk-...)`}
-                      value={apiKeyNew}
-                      onChange={(e) => setApiKeyNew(e.target.value)}
-                      autoComplete="new-password"
-                    />
-                    <p className="text-xs text-muted-foreground">密钥只允许覆盖写入，保存后不会再从系统读回或显示。</p>
                   </div>
                 </div>
               </div>
@@ -575,11 +815,15 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label className="text-sm font-medium" htmlFor="ai-temperature">
+                      <label
+                        className="text-sm font-medium"
+                        htmlFor="ai-temperature"
+                      >
                         采样温度（Temperature）
                       </label>
                       <span className="text-sm tabular-nums text-muted-foreground">
-                        {(temperature ?? 0.7).toFixed(1)} — {getTemperatureStyleLabel(temperature ?? 0.7)}
+                        {(temperature ?? 0.7).toFixed(1)} —{" "}
+                        {getTemperatureStyleLabel(temperature ?? 0.7)}
                       </span>
                     </div>
                     <Slider
@@ -589,15 +833,22 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                       step={0.1}
                       value={[temperature ?? 0.7]}
                       onValueChange={([v]) => setTemperature(v ?? 0.7)}
-                      disabled={isDeepSeek}
+                      disabled={isDeepSeek || isOpenAI}
                     />
                     <p className="text-xs text-muted-foreground">
-                      {isDeepSeek ? 'DeepSeek 思考模式不使用温度参数；保留原配置值。' : '0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。'}
+                      {isOpenAI
+                        ? "OpenAI 请求不使用此处的温度与长度参数（由服务器环境决定）。"
+                        : isDeepSeek
+                          ? "DeepSeek 思考模式不使用温度参数；保留原配置值。"
+                          : "0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。"}
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="ai-max-tokens">
+                    <label
+                      className="text-sm font-medium"
+                      htmlFor="ai-max-tokens"
+                    >
                       最大输出长度（Max tokens）
                     </label>
                     <Input
@@ -623,9 +874,13 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
 
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground border-t pt-4">
                 <span>问答：</span>
-                <Badge variant="outline" className="font-mono text-[10px]">{chatModel}</Badge>
+                <Badge variant="outline" className="font-mono text-[10px]">
+                  {chatModel}
+                </Badge>
                 <span className="ml-2">HS推荐：</span>
-                <Badge variant="outline" className="font-mono text-[10px]">{hsCodeModel}</Badge>
+                <Badge variant="outline" className="font-mono text-[10px]">
+                  {hsCodeModel}
+                </Badge>
               </div>
             </CardContent>
           </Card>
@@ -636,11 +891,23 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Globe className="h-4 w-4 text-muted-foreground" />
-                  <CardTitle className="text-base">HSCIQ 海关归类 API</CardTitle>
+                  <CardTitle className="text-base">
+                    HSCIQ 海关归类 API
+                  </CardTitle>
                   {hsciqEnabled ? (
-                    <Badge variant="secondary" className="text-[10px] font-normal">已开启</Badge>
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] font-normal"
+                    >
+                      已开启
+                    </Badge>
                   ) : (
-                    <Badge variant="outline" className="text-[10px] font-normal">已关闭</Badge>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-normal"
+                    >
+                      已关闭
+                    </Badge>
                   )}
                 </div>
                 <Switch
@@ -650,7 +917,8 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                 />
               </div>
               <CardDescription>
-                开启后，HS 编码推荐与申报要素填写将优先调用 HSCIQ 官方海关归类 API（含真实归类实例、官方税率与申报要素模板）。
+                开启后，HS 编码推荐与申报要素填写将优先调用 HSCIQ 官方海关归类
+                API（含真实归类实例、官方税率与申报要素模板）。
                 关闭后仅使用本地数据库与 AI 推断。
               </CardDescription>
             </CardHeader>
@@ -660,20 +928,28 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                   <div className="flex items-center gap-1.5">
                     <span>API 状态：</span>
                     {hsciqUsage.available ? (
-                      <Badge variant="secondary" className="text-[10px]">已配置</Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        已配置
+                      </Badge>
                     ) : (
-                      <Badge variant="destructive" className="text-[10px]">未配置 API Key</Badge>
+                      <Badge variant="destructive" className="text-[10px]">
+                        未配置 API Key
+                      </Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span>今日调用：</span>
-                    <span className="tabular-nums font-medium text-foreground">{hsciqUsage.used}</span>
+                    <span className="tabular-nums font-medium text-foreground">
+                      {hsciqUsage.used}
+                    </span>
                     <span>/</span>
                     <span className="tabular-nums">{hsciqUsage.limit}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span>剩余配额：</span>
-                    <span className={`tabular-nums font-medium ${hsciqUsage.remaining <= 10 ? 'text-destructive' : 'text-foreground'}`}>
+                    <span
+                      className={`tabular-nums font-medium ${hsciqUsage.remaining <= 10 ? "text-destructive" : "text-foreground"}`}
+                    >
                       {hsciqUsage.remaining}
                     </span>
                   </div>
@@ -685,9 +961,15 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
           <div className="flex justify-end">
             <Button type="submit" size="lg" disabled={saving}>
               {saving ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />保存中...</>
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  保存中...
+                </>
               ) : (
-                <><Save className="mr-2 h-4 w-4" />保存配置</>
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  保存配置
+                </>
               )}
             </Button>
           </div>
