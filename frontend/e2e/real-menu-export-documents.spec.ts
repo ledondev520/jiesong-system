@@ -120,9 +120,9 @@ test.afterEach(async () => {
 async function enterFromMenu(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
   await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/dashboard\/sales$/);
+  await expect(page).toHaveURL(/\/dashboard\/orders$/);
   await page
-    .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
+    .getByRole("link", { name: fixture.salesNo!, exact: true })
     .click();
   await expect(page).toHaveURL(`/dashboard/sales/${fixture.salesId}`);
   await expect(
@@ -307,7 +307,7 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   // The active primary module preserves its current detail URL. Sales detail
   // has no module tabs, so use its existing Return action before the menu path.
   await page.getByRole("button", { name: "返回", exact: true }).click();
-  await expect(page).toHaveURL(/\/dashboard\/sales$/);
+  await expect(page).toHaveURL(/\/dashboard\/orders$/);
   await page.getByRole("link", { name: "单证与退税", exact: true }).click();
   await page.getByRole("link", { name: "出口退税", exact: true }).click();
   await page.getByRole("tab", { name: "报关单", exact: true }).click();
