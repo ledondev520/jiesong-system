@@ -64,11 +64,12 @@ describe('navigation.config helpers', () => {
     expect(procurement?.childPrefixes).not.toContain('/dashboard/contract-templates');
   });
 
-  it('出口模块只保留出口合同、出口退税和 HS 编码', () => {
+  it('出口模块包含出口合同、报价、出口退税和 HS 编码', () => {
     const exportModule = MODULE_NAV_ITEMS.find((item) => item.key === 'export');
 
     expect(exportModule?.label).toBe('出口');
-    expect(exportModule?.tabs.map((tab) => tab.label)).toEqual(['出口合同', '出口退税', 'HS 编码']);
+    expect(exportModule?.tabs.map((tab) => tab.label)).toEqual(['出口合同', '报价', '出口退税', 'HS 编码']);
+    expect(exportModule?.childPrefixes).toContain('/dashboard/quotes');
     expect(exportModule?.childPrefixes).toContain('/dashboard/customs-declarations');
     expect(exportModule?.childPrefixes).toContain('/dashboard/hs-codes');
   });

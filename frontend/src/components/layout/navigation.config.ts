@@ -51,6 +51,7 @@ export const PROCUREMENT_TABS: TabConfig[] = [
 
 export const EXPORT_TABS: TabConfig[] = [
   { href: '/dashboard/sales', label: '出口合同' },
+  { href: '/dashboard/quotes', label: '报价' },
   { href: '/dashboard/tax-refunds', label: '出口退税' },
   { href: '/dashboard/hs-codes', label: 'HS 编码' },
 ];
@@ -118,6 +119,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     icon: PackageOpen,
     childPrefixes: [
       '/dashboard/sales',
+      '/dashboard/quotes',
       '/dashboard/tax-refunds',
       '/dashboard/customs-declarations',
       '/dashboard/hs-codes',
