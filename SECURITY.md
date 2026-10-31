@@ -157,18 +157,21 @@ Legacy `/api/v1/import` and `/api/v1/system/import` share `tabularUpload` from `
 
 Pricing requires a finite positive spot rate and a positive adjusted rate rounded
 to six decimal places. Positive adjustments cannot make missing or invalid spot
-rates usable. Python rejects invalid spot rates before reading proposal sources.
+rates usable.
 
-`config/pricing.json` contains non-secret policy values. Both export services and
-`scripts/prepare_export_packet.py` use this same file, or the explicit
-`JIESONG_PRICING_CONFIG` path. The shared `config/pricing.schema.json` defines
-strict keys and numeric bounds. Invalid or missing files stop pricing without
-fallback. Readiness recommendations use the same adjusted exchange rate, tiered
-markups and rounding as packet. Request-level profitRate does not override the
-shared file. Multiplier mode requires explicit selection. No environment file or
-business database is read by the loaders.
+`config/pricing.json` contains non-secret policy values (spot rate, adjustment,
+default markup, category markups, round-up step). Both export services use this
+file, or the explicit `JIESONG_PRICING_CONFIG` path, through the single
+`priceFor()` implementation. The shared `config/pricing.schema.json` defines
+strict keys and numeric bounds; category IDs are checked against the database on
+save. Invalid or missing files, including the retired tiered/multiplier shape,
+stop pricing without fallback. No environment file or business database is read
+by the file loader.
 
-`GET/PUT /system/pricing-config` require authenticated ADMIN. Updates replace the
+`GET/PUT /system/pricing-config` and the read-only `GET /system/pricing-config/preview`
+require authenticated ADMIN (preview is GET because the lifecycle contract forbids new
+unregistered write routes). Preview with a draft config validates it and never writes.
+Updates replace the
 whole validated document atomically, require the last revision, and use an
 exclusive lock file. Structured stderr events retain only operator ID, field
 names and policy hashes. No request values, contract data or secrets are logged.

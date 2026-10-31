@@ -6,7 +6,6 @@ import api, { clearApiGetCache } from "@/lib/axios";
 import { pricingService } from "@/services/pricing.service";
 import { PricingConfigCard } from "./PricingConfigCard";
 import defaults from "../../../../../../config/pricing.json";
-import schema from "../../../../../../config/pricing.schema.json";
 
 vi.mock("@/store/auth.store", () => ({
   useAuthStore: (selector: (state: unknown) => unknown) =>
@@ -15,7 +14,7 @@ vi.mock("@/store/auth.store", () => ({
 
 const originalAdapter = api.defaults.adapter;
 const adapter = vi.fn();
-const snapshot = { config: defaults, revision: "a".repeat(64), schema };
+const snapshot = { config: defaults, revision: "a".repeat(64) };
 
 beforeEach(() => {
   clearApiGetCache();
@@ -37,7 +36,7 @@ afterEach(() => {
 it("shows the actual conflict message after the shared Axios interceptor unwraps it", async () => {
   const user = userEvent.setup();
   render(<PricingConfigCard />);
-  await screen.findByLabelText("乘数");
+  await screen.findByLabelText("默认加价 (%)");
   const message = "报价配置已变更，请重新加载后保存";
   adapter.mockImplementationOnce(async (config) => {
     throw new AxiosError(
@@ -54,11 +53,11 @@ it("shows the actual conflict message after the shared Axios interceptor unwraps
       },
     );
   });
-  await user.clear(screen.getByLabelText("乘数"));
-  await user.type(screen.getByLabelText("乘数"), "1.5");
+  await user.clear(screen.getByLabelText("默认加价 (%)"));
+  await user.type(screen.getByLabelText("默认加价 (%)"), "40");
   await user.click(screen.getByRole("button", { name: "保存报价配置" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(message);
-  expect(screen.getByLabelText("乘数")).toHaveValue(1.5);
+  expect(screen.getByLabelText("默认加价 (%)")).toHaveValue(40);
 });
 
 it("loads the current configuration revision on every read after an external change", async () => {
@@ -66,7 +65,7 @@ it("loads the current configuration revision on every read after an external cha
   const changed = {
     ...snapshot,
     revision: "b".repeat(64),
-    config: { ...defaults, refundableMarkup: 0.4 },
+    config: { ...defaults, defaultMarkup: 0.4 },
   };
   adapter.mockImplementationOnce(async (config) => ({
     config,
@@ -77,5 +76,5 @@ it("loads the current configuration revision on every read after an external cha
   }));
   const current = (await pricingService.get()).data;
   expect(current.revision).toBe(changed.revision);
-  expect(current.config.refundableMarkup).toBe(0.4);
+  expect(current.config.defaultMarkup).toBe(0.4);
 });
