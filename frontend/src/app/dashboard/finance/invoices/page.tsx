@@ -204,7 +204,6 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-4">
-
       {loadError && (
         <ErrorState
           title="发票台账读取失败"

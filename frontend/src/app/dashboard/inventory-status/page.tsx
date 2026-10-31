@@ -6,10 +6,10 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { InventoryTab } from '@/app/dashboard/products/components/InventoryTab';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { InventoryTab } from "@/app/dashboard/products/components/InventoryTab";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export default function InventoryStatusPage() {
   return (

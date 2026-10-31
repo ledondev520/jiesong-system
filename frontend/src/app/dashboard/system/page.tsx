@@ -6,15 +6,21 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { ArrowRight, ShieldCheck } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { SYSTEM_CENTER_LINKS } from '@/components/layout/navigation.config';
+import { useRouter } from "next/navigation";
+import { ArrowRight, ShieldCheck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { SYSTEM_CENTER_LINKS } from "@/components/layout/navigation.config";
 
 /**
  * 职责：渲染运维中心总览页，提供共享入口卡片与操作建议
@@ -29,7 +35,11 @@ export default function SystemOverviewPage() {
         title="运维中心"
         description="系统监控、操作审计与数据导入管理"
         actions={
-          <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/settings')}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/dashboard/settings")}
+          >
             返回系统配置
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
@@ -43,9 +53,13 @@ export default function SystemOverviewPage() {
               <Badge variant="secondary" className="rounded-full px-3 py-1">
                 运维入口
               </Badge>
-              <span className="text-xs text-muted-foreground">统一承接通知、日志、导入记录</span>
+              <span className="text-xs text-muted-foreground">
+                统一承接通知、日志、导入记录
+              </span>
             </div>
-            <CardTitle className="text-2xl">先处理通知，再查日志，最后回看导入记录。</CardTitle>
+            <CardTitle className="text-2xl">
+              先处理通知，再查日志，最后回看导入记录。
+            </CardTitle>
             <CardDescription className="max-w-xl">
               这个页面不是入口拼盘，而是运维任务的起点。先按优先级处理高风险提醒，再用日志定位问题，最后用导入记录回溯数据流。
             </CardDescription>
@@ -68,8 +82,12 @@ export default function SystemOverviewPage() {
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="space-y-1">
-                      <span className="block font-medium text-foreground">{item.label}</span>
-                      <span className="block text-xs text-muted-foreground">{item.desc}</span>
+                      <span className="block font-medium text-foreground">
+                        {item.label}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {item.desc}
+                      </span>
                     </div>
                   </Button>
                 );

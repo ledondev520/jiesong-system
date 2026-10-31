@@ -333,7 +333,6 @@ export function FinancialStatementsPageContent() {
 
   return (
     <div className="space-y-6" data-testid="financial-statements-page-content">
-
       {(loadError || detailError) && (
         <ErrorState
           title={loadError ? "财务报表读取失败" : "所选账期读取失败"}

@@ -6,18 +6,18 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { Suspense, use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import type { CustomsDeclaration } from '@/types';
+import { Suspense, use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import type { CustomsDeclaration } from "@/types";
 import {
   customsDeclarationService,
   type CustomsDeclarationUpsertInput,
-} from '@/services/customsDeclaration.service';
-import { PageHeader } from '@/components/layout/PageHeader';
-import { CustomsDeclarationForm } from '@/app/customs-declarations/components/CustomsDeclarationForm';
+} from "@/services/customsDeclaration.service";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { CustomsDeclarationForm } from "@/app/customs-declarations/components/CustomsDeclarationForm";
 
 interface EditCustomsDeclarationContentProps {
   params: Promise<{ id: string }>;
@@ -28,7 +28,9 @@ function EditCustomsDeclarationContent({
 }: EditCustomsDeclarationContentProps) {
   const { id } = use(params);
   const router = useRouter();
-  const [declaration, setDeclaration] = useState<CustomsDeclaration | null>(null);
+  const [declaration, setDeclaration] = useState<CustomsDeclaration | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ function EditCustomsDeclarationContent({
         const response = await customsDeclarationService.getById(id);
         setDeclaration(response?.data || null);
       } catch {
-        toast.error('加载报关单失败');
+        toast.error("加载报关单失败");
       } finally {
         setLoading(false);
       }
@@ -50,19 +52,25 @@ function EditCustomsDeclarationContent({
   const handleSubmit = async (payload: CustomsDeclarationUpsertInput) => {
     try {
       await customsDeclarationService.update(id, payload);
-      toast.success('报关单更新成功');
+      toast.success("报关单更新成功");
       router.push(`/dashboard/customs-declarations/${id}`);
     } catch {
-      toast.error('更新报关单失败');
+      toast.error("更新报关单失败");
     }
   };
 
   if (loading) {
-    return <div className="py-14 text-center text-muted-foreground">加载中...</div>;
+    return (
+      <div className="py-14 text-center text-muted-foreground">加载中...</div>
+    );
   }
 
   if (!declaration) {
-    return <div className="py-14 text-center text-muted-foreground">报关单不存在</div>;
+    return (
+      <div className="py-14 text-center text-muted-foreground">
+        报关单不存在
+      </div>
+    );
   }
 
   return (
@@ -87,7 +95,11 @@ interface PageProps {
 
 export default function EditCustomsDeclarationPage({ params }: PageProps) {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-muted-foreground">加载中...</div>
+      }
+    >
       <EditCustomsDeclarationContent params={params} />
     </Suspense>
   );

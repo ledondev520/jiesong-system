@@ -4,10 +4,10 @@
  * Pos: AI 助手模块主入口，直接承载日常问答；会话治理下沉到会话记录页
  */
 
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { AIAssistant } from '@/components/ai/AIAssistant';
-import { PageHeader } from '@/components/layout/PageHeader';
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { AIAssistant } from "@/components/ai/AIAssistant";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export default function AiAssistantModulePage() {
   return (

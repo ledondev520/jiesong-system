@@ -98,8 +98,16 @@ export function Header() {
         <HeaderNotifications />
         {/* AI 助手入口：BOSS 无权限；侧栏面板上线后改为切换面板 */}
         {user?.role !== Role.BOSS && (
-          <Button asChild variant="ghost" size="icon" className="hidden md:inline-flex" aria-label="AI 助手">
-            <Link href="/dashboard/ai"><Bot className="h-4 w-4" /></Link>
+          <Button
+            asChild
+            variant="ghost"
+            size="icon"
+            className="hidden md:inline-flex"
+            aria-label="AI 助手"
+          >
+            <Link href="/dashboard/ai">
+              <Bot className="h-4 w-4" />
+            </Link>
           </Button>
         )}
         {/* 用户菜单：桌面端保留，移动端通过底部TabBar"更多"入口访问 */}
