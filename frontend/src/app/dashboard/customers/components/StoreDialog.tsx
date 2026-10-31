@@ -32,7 +32,12 @@ interface StoreDialogProps {
   onSaved: (store: Store) => void;
 }
 
-export function StoreDialog({ customerId, store, onClose, onSaved }: StoreDialogProps) {
+export function StoreDialog({
+  customerId,
+  store,
+  onClose,
+  onSaved,
+}: StoreDialogProps) {
   const [ports, setPorts] = useState<Port[]>([]);
   const [portsError, setPortsError] = useState(false);
   const [name, setName] = useState(store?.name ?? "");
@@ -47,7 +52,11 @@ export function StoreDialog({ customerId, store, onClose, onSaved }: StoreDialog
     let alive = true;
     storeService
       .getPorts()
-      .then((response) => alive && setPorts(response.data.filter((port) => port.isActive !== false)))
+      .then(
+        (response) =>
+          alive &&
+          setPorts(response.data.filter((port) => port.isActive !== false)),
+      )
       .catch(() => alive && setPortsError(true));
     return () => {
       alive = false;
@@ -92,15 +101,30 @@ export function StoreDialog({ customerId, store, onClose, onSaved }: StoreDialog
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="store-name">门店名称 *</Label>
-            <Input id="store-name" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input
+              id="store-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="store-code">门店简称（唯一，用于唛头和报价行）</Label>
-            <Input id="store-code" value={code} maxLength={12} onChange={(e) => setCode(e.target.value)} />
+            <Label htmlFor="store-code">
+              门店简称（唯一，用于唛头和报价行）
+            </Label>
+            <Input
+              id="store-code"
+              value={code}
+              maxLength={12}
+              onChange={(e) => setCode(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="store-legal">经营主体（收货方抬头）</Label>
-            <Input id="store-legal" value={legalName} onChange={(e) => setLegalName(e.target.value)} />
+            <Input
+              id="store-legal"
+              value={legalName}
+              onChange={(e) => setLegalName(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="store-port">目的港 *</Label>
@@ -112,19 +136,35 @@ export function StoreDialog({ customerId, store, onClose, onSaved }: StoreDialog
             >
               <option value="">请选择</option>
               {ports.map((port) => (
-                <option key={port.id} value={port.id}>{port.name}</option>
+                <option key={port.id} value={port.id}>
+                  {port.name}
+                </option>
               ))}
             </select>
-            {portsError ? <p className="text-xs text-destructive">港口加载失败，请关闭后重试</p> : null}
+            {portsError ? (
+              <p className="text-xs text-destructive">
+                港口加载失败，请关闭后重试
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label htmlFor="store-address">地址</Label>
-            <Input id="store-address" value={address} onChange={(e) => setAddress(e.target.value)} />
+            <Input
+              id="store-address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
           </div>
         </div>
-        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={submitting}>取消</Button>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            取消
+          </Button>
           <Button onClick={() => void submit()} disabled={submitting}>
             {submitting ? "保存中..." : "保存"}
           </Button>

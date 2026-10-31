@@ -38,7 +38,9 @@ export default function CustomersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
-  const [editing, setEditing] = useState<Customer | null | undefined>(undefined);
+  const [editing, setEditing] = useState<Customer | null | undefined>(
+    undefined,
+  );
   const includeArchived = filters.archived === "yes";
 
   const load = useCallback(async () => {
@@ -79,7 +81,10 @@ export default function CustomersPage() {
       key: "name",
       header: "客户",
       cell: (customer) => (
-        <Link href={`/dashboard/customers/${customer.id}`} className="font-medium hover:underline">
+        <Link
+          href={`/dashboard/customers/${customer.id}`}
+          className="font-medium hover:underline"
+        >
           {customer.name}
         </Link>
       ),
@@ -92,11 +97,21 @@ export default function CustomersPage() {
       header: "默认条款",
       cell: (c) => `${c.defaultCurrency} · ${c.defaultIncoterm}`,
     },
-    { key: "stores", header: "门店数", cell: (c) => c._count?.stores ?? 0, sortValue: (c) => c._count?.stores ?? 0 },
+    {
+      key: "stores",
+      header: "门店数",
+      cell: (c) => c._count?.stores ?? 0,
+      sortValue: (c) => c._count?.stores ?? 0,
+    },
     {
       key: "status",
       header: "状态",
-      cell: (c) => <StatusBadge status={c.isActive ? "ACTIVE" : "ARCHIVED"} statusMap={STATUS_MAP} />,
+      cell: (c) => (
+        <StatusBadge
+          status={c.isActive ? "ACTIVE" : "ARCHIVED"}
+          statusMap={STATUS_MAP}
+        />
+      ),
     },
   ];
 
@@ -107,7 +122,10 @@ export default function CustomersPage() {
         description="维护买方客户及其门店（收货点）；客户只归档，不删除"
         actions={
           canWrite ? (
-            <Button onClick={() => setEditing(null)} className="h-10 rounded-xl">
+            <Button
+              onClick={() => setEditing(null)}
+              className="h-10 rounded-xl"
+            >
               <Plus className="mr-2 h-4 w-4" /> 新增客户
             </Button>
           ) : undefined
@@ -124,8 +142,12 @@ export default function CustomersPage() {
           errorWhat="加载客户失败"
           onRetry={() => void load()}
           emptyTitle={filters.keyword ? "没有符合条件的客户" : "暂无客户"}
-          emptyDescription={filters.keyword ? undefined : "先新增客户，再在客户下添加门店"}
-          onRowClick={(customer) => router.push(`/dashboard/customers/${customer.id}`)}
+          emptyDescription={
+            filters.keyword ? undefined : "先新增客户，再在客户下添加门店"
+          }
+          onRowClick={(customer) =>
+            router.push(`/dashboard/customers/${customer.id}`)
+          }
           search={{
             value: filters.keyword,
             onChange: (keyword) => setFilters({ keyword }),
@@ -136,7 +158,8 @@ export default function CustomersPage() {
               key: "archived",
               label: "含已归档",
               active: includeArchived,
-              onToggle: () => setFilters({ archived: includeArchived ? "no" : "yes" }),
+              onToggle: () =>
+                setFilters({ archived: includeArchived ? "no" : "yes" }),
             },
           ]}
           pagination={{
@@ -173,17 +196,23 @@ export default function CustomersPage() {
               <CardContent className="space-y-1 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-semibold">{customer.name}</p>
-                  <StatusBadge status={customer.isActive ? "ACTIVE" : "ARCHIVED"} statusMap={STATUS_MAP} />
+                  <StatusBadge
+                    status={customer.isActive ? "ACTIVE" : "ARCHIVED"}
+                    statusMap={STATUS_MAP}
+                  />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {customer.defaultCurrency} · {customer.defaultIncoterm} · {customer._count?.stores ?? 0} 家门店
+                  {customer.defaultCurrency} · {customer.defaultIncoterm} ·{" "}
+                  {customer._count?.stores ?? 0} 家门店
                 </p>
               </CardContent>
             </Card>
           </Link>
         ))}
         {!loading && !loadError && items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">暂无客户</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            暂无客户
+          </p>
         ) : null}
       </div>
 

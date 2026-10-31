@@ -36,7 +36,10 @@ const TEXT_FIELDS = [
   ["defaultPortOfLoading", "默认装货港（文字）"],
 ] as const;
 
-type FormState = Record<(typeof TEXT_FIELDS)[number][0] | "name" | "country" | "note", string> & {
+type FormState = Record<
+  (typeof TEXT_FIELDS)[number][0] | "name" | "country" | "note",
+  string
+> & {
   defaultIncoterm: string;
 };
 
@@ -96,7 +99,10 @@ export function CustomerDialog({
     if (!form.name.trim()) return setError("客户名称不能为空");
     if (form.country.trim() && !/^[A-Za-z]{2}$/.test(form.country.trim()))
       return setError("国家须为两位字母代码，如 US");
-    if (form.contactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail.trim()))
+    if (
+      form.contactEmail.trim() &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail.trim())
+    )
       return setError("联系邮箱格式不正确");
     setError(null);
     setSubmitting(true);
@@ -123,17 +129,30 @@ export function CustomerDialog({
         <div className="grid gap-4 py-2 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="customer-name">客户名称 *</Label>
-            <Input id="customer-name" value={form.name} onChange={(e) => set("name", e.target.value)} />
+            <Input
+              id="customer-name"
+              value={form.name}
+              onChange={(e) => set("name", e.target.value)}
+            />
           </div>
           {TEXT_FIELDS.map(([key, label]) => (
             <div key={key} className="space-y-2">
               <Label htmlFor={`customer-${key}`}>{label}</Label>
-              <Input id={`customer-${key}`} value={form[key]} onChange={(e) => set(key, e.target.value)} />
+              <Input
+                id={`customer-${key}`}
+                value={form[key]}
+                onChange={(e) => set(key, e.target.value)}
+              />
             </div>
           ))}
           <div className="space-y-2">
             <Label htmlFor="customer-country">国家（两位代码）</Label>
-            <Input id="customer-country" maxLength={2} value={form.country} onChange={(e) => set("country", e.target.value)} />
+            <Input
+              id="customer-country"
+              maxLength={2}
+              value={form.country}
+              onChange={(e) => set("country", e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="customer-incoterm">默认贸易术语</Label>
@@ -144,7 +163,9 @@ export function CustomerDialog({
               onChange={(e) => set("defaultIncoterm", e.target.value)}
             >
               {INCOTERM_OPTIONS.map((term) => (
-                <option key={term} value={term}>{term}</option>
+                <option key={term} value={term}>
+                  {term}
+                </option>
               ))}
             </select>
           </div>
@@ -154,14 +175,22 @@ export function CustomerDialog({
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="customer-note">备注</Label>
-            <Textarea id="customer-note" value={form.note} onChange={(e) => set("note", e.target.value)} />
+            <Textarea
+              id="customer-note"
+              value={form.note}
+              onChange={(e) => set("note", e.target.value)}
+            />
           </div>
         </div>
         {error ? (
-          <p role="alert" className="text-sm text-destructive">{error}</p>
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
         ) : null}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={submitting}>取消</Button>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            取消
+          </Button>
           <Button onClick={() => void submit()} disabled={submitting}>
             {submitting ? "保存中..." : "保存"}
           </Button>

@@ -13,8 +13,17 @@ vi.mock("@/services/customer.service", () => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const existing: Customer = {
-  id: "c1", name: "Seapot", legalName: "Seapot Group", contactName: "Amy", contactEmail: null, country: "US",
-  defaultCurrency: "USD", defaultIncoterm: "FOB", isActive: true, createdAt: "", updatedAt: "",
+  id: "c1",
+  name: "Seapot",
+  legalName: "Seapot Group",
+  contactName: "Amy",
+  contactEmail: null,
+  country: "US",
+  defaultCurrency: "USD",
+  defaultIncoterm: "FOB",
+  isActive: true,
+  createdAt: "",
+  updatedAt: "",
 };
 
 beforeEach(() => {
@@ -24,15 +33,33 @@ beforeEach(() => {
 
 describe("buildCustomerPayload", () => {
   const form = {
-    name: " Seapot ", country: "us", note: "", defaultIncoterm: "CIF", legalName: "Seapot Group", address: "",
-    contactName: "", contactPhone: "", contactEmail: "", defaultPaymentTerms: "", defaultPortOfLoading: "",
+    name: " Seapot ",
+    country: "us",
+    note: "",
+    defaultIncoterm: "CIF",
+    legalName: "Seapot Group",
+    address: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    defaultPaymentTerms: "",
+    defaultPortOfLoading: "",
   };
   it("新增：空值不发送，国家大写", () => {
-    expect(buildCustomerPayload(form)).toEqual({ name: "Seapot", country: "US", defaultIncoterm: "CIF", legalName: "Seapot Group" });
+    expect(buildCustomerPayload(form)).toEqual({
+      name: "Seapot",
+      country: "US",
+      defaultIncoterm: "CIF",
+      legalName: "Seapot Group",
+    });
   });
   it("编辑：原来有值、现在清空的字段发送 null，原来就为空的不发送", () => {
     expect(buildCustomerPayload(form, existing)).toEqual({
-      name: "Seapot", country: "US", defaultIncoterm: "CIF", legalName: "Seapot Group", contactName: null,
+      name: "Seapot",
+      country: "US",
+      defaultIncoterm: "CIF",
+      legalName: "Seapot Group",
+      contactName: null,
     });
   });
 });
@@ -67,11 +94,17 @@ describe("CustomerDialog", () => {
     render(<CustomerDialog onClose={vi.fn()} onSaved={onSaved} />);
     await user.type(screen.getByLabelText("客户名称 *"), "Seapot");
     await user.click(screen.getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("客户名称已存在"));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("客户名称已存在"),
+    );
     expect(screen.getByLabelText("客户名称 *")).toHaveValue("Seapot");
     mocks.create.mockResolvedValueOnce({ data: { ...existing, id: "c2" } });
     await user.click(screen.getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: "c2" })));
+    await waitFor(() =>
+      expect(onSaved).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "c2" }),
+      ),
+    );
     expect(mocks.create).toHaveBeenCalledTimes(2);
   });
 });
