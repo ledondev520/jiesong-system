@@ -345,11 +345,12 @@ test('addSalesItem: 门店属于其他客户时拒绝写入（评审 R1-3）', a
 });
 
 test('addSalesItem: 未传 sellingPrice 且老商品有上次确认价时直接取该价（排除本订单）', async () => {
-  const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany];
+  const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany, prisma.store.findMany];
   let lookup = null;
   let createArgs = null;
   prisma.quoteItem.findMany = async () => [];
-  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5 });
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5, customerId: 'c-1' });
+  prisma.store.findMany = async () => [{ id: 's-1', customerId: 'c-1' }];
   prisma.salesItem.create = async (args) => { createArgs = args; return { id: 'si-1', ...args.data }; };
   prisma.salesItem.findMany = async (args) => {
     if (args.where?.productId) { lookup = args.where; return [{ productId: 'p-1', sellingPrice: 2500.5, createdAt: new Date('2026-10-01') }]; }
@@ -361,7 +362,7 @@ test('addSalesItem: 未传 sellingPrice 且老商品有上次确认价时直接�
     assert.equal(createArgs.data.sellingPrice, 2500.5);
     assert.deepEqual(lookup.salesContractId, { not: 'sc-1' });
   } finally {
-    [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany] = originals;
+    [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany, prisma.store.findMany] = originals;
   }
 });
 
