@@ -137,4 +137,10 @@ const updatePricingConfig = (value, expectedRevision, actorId) => {
   }
 };
 
-module.exports = { loadPricingConfig, loadPricingSnapshot, updatePricingConfig, validatePricingConfig, schema };
+/** 巡检用：配置是否可读且合法，以及文件最后修改时间（用于判断现汇是否久未更新）。 */
+const pricingConfigStatus = () => {
+  const { revision } = loadPricingSnapshot();
+  return { revision, modifiedAt: fs.statSync(configPath()).mtime };
+};
+
+module.exports = { pricingConfigStatus, loadPricingConfig, loadPricingSnapshot, updatePricingConfig, validatePricingConfig, schema };

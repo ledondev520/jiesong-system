@@ -155,3 +155,53 @@ it('真实Prisma空库验证销售巡检与通知去重，不触碰业务数据�
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+describe('runSystemPatrol: 报价配置是唯一的汇率/加价来源', () => {
+  const os = require('node:os');
+  const prisma = require('../utils/prisma');
+  const { runSystemPatrol } = require('./patrolService');
+  const withPricing = async (setup, run) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'patrol-pricing-'));
+    const file = path.join(dir, 'pricing.json');
+    const previous = process.env.JIESONG_PRICING_CONFIG;
+    const originalQuery = prisma.$queryRaw;
+    const originalFindMany = prisma.systemConfig.findMany;
+    prisma.$queryRaw = async () => [{ 1: 1 }];
+    // 旧行为读 SystemConfig 的 exchangeRate/profitRate；现在即使调用也必须没有影响
+    prisma.systemConfig.findMany = async () => { throw new Error('SystemConfig pricing keys must not be read'); };
+    process.env.JIESONG_PRICING_CONFIG = file;
+    try {
+      setup(file);
+      return await run(file);
+    } finally {
+      prisma.$queryRaw = originalQuery;
+      prisma.systemConfig.findMany = originalFindMany;
+      if (previous === undefined) delete process.env.JIESONG_PRICING_CONFIG; else process.env.JIESONG_PRICING_CONFIG = previous;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  const valid = { exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5 };
+
+  it('配置合法且新近：不产生配置类发现', async () => {
+    const findings = await withPricing((file) => fs.writeFileSync(file, JSON.stringify(valid), { mode: 0o600 }), runSystemPatrol);
+    assert.equal(findings.some((f) => ['MISSING_CONFIG', 'STALE_EXCHANGE_RATE'].includes(f.rule)), false);
+  });
+
+  it('配置缺失或无效：CRITICAL MISSING_CONFIG', async () => {
+    const missing = await withPricing(() => {}, runSystemPatrol);
+    assert.ok(missing.some((f) => f.rule === 'MISSING_CONFIG' && f.severity === 'CRITICAL'));
+    const invalid = await withPricing((file) => fs.writeFileSync(file, '{"exchangeRate":-1}', { mode: 0o600 }), runSystemPatrol);
+    assert.ok(invalid.some((f) => f.rule === 'MISSING_CONFIG'));
+  });
+
+  it('配置文件超过 7 天未更新：WARNING STALE_EXCHANGE_RATE，并带当前现汇', async () => {
+    const findings = await withPricing((file) => {
+      fs.writeFileSync(file, JSON.stringify(valid), { mode: 0o600 });
+      const old = new Date(Date.now() - 9 * 24 * 3600 * 1000);
+      fs.utimesSync(file, old, old);
+    }, runSystemPatrol);
+    const stale = findings.find((f) => f.rule === 'STALE_EXCHANGE_RATE');
+    assert.equal(stale?.severity, 'WARNING');
+    assert.match(stale.detail, /6\.72/);
+  });
+});
