@@ -27,3 +27,17 @@ test('非法表头或任一明细必须在提交前拒绝', () => {
     assert.throws(() => normalizeCreation({ exchangeRate: 7.2, items: [item, { ...item, ...patch }] }), error => error.statusCode === 400);
   }
 });
+
+test('订单条款：默认 USD，贸易术语大写并限定列表，客户可空，缺省售价留给报价规则', () => {
+  const base = { exchangeRate: 7.2, items: [item] };
+  const defaults = normalizeCreation(base);
+  assert.equal(defaults.currency, 'USD');
+  assert.equal(defaults.customerId, null);
+  assert.equal(defaults.incoterm, null);
+  assert.equal(normalizeCreation({ ...base, incoterm: ' cif ', customerId: 'c1', paymentTerms: ' T/T ' }).incoterm, 'CIF');
+  assert.equal(normalizeCreation({ ...base, paymentTerms: ' T/T ' }).paymentTerms, 'T/T');
+  assert.equal(normalizeCreation({ exchangeRate: 7.2, items: [{ ...item, sellingPrice: undefined }] }).items[0].sellingPrice, undefined);
+  for (const patch of [{ currency: 'EUR' }, { incoterm: 'DAP' }, { customerId: '' }, { paymentTerms: 'x'.repeat(501) }]) {
+    assert.throws(() => normalizeCreation({ ...base, ...patch }), error => error.statusCode === 400, JSON.stringify(patch));
+  }
+});

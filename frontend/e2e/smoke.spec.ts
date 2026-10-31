@@ -122,8 +122,8 @@ test.describe('关键按钮交互', () => {
     await expect(page.getByRole('heading', { name: '出口订单' })).toBeVisible();
 
     await safeClick(page.getByRole('button', { name: '新建订单' }));
-    await expect(page).toHaveURL(/\/dashboard\/sales\/create$/, { timeout: 10000 });
-    await expect(page.getByRole('heading', { name: '创建出口合同' })).toBeVisible();
+    await expect(page).toHaveURL(/\/dashboard\/orders\/new$/, { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: '新建出口订单' })).toBeVisible();
   });
 
   test('库存状态页：批量状态更新可触发', async ({ page }) => {

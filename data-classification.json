@@ -96,7 +96,8 @@
         "financial summary reports, cash-flow statements, account balances, general-ledger entries, payroll, social-security, and tax-return structured rows",
         "inventory and shipment operational history",
         "customer master data (Customer name, legal name, address, contacts) and order-level customer terms (incoterm, payment terms, port of loading)",
-        "customers API (backend/src/routes/customers.js): ADMIN/SALES write, all roles read, BOSS GET-only; contact fields excluded from audit field lists; customers are archived, never deleted"
+        "customers API (backend/src/routes/customers.js): ADMIN/SALES write, all roles read, BOSS GET-only; contact fields excluded from audit field lists; customers are archived, never deleted",
+        "purchase drafts generated from export orders (purchase_contracts.salesContractId, purchase_items.storeId): Confidential supplier pricing; generation limited to ADMIN/PURCHASE and written atomically as DRAFT"
       ],
       "controls": {
         "storage": [
@@ -139,13 +140,13 @@
         "build scripts",
         "readme and API contract docs",
         "ByteRover engineering memory that excludes secrets and business-sensitive data",
-        "non-secret export pricing mode, exchange adjustment and markup settings"
+        "non-secret export pricing spot rate, exchange adjustment, markup and round-up settings"
       ],
       "controls": {
         "storage": [
           "Repository standard permissions",
           "Code review for unintended leakage",
-          "exportReadinessService.js, exportPacketService.js and scripts/pricing_config.py consume the same policy validated by pricingConfigService.js or the Python loader; ADMIN-only file updates log actor, changed fields and hashes without values. External file edits are detected on load; offline editors retain filesystem audit."
+          "exportReadinessService.js and exportPacketService.js consume the same policy through priceFor() in exportPricing.js, validated by pricingConfigService.js; ADMIN-only file updates log actor, changed fields and hashes without values. External file edits are detected on load; offline editors retain filesystem audit."
         ],
         "transfer": [
           "Use normal authenticated collaboration channels"
