@@ -15,24 +15,34 @@
 
 ## 色彩系统
 
-### 主色调（Green — OKLCH）
-| Token | 值 | 用途 |
-|---|---|---|
-| `--primary` | `oklch(0.546 0.245 152.881)` | 按钮、链接、激活状态 |
-| `--primary-foreground` | `oklch(0.985 0 0)` | 主色背景上的文字 |
+Token 单一来源：`frontend/src/app/globals.css`（`:root` 与 `.dark`）。依据 `docs/redesign/UX-REDESIGN-2026.md` §8.3。
 
-### 侧边栏
-| Token | 值 |
-|---|---|
-| `--sidebar` | `oklch(0.995 0.001 147.858)` 极浅绿白 |
-| `--sidebar-foreground` | `oklch(0.238 0.014 153.1)` 深绿灰 |
-| `--sidebar-accent` | `oklch(0.953 0.013 145.508)` 悬停底色 |
+### 中性色（shadcn zinc）
+`--background` / `--card` / `--secondary` / `--muted` / `--accent` / `--border` / `--input` / `--sidebar*` 均取自 zinc 色阶（色相 ≈ 286，近乎无彩），不再带绿色底色。
 
-### 语义色（shadcn/ui 标准）
+### 主色（唯一品牌强调色：深青绿）
+| Token | 浅色 | 深色 | 用途 |
+|---|---|---|---|
+| `--primary` / `--ring` / `--sidebar-primary` | `oklch(0.5 0.11 165)` | `oklch(0.62 0.12 165)` | 仅用于主按钮、链接、当前导航项 |
+| `--primary-foreground` | `oklch(0.985 0 0)` | `oklch(0.141 0.005 285.823)` | 主色背景上的文字 |
+
+### 语义色
+- `--destructive`：删除/错误（红色仅用于阻塞、逾期、破坏性操作）
 - `--muted` / `--muted-foreground`：辅助信息
-- `--destructive`：删除/错误操作
-- `--border`：边框
-- `--card` / `--card-foreground`：卡片背景
+- `--border`、`--card` / `--card-foreground`：边框与卡片
+
+### 状态徽章色（§8.7）
+Tailwind 工具类：`text-status-<色>` / `bg-status-<色>-soft`（`gray|blue|amber|green|red`）。`:root` 与 `.dark` 各有一套，文字对比度 ≥ 4.5:1。
+
+| 色 | 含义 | 典型状态 |
+|---|---|---|
+| gray | 草稿 / 停用 | 草稿、已取消、已拒绝、已出库 |
+| blue | 进行中 | 已确认、生产中、包装中、运输中 |
+| amber | 等待他人 / 需处理 | 已到港、待装柜、已过期 |
+| green | 已完成 | 已入库、已收货、已完成 |
+| red | 阻塞 / 逾期 / 破坏性 | 仅此类场景 |
+
+状态 → 颜色的映射由后续 PR 合并 `status-badge.tsx` 与 `semantic-badge.tsx` 时落地；本次只提供 token。
 
 ---
 
@@ -44,7 +54,15 @@
 |---|---|---|
 | `--font-body-sans` | PingFang SC, Hiragino Sans GB, Microsoft YaHei, Source Han Sans SC | 正文（全局默认） |
 | `--font-display-serif` | Songti SC, STSong, Noto Serif CJK SC | 标题展示（大号数字/金额） |
-| `--font-ui-mono` | IBM Plex Mono, SFMono-Regular, Menlo | 代码、合同号、SKU |
+| `--font-ui-mono` | IBM Plex Mono, SFMono-Regular, Menlo | 代码、合同号、SKU、单据号（EXP…、CG…、QT…） |
+
+> 重设计方向（§8.2）：不再用衬线体显示数字；`--font-display-serif` 保留但新页面不使用。
+
+### 字号阶梯
+12 / 13 / 14（正文）/ 16 / 20 / 24 px。对应 Tailwind `text-xs` / **`text-13`（新增，表格用）** / `text-sm` / `text-base` / `text-xl` / `text-2xl`。`text-13` 通过 `@theme` 的 `--text-13` 提供，不覆盖 Tailwind 默认字号。
+
+### 数字
+`globals.css` 对 `td`、`th` 与 `.tabular-nums` 设置 `font-variant-numeric: tabular-nums`，金额/数量列对齐；表格内数字右对齐由表格组件负责。
 
 ---
 
@@ -125,7 +143,9 @@
 - 页面内容区：`space-y-6`（各区块间距）
 - 卡片内部：`CardHeader pb-4` + `CardContent`
 - 表格行高：`py-3`（`TableHead` / `TableCell`）
-- 圆角：`rounded-xl`（卡片），`rounded-lg`（按钮、表单控件）
+- 圆角：`--radius: 0.375rem`（6px）。`rounded-lg` = 6px，`rounded-md` = 4px，`rounded-sm` = 2px，`rounded-xl` = 10px；不使用胶囊形状。已有 `rounded-2xl` 的卡片类（`.surface-panel`、`.kpi-card`、`.auth-card`）与 `.status-badge` 的 `rounded-full` 随后续页面 PR 逐步收敛，本次不改
+- 4/8 px 间距网格；表格行 36px（紧凑），表单控件 36px，按钮 32/36px（后续组件 PR 落地）
+- 以边框代替阴影；阴影只用于弹层与对话框
 - 触摸目标最小尺寸：`h-11`（44px）
 
 ---
@@ -147,4 +167,4 @@
 
 ---
 
-*最后更新：2026-03-21 by plan-design-review*
+*最后更新：2026-10-31（设计 Token：UX 重设计 §8.2–8.4/8.7）*
