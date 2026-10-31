@@ -51,7 +51,8 @@ const resolveCustomerIdForNewStore = async (customerId, db = prisma, subject = '
     return customer.id;
   }
   const active = await db.customer.findMany({ where: { isActive: true }, select: { id: true }, take: 2 });
-  if (active.length !== 1) throw createError('请选择客户', 400);
+  if (active.length === 0) throw createError('请选择客户：暂无启用的客户，请先在「客户与门店」新增客户', 400);
+  if (active.length > 1) throw createError('请选择客户', 400);
   return active[0].id;
 };
 
