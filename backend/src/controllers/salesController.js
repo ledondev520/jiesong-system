@@ -161,13 +161,18 @@ const getNextContractNo = async (req, res, next) => {
   }
 };
 
+// 带 items 时返回订单整体利润率预览（只提示）；否则按单个成本（可带 productId 取分类加价）给推荐单价。
 const calculatePrice = async (req, res, next) => {
   try {
-    const result = salesService.calculateSellingPrice({
-      costPrice: req.body?.costPrice,
-      exchangeRate: req.body?.exchangeRate,
-      profitRate: req.body?.profitRate,
-    });
+    const body = req.body || {};
+    const result = body.items !== undefined
+      ? await salesService.previewOrderMargin({ exchangeRate: body.exchangeRate, items: body.items })
+      : await salesService.calculateProductSellingPrice({
+        productId: typeof body.productId === 'string' ? body.productId : undefined,
+        costPrice: body.costPrice,
+        exchangeRate: body.exchangeRate,
+        profitRate: body.profitRate,
+      });
     success(res, result);
   } catch (error) {
     next(error);

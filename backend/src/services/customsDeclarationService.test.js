@@ -152,14 +152,31 @@ test('详情读取包含有序商品明细', async () => {
 });
 
 test('创建把真实商品字段作为嵌套明细写入', async () => {
-  await withMockDelegate('customsDeclaration', { create: async ({ data }) => {
-    assert.equal(data.items.create[0].customsName, '测试商品');
-    assert.equal(data.items.create[0].productId, 'p1');
-    assert.equal(data.items.create[0].quantity, 2);
-    return data;
-  } }, async () => customsDeclarationService.createCustomsDeclaration({
-    declarationNo: 'TEST', salesContractId: 's1', items: [{ productId: 'p1', customsName: '测试商品', quantity: '2' }],
-  }));
+  await withMockDelegate('salesContract', { findUnique: async () => ({ exchangeRate: 6.9 }) }, async () => {
+    await withMockDelegate('customsDeclaration', { create: async ({ data }) => {
+      assert.equal(data.items.create[0].customsName, '测试商品');
+      assert.equal(data.items.create[0].productId, 'p1');
+      assert.equal(data.items.create[0].quantity, 2);
+      return data;
+    } }, async () => customsDeclarationService.createCustomsDeclaration({
+      declarationNo: 'TEST', salesContractId: 's1', items: [{ productId: 'p1', customsName: '测试商品', quantity: '2' }],
+    }));
+  });
+});
+
+test('创建未填汇率时采用订单已保存的汇率；显式汇率保持不变；订单无有效汇率则留空', async () => {
+  const created = [];
+  await withMockDelegate('customsDeclaration', { create: async ({ data }) => { created.push(data); return data; } }, async () => {
+    const base = { declarationNo: 'RATE', salesContractId: 's1' };
+    await withMockDelegate('salesContract', { findUnique: async () => ({ exchangeRate: 6.52 }) }, async () => {
+      await customsDeclarationService.createCustomsDeclaration(base);
+      await customsDeclarationService.createCustomsDeclaration({ ...base, exchangeRate: '7.18' });
+    });
+    await withMockDelegate('salesContract', { findUnique: async () => ({ exchangeRate: 0 }) }, async () => {
+      await customsDeclarationService.createCustomsDeclaration(base);
+    });
+  });
+  assert.deepEqual(created.map((data) => data.exchangeRate), [6.52, 7.18, undefined]);
 });
 
 test('无效数字和过时字段返回400，不向Prisma传递', async () => {

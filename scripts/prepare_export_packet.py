@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Build a read-only export-packet pricing and completeness proposal.
+"""Retired export-packet pricing proposal (kept for its read-only source readers).
 
-This script never mutates the database or WPS files. It reads one EXP contract,
-its packing and purchase-cost evidence, the official export-refund DBF, and
-historical EXP workbooks, then prints an auditable JSON proposal.
+Pricing is implemented only by priceFor() in backend/src/services/exportPricing.js; running this
+script is refused. export_refund_rate_reference.py still imports read_dbf_records from here.
 """
 
 from __future__ import annotations
@@ -23,7 +22,6 @@ from typing import Any, Iterable
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from pricing_config import load_pricing_config
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -238,101 +236,6 @@ def exclude_current_contract(
         for quote in quotes
         if normalize_text(quote.contract_no).upper() != current
     ]
-
-
-def nearest_multiple_of_five(value: float) -> int:
-    return int(round(value / 5.0) * 5)
-
-
-def realized_markup(
-    unit_price_usd: float, quantity: float, effective_rate: float, cost_cny: float
-) -> float:
-    if cost_cny <= 0:
-        return math.nan
-    return unit_price_usd * quantity * effective_rate / cost_cny - 1
-
-
-def historical_quote_allowed(
-    unit_price_usd: float,
-    quantity: float,
-    effective_rate: float,
-    cost_cny: float,
-    refund_rate: float,
-    no_refund_markup_cap: float,
-    refundable_markup: float | None = None,
-    refundable_tolerance: float = 0.05,
-    mode: str = "tiered",
-) -> tuple[bool, float]:
-    if refundable_markup is None:
-        config = load_pricing_config()
-        refundable_markup = round(config["multiplier"] - 1, 10) if mode == "multiplier" else config["refundableMarkup"]
-    markup = realized_markup(unit_price_usd, quantity, effective_rate, cost_cny)
-    if mode == "tiered" and refund_rate == 0 and math.isfinite(markup):
-        return -1e-9 <= markup <= no_refund_markup_cap + 1e-9, markup
-    if (refund_rate > 0 or mode == "multiplier") and math.isfinite(markup):
-        return abs(markup - refundable_markup) <= refundable_tolerance + 1e-9, markup
-    return True, markup
-
-
-def unit_for_rounded_total(total: float, quantity: float) -> float:
-    exact = total / quantity
-    for precision in range(0, 11):
-        factor = 10**precision
-        candidates = {
-            math.floor(exact * factor) / factor,
-            round(exact, precision),
-            math.ceil(exact * factor) / factor,
-        }
-        for unit in sorted(candidates, key=lambda value: abs(value - exact)):
-            product = unit * quantity
-            roundup_one_decimal = math.ceil((product - 1e-10) * 10) / 10
-            if (
-                round(product, 1) == round(total, 1)
-                and abs(roundup_one_decimal - round(total, 1)) <= 1e-9
-            ):
-                return unit
-    return round(total / quantity, 10)
-
-
-def calculate_price(
-    cost_cny: float,
-    quantity: float,
-    effective_rate: float,
-    markup: float,
-    strict_cap: bool,
-) -> tuple[float, float, float, str]:
-    raw_total = cost_cny * (1 + markup) / effective_rate
-    raw_unit = raw_total / quantity
-    integer_unit = math.floor(raw_unit) if strict_cap else round(raw_unit)
-    integer_unit = max(integer_unit, 1)
-    integer_total = integer_unit * quantity
-
-    candidates: list[tuple[float, float, float, str]] = []
-    candidates.append(
-        (
-            float(integer_unit),
-            round(integer_total, 4),
-            realized_markup(integer_unit, quantity, effective_rate, cost_cny),
-            "integer_unit",
-        )
-    )
-    target_total = nearest_multiple_of_five(raw_total)
-    for offset in range(-10, 11, 5):
-        total = max(target_total + offset, 5)
-        unit = unit_for_rounded_total(total, quantity)
-        actual_markup = total * effective_rate / cost_cny - 1
-        if strict_cap and actual_markup > markup + 1e-9:
-            continue
-        candidates.append((unit, float(total), actual_markup, "total_ends_0_or_5"))
-
-    def score(candidate: tuple[float, float, float, str]) -> tuple[float, int, float]:
-        unit, total, actual_markup, method = candidate
-        markup_gap = abs(actual_markup - markup)
-        integer_penalty = 0 if float(unit).is_integer() else 1
-        total_gap = abs(total - raw_total)
-        return (markup_gap, integer_penalty, total_gap)
-
-    return min(candidates, key=score)
 
 
 def fetch_contract_rows(database: Path, contract_no: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -554,186 +457,13 @@ def fetch_shipment_summary_rows(
 
 
 def build_proposal(args: argparse.Namespace) -> dict[str, Any]:
-    export_day = parse_iso_day(args.export_date)
-    if not math.isfinite(args.spot_rate) or args.spot_rate <= 0:
-        raise ValueError("Spot FX rate must be finite and positive")
-    effective_rate = round(args.spot_rate - args.fx_buffer, 6)
-    if effective_rate <= 0:
-        raise ValueError("Effective FX rate must be positive")
-    if args.shipment_summary:
-        if not args.declaration_catalog:
-            raise ValueError("--declaration-catalog is required with --shipment-summary")
-        header, rows = fetch_shipment_summary_rows(
-            args.shipment_summary,
-            args.contract,
-            args.declaration_catalog,
-            args.confirmed_workbook,
-        )
-    else:
-        header, rows = fetch_contract_rows(args.database, args.contract)
-    history = exclude_current_contract(
-        scan_historical_quotes(args.history_root), args.contract
-    )
-    proposal_rows: list[dict[str, Any]] = []
-    blockers: list[str] = []
+    """Retired: pricing lives only in backend/src/services/exportPricing.js (priceFor).
 
-    for row in rows:
-        name = row.get("customsName") or ""
-        hs_code = normalize_hs(row.get("hsCode"))
-        quantity = float(row.get("quantity") or 0)
-        cost_cny = float(row.get("purchaseCost") or 0)
-        specification = row.get("specification") or ""
-        required_fields = [
-            "hsCode", "quantity", "unit", "boxes", "grossWeight", "netWeight", "volume"
-        ]
-        if args.shipment_summary:
-            required_fields.extend(("declaration", "origin"))
-        missing = [
-            field for field in required_fields if row.get(field) in (None, "")
-        ]
-        if quantity <= 0:
-            missing.append("positive_quantity")
-        refund = (
-            lookup_refund_rate(args.refund_dbf, hs_code, export_day, args.refund_version)
-            if hs_code
-            else None
-        )
-        historical = choose_historical_quote(history, name, specification)
-        name_only_references = same_name_history(history, name)[:5]
-        rejected_historical: dict[str, Any] | None = None
-        if historical and refund and cost_cny > 0 and quantity > 0:
-            allowed, historical_markup = historical_quote_allowed(
-                unit_price_usd=historical.unit_price_usd,
-                quantity=quantity,
-                effective_rate=effective_rate,
-                cost_cny=cost_cny,
-                refund_rate=refund.refund_rate,
-                no_refund_markup_cap=args.no_refund_markup,
-                refundable_markup=args.refundable_markup,
-                refundable_tolerance=args.history_markup_tolerance,
-                mode=args.pricing_mode,
-            )
-            if not allowed:
-                rejected_historical = {
-                    "contract_no": historical.contract_no,
-                    "unit_price_usd": historical.unit_price_usd,
-                    "realized_markup_at_effective_fx": round(historical_markup, 6),
-                    "reason": (
-                        "zero_refund_markup_outside_allowed_range"
-                        if refund.refund_rate == 0
-                        else "refundable_markup_outside_target_band"
-                    ),
-                }
-                historical = None
-        pricing: dict[str, Any]
-        if historical:
-            unit_price = historical.unit_price_usd
-            total_usd = round(unit_price * quantity, 4)
-            current_markup = realized_markup(
-                unit_price, quantity, effective_rate, cost_cny
-            )
-            pricing = {
-                "source": "historical_quote",
-                "unit_price_usd": unit_price,
-                "total_usd": total_usd,
-                "realized_markup_at_effective_fx": (
-                    round(current_markup, 6) if math.isfinite(current_markup) else None
-                ),
-                "reference_contract": historical.contract_no,
-                "reference_specification": historical.specification,
-                "reference_workbook": historical.workbook,
-            }
-        elif not refund:
-            pricing = {"source": "blocked", "reason": "refund_rate_not_verified"}
-        elif cost_cny <= 0:
-            pricing = {"source": "blocked", "reason": "purchase_cost_missing"}
-        elif quantity <= 0:
-            pricing = {"source": "blocked", "reason": "quantity_invalid"}
-        else:
-            no_refund = args.pricing_mode == "tiered" and refund.refund_rate == 0
-            markup = args.no_refund_markup if no_refund else args.refundable_markup
-            unit_price, total_usd, actual_markup, rounding_method = calculate_price(
-                cost_cny=cost_cny,
-                quantity=quantity,
-                effective_rate=effective_rate,
-                markup=markup,
-                strict_cap=no_refund,
-            )
-            pricing = {
-                "source": "formula",
-                "unit_price_usd": unit_price,
-                "total_usd": total_usd,
-                "target_markup": markup,
-                "realized_markup_at_effective_fx": round(actual_markup, 6),
-                "rounding_method": rounding_method,
-            }
-
-        if missing:
-            blockers.append(f"{name}: missing {', '.join(dict.fromkeys(missing))}")
-        evidence_conflicts = row.get("evidenceConflicts") or []
-        if evidence_conflicts:
-            fields = ", ".join(conflict["field"] for conflict in evidence_conflicts)
-            blockers.append(f"{name}: source_conflict {fields}")
-        if pricing.get("source") == "blocked":
-            blockers.append(f"{name}: {pricing['reason']}")
-        proposal_rows.append(
-            {
-                "product_name": name,
-                "specification": specification,
-                "store": row.get("store"),
-                "quantity": quantity,
-                "unit": row.get("unit"),
-                "boxes": row.get("boxes"),
-                "gross_weight_kg": row.get("grossWeight"),
-                "net_weight_kg": row.get("netWeight"),
-                "volume_m3": row.get("volume"),
-                "purchase_cost_cny": cost_cny,
-                "purchase_contract_no": row.get("purchaseContractNo"),
-                "hs_code": hs_code,
-                "declaration": row.get("declaration"),
-                "origin": row.get("origin"),
-                "source_row": row.get("sourceRow"),
-                "product_evidence_source": row.get("productEvidenceSource"),
-                "evidence_conflicts": evidence_conflicts,
-                "refund": asdict(refund) if refund else None,
-                "pricing": pricing,
-                "name_only_history_references": [
-                    {
-                        "contract_no": reference.contract_no,
-                        "specification": reference.specification,
-                        "unit_price_usd": reference.unit_price_usd,
-                    }
-                    for reference in name_only_references
-                    if reference != historical
-                ],
-                "rejected_historical_quote": rejected_historical,
-                "missing_fields": list(dict.fromkeys(missing)),
-            }
-        )
-
-    priced_totals = [
-        float(row["pricing"]["total_usd"])
-        for row in proposal_rows
-        if row["pricing"].get("total_usd") is not None
-    ]
-    return {
-        "contract": header,
-        "pricing_policy": {
-            **({"mode": args.pricing_mode, "multiplier": args.multiplier} if args.pricing_mode == "multiplier" else {}),
-            "spot_rate": args.spot_rate,
-            "fx_buffer": args.fx_buffer,
-            "effective_rate": effective_rate,
-            "refundable_markup": args.refundable_markup,
-            "no_refund_markup_cap": args.no_refund_markup,
-            "history_first": True,
-            "refund_version": args.refund_version,
-            "export_date": args.export_date,
-        },
-        "rows": proposal_rows,
-        "priced_total_usd": round(sum(priced_totals), 4),
-        "blockers": blockers,
-        "ready_for_wps_write": not blockers,
-    }
+    The Python copy of the pricing rule (and the proposal built on it) was removed so that no second
+    rate/markup source remains. The readers above (DBF refund lookup, history scan, catalog) stay for
+    export_refund_rate_reference.py.
+    """
+    raise RuntimeError("报价规则只在系统服务 priceFor 中实现；本脚本不再生成报价建议")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -761,24 +491,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--refund-dbf", type=Path, required=True)
     parser.add_argument("--refund-version", default="2026B")
     args = parser.parse_args(argv)
-    try:
-        config = load_pricing_config()
-    except ValueError as error:
-        parser.error(str(error))
-    target = round(config["multiplier"] - 1, 10) if config["mode"] == "multiplier" else config["refundableMarkup"]
-    values = {"fx_buffer": -config["exchangeAdjustment"], "refundable_markup": target,
-              "no_refund_markup": target if config["mode"] == "multiplier" else config["noRefundMarkup"]}
-    for key, value in values.items():
-        supplied = getattr(args, key)
-        if supplied is not None and (not math.isfinite(supplied) or supplied != value):
-            parser.error(f"--{key.replace('_', '-')} 与共用报价配置不一致，请修改 JIESONG_PRICING_CONFIG 指定的文件")
-        setattr(args, key, value)
+    # 报价规则已移到 Node 服务 backend/src/services/exportPricing.js 的 priceFor()（config/pricing.json 新结构）。
+    # 本脚本的 Python 公式副本不再维护：待负责人确认生产不再使用后删除；在此之前拒绝运行，避免产出与系统不一致的价格。
+    parser.error("报价规则已迁移到系统服务（priceFor），本脚本不再计算报价；请使用出口备单页面")
     if not math.isfinite(args.spot_rate) or args.spot_rate <= 0:
         parser.error("现汇必须是大于零的有限数字")
     if not math.isfinite(args.history_markup_tolerance) or not 0 <= args.history_markup_tolerance <= 1:
         parser.error("历史报价容差必须是 0 至 1 的有限数字")
-    args.pricing_mode = config["mode"]
-    args.multiplier = config["multiplier"]
     return args
 
 

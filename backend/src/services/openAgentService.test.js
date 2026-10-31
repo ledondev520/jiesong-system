@@ -826,3 +826,46 @@ test('AI 库存确认执行时重新检查来源，不能绕开验货/发运', a
     assert.equal(updates, 0);
   });
 });
+
+
+test('AI 不能读写遗留的汇率/利润率配置：写入被拒绝，读取只来自报价配置', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-pricing-'));
+  const previous = process.env.JIESONG_PRICING_CONFIG;
+  process.env.JIESONG_PRICING_CONFIG = path.join(dir, 'pricing.json');
+  fs.writeFileSync(process.env.JIESONG_PRICING_CONFIG, JSON.stringify({
+    exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5,
+  }), { mode: 0o600 });
+  let upserts = 0;
+  try {
+    await withPatched({
+      'prisma.systemConfig.findUnique': async () => ({ key: 'exchangeRate', value: '{"rate":99,"buffer":0}', note: 'legacy' }),
+      'prisma.systemConfig.upsert': async () => { upserts += 1; return {}; },
+      'prisma.operationLog.create': async () => ({}),
+    }, async () => {
+      const write = openAgentService.buildWriteToolPool(spec => spec, 'test-admin', 'ADMIN', [], [])
+        .find(item => item.name === 'UpdateSystemConfig');
+      for (const key of ['exchangeRate', 'profitRate']) {
+        const refused = JSON.parse(await write.call({ key, value: '7.5' }));
+        assert.match(refused.error, /报价配置/);
+        assert.equal(refused.actionId, undefined);
+      }
+      // 普通键仍可生成待确认动作；执行时对遗留的待确认定价动作再次拒绝
+      const ok = JSON.parse(await write.call({ key: 'stampPlatformUrl', value: 'https://example.invalid' }));
+      assert.ok(ok.actionId);
+      await openAgentService.executeAction(ok.actionId, 'test-admin');
+      assert.equal(upserts, 1);
+
+      const read = openAgentService.buildToolPool(spec => spec, [], [])
+        .find(item => item.name === 'GetSystemConfig');
+      const rate = JSON.parse(await read.call({ key: 'exchangeRate' }));
+      assert.deepEqual(rate.value, { rate: 6.72, buffer: 0.2, effectiveRate: 6.52 });
+      assert.equal(JSON.parse(await read.call({ key: 'profitRate' })).value, 1.3);
+    });
+  } finally {
+    if (previous === undefined) delete process.env.JIESONG_PRICING_CONFIG; else process.env.JIESONG_PRICING_CONFIG = previous;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

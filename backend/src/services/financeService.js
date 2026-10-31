@@ -7,6 +7,7 @@
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { getPurchaseSettlementStatus } = require('./purchaseStateMachine');
+const { payableWhere, isInEffect, outstandingOf, getPayablesSummary } = require('./payablesService');
 const { getSalesSettlementStatus } = require('./salesStateMachine');
 const {
   getEffectiveSalesContractTotal,
@@ -641,9 +642,10 @@ const createPayment = async (data = {}, options = {}) => {
 };
 
 const getPayables = async ({ page, pageSize, skip, search, outstandingOnly = false, pastDelivery = false }) => {
+  // 应付口径见 payablesService：草稿/已取消合同不是应付。
   const where = {
     totalAmount: { gt: 0 },
-    NOT: { status: 'CANCELLED' },
+    ...payableWhere(),
   };
 
   if (pastDelivery) where.expectedDate = { lt: new Date() };
@@ -653,9 +655,9 @@ const getPayables = async ({ page, pageSize, skip, search, outstandingOnly = fal
     include: { supplier: true },
     orderBy: { createdAt: 'desc' },
   });
-  const payables = contracts.map((contract) => ({
+  const payables = contracts.filter(isInEffect).map((contract) => ({
     ...contract,
-    unpaidAmount: Math.max(0, contract.totalAmount - contract.paidAmount),
+    unpaidAmount: outstandingOf(contract),
   })).filter((contract) => (!outstandingOnly || contract.unpaidAmount > 0)
     && (!search || `${contract.contractNo} ${contract.supplier?.name || ''}`.toLowerCase().includes(String(search).trim().toLowerCase())));
   return { payables: payables.slice(skip, skip + pageSize), total: payables.length, page, pageSize };
@@ -701,10 +703,8 @@ const getReceivables = async ({ page, pageSize, skip, search, outstandingOnly = 
 };
 
 const getStats = async () => {
-  const payableStats = await prisma.purchaseContract.aggregate({
-    where: { NOT: { status: 'CANCELLED' } },
-    _sum: { totalAmount: true, paidAmount: true },
-  });
+  const { total: payableTotal, paid: payablePaid, unpaid: payableUnpaid } = await getPayablesSummary(prisma);
+  const payable = { total: payableTotal, paid: payablePaid, unpaid: payableUnpaid };
 
   // 1. 轻量查询销售合同，避免 include packingItems 全表扫描
   const contracts = await prisma.salesContract.findMany({
@@ -722,11 +722,7 @@ const getStats = async () => {
 
   if (contracts.length === 0) {
     return {
-      payable: {
-        total: payableStats._sum.totalAmount || 0,
-        paid: payableStats._sum.paidAmount || 0,
-        unpaid: (payableStats._sum.totalAmount || 0) - (payableStats._sum.paidAmount || 0),
-      },
+      payable,
       receivable: { total: 0, received: 0, unreceived: 0 },
     };
   }
@@ -770,11 +766,7 @@ const getStats = async () => {
   }, { total: 0, received: 0 });
 
   return {
-    payable: {
-      total: payableStats._sum.totalAmount || 0,
-      paid: payableStats._sum.paidAmount || 0,
-      unpaid: (payableStats._sum.totalAmount || 0) - (payableStats._sum.paidAmount || 0),
-    },
+    payable,
     receivable: {
       total: Number(receivableTotals.total.toFixed(2)),
       received: Number(receivableTotals.received.toFixed(2)),

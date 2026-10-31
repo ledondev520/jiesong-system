@@ -1038,14 +1038,21 @@ export default function ContractsPageContent() {
                       </p>
                       <AmountText
                         tone={
-                          contract.paidAmount < contract.totalAmount
-                            ? "warning"
-                            : "success"
+                          contract.status === "DRAFT"
+                            ? "neutral"
+                            : contract.paidAmount < contract.totalAmount
+                              ? "warning"
+                              : "success"
                         }
                         size="sm"
                         className="text-base font-semibold tabular-nums"
                       >
                         ¥{contract.paidAmount.toLocaleString()}
+                        {contract.status === "DRAFT" && (
+                          <span className="ml-1 text-xs font-normal text-muted-foreground">
+                            草稿
+                          </span>
+                        )}
                       </AmountText>
                     </div>
 
@@ -1186,7 +1193,10 @@ export default function ContractsPageContent() {
                 </TableHeader>
                 <TableBody>
                   {pagedPurchaseContracts.map((contract) => {
-                    const isUnpaid = contract.paidAmount < contract.totalAmount;
+                    const isDraft = contract.status === "DRAFT";
+                    // 草稿不是应付：不按“未付”着色，只标注草稿。
+                    const isUnpaid =
+                      !isDraft && contract.paidAmount < contract.totalAmount;
                     return (
                       <TableRow
                         key={contract.id}
@@ -1237,9 +1247,22 @@ export default function ContractsPageContent() {
                           {formatAmount(contract.totalAmount)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          <AmountText tone={isUnpaid ? "warning" : "success"}>
+                          <AmountText
+                            tone={
+                              isDraft
+                                ? "neutral"
+                                : isUnpaid
+                                  ? "warning"
+                                  : "success"
+                            }
+                          >
                             ¥{contract.paidAmount.toLocaleString()}
                           </AmountText>
+                          {isDraft && (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              草稿
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <StatusPill status={contract.status} />

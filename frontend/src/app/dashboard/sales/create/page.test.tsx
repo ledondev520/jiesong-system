@@ -18,6 +18,9 @@ const mockGetNextContractNo = vi.fn();
 const mockToastError = vi.fn();
 const mockCreateWithItems = vi.fn();
 const mockAddItem = vi.fn();
+const mockGetExchangeRate = vi.fn();
+const mockCalculatePrice = vi.fn();
+const mockPreviewOrderMargin = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -40,7 +43,9 @@ vi.mock("@/services/store.service", () => ({
 
 vi.mock("@/services/sales.service", () => ({
   salesService: {
-    calculatePrice: vi.fn(() => 3),
+    calculatePrice: (...args: unknown[]) => mockCalculatePrice(...args),
+    previewOrderMargin: (...args: unknown[]) => mockPreviewOrderMargin(...args),
+    getExchangeRate: (...args: unknown[]) => mockGetExchangeRate(...args),
     getNextContractNo: (...args: unknown[]) => mockGetNextContractNo(...args),
     create: vi.fn(),
     createWithItems: (...args: unknown[]) => mockCreateWithItems(...args),
@@ -64,6 +69,21 @@ describe("CreateSalesPage 交互逻辑", () => {
     mockCreateWithItems.mockReset();
     mockAddItem.mockReset();
     mockPush.mockReset();
+    mockCalculatePrice.mockReset();
+    mockCalculatePrice.mockResolvedValue(3);
+    mockPreviewOrderMargin.mockReset();
+    mockPreviewOrderMargin.mockResolvedValue({
+      margin: 0.3007,
+      marginPct: 30.07,
+      band: { minPct: 30, maxPct: 35 },
+      effectiveRate: 6.52,
+      excludedLines: 0,
+      warning: null,
+    });
+    mockGetExchangeRate.mockReset();
+    mockGetExchangeRate.mockResolvedValue({
+      data: { rate: 6.72, buffer: 0.2, effectiveRate: 6.52 },
+    });
     mockGetNextContractNo.mockResolvedValue({
       data: { contractNo: "EXP2600001" },
     });
@@ -95,6 +115,76 @@ describe("CreateSalesPage 交互逻辑", () => {
     expect(screen.getByRole("spinbutton", { name: /成本/ })).toHaveValue(125);
     return { user, ...view };
   };
+
+  it("汇率由报价配置现汇预填；成本 10000 的推荐售价来自后端报价规则 = 1995（负责人例子）", async () => {
+    mockCalculatePrice.mockResolvedValue(1995);
+    mockGetProducts.mockResolvedValue({
+      data: { items: [{ id: "prod-1", customsName: "瓷砖" }] },
+    });
+    mockGetStores.mockResolvedValue({
+      data: { items: [{ id: "store-1", name: "上海店" }] },
+    });
+    const user = userEvent.setup();
+    render(<CreateSalesPage />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("合同编号")).toHaveValue("EXP2600001"),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText(/汇率/)).toHaveValue(6.72),
+    );
+    await user.click(screen.getByRole("button", { name: "下一步：出口明细" }));
+    await user.clear(screen.getByRole("spinbutton", { name: /成本/ }));
+    await user.type(screen.getByRole("spinbutton", { name: /成本/ }), "10000");
+    await waitFor(() =>
+      expect(mockCalculatePrice).toHaveBeenLastCalledWith(
+        10000,
+        6.72,
+        undefined,
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("spinbutton", { name: /售价/ })).toHaveValue(
+        1995,
+      ),
+    );
+  });
+
+  it("订单利润率不在 30%~35% 时显示后端提示，但不阻止创建合同", async () => {
+    mockPreviewOrderMargin.mockResolvedValue({
+      margin: 0.2388,
+      marginPct: 23.88,
+      band: { minPct: 30, maxPct: 35 },
+      effectiveRate: 6.52,
+      excludedLines: 1,
+      warning: "订单整体利润率 23.88% 不在 30%~35% 范围内",
+    });
+    mockCreateWithItems.mockResolvedValue({ data: { id: "synthetic-low" } });
+    const { user } = await fillValidForm();
+    // 选中商品后按商品取分类加价
+    await waitFor(() =>
+      expect(mockCalculatePrice).toHaveBeenLastCalledWith(125, 6.72, "prod-1"),
+    );
+    const warning = await screen.findByTestId("order-margin-warning");
+    expect(warning).toHaveTextContent(
+      "订单整体利润率 23.88% 不在 30%~35% 范围内（仅提示，仍可创建合同）",
+    );
+    expect(screen.getByText("23.88%")).toBeInTheDocument();
+    expect(screen.getByText(/不计入利润率区间检查/)).toBeInTheDocument();
+    expect(mockPreviewOrderMargin).toHaveBeenLastCalledWith(6.72, [
+      { productId: "prod-1", quantity: 12, costPrice: 125, sellingPrice: 3 },
+    ]);
+    await user.click(screen.getByRole("button", { name: "创建合同" }));
+    await waitFor(() => expect(mockCreateWithItems).toHaveBeenCalledTimes(1));
+    expect(mockPush).toHaveBeenCalledWith("/dashboard/sales/synthetic-low");
+  });
+
+  it("利润率在区间内不显示提示", async () => {
+    await fillValidForm();
+    await waitFor(() => expect(screen.getByText("30.07%")).toBeInTheDocument());
+    expect(
+      screen.queryByTestId("order-margin-warning"),
+    ).not.toBeInTheDocument();
+  });
 
   it("完整表头和明细一次提交；数值连续输入不丢焦点，重复点击不重复创建", async () => {
     let resolve!: (value: unknown) => void;

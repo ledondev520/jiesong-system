@@ -13,6 +13,7 @@ const { success } = require('../utils/response');
 const { generateForUser } = require('../services/notificationService');
 const { buildSalesFinanceSummary } = require('../services/salesFinanceService');
 const { getOverdueReceivables, getStats: getFinanceStats } = require('../services/financeService');
+const { summarizePayables } = require('../services/payablesService');
 const { listLowStockAlerts } = require('../services/inventoryAlertService');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { listTradeWorkflows } = require('../services/tradeWorkflowService');
@@ -264,7 +265,6 @@ const getAnalytics = async (req, res, next) => {
       prisma.purchaseContract.aggregate({
         where: { status: { not: 'CANCELLED' } },
         _count: true,
-        _sum: { totalAmount: true, paidAmount: true },
       }),
       prisma.salesContract.aggregate({
         where: { status: { not: 'CANCELLED' } },
@@ -378,8 +378,9 @@ const getAnalytics = async (req, res, next) => {
       contracts: {
         purchase: {
           count: purchaseStats._count,
-          totalAmount: purchaseStats._sum.totalAmount || 0,
-          paidAmount: purchaseStats._sum.paidAmount || 0,
+          // 应付口径统一来自 payablesService（经 getFinanceStats）；count 仍是未取消合同数。
+          totalAmount: financeStats.payable.total,
+          paidAmount: financeStats.payable.paid,
           unpaidAmount: financeStats.payable.unpaid,
         },
         sales: {
@@ -422,13 +423,15 @@ const getBusinessOverview = async (req, res, next) => {
       }),
       prisma.purchaseContract.findMany({
         where: { status: { not: 'CANCELLED' } },
-        select: { id: true, contractNo: true, totalAmount: true, paidAmount: true, expectedDate: true },
+        select: { id: true, contractNo: true, status: true, totalAmount: true, paidAmount: true, expectedDate: true },
       }),
       prisma.product.count({ where: { isActive: true } }),
       prisma.salesContract.count({ where: { status: 'SHIPPED' } }),
       getOverdueReceivables(),
       listLowStockAlerts(prisma),
     ]);
+    // 应付与其他页面同口径：只统计已生效合同（草稿/已取消除外）。
+    const payables = summarizePayables(purchases);
     const round = (value) => Number(value.toFixed(2));
     const sum = (items, pick) => round(items.reduce((total, item) => total + Number(pick(item) || 0), 0));
     // ponytail: 逐合同复用现有单柜计算；规模扩大后再共享批量采购索引。
@@ -475,10 +478,9 @@ const getBusinessOverview = async (req, res, next) => {
       },
       funds: {
         totalReceivable: sum(allSummaries, ({ summary }) => summary.revenue.outstandingUsd),
-        totalPayable: sum(purchases, (contract) => Math.max(contract.totalAmount - contract.paidAmount, 0)),
+        totalPayable: payables.unpaid,
         overdueReceivable: sum(overdue, (contract) => contract.unreceived),
-        overduePayable: sum(purchases.filter((contract) => contract.expectedDate && new Date(contract.expectedDate) < new Date()),
-          (contract) => Math.max(contract.totalAmount - contract.paidAmount, 0)),
+        overduePayable: payables.overdue,
         overdueRule: '发运超过30天仍未收齐；这是运营预警，不代表已核对合同付款到期条款',
       },
       inventory: {

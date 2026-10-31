@@ -60,3 +60,25 @@ test('buildChatMessages / hasImageInHistory: 组装完整消息序列', () => {
   assert.equal(messages[0].content.includes('数据库参考信息'), true);
   assert.equal(messages[messages.length - 1].content, '本次提问');
 });
+
+test('系统提示词的定价口径来自唯一报价配置，不再写死 ×1.3 / −0.2', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompt-pricing-'));
+  const file = path.join(dir, 'pricing.json');
+  const previous = process.env.JIESONG_PRICING_CONFIG;
+  process.env.JIESONG_PRICING_CONFIG = file;
+  try {
+    fs.writeFileSync(file, JSON.stringify({ exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.35, categoryMarkups: [], roundUpTo: 5 }), { mode: 0o600 });
+    const prompt = getSystemPrompt();
+    assert.match(prompt, /默认0\.35/);
+    assert.match(prompt, /当前现汇6\.72/);
+    assert.doesNotMatch(prompt, /× 1\.3/);
+    fs.rmSync(file);
+    assert.match(getSystemPrompt(), /当前配置不可用/);
+  } finally {
+    if (previous === undefined) delete process.env.JIESONG_PRICING_CONFIG; else process.env.JIESONG_PRICING_CONFIG = previous;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

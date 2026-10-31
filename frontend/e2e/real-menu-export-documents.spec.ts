@@ -458,7 +458,8 @@ test("SALES commercial prerequisites and cancelled preview do not reprice or arc
   ).toBeDisabled();
   await fillPacket(dialog);
   const preview = await previewPacket(page, dialog);
-  expect(preview.summary.totalUsd).toBe(20);
+  // owner 14:33 rule: 11.3 × 1.3 ÷ 7 = 2.10 is under $5 → ceil to whole dollar = 3 USD per piece × 10
+  expect(preview.summary.totalUsd).toBe(30);
   expect(preview.summary.purchaseCostCny).toBe(113);
   expect(readExportDocuments(fixture)).toEqual(before);
   await dialog

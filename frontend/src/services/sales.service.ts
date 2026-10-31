@@ -32,6 +32,22 @@ export type SalesCreationPayload = Omit<SalesCreatePayload, "items"> & {
   items: SalesCreationItem[];
 };
 
+export interface OrderMarginItem {
+  productId: string;
+  quantity: number;
+  costPrice: number;
+  sellingPrice: number;
+}
+
+export interface OrderMargin {
+  margin: number | null;
+  marginPct: number | null;
+  band: { minPct: number; maxPct: number };
+  effectiveRate: number;
+  excludedLines: number;
+  warning: string | null;
+}
+
 /** 装箱单核对：单个字段比对结果（matched=null 表示系统未录入、跳过比对） */
 export interface PackingListCheckField {
   key: string;
@@ -453,15 +469,41 @@ export const salesService = {
     );
   },
 
-  /**
-   * 计算推荐售价。
-   */
-  calculatePrice: (
+  /** 当前现汇（来自唯一报价配置），用于新订单的汇率预填。 */
+  getExchangeRate: () =>
+    api.get<
+      ApiResponse<{ rate: number; buffer: number; effectiveRate: number }>,
+      ApiResponse<{ rate: number; buffer: number; effectiveRate: number }>
+    >("/system/exchange-rate"),
+
+  /** 推荐售价（USD 单价）：由后端 priceFor 计算（现汇-0.2、分类加价、单价取整规则）；带 productId 才能取瓷砖等分类加价。 */
+  calculatePrice: async (
     costPrice: number,
     exchangeRate: number,
-    profitRate: number,
-  ) => {
-    const effectiveRate = Math.max(0.1, exchangeRate - 0.2);
-    return Math.ceil((costPrice / effectiveRate) * profitRate);
+    productId?: string,
+  ): Promise<number> => {
+    const response = await api.post<
+      ApiResponse<{ recommended: number }>,
+      ApiResponse<{ recommended: number }>,
+      { costPrice: number; exchangeRate: number; productId?: string }
+    >("/sales/calculate-price", {
+      costPrice,
+      exchangeRate,
+      ...(productId ? { productId } : {}),
+    });
+    return response.data.recommended;
+  },
+
+  /** 订单整体利润率预览（后端 orderMargin）；warning 只提示，不阻止保存。 */
+  previewOrderMargin: async (
+    exchangeRate: number,
+    items: OrderMarginItem[],
+  ): Promise<OrderMargin> => {
+    const response = await api.post<
+      ApiResponse<OrderMargin>,
+      ApiResponse<OrderMargin>,
+      { exchangeRate: number; items: OrderMarginItem[] }
+    >("/sales/calculate-price", { exchangeRate, items });
+    return response.data;
   },
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,71 +12,43 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuthStore } from "@/store/auth.store";
-import { pricingService, type PricingConfig } from "@/services/pricing.service";
+import { getSystemCategories } from "@/services/system.service";
+import {
+  pricingService,
+  type PricingConfig,
+  type PricingPreview,
+} from "@/services/pricing.service";
 
-type NumericKey = Exclude<keyof PricingConfig, "mode">;
-const fields: {
-  key: NumericKey;
-  label: string;
-  scale: number;
-  step: number;
-}[] = [
-  { key: "exchangeAdjustment", label: "汇率调整值", scale: 1, step: 0.01 },
-  {
-    key: "refundableMarkup",
-    label: "有退税加价比例 (%)",
-    scale: 100,
-    step: 0.1,
-  },
-  { key: "noRefundMarkup", label: "零退税加价上限 (%)", scale: 100, step: 0.1 },
-  { key: "multiplier", label: "乘数", scale: 1, step: 0.01 },
-];
+type ScalarKey =
+  "exchangeRate" | "exchangeAdjustment" | "defaultMarkup" | "roundUpTo";
+const fields: { key: ScalarKey; label: string; scale: number; step: number }[] =
+  [
+    { key: "exchangeRate", label: "现汇 (¥/$)", scale: 1, step: 0.0001 },
+    { key: "exchangeAdjustment", label: "汇率调整", scale: 1, step: 0.01 },
+    { key: "defaultMarkup", label: "默认加价 (%)", scale: 100, step: 0.1 },
+    { key: "roundUpTo", label: "取整步长 ($)", scale: 1, step: 1 },
+  ];
 
-const numericRule = z
-  .object({ minimum: z.number().finite(), maximum: z.number().finite() })
-  .refine((rule) => rule.minimum <= rule.maximum);
-// Validate the entire server document before committing any state; bounds have no local fallback.
-const snapshotResponse = z
-  .object({
-    code: z.literal(200),
-    data: z.object({
-      config: z.object({
-        mode: z.enum(["tiered", "multiplier"]),
-        exchangeAdjustment: z.number().finite(),
-        refundableMarkup: z.number().finite(),
-        noRefundMarkup: z.number().finite(),
-        multiplier: z.number().finite(),
-      }),
-      revision: z.string().regex(/^[a-f0-9]{64}$/),
-      schema: z.object({
-        properties: z.object({
-          mode: z.object({ enum: z.array(z.string()).min(1) }),
-          exchangeAdjustment: numericRule,
-          refundableMarkup: numericRule,
-          noRefundMarkup: numericRule,
-          multiplier: numericRule,
+const snapshotResponse = z.object({
+  code: z.literal(200),
+  data: z.object({
+    config: z.object({
+      exchangeRate: z.number().finite(),
+      exchangeAdjustment: z.number().finite(),
+      defaultMarkup: z.number().finite(),
+      roundUpTo: z.number().finite(),
+      categoryMarkups: z.array(
+        z.object({
+          categoryId: z.string(),
+          categoryName: z.string(),
+          markup: z.number().finite(),
         }),
-      }),
+      ),
     }),
-  })
-  .refine(
-    ({ data }) =>
-      data.schema.properties.mode.enum.includes(data.config.mode) &&
-      fields.every(({ key }) => {
-        const rule = data.schema.properties[key];
-        return (
-          data.config[key] >= rule.minimum && data.config[key] <= rule.maximum
-        );
-      }),
-  );
+    revision: z.string().regex(/^[a-f0-9]{64}$/),
+  }),
+});
 
 function readSnapshot(response: unknown) {
   const result = snapshotResponse.safeParse(response);
@@ -84,33 +56,81 @@ function readSnapshot(response: unknown) {
   return result.data.data;
 }
 
+type Snapshot = ReturnType<typeof readSnapshot>;
+type Row = { categoryId: string; categoryName: string; percent: string };
+type CategoryOption = { id: string; name: string };
+
+// 把表单文本转成配置；任一项非法返回错误文案（范围以服务端校验为准，这里只挡明显非法输入）
+function buildConfig(
+  values: Record<string, string>,
+  rows: Row[],
+): { config: PricingConfig } | { error: string } {
+  const next = {
+    categoryMarkups: [] as PricingConfig["categoryMarkups"],
+  } as PricingConfig;
+  for (const field of fields) {
+    const raw = values[field.key]?.trim();
+    const value = Number(raw) / field.scale;
+    if (!raw || !Number.isFinite(value))
+      return { error: `${field.label}必须是数字` };
+    next[field.key] = Number(value.toFixed(10));
+  }
+  for (const row of rows) {
+    const markup = Number(row.percent) / 100;
+    if (!row.categoryId || !row.percent.trim() || !Number.isFinite(markup)) {
+      return { error: "分类加价需要选择分类并填写百分比" };
+    }
+    next.categoryMarkups.push({
+      categoryId: row.categoryId,
+      categoryName: row.categoryName,
+      markup: Number(markup.toFixed(10)),
+    });
+  }
+  return { config: next };
+}
+
+const fmt = (value: number | null | undefined) =>
+  typeof value === "number" ? `$${value}` : "—";
+
 function AdminPricingConfigCard() {
-  const [snapshot, setSnapshot] = useState<ReturnType<
-    typeof readSnapshot
-  > | null>(null);
-  const [mode, setMode] = useState<PricingConfig["mode"]>("tiered");
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [rows, setRows] = useState<Row[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [preview, setPreview] = useState<{
+    normal?: PricingPreview;
+    tile?: PricingPreview;
+  }>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const load = (next: Snapshot) => {
+    setSnapshot(next);
+    setValues(
+      Object.fromEntries(
+        fields.map((f) => [
+          f.key,
+          String(Number((next.config[f.key] * f.scale).toFixed(10))),
+        ]),
+      ),
+    );
+    setRows(
+      next.config.categoryMarkups.map((c) => ({
+        categoryId: c.categoryId,
+        categoryName: c.categoryName,
+        percent: String(Number((c.markup * 100).toFixed(10))),
+      })),
+    );
+  };
 
   useEffect(() => {
     let active = true;
     pricingService
       .get()
       .then((response) => {
-        if (!active) return;
-        const nextSnapshot = readSnapshot(response);
-        const nextValues = Object.fromEntries(
-          fields.map((field) => [
-            field.key,
-            String(nextSnapshot.config[field.key] * field.scale),
-          ]),
-        );
-        setSnapshot(nextSnapshot);
-        setMode(nextSnapshot.config.mode);
-        setValues(nextValues);
+        if (active) load(readSnapshot(response));
       })
       .catch(() => {
         if (active) setError("报价配置加载失败，请刷新页面重试");
@@ -118,39 +138,70 @@ function AdminPricingConfigCard() {
       .finally(() => {
         if (active) setLoading(false);
       });
+    // 分类下拉只是编辑辅助，加载失败不影响其余配置
+    getSystemCategories({ page: 1, pageSize: 100 })
+      .then((response) => {
+        if (active) setCategories(response.data?.items ?? []);
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
   }, []);
+
+  const draft = useMemo(() => buildConfig(values, rows), [values, rows]);
+  const sample = rows[0];
+
+  // 预览调用服务端同一个 priceFor：普通商品 + 第一个分类（草稿未保存也可预览）
+  useEffect(() => {
+    if (!snapshot || !("config" in draft)) return undefined;
+    let active = true;
+    const timer = setTimeout(() => {
+      const first = draft.config.categoryMarkups[0];
+      const normalDraft = { ...draft.config, categoryMarkups: [] };
+      const tileDraft = {
+        ...draft.config,
+        categoryMarkups: first ? [first] : [],
+      };
+      Promise.all([
+        pricingService.preview({ costCny: 100, config: normalDraft }),
+        first
+          ? pricingService.preview({
+              costCny: 100,
+              categoryId: first.categoryId,
+              config: tileDraft,
+            })
+          : Promise.resolve(null),
+      ])
+        .then(([normal, tile]) => {
+          if (active) setPreview({ normal: normal.data, tile: tile?.data });
+        })
+        .catch(() => {
+          if (active) setPreview({});
+        });
+    }, 400);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [snapshot, draft]);
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!snapshot || saving) return;
     setError("");
     setSaved(false);
-    const next: PricingConfig = { ...snapshot.config, mode };
-    for (const field of fields) {
-      const raw = values[field.key]?.trim();
-      const value = Number(raw) / field.scale;
-      const rule = snapshot.schema.properties[field.key];
-      if (
-        !raw ||
-        !Number.isFinite(value) ||
-        value < rule.minimum ||
-        value > rule.maximum
-      ) {
-        setError(
-          `${field.label}须在 ${rule.minimum * field.scale} 至 ${rule.maximum * field.scale} 之间`,
-        );
-        return;
-      }
-      next[field.key] = value;
+    if (!("config" in draft)) {
+      setError(draft.error);
+      return;
     }
     setSaving(true);
     try {
-      const response = await pricingService.save(next, snapshot.revision);
-      const nextSnapshot = readSnapshot(response);
-      setSnapshot(nextSnapshot);
+      const response = await pricingService.save(
+        draft.config,
+        snapshot.revision,
+      );
+      load(readSnapshot(response));
       setSaved(true);
     } catch (failure) {
       const rejected = failure as {
@@ -168,13 +219,19 @@ function AdminPricingConfigCard() {
     }
   };
 
+  const edit = (update: () => void) => {
+    update();
+    setSaved(false);
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>出口报价配置</CardTitle>
+        <CardTitle>报价规则</CardTitle>
         <CardDescription>
-          分档模式默认使用有退税 30%、零退税上限 10% 和汇率调整
-          −0.2。乘数模式须主动选择，默认乘数 1.3。保存后用于后续报价计算。
+          单价 = 采购成本(¥) × (1 + 加价) ÷ (现汇 +
+          调整)，按单价取整：低于步长向上取整到整美元；达到步长先向上取整到整美元，再取最近的步长倍数（步长
+          5：1993.87→1995，1996→1995，1998→2000）。普通商品用默认加价，分类可单独设置（含其子分类）。已保存的订单和报价不会被重新计算。
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -184,60 +241,139 @@ function AdminPricingConfigCard() {
           <form onSubmit={save} noValidate className="space-y-4">
             {snapshot && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="pricing-mode">报价模式</Label>
-                  <Select
-                    value={mode}
-                    onValueChange={(value) => {
-                      setMode(value as PricingConfig["mode"]);
-                      setSaved(false);
-                    }}
-                    disabled={saving}
-                  >
-                    <SelectTrigger id="pricing-mode">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tiered">分档加价（默认）</SelectItem>
-                      <SelectItem value="multiplier">固定乘数</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {fields.map((field) => {
-                    const rule = snapshot.schema.properties[field.key];
-                    return (
-                      <div key={field.key} className="space-y-2">
-                        <Label htmlFor={`pricing-${field.key}`}>
-                          {field.label}
-                        </Label>
-                        <Input
-                          id={`pricing-${field.key}`}
-                          type="number"
-                          step={field.step}
-                          min={rule.minimum * field.scale}
-                          max={rule.maximum * field.scale}
-                          value={values[field.key] ?? ""}
-                          disabled={saving}
-                          onChange={(event) => {
-                            setValues((current) => ({
-                              ...current,
+                  {fields.map((field) => (
+                    <div key={field.key} className="space-y-2">
+                      <Label htmlFor={`pricing-${field.key}`}>
+                        {field.label}
+                      </Label>
+                      <Input
+                        id={`pricing-${field.key}`}
+                        type="number"
+                        step={field.step}
+                        value={values[field.key] ?? ""}
+                        disabled={saving}
+                        onChange={(event) =>
+                          edit(() =>
+                            setValues((c) => ({
+                              ...c,
                               [field.key]: event.target.value,
-                            }));
-                            setSaved(false);
-                          }}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          范围 {rule.minimum * field.scale} 至{" "}
-                          {rule.maximum * field.scale}
-                        </p>
-                      </div>
-                    );
-                  })}
+                            })),
+                          )
+                        }
+                      />
+                    </div>
+                  ))}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  分档模式使用两项加价比例；固定乘数模式统一使用乘数。两种模式均先调整汇率，沿用报价凑整规则。
-                </p>
+                <div className="space-y-2">
+                  <Label>分类加价</Label>
+                  {rows.map((row, index) => (
+                    <div
+                      key={index}
+                      className="flex flex-wrap items-center gap-2"
+                    >
+                      <select
+                        aria-label={`分类 ${index + 1}`}
+                        className="h-9 rounded-md border bg-background px-2 text-sm"
+                        value={row.categoryId}
+                        disabled={saving}
+                        onChange={(event) =>
+                          edit(() =>
+                            setRows((c) =>
+                              c.map((r, i) =>
+                                i === index
+                                  ? {
+                                      ...r,
+                                      categoryId: event.target.value,
+                                      categoryName:
+                                        categories.find(
+                                          (o) => o.id === event.target.value,
+                                        )?.name ?? r.categoryName,
+                                    }
+                                  : r,
+                              ),
+                            ),
+                          )
+                        }
+                      >
+                        {!categories.some((o) => o.id === row.categoryId) && (
+                          <option value={row.categoryId}>
+                            {row.categoryName || "选择分类"}
+                          </option>
+                        )}
+                        {categories.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </select>
+                      <Input
+                        aria-label={`分类加价 ${index + 1} (%)`}
+                        type="number"
+                        step={0.1}
+                        className="w-28"
+                        value={row.percent}
+                        disabled={saving}
+                        onChange={(event) =>
+                          edit(() =>
+                            setRows((c) =>
+                              c.map((r, i) =>
+                                i === index
+                                  ? { ...r, percent: event.target.value }
+                                  : r,
+                              ),
+                            ),
+                          )
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={saving}
+                        onClick={() =>
+                          edit(() =>
+                            setRows((c) => c.filter((_, i) => i !== index)),
+                          )
+                        }
+                      >
+                        删除
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={saving || categories.length === 0}
+                    onClick={() =>
+                      edit(() =>
+                        setRows((c) => [
+                          ...c,
+                          {
+                            categoryId: categories[0].id,
+                            categoryName: categories[0].name,
+                            percent: "10",
+                          },
+                        ]),
+                      )
+                    }
+                  >
+                    添加分类
+                  </Button>
+                </div>
+                <div
+                  className="rounded-md border bg-muted/30 p-3 text-sm"
+                  aria-label="报价预览"
+                >
+                  <p>成本 ¥100（普通） → {fmt(preview.normal?.unitPriceUsd)}</p>
+                  {sample && (
+                    <p>
+                      成本 ¥100（{sample.categoryName || "分类"}） →{" "}
+                      {fmt(preview.tile?.unitPriceUsd)}
+                    </p>
+                  )}
+                </div>
                 <Button type="submit" disabled={saving}>
                   {saving ? "保存报价配置中..." : "保存报价配置"}
                 </Button>

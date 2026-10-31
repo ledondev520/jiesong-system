@@ -7,6 +7,7 @@
  */
 
 const { createError } = require('../middleware/errorHandler');
+const { defaultSpotRate } = require('./exportPricing');
 const { parseTabularFile } = require('../utils/tabularImport');
 const prisma = require('../utils/prisma');
 const { IMPORT_STATUS } = require('../config/constants');
@@ -270,7 +271,7 @@ const processRow = async (row, cache, db) => {
           isFumigated: row['是否熏蒸'] === '是',
           hasTaxRefund: row['是否报出口退税'] === '是',
           status: 'SHIPPED',
-          exchangeRate: 7.0,
+          exchangeRate: defaultSpotRate(),
         },
       });
       if (!existing) cache.createdContainers.set(container.id, true);

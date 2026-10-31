@@ -69,6 +69,11 @@ const getById = async (id, db = prisma) => {
 const create = async ({ items, ...input } = {}) => {
   const data = mapData(input);
   if (!data.declarationNo?.trim() || !data.salesContractId) throw createError('报关单号与出口合同必填', 400);
+  // 汇率只取订单已保存的汇率（不再有代码内默认）；显式填写的汇率保持不变。
+  if (data.exchangeRate == null) {
+    const order = await prisma.salesContract.findUnique({ where: { id: data.salesContractId }, select: { exchangeRate: true } });
+    if (order?.exchangeRate > 0) data.exchangeRate = order.exchangeRate;
+  }
   if (items !== undefined) {
     if (!Array.isArray(items) || !items.length) throw createError('至少填写一条商品明细', 400);
     data.items = { create: items.map(item => mapItem(item).data) };

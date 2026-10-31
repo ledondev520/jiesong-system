@@ -7,6 +7,8 @@ const { createHash } = require('node:crypto');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { generateNextContractNo } = require('./shared/contractUtils');
+const { priceFor } = require('./exportPricing');
+const { categoryIdsByProduct } = require('./productCategoryChain');
 
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const text = (value, label, required = false, max = 2000) => {
@@ -42,7 +44,8 @@ const normalizeCreation = (data) => {
         quantity: number(item.quantity, '数量'),
         unit: text(item.unit, '单位', false, 50),
         costPrice,
-        sellingPrice: number(item.sellingPrice === undefined ? costPrice / exchangeRate * 1.3 : item.sellingPrice, '售价'),
+        // 未给售价时留空，落库前按唯一报价规则补齐（withRulePrices），不在这里另算一份公式
+        sellingPrice: item.sellingPrice === undefined ? undefined : number(item.sellingPrice, '售价'),
         specification: text(item.specification, '规格'),
         note: text(item.note, '明细备注'),
       };
@@ -55,6 +58,18 @@ const normalizeCreation = (data) => {
     note: text(data.note, '备注'),
     items,
   };
+};
+
+/** 未给售价的明细按唯一报价规则（分类加价、现汇 + 调整、单价取整）定价；规则无法定价时拒绝。 */
+const withRulePrices = async (input, db) => {
+  if (!input.items.some(item => item.sellingPrice === undefined)) return input.items;
+  const chains = await categoryIdsByProduct(input.items.map(item => item.productId), db);
+  return input.items.map(item => {
+    if (item.sellingPrice !== undefined) return item;
+    const priced = priceFor({ costCny: item.costPrice, categoryIds: chains.get(item.productId) || [], spotRate: input.exchangeRate });
+    if (priced.status !== 'OK') throw createError('缺少有效成本或汇率，无法按报价规则定价，请填写售价', 400);
+    return { ...item, sellingPrice: priced.unitPriceUsd };
+  });
 };
 
 const createSalesContractAtomically = async (data, context = {}) => {
@@ -108,8 +123,9 @@ const createSalesContractAtomically = async (data, context = {}) => {
         ]);
         if (products !== productIds.length || stores !== storeIds.length) throw createError('商品或门店已不存在，请刷新后重新选择', 400);
       }
+      const items = input.items && await withRulePrices(input, tx);
       const contractNo = input.contractNo || await generateNextContractNo({ prisma: tx, year: new Date().getFullYear().toString().slice(-2) });
-      const totalAmount = (input.items || []).reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0);
+      const totalAmount = (items || []).reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0);
       if (!Number.isFinite(totalAmount) || totalAmount > Number.MAX_SAFE_INTEGER) throw createError('合同金额超出支持范围', 400);
       const contract = await tx.salesContract.create({
         data: {
@@ -119,7 +135,7 @@ const createSalesContractAtomically = async (data, context = {}) => {
           signedAt: input.signedAt ? new Date(input.signedAt) : null,
           note: input.note,
           totalAmount: Number(totalAmount.toFixed(2)),
-          ...(input.items ? { items: { create: input.items } } : {}),
+          ...(items ? { items: { create: items } } : {}),
         },
         include: { items: true },
       });
@@ -132,4 +148,4 @@ const createSalesContractAtomically = async (data, context = {}) => {
   }
 };
 
-module.exports = { createSalesContractAtomically, normalizeCreation };
+module.exports = { createSalesContractAtomically, normalizeCreation, withRulePrices };

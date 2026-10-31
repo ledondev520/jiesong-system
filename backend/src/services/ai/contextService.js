@@ -4,6 +4,8 @@
  * Pos: AI上下文聚合；独立查询失败不抹去其他已读取资料
  */
 const prisma = require('../../utils/prisma');
+const { getPayablesSummary } = require('../payablesService');
+const { currentRates } = require('../exportPricing');
 
 const STOP_WORDS = ['是什么', '在哪', '多少', '有没有', '能不能', '怎么', '哪里', '哪个', '什么', '请', '帮我', '查询', '查一下', '找', '看看'];
 
@@ -151,16 +153,14 @@ const buildContextQueries = (message) => {
   }
 
   if (shouldSearchPrice) {
-    addQuery(tasks, 'exchange', () => safe(prisma.systemConfig.findUnique({ where: { key: 'exchangeRate' } })));
+    // 汇率/加价只来自唯一报价配置；配置无效时不提供汇率上下文（safe 吞掉错误）
+    addQuery(tasks, 'exchange', () => safe(Promise.resolve().then(() => currentRates())));
   }
 
   if (shouldSearchFinance) {
     addQuery(tasks, 'finance', () =>
       safe(Promise.all([
-        prisma.purchaseContract.aggregate({
-          where: { NOT: { status: 'CANCELLED' } },
-          _sum: { totalAmount: true, paidAmount: true },
-        }),
+        getPayablesSummary(prisma),
         prisma.salesContract.aggregate({
           where: { NOT: { status: 'CANCELLED' } },
           _sum: { totalAmount: true, receivedAmount: true },
@@ -278,26 +278,18 @@ const appendContextLines = (context, byName, salesKeyword) => {
   });
 
   if (byName.exchange) {
-    let rate = byName.exchange.value;
-    try {
-      if (typeof rate === 'string') rate = JSON.parse(rate);
-    } catch {
-      // 兼容历史纯文本配置；不能提前返回而丢弃后面的财务资料。
-    }
-    if (rate && typeof rate === 'object') {
-      context.push(`【汇率配置】当前汇率${rate.rate}, 缓冲值${rate.buffer ?? 0.2}`);
-    } else {
-      context.push(`【汇率配置】当前汇率${rate}`);
-    }
+    const rates = byName.exchange;
+    context.push(`【汇率配置】现汇${rates.spotRate}, 调整${rates.adjustment}, 报价汇率${rates.effectiveRate}, 默认加价${rates.defaultMarkup}, 单价取整步长${rates.roundUpTo}（低于步长向上取整到整美元，达到步长取最近的倍数）`);
   }
 
   if (Array.isArray(byName.finance) && byName.finance.length === 2) {
     const [payableStats, receivableStats] = byName.finance;
-    const payableTotal = payableStats?._sum?.totalAmount || 0;
-    const paidTotal = payableStats?._sum?.paidAmount || 0;
+    const payableTotal = payableStats?.total || 0;
+    const paidTotal = payableStats?.paid || 0;
+    const unpaidTotal = payableStats?.unpaid || 0;
     const receivableTotal = receivableStats?._sum?.totalAmount || 0;
     const receivedTotal = receivableStats?._sum?.receivedAmount || 0;
-    context.push(`【财务概况】应付总额¥${payableTotal}, 已付¥${paidTotal}, 待付¥${payableTotal - paidTotal}; 应收总额$${receivableTotal}, 已收$${receivedTotal}, 待收$${receivableTotal - receivedTotal}`);
+    context.push(`【财务概况】应付总额¥${payableTotal}, 已付¥${paidTotal}, 待付¥${unpaidTotal}（仅统计已生效合同，草稿不计）; 应收总额$${receivableTotal}, 已收$${receivedTotal}, 待收$${receivableTotal - receivedTotal}`);
   }
 };
 
