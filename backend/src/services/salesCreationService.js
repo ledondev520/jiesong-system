@@ -131,10 +131,10 @@ const createSalesContractAtomically = async (data, context = {}) => {
         const productIds = [...new Set(input.items.map(item => item.productId))];
         if (await tx.product.count({ where: { id: { in: productIds } } }) !== productIds.length) throw createError('商品或门店已不存在，请刷新后重新选择', 400);
       }
-      const items = input.items && await withRulePrices(input, tx);
       const customerFields = await resolveOrderCustomerFields(input, tx);
-      // 门店必须属于本单客户（评审 R1-3）；未关联客户的旧门店放行，见 shared/storeOwnership.js
+      // 门店必须属于本单客户（评审 R1-3）；未关联客户的旧门店放行，见 shared/storeOwnership.js。先于定价，避免定价错误掩盖归属错误
       if (input.items) await assertStoresOwnedBy(tx, input.items.map(item => item.storeId), customerFields.customerId);
+      const items = input.items && await withRulePrices(input, tx);
       const contractNo = input.contractNo || await generateNextContractNo({ prisma: tx, year: new Date().getFullYear().toString().slice(-2) });
       const totalAmount = (items || []).reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0);
       if (!Number.isFinite(totalAmount) || totalAmount > Number.MAX_SAFE_INTEGER) throw createError('合同金额超出支持范围', 400);

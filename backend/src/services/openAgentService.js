@@ -1256,7 +1256,8 @@ const executeAction = async (actionId, userId, { automatic = false } = {}) => {
 
   try {
     const result = await executor(action.params, userId);
-    await pendingStore.finishClaimed(actionId, 'executed');
+    // 写已生效：标记失败（如 SQLITE_BUSY）不得把它记成 failed 引发用户重复写；行保持 executing 直到过期，不可再次确认
+    await pendingStore.finishClaimed(actionId, 'executed').catch(() => {});
 
     // 写入审计日志
     await prisma.operationLog.create({

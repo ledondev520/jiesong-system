@@ -175,8 +175,9 @@ const createQuote = async (body = {}, actor) => {
     data.portOfLoading ??= customer.defaultPortOfLoading;
   }
   delete data.spotRate;
-  const priced = rawItems === undefined ? null : await priceItems(prisma, await normalizeItems(prisma, rawItems), spotInput);
-  if (priced) await assertStoresOwnedBy(prisma, priced.items.map((i) => i.storeId), data.customerId);
+  const rows = rawItems === undefined ? null : await normalizeItems(prisma, rawItems);
+  if (rows) await assertStoresOwnedBy(prisma, rows.map((r) => r.storeId), data.customerId); // before pricing reads (INT-4 P3-2)
+  const priced = rows && await priceItems(prisma, rows, spotInput);
   const id = await createWithNumber(async (tx) => {
     const quote = await tx.quote.create({ data: {
       ...data, quoteNo: await nextQuoteNo(tx), createdById: actor.id,

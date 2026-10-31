@@ -14,10 +14,10 @@ test('CSV BOM preserves all content and is idempotent for empty and populated CS
 const { csvSafeText } = require('./csvExport');
 
 test('csvSafeText prefixes formula triggers but keeps numbers and normal text', () => {
-  for (const bad of ['=SUM(A1)', '+1+1', '-2+3', '@cmd', '\tx', '\rx', '-cmd|calc']) {
+  for (const bad of ['=SUM(A1)', '+1+1', '-2+3', '@cmd', '\tx', '\rx', '-cmd|calc', '+86 138+1', '+1 SUM(A1)', '+86\t138']) {
     assert.equal(csvSafeText(bad), `'${bad}`);
   }
-  for (const [input, out] of [[-5.5, '-5.5'], ['-5.00', '-5.00'], ['+12', '+12'], ['中文', '中文'], ['a=b', 'a=b'], [null, ''], [undefined, ''], [0, '0']]) {
+  for (const [input, out] of [[-5.5, '-5.5'], ['-5.00', '-5.00'], ['+12', '+12'], ['中文', '中文'], ['a=b', 'a=b'], [null, ''], [undefined, ''], [0, '0'], ['+86 138 0013 8000', '+86 138 0013 8000'], ['+1 (555) 123-4567', '+1 (555) 123-4567']]) {
     assert.equal(csvSafeText(input), out);
   }
 });

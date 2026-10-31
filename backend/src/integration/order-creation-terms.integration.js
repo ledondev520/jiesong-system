@@ -90,6 +90,11 @@ test('HTTP/SQLite: new orders need an active customer (none → 400), adopt a si
   assert.equal(foreign.status, 400);
   assert.match(foreign.message, /门店不属于所选客户/);
   assert.equal(await db.salesContract.count(), count, 'nothing written for a cross-customer store');
+  // Ownership is checked before pricing: an unpriceable line (spot below the FX adjustment) on a foreign store reports the store, not the pricing gap.
+  const fresh = await db.product.create({ data: { customsName: '合成无报价商品', unit: '件' } });
+  const unpriced = await create(order({ exchangeRate: 0.1, customerId: seapot.id, items: [line({ productId: fresh.id, storeId: foreignStore.id })] }));
+  assert.equal(unpriced.status, 400);
+  assert.match(unpriced.message, /门店不属于所选客户/);
   assert.equal((await create(order({ customerId: seapot.id, items: [line({ storeId: ownStore.id })] }))).status, 201);
   assert.equal((await create(order({ customerId: seapot.id, items: [line()] }))).status, 201, 'a legacy store with no customer link still passes');
 });

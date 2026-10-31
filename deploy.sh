@@ -204,6 +204,8 @@ cd $APP_DIR
 cd backend
 log_info "执行数据库迁移..."
 npx prisma migrate deploy  # 禁止 db push（AGENTS.md）；迁移前先 npm run db:backup
+# 全新服务器上 migrate 以默认 umask 创建库文件，收紧为 0600（路径同上方 .env 的 DATABASE_URL；上级目录已是 0700）
+if [ -f "$APP_DIR/data/jiesong.db" ]; then chmod 600 "$APP_DIR/data/jiesong.db"; fi
 
 # 使用 PM2 启动
 pm2 delete jiesong-backend jiesong-frontend 2>/dev/null || true
