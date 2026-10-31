@@ -277,7 +277,7 @@ test('addSalesItem: 未传 sellingPrice 时按唯一报价规则（订单已保�
       costPrice: 50,
     });
 
-    // 成本 ¥50 × 1.3 ÷ (5 − 0.2) = 13.54 → 14 → 15（整美元后取整到 5 的倍数）；不是旧的 ×1.3 公式
+    // 成本 ¥50 × 1.3 ÷ (5 − 0.2) = 13.54 → 14 → 15（≥5 美元：整美元后取最近的 5 的倍数，个位 4 → 5）；不是旧的 ×1.3 公式
     assert.equal(createArgs.data.sellingPrice, 15);
     assert.deepEqual(updateArgs, {
       where: { id: 'sc-1' },

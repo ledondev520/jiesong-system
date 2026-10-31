@@ -703,7 +703,7 @@ const generateLocalResponse = async (message) => {
     return `当前现汇为${rates.spotRate}，调整${rates.adjustment}，实际报价汇率为${rates.effectiveRate}。`;
   }
   
-  // 价格计算：唯一报价规则（加价、现汇调整、整美元后取整到 roundUpTo 的倍数）
+  // 价格计算：唯一报价规则（加价、现汇调整、单价取整规则见 exportPricing.roundUnitPrice）
   if (lowerMessage.includes('价格') || lowerMessage.includes('售价')) {
     const numbers = message.match(/\d+(\.\d+)?/g);
     if (numbers && numbers.length > 0) {

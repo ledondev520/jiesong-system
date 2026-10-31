@@ -4,7 +4,7 @@ const { currentRates } = require('../exportPricing');
 const pricingRuleText = () => {
   try {
     const rates = currentRates();
-    return `定价规则（唯一报价配置）：售价(USD) = 成本价(RMB) × (1 + 加价，默认${rates.defaultMarkup}，按商品分类可不同) ÷ (现汇 + ${rates.adjustment})，先向上取整到整美元，再向上取整到${rates.roundUpTo}的倍数；当前现汇${rates.spotRate}`;
+    return `定价规则（唯一报价配置）：售价(USD) = 成本价(RMB) × (1 + 加价，默认${rates.defaultMarkup}，按商品分类可不同) ÷ (现汇 + ${rates.adjustment})，按单价取整：低于${rates.roundUpTo}美元向上取整到整美元，达到${rates.roundUpTo}美元则先向上取整到整美元再取最近的${rates.roundUpTo}的倍数（如 1993.87→1995，1996→1995，1998→2000）；当前现汇${rates.spotRate}`;
   } catch {
     return '定价规则：以系统报价配置为准（当前配置不可用，请勿自行推算价格）';
   }

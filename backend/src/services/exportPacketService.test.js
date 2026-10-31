@@ -78,7 +78,7 @@ test('历史报价只在按本票成本复算后符合利润政策时允许采�
   }).allowed, false);
 });
 
-test('完整资料形成可生成快照，展示调整汇率、实际加价和价格来源（单价向上取整）', () => {
+test('完整资料形成可生成快照，展示调整汇率、实际加价和价格来源（单价取整）', () => {
   const packet = evaluateExportPacket(contract(), readiness(), [], options());
   assert.equal(packet.ready, true);
   assert.equal(packet.pricingPolicy.effectiveRate, 6.6);
@@ -119,7 +119,7 @@ test('工作簿只生成外销合同、商业发票、装箱单三张表且合�
   assert.equal(workbook.getWorksheet('装箱单').getCell('H11').value, packet.summary.netWeight);
 });
 
-test('分类加价沿祖先链取最近一项：瓷砖 10%，单价向上取整到整美元', () => {
+test('分类加价沿祖先链取最近一项：瓷砖 10%，单价取整到整美元', () => {
   const tile = contract({
     packingItems: [{ ...contract().packingItems[0], product: { ...contract().packingItems[0].product, categoryIds: ['tile-sub', 'tile'] } }],
   });

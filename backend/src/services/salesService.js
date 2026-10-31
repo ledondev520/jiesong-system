@@ -335,7 +335,7 @@ const getNextContractNo = async () => {
   return generateNextContractNo({ prisma, year });
 };
 
-// 推荐售价 = 唯一报价规则（加价、现汇 − 调整、整美元后取整到 roundUpTo）。profitRate 不再由调用方传入。
+// 推荐售价 = 唯一报价规则（加价、现汇 − 调整、单价取整规则见 exportPricing.roundUnitPrice）。profitRate 不再由调用方传入。
 const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate, categoryIds } = {}) => {
   if (profitRate !== undefined) throw createError('利润率由报价规则统一配置，不能在请求中指定', 400);
   const numericCostPrice = Number(costPrice);
