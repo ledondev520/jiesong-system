@@ -3,6 +3,8 @@
 # =============================================================================
 # 捷淞进销存系统 - VPS 一键部署脚本
 # 适用系统：Ubuntu 20.04+ / Debian 11+
+# 仅用于全新服务器首次引导；日常发布由 .github/workflows/deploy.yml 完成。
+# 数据库为 SQLite（prisma schema provider = sqlite）。
 # =============================================================================
 
 set -e
@@ -35,9 +37,7 @@ apt-get install -y \
   curl \
   git \
   ufw \
-  fail2ban \
-  postgresql \
-  postgresql-contrib
+  fail2ban
 
 # =============================================================================
 # 2. 选择已预置的专用 Node.js (22.23.4+)
@@ -55,24 +55,15 @@ log_info "正在安装 PM2..."
 npm install -g pm2
 
 # =============================================================================
-# 3.5 配置 PostgreSQL
-# =============================================================================
-log_info "配置 PostgreSQL..."
-systemctl start postgresql
-systemctl enable postgresql
-
-# 创建数据库用户和数据库
-sudo -u postgres psql -c "CREATE USER jiesong WITH PASSWORD 'jiesong_pass';" 2>/dev/null || true
-sudo -u postgres psql -c "CREATE DATABASE jiesong OWNER jiesong;" 2>/dev/null || true
-sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE jiesong TO jiesong;" 2>/dev/null || true
-
-# =============================================================================
 # 4. 创建应用目录和用户
 # =============================================================================
 APP_DIR="/opt/jiesong-system"
 log_info "创建应用目录：$APP_DIR"
 mkdir -p $APP_DIR
 chown -R $SUDO_USER:$SUDO_USER $APP_DIR
+# SQLite 数据库目录（私有 0700；生产库路径以实际 DATABASE_URL 为准）
+mkdir -p $APP_DIR/data
+chmod 700 $APP_DIR/data
 
 # =============================================================================
 # 5. 复制项目文件
@@ -120,8 +111,8 @@ cat > $APP_DIR/backend/.env << 'EOF'
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 JWT_EXPIRES_IN=7d
 
-# 数据库配置 (PostgreSQL)
-DATABASE_URL="postgresql://jiesong:jiesong_pass@localhost:5432/jiesong?schema=public"
+# 数据库配置 (SQLite，绝对路径)
+DATABASE_URL="file:/opt/jiesong-system/data/jiesong.db"
 
 # 服务器配置
 PORT=3001
@@ -134,8 +125,8 @@ cat > $APP_DIR/backend/.env.example << 'EOF'
 JWT_SECRET=
 JWT_EXPIRES_IN=7d
 
-# 数据库 (PostgreSQL)
-DATABASE_URL=postgresql://jiesong:jiesong_pass@localhost:5432/jiesong?schema=public
+# 数据库 (SQLite，绝对路径)
+DATABASE_URL=file:/opt/jiesong-system/data/jiesong.db
 
 # 服务器
 PORT=3001
@@ -169,7 +160,7 @@ module.exports = {
     {
       name: 'jiesong-backend',
       cwd: './backend',
-      script: 'src/server.js',
+      script: 'src/app.js',
       instances: 2,
       exec_mode: 'cluster',
       env: {
@@ -212,10 +203,10 @@ cd $APP_DIR
 # 运行数据库迁移
 cd backend
 log_info "执行数据库迁移..."
-npx prisma migrate deploy || npx prisma db push
+npx prisma migrate deploy  # 禁止 db push（AGENTS.md）；迁移前先 npm run db:backup
 
 # 使用 PM2 启动
-pm2 delete all 2>/dev/null || true
+pm2 delete jiesong-backend jiesong-frontend 2>/dev/null || true
 pm2 start ecosystem.config.js
 pm2 save
 pm2 startup

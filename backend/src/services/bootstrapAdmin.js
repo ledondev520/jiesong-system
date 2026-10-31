@@ -3,7 +3,7 @@
  * Output: initialized/verified admin or a startup-blocking error
  * Pos: seed/startup gate; never resets an already-secure admin password
  */
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const { assertPassword } = require('../utils/passwordPolicy');
 
 async function ensureBootstrapAdmin(db, { password = process.env.DEFAULT_ADMIN_PASSWORD, allowCreate = false } = {}) {

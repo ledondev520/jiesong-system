@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync, spawnSync, spawn } = require('node:child_process');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
 const { ensureBootstrapAdmin } = require('./bootstrapAdmin');
 
