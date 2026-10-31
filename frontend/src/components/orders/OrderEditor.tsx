@@ -25,8 +25,11 @@ import {
   isManualPrice,
   lineTotal,
   orderTotal,
+  pricingInputs,
+  pricingPending,
   storeSubtotals,
   validateOrder,
+  withCurrentPricing,
   type OrderHeader,
   type OrderLine,
 } from "@/lib/order-lines";
@@ -55,6 +58,9 @@ export function OrderEditor() {
   const [submitting, setSubmitting] = useState(false);
   const requestKey = useRef(crypto.randomUUID());
   const previewTicket = useRef(0);
+  // 最近一次失败的报价预览对应的 previewKey；输入再变化会重新请求并清除
+  const [previewFailedFor, setPreviewFailedFor] = useState<string | null>(null);
+  const [previewRetry, setPreviewRetry] = useState(0);
 
   const applyCustomer = useCallback((customer: Customer) => {
     setHeader((current) => ({
@@ -93,8 +99,9 @@ export function OrderEditor() {
       JSON.stringify([
         header.exchangeRate,
         lines.map((line) => [line.key, line.productId, line.costCny]),
+        previewRetry,
       ]),
-    [header.exchangeRate, lines],
+    [header.exchangeRate, lines, previewRetry],
   );
   useEffect(() => {
     const priced = lines.filter(
@@ -113,17 +120,22 @@ export function OrderEditor() {
           Number.isFinite(spot) && spot > 0 ? spot : undefined,
         );
         if (ticket !== previewTicket.current) return;
+        // 记下这次报价用的输入：现汇为空时服务端用了规则现汇，表头随后会填成它
+        const rate =
+          header.exchangeRate.trim() || String(response.data.spotRate);
         const byKey = new Map(
-          priced.map((line, index) => [line.key, response.data.results[index]]),
+          priced.map((line, index) => [
+            line.key,
+            {
+              suggested: response.data.results[index]?.unitPriceUsd ?? null,
+              suggestedFor: pricingInputs(line, rate),
+            },
+          ]),
         );
+        setPreviewFailedFor(null);
         setLines((current) =>
           current.map((line) =>
-            byKey.has(line.key)
-              ? {
-                  ...line,
-                  suggested: byKey.get(line.key)?.unitPriceUsd ?? null,
-                }
-              : line,
+            byKey.has(line.key) ? { ...line, ...byKey.get(line.key) } : line,
           ),
         );
         setHeader((current) =>
@@ -132,7 +144,8 @@ export function OrderEditor() {
             : { ...current, exchangeRate: String(response.data.spotRate) },
         );
       } catch {
-        // 预览失败时保留旧建议价；提交时仍会校验可用单价
+        // 失败时旧建议价已因输入变化作废（withCurrentPricing）；提示并阻止提交，直到重新报价成功
+        if (ticket === previewTicket.current) setPreviewFailedFor(previewKey);
       }
     }, 350);
     return () => clearTimeout(timer);
@@ -144,14 +157,22 @@ export function OrderEditor() {
       current.map((line) => (line.key === key ? { ...line, ...patch } : line)),
     );
 
+  // 只用按当前现汇/商品/成本算出的建议价；过期的视为待报价
+  const pricedLines = withCurrentPricing(lines, header.exchangeRate);
+  const pending = pricingPending(lines, header.exchangeRate);
+  const previewFailed = previewFailedFor === previewKey;
+
   const submit = async () => {
-    const problem = validateOrder(header, lines);
+    if (previewFailed)
+      return setError("单价计算失败，请稍后重试，或为这些行填写人工单价");
+    if (pending) return setError("正在按最新现汇和成本计算单价，请稍候再提交");
+    const problem = validateOrder(header, pricedLines);
     if (problem) return setError(problem);
     setError(null);
     setSubmitting(true);
     try {
       const response = await salesService.createWithItems(
-        buildCreationPayload(header, lines),
+        buildCreationPayload(header, pricedLines),
         requestKey.current,
       );
       const id = response.data?.id;
@@ -165,8 +186,8 @@ export function OrderEditor() {
     }
   };
 
-  const total = orderTotal(lines);
-  const subtotals = storeSubtotals(lines);
+  const total = orderTotal(pricedLines);
+  const subtotals = storeSubtotals(pricedLines);
   const storeName = (id: string) =>
     stores.find((store) => store.id === id)?.name ?? id;
 
@@ -288,7 +309,7 @@ export function OrderEditor() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {lines.map((line, index) => (
+          {pricedLines.map((line, index) => (
             <div
               key={line.key}
               className="grid items-end gap-2 rounded-lg border p-3 md:grid-cols-[2fr_1.4fr_0.8fr_1fr_1fr_auto]"
@@ -433,6 +454,23 @@ export function OrderEditor() {
             {error ? (
               <p role="alert" className="text-sm text-destructive">
                 {error}
+              </p>
+            ) : null}
+            {previewFailed ? (
+              <p className="text-sm text-destructive">
+                单价计算失败，可重试或填写人工单价{" "}
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto p-0"
+                  onClick={() => setPreviewRetry((count) => count + 1)}
+                >
+                  重试报价
+                </Button>
+              </p>
+            ) : pending ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                正在按最新现汇和成本计算单价…
               </p>
             ) : null}
             <Button

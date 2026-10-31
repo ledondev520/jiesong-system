@@ -695,7 +695,13 @@ function DataSourceList({
   );
 }
 
+/** 报表页内页签：总览（趋势与预警）/ 资产负债表 / 利润表 / 现金流 / 明细账（科目余额、明细账、来源校验） */
+export type FinancialStatementsView =
+  "overview" | "balance" | "income" | "cashflow" | "ledger";
+
 interface FinancialStatementsTabsSectionProps {
+  /** 缺省 = 全部显示（兼容旧调用） */
+  view?: FinancialStatementsView;
   analytics: AnalyticsData;
   periods: FinancialPeriod[];
   currentDetail: FinancialPeriod | null;
@@ -703,12 +709,14 @@ interface FinancialStatementsTabsSectionProps {
 }
 
 export function FinancialStatementsTabsSection({
+  view,
   analytics,
   periods,
   currentDetail,
   detailLoading,
 }: FinancialStatementsTabsSectionProps) {
   const readOnly = useBusinessReadOnly();
+  const show = (section: FinancialStatementsView) => !view || view === section;
   // 支出分类占比数据（取最新一期）
   const latestTrend = analytics.trends[analytics.trends.length - 1];
   const expensePieData = latestTrend
@@ -759,253 +767,32 @@ export function FinancialStatementsTabsSection({
   return (
     <>
       <div data-testid="financial-statements-drilldowns" className="space-y-6">
-        <section id="finance-income-profit" className="scroll-mt-24 space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold tracking-tight">
-              收入与利润趋势
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              下钻查看营业收入、净利润与最近账期经营状态。
-            </p>
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                月度营收 vs 净利润趋势
-              </CardTitle>
-              <CardDescription>
-                各月本月营业收入与净利润对比（元）
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={320}>
-                <ComposedChart
-                  data={analytics.trends}
-                  margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="var(--border)"
-                  />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  <ReferenceLine
-                    y={0}
-                    stroke="var(--border)"
-                    strokeDasharray="3 3"
-                  />
-                  <Bar
-                    dataKey="revenue"
-                    name="营业收入"
-                    fill={COLORS.revenue}
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="netProfit"
-                    name="净利润"
-                    stroke={COLORS.netProfit}
-                    strokeWidth={2.5}
-                    dot={{
-                      r: 4,
-                      fill: COLORS.netProfit,
-                      strokeWidth: 2,
-                      stroke: "var(--background)",
-                    }}
-                    activeDot={{ r: 6 }}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                本年累计营收 vs 净利润
-              </CardTitle>
-              <CardDescription>截至每月末的本年累计数据（元）</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart
-                  data={analytics.trends.map((trend) => {
-                    const period = periods.find(
-                      (item) =>
-                        item.year === trend.year && item.month === trend.month,
-                    );
-                    return {
-                      ...trend,
-                      revenueYTD: period?.incomeStatement?.revenueYTD ?? 0,
-                      netProfitYTD: period?.incomeStatement?.netProfitYTD ?? 0,
-                    };
-                  })}
-                  margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="var(--border)"
-                  />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  <ReferenceLine
-                    y={0}
-                    stroke="var(--border)"
-                    strokeDasharray="3 3"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="revenueYTD"
-                    name="营收累计"
-                    stroke={COLORS.revenue}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="netProfitYTD"
-                    name="净利润累计"
-                    stroke={COLORS.netProfit}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* 最近经营指标表 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                <Activity className="h-4 w-4 text-primary" />
-                最近经营指标
-              </CardTitle>
-              <CardDescription className="text-xs">
-                最近 {recentMetrics.length} 期营收、成本与利润状态
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="py-2 text-left font-medium text-muted-foreground">
-                        账期
-                      </th>
-                      <th className="py-2 text-right font-medium text-muted-foreground">
-                        营业收入
-                      </th>
-                      <th className="py-2 text-right font-medium text-muted-foreground">
-                        总费用
-                      </th>
-                      <th className="py-2 text-right font-medium text-muted-foreground">
-                        净利润
-                      </th>
-                      <th className="py-2 text-right font-medium text-muted-foreground">
-                        净利率
-                      </th>
-                      <th className="py-2 text-left font-medium text-muted-foreground">
-                        状态
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentMetrics.map((m) => (
-                      <tr
-                        key={m.label}
-                        className="border-b border-border/50 transition-colors hover:bg-muted/30"
-                      >
-                        <td className="py-1.5 font-medium">{m.label}</td>
-                        <td className="py-1.5 text-right tabular-nums">
-                          ¥{m.revenue.toLocaleString()}
-                        </td>
-                        <td className="py-1.5 text-right tabular-nums text-red-600">
-                          ¥{m.cost.toLocaleString()}
-                        </td>
-                        <td
-                          className={`py-1.5 text-right tabular-nums font-semibold ${m.profit >= 0 ? "text-emerald-600" : "text-red-600"}`}
-                        >
-                          ¥{m.profit.toLocaleString()}
-                        </td>
-                        <td className="py-1.5 text-right tabular-nums">
-                          {m.profitRate.toFixed(1)}%
-                        </td>
-                        <td className="py-1.5">
-                          {m.status === "profit" ? (
-                            <Badge
-                              variant="outline"
-                              className="text-emerald-600 border-emerald-200 text-[10px]"
-                            >
-                              盈利
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="text-red-600 border-red-200 text-[10px]"
-                            >
-                              亏损
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section id="finance-cost-structure" className="scroll-mt-24 space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold tracking-tight">成本结构</h3>
-            <p className="text-sm text-muted-foreground">
-              下钻查看营业成本、管理费用、财务费用与销售费用构成。
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
+        {show("overview") && (
+          <section
+            id="finance-income-profit"
+            className="scroll-mt-24 space-y-4"
+          >
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight">
+                收入与利润趋势
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                下钻查看营业收入、净利润与最近账期经营状态。
+              </p>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  月度费用结构
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  月度营收 vs 净利润趋势
                 </CardTitle>
                 <CardDescription>
-                  营业成本 + 管理费用 + 财务费用 + 销售费用（元）
+                  各月本月营业收入与净利润对比（元）
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={360}>
-                  <BarChart
+                <ResponsiveContainer width="100%" height={320}>
+                  <ComposedChart
                     data={analytics.trends}
                     margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
                   >
@@ -1028,35 +815,32 @@ export function FinancialStatementsTabsSection({
                     />
                     <Tooltip content={<ChartTooltipContent />} />
                     <Legend />
-                    <Bar
-                      dataKey="costOfSales"
-                      name="营业成本"
-                      stackId="a"
-                      fill={COLORS.cost}
-                      radius={[0, 0, 0, 0]}
+                    <ReferenceLine
+                      y={0}
+                      stroke="var(--border)"
+                      strokeDasharray="3 3"
                     />
                     <Bar
-                      dataKey="adminExpenses"
-                      name="管理费用"
-                      stackId="a"
-                      fill={COLORS.admin}
-                      radius={[0, 0, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="financialExpenses"
-                      name="财务费用"
-                      stackId="a"
-                      fill={COLORS.financial}
-                      radius={[0, 0, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="sellingExpenses"
-                      name="销售费用"
-                      stackId="a"
-                      fill={COLORS.selling}
+                      dataKey="revenue"
+                      name="营业收入"
+                      fill={COLORS.revenue}
                       radius={[4, 4, 0, 0]}
                     />
-                  </BarChart>
+                    <Line
+                      type="monotone"
+                      dataKey="netProfit"
+                      name="净利润"
+                      stroke={COLORS.netProfit}
+                      strokeWidth={2.5}
+                      dot={{
+                        r: 4,
+                        fill: COLORS.netProfit,
+                        strokeWidth: 2,
+                        stroke: "var(--background)",
+                      }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
@@ -1064,166 +848,31 @@ export function FinancialStatementsTabsSection({
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <PieChartIcon className="h-5 w-5 text-primary" />
-                  支出分类占比
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  本年累计营收 vs 净利润
                 </CardTitle>
-                <CardDescription>最新账期各项费用占比分布</CardDescription>
+                <CardDescription>
+                  截至每月末的本年累计数据（元）
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {expensePieData.length === 0 ? (
-                  <div className="flex flex-col items-center gap-2 py-14 text-center">
-                    <span className="rounded-full bg-muted/50 p-3">
-                      <PieChartIcon className="h-5 w-5 text-muted-foreground/50" />
-                    </span>
-                    <p className="text-sm text-muted-foreground/60">
-                      暂无费用数据
-                    </p>
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={360}>
-                    <PieChart>
-                      <Tooltip
-                        formatter={(value: unknown, name: unknown) => [
-                          `¥${Number(value ?? 0).toLocaleString("zh-CN")}`,
-                          String(name),
-                        ]}
-                      />
-                      <Legend />
-                      <Pie
-                        data={expensePieData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={120}
-                        paddingAngle={3}
-                        strokeWidth={2}
-                        stroke="var(--background)"
-                      >
-                        {expensePieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        <section id="finance-balance" className="scroll-mt-24 space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold tracking-tight">资产负债</h3>
-            <p className="text-sm text-muted-foreground">
-              下钻查看资产、负债、权益、货币资金与资产负债率趋势。
-            </p>
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                资产 / 负债 / 权益 趋势
-              </CardTitle>
-              <CardDescription>
-                期末资产合计、负债合计与所有者权益变化
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={320}>
-                <LineChart
-                  data={analytics.trends}
-                  margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    stroke="var(--border)"
-                  />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
-                    tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  <ReferenceLine
-                    y={0}
-                    stroke="var(--border)"
-                    strokeDasharray="3 3"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="totalAssets"
-                    name="资产合计"
-                    stroke={COLORS.assets}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="totalLiabilities"
-                    name="负债合计"
-                    stroke={COLORS.liabilities}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="totalEquity"
-                    name="所有者权益"
-                    stroke={COLORS.equity}
-                    strokeWidth={2.5}
-                    dot={{ r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Wallet className="h-4 w-4 text-primary" />
-                  货币资金趋势
-                </CardTitle>
-                <CardDescription>期末货币资金余额变化</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart
-                    data={analytics.trends}
-                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart
+                    data={analytics.trends.map((trend) => {
+                      const period = periods.find(
+                        (item) =>
+                          item.year === trend.year &&
+                          item.month === trend.month,
+                      );
+                      return {
+                        ...trend,
+                        revenueYTD: period?.incomeStatement?.revenueYTD ?? 0,
+                        netProfitYTD:
+                          period?.incomeStatement?.netProfitYTD ?? 0,
+                      };
+                    })}
+                    margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
                   >
-                    <defs>
-                      <linearGradient
-                        id="cashGradient"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor={COLORS.cash}
-                          stopOpacity={0.2}
-                        />
-                        <stop
-                          offset="95%"
-                          stopColor={COLORS.cash}
-                          stopOpacity={0}
-                        />
-                      </linearGradient>
-                    </defs>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
@@ -1242,34 +891,273 @@ export function FinancialStatementsTabsSection({
                       tickLine={false}
                     />
                     <Tooltip content={<ChartTooltipContent />} />
-                    <Area
-                      type="monotone"
-                      dataKey="cash"
-                      name="货币资金"
-                      stroke={COLORS.cash}
-                      fill="url(#cashGradient)"
-                      strokeWidth={2}
+                    <Legend />
+                    <ReferenceLine
+                      y={0}
+                      stroke="var(--border)"
+                      strokeDasharray="3 3"
                     />
-                  </AreaChart>
+                    <Line
+                      type="monotone"
+                      dataKey="revenueYTD"
+                      name="营收累计"
+                      stroke={COLORS.revenue}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="netProfitYTD"
+                      name="净利润累计"
+                      stroke={COLORS.netProfit}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
+            {/* 最近经营指标表 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Scale className="h-4 w-4 text-primary" />
-                  资产负债率趋势
+                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                  <Activity className="h-4 w-4 text-primary" />
+                  最近经营指标
                 </CardTitle>
-                <CardDescription>
-                  各月资产负债率变化（警戒线 70%）
+                <CardDescription className="text-xs">
+                  最近 {recentMetrics.length} 期营收、成本与利润状态
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={220}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="py-2 text-left font-medium text-muted-foreground">
+                          账期
+                        </th>
+                        <th className="py-2 text-right font-medium text-muted-foreground">
+                          营业收入
+                        </th>
+                        <th className="py-2 text-right font-medium text-muted-foreground">
+                          总费用
+                        </th>
+                        <th className="py-2 text-right font-medium text-muted-foreground">
+                          净利润
+                        </th>
+                        <th className="py-2 text-right font-medium text-muted-foreground">
+                          净利率
+                        </th>
+                        <th className="py-2 text-left font-medium text-muted-foreground">
+                          状态
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentMetrics.map((m) => (
+                        <tr
+                          key={m.label}
+                          className="border-b border-border/50 transition-colors hover:bg-muted/30"
+                        >
+                          <td className="py-1.5 font-medium">{m.label}</td>
+                          <td className="py-1.5 text-right tabular-nums">
+                            ¥{m.revenue.toLocaleString()}
+                          </td>
+                          <td className="py-1.5 text-right tabular-nums text-red-600">
+                            ¥{m.cost.toLocaleString()}
+                          </td>
+                          <td
+                            className={`py-1.5 text-right tabular-nums font-semibold ${m.profit >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                          >
+                            ¥{m.profit.toLocaleString()}
+                          </td>
+                          <td className="py-1.5 text-right tabular-nums">
+                            {m.profitRate.toFixed(1)}%
+                          </td>
+                          <td className="py-1.5">
+                            {m.status === "profit" ? (
+                              <Badge
+                                variant="outline"
+                                className="text-emerald-600 border-emerald-200 text-[10px]"
+                              >
+                                盈利
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-red-600 border-red-200 text-[10px]"
+                              >
+                                亏损
+                              </Badge>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        {show("income") && (
+          <section
+            id="finance-cost-structure"
+            className="scroll-mt-24 space-y-4"
+          >
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight">成本结构</h3>
+              <p className="text-sm text-muted-foreground">
+                下钻查看营业成本、管理费用、财务费用与销售费用构成。
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    月度费用结构
+                  </CardTitle>
+                  <CardDescription>
+                    营业成本 + 管理费用 + 财务费用 + 销售费用（元）
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={360}>
+                    <BarChart
+                      data={analytics.trends}
+                      margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="var(--border)"
+                      />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
+                        tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip content={<ChartTooltipContent />} />
+                      <Legend />
+                      <Bar
+                        dataKey="costOfSales"
+                        name="营业成本"
+                        stackId="a"
+                        fill={COLORS.cost}
+                        radius={[0, 0, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="adminExpenses"
+                        name="管理费用"
+                        stackId="a"
+                        fill={COLORS.admin}
+                        radius={[0, 0, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="financialExpenses"
+                        name="财务费用"
+                        stackId="a"
+                        fill={COLORS.financial}
+                        radius={[0, 0, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="sellingExpenses"
+                        name="销售费用"
+                        stackId="a"
+                        fill={COLORS.selling}
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PieChartIcon className="h-5 w-5 text-primary" />
+                    支出分类占比
+                  </CardTitle>
+                  <CardDescription>最新账期各项费用占比分布</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {expensePieData.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 py-14 text-center">
+                      <span className="rounded-full bg-muted/50 p-3">
+                        <PieChartIcon className="h-5 w-5 text-muted-foreground/50" />
+                      </span>
+                      <p className="text-sm text-muted-foreground/60">
+                        暂无费用数据
+                      </p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={360}>
+                      <PieChart>
+                        <Tooltip
+                          formatter={(value: unknown, name: unknown) => [
+                            `¥${Number(value ?? 0).toLocaleString("zh-CN")}`,
+                            String(name),
+                          ]}
+                        />
+                        <Legend />
+                        <Pie
+                          data={expensePieData}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={80}
+                          outerRadius={120}
+                          paddingAngle={3}
+                          strokeWidth={2}
+                          stroke="var(--background)"
+                        >
+                          {expensePieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+        )}
+
+        {show("balance") && (
+          <section id="finance-balance" className="scroll-mt-24 space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight">资产负债</h3>
+              <p className="text-sm text-muted-foreground">
+                下钻查看资产、负债、权益、货币资金与资产负债率趋势。
+              </p>
+            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  资产 / 负债 / 权益 趋势
+                </CardTitle>
+                <CardDescription>
+                  期末资产合计、负债合计与所有者权益变化
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={320}>
                   <LineChart
                     data={analytics.trends}
-                    margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                    margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -1283,209 +1171,369 @@ export function FinancialStatementsTabsSection({
                       tickLine={false}
                     />
                     <YAxis
-                      tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+                      tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
                       tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                      domain={[0, 1.2]}
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: "12px",
-                        border: "1px solid var(--border)",
-                        background: "var(--card)",
-                        fontSize: "13px",
-                      }}
-                      formatter={(value) => [
-                        value !== undefined
-                          ? `${(Number(value) * 100).toFixed(1)}%`
-                          : "—",
-                        "资产负债率",
-                      ]}
-                    />
+                    <Tooltip content={<ChartTooltipContent />} />
+                    <Legend />
                     <ReferenceLine
-                      y={0.7}
-                      stroke="#ef4444"
-                      strokeDasharray="4 4"
-                      label={{
-                        value: "70%警戒线",
-                        fill: "#ef4444",
-                        fontSize: 11,
-                      }}
+                      y={0}
+                      stroke="var(--border)"
+                      strokeDasharray="3 3"
                     />
                     <Line
                       type="monotone"
-                      dataKey="debtRatio"
-                      name="资产负债率"
+                      dataKey="totalAssets"
+                      name="资产合计"
+                      stroke={COLORS.assets}
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="totalLiabilities"
+                      name="负债合计"
                       stroke={COLORS.liabilities}
                       strokeWidth={2}
                       dot={{ r: 3 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="totalEquity"
+                      name="所有者权益"
+                      stroke={COLORS.equity}
+                      strokeWidth={2.5}
+                      dot={{ r: 4 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
-          </div>
-        </section>
 
-        <section id="finance-period-detail" className="scroll-mt-24 space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold tracking-tight">账期详情</h3>
-            <p className="text-sm text-muted-foreground">
-              下钻查看当前账期的三张报表、科目余额、明细账与来源校验。
-            </p>
-          </div>
-          {detailLoading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              加载账期详情...
-            </div>
-          ) : currentDetail ? (
-            /* 手机使用明确的 minmax(0, 1fr) 列；宽账簿只在自身容器内滚动。 */
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Card className="min-w-0">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-primary" />
-                      资产负债表
-                    </span>
-                    <Badge variant="outline">{currentDetail.periodLabel}</Badge>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Wallet className="h-4 w-4 text-primary" />
+                    货币资金趋势
                   </CardTitle>
+                  <CardDescription>期末货币资金余额变化</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {currentDetail.balanceSheet ? (
-                    <BalanceSheetTable bs={currentDetail.balanceSheet} />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">暂无数据</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="min-w-0">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-primary" />
-                      利润表
-                    </span>
-                    <Badge variant="outline">{currentDetail.periodLabel}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {currentDetail.incomeStatement ? (
-                    <IncomeStatementTable
-                      statement={currentDetail.incomeStatement}
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">暂无数据</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="min-w-0 md:col-span-2">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Wallet className="h-5 w-5 text-primary" />
-                      现金流量表
-                    </span>
-                    <Badge variant="outline">{currentDetail.periodLabel}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {currentDetail.cashFlowStatement ? (
-                    <CashFlowTable
-                      statement={currentDetail.cashFlowStatement}
-                    />
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      该账期来源文件未包含现金流量表
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {!readOnly && (
-                <Card className="min-w-0 md:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Scale className="h-5 w-5 text-primary" />
-                      科目余额表（{currentDetail.accountBalances?.length ??
-                        0}{" "}
-                      行）
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {currentDetail.accountBalances?.length ? (
-                      <AccountBalancesTable
-                        rows={currentDetail.accountBalances}
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart
+                      data={analytics.trends}
+                      margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                    >
+                      <defs>
+                        <linearGradient
+                          id="cashGradient"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor={COLORS.cash}
+                            stopOpacity={0.2}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor={COLORS.cash}
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="var(--border)"
                       />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">暂无数据</p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {!readOnly && (
-                <Card className="min-w-0 md:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BookOpen className="h-5 w-5 text-primary" />
-                      明细账（{currentDetail.generalLedgerEntries?.length ??
-                        0}{" "}
-                      行）
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {currentDetail.generalLedgerEntries?.length ? (
-                      <GeneralLedgerTable
-                        rows={currentDetail.generalLedgerEntries}
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
                       />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">暂无数据</p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+                      <YAxis
+                        tickFormatter={(v) => `${(v / 10000).toFixed(0)}万`}
+                        tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip content={<ChartTooltipContent />} />
+                      <Area
+                        type="monotone"
+                        dataKey="cash"
+                        name="货币资金"
+                        stroke={COLORS.cash}
+                        fill="url(#cashGradient)"
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
-              {!readOnly && (
-                <Card className="min-w-0 md:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileCheck2 className="h-5 w-5 text-primary" />
-                      来源校验（{currentDetail.dataSources?.length ?? 0} 份）
-                    </CardTitle>
-                    <CardDescription>
-                      保留文件名、行数、大小和摘要，用于追溯本账期数据来源。
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {currentDetail.dataSources?.length ? (
-                      <DataSourceList sources={currentDetail.dataSources} />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        暂无来源记录
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Scale className="h-4 w-4 text-primary" />
+                    资产负债率趋势
+                  </CardTitle>
+                  <CardDescription>
+                    各月资产负债率变化（警戒线 70%）
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart
+                      data={analytics.trends}
+                      margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="var(--border)"
+                      />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+                        tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
+                        domain={[0, 1.2]}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "12px",
+                          border: "1px solid var(--border)",
+                          background: "var(--card)",
+                          fontSize: "13px",
+                        }}
+                        formatter={(value) => [
+                          value !== undefined
+                            ? `${(Number(value) * 100).toFixed(1)}%`
+                            : "—",
+                          "资产负债率",
+                        ]}
+                      />
+                      <ReferenceLine
+                        y={0.7}
+                        stroke="#ef4444"
+                        strokeDasharray="4 4"
+                        label={{
+                          value: "70%警戒线",
+                          fill: "#ef4444",
+                          fontSize: 11,
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="debtRatio"
+                        name="资产负债率"
+                        stroke={COLORS.liabilities}
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
             </div>
-          ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <p className="text-muted-foreground">
-                  请在上方选择账期查看详情
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </section>
+          </section>
+        )}
+
+        {view !== "overview" && (
+          <section
+            id="finance-period-detail"
+            className="scroll-mt-24 space-y-4"
+          >
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight">账期详情</h3>
+              <p className="text-sm text-muted-foreground">
+                下钻查看当前账期的三张报表、科目余额、明细账与来源校验。
+              </p>
+            </div>
+            {detailLoading ? (
+              <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                加载账期详情...
+              </div>
+            ) : currentDetail ? (
+              /* 手机使用明确的 minmax(0, 1fr) 列；宽账簿只在自身容器内滚动。 */
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {show("balance") && (
+                  <Card className="min-w-0">
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          <Building2 className="h-5 w-5 text-primary" />
+                          资产负债表
+                        </span>
+                        <Badge variant="outline">
+                          {currentDetail.periodLabel}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {currentDetail.balanceSheet ? (
+                        <BalanceSheetTable bs={currentDetail.balanceSheet} />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          暂无数据
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {show("income") && (
+                  <Card className="min-w-0">
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          <DollarSign className="h-5 w-5 text-primary" />
+                          利润表
+                        </span>
+                        <Badge variant="outline">
+                          {currentDetail.periodLabel}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {currentDetail.incomeStatement ? (
+                        <IncomeStatementTable
+                          statement={currentDetail.incomeStatement}
+                        />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          暂无数据
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {show("cashflow") && (
+                  <Card className="min-w-0 md:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <span className="flex items-center gap-2">
+                          <Wallet className="h-5 w-5 text-primary" />
+                          现金流量表
+                        </span>
+                        <Badge variant="outline">
+                          {currentDetail.periodLabel}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {currentDetail.cashFlowStatement ? (
+                        <CashFlowTable
+                          statement={currentDetail.cashFlowStatement}
+                        />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          该账期来源文件未包含现金流量表
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {show("ledger") && !readOnly && (
+                  <Card className="min-w-0 md:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Scale className="h-5 w-5 text-primary" />
+                        科目余额表（{currentDetail.accountBalances?.length ??
+                          0}{" "}
+                        行）
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {currentDetail.accountBalances?.length ? (
+                        <AccountBalancesTable
+                          rows={currentDetail.accountBalances}
+                        />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          暂无数据
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {show("ledger") && !readOnly && (
+                  <Card className="min-w-0 md:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BookOpen className="h-5 w-5 text-primary" />
+                        明细账（
+                        {currentDetail.generalLedgerEntries?.length ?? 0} 行）
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {currentDetail.generalLedgerEntries?.length ? (
+                        <GeneralLedgerTable
+                          rows={currentDetail.generalLedgerEntries}
+                        />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          暂无数据
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {show("ledger") && !readOnly && (
+                  <Card className="min-w-0 md:col-span-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileCheck2 className="h-5 w-5 text-primary" />
+                        来源校验（{currentDetail.dataSources?.length ?? 0} 份）
+                      </CardTitle>
+                      <CardDescription>
+                        保留文件名、行数、大小和摘要，用于追溯本账期数据来源。
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {currentDetail.dataSources?.length ? (
+                        <DataSourceList sources={currentDetail.dataSources} />
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          暂无来源记录
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="flex items-center justify-center py-12">
+                  <p className="text-muted-foreground">
+                    请在上方选择账期查看详情
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </section>
+        )}
       </div>
 
-      {analytics.historicalAlerts.length > 0 && (
+      {show("overview") && analytics.historicalAlerts.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

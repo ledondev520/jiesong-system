@@ -21,8 +21,7 @@ import {
   it,
   vi,
 } from "vitest";
-import DashboardPage from "./page";
-import BusinessReportsPage from "./reports/page";
+import BusinessReportsPage from "./finance/analysis/page";
 import type { BusinessOverview } from "@/services/reports.service";
 
 const mocks = vi.hoisted(() => {
@@ -40,7 +39,6 @@ const mocks = vi.hoisted(() => {
     },
     nextQuery: null as string | null,
     push: vi.fn((href: string) => window.history.pushState(null, "", href)),
-    workflows: vi.fn(),
     overview: vi.fn(),
   };
 });
@@ -74,25 +72,6 @@ vi.mock("@/store/auth.store", () => ({
   useAuthStore: () => ({
     user: { id: "qa-admin", role: "ADMIN", name: "合成管理员" },
   }),
-}));
-vi.mock("@/services/ai.service", () => ({
-  aiService: {
-    getDashboardAnalytics: async () => ({
-      data: {
-        contracts: { sales: { receivable: 0 }, purchase: { unpaidAmount: 0 } },
-        inventory: { recordCount: 0 },
-      },
-    }),
-  },
-}));
-vi.mock("@/services/financialStatements.service", () => ({
-  financialStatementsService: { listStatements: async () => [] },
-}));
-vi.mock("@/services/tradeWorkflow.service", () => ({
-  tradeWorkflowService: {
-    syncStatus: async () => ({ data: { state: "current", conflicts: 0 } }),
-    list: mocks.workflows,
-  },
 }));
 vi.mock("@/services/reports.service", () => ({
   reportsService: { getBusinessOverview: mocks.overview },
@@ -148,22 +127,6 @@ const report = (
     trends: { monthlySales: [] },
   },
 });
-const workflows = (name: string) => ({
-  data: [
-    {
-      id: name,
-      contractNo: name,
-      purchaseContractNos: [],
-      completedStageCount: 0,
-      stageCount: 1,
-      stages: [
-        { key: "qa", label: "合成阶段", status: "blocked", reason: "合成阻塞" },
-      ],
-      nextAction: { label: "查看合成详情", href: "/dashboard/sales/qa" },
-      issues: [],
-    },
-  ],
-});
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason: unknown) => void;
@@ -178,8 +141,7 @@ function Routes() {
     mocks.subscribe,
     () => window.location.pathname,
   );
-  if (path === "/dashboard") return <DashboardPage />;
-  if (path === "/dashboard/reports") return <BusinessReportsPage />;
+  if (path === "/dashboard/finance/analysis") return <BusinessReportsPage />;
   return <h1>合成销售明细</h1>;
 }
 const replace = window.history.replaceState.bind(window.history);
@@ -203,14 +165,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.nextQuery = null;
   window.history.replaceState(null, "", "/dashboard");
-  mocks.workflows.mockImplementation(async (_limit, scope) =>
-    workflows(`QA-${scope}`),
-  );
   mocks.overview.mockImplementation(async (period) =>
     report(period, period.startDate || period.endDate ? 1 : 46),
   );
 });
-const selectScope = (name: string) => screen.getByRole("button", { name });
 const apply = () => screen.getByRole("button", { name: "应用期间" });
 const reset = () => screen.getByRole("button", { name: "全部期间" });
 const start = () => screen.getByLabelText("发运开始日期");
@@ -221,94 +179,12 @@ const editDates = (from: string, to: string) => {
 };
 const summary = () => screen.getByText(/^发运期间：/);
 
-describe("工作台范围返回上下文", () => {
-  it("阻塞→查看全部→Back/Forward保留范围，重新挂载仍恢复", async () => {
-    window.history.replaceState(null, "", "/dashboard?source=qa#tasks");
-    const view = render(<Routes />);
-    await screen.findByText("QA-recent");
-    await userEvent.click(selectScope("阻塞"));
-    await screen.findByText("QA-blocked");
-    await userEvent.click(screen.getByRole("button", { name: "查看全部" }));
-    expect(
-      await screen.findByRole("heading", { name: "合成销售明细" }),
-    ).toBeInTheDocument();
-    act(() => window.history.back());
-    await screen.findByText("QA-blocked");
-    expect(selectScope("阻塞")).toHaveAttribute("aria-pressed", "true");
-    expect(
-      new URLSearchParams(window.location.search).get("workflowView"),
-    ).toBe("blocked");
-    expect(window.location.hash).toBe("#tasks");
-    expect(new URLSearchParams(window.location.search).get("source")).toBe(
-      "qa",
-    );
-
-    act(() => window.history.forward());
-    await screen.findByRole("heading", { name: "合成销售明细" });
-    act(() => window.history.back());
-    await screen.findByText("QA-blocked");
-    view.unmount();
-    render(<Routes />);
-    await screen.findByText("QA-blocked");
-  });
-  it.each(["pending", "blocked", "risk"])(
-    "有效深链接 %s 首次查询采用所选范围",
-    async (scope) => {
-      window.history.replaceState(null, "", `/dashboard?workflowView=${scope}`);
-      render(<Routes />);
-      await screen.findByText(`QA-${scope}`);
-      expect(mocks.workflows).toHaveBeenCalledTimes(1);
-      expect(mocks.workflows).toHaveBeenCalledWith(6, scope);
-    },
-  );
-  it("无效范围安全回到最近更新，选择最近更新清除参数而保留来源", async () => {
-    window.history.replaceState(
-      null,
-      "",
-      "/dashboard?source=qa&workflowView=invalid",
-    );
-    render(<Routes />);
-    await screen.findByText("QA-recent");
-    expect(window.location.search).toContain("workflowView=invalid");
-    await userEvent.click(selectScope("阻塞"));
-    await screen.findByText("QA-blocked");
-    await userEvent.click(selectScope("最近更新"));
-    await screen.findByText("QA-recent");
-    expect(window.location.search).toBe("?source=qa");
-  });
-  it("实际历史查询优先于延迟Next快照，快速选择后晚到结果不覆盖当前范围", async () => {
-    const old = deferred<ReturnType<typeof workflows>>();
-    mocks.workflows.mockImplementation((_limit, scope) =>
-      scope === "blocked"
-        ? old.promise
-        : Promise.resolve(workflows(`QA-${scope}`)),
-    );
-    mocks.nextQuery = "?workflowView=recent";
-    render(<Routes />);
-    await screen.findByText("QA-recent");
-    await userEvent.click(selectScope("阻塞"));
-    await userEvent.click(selectScope("风险优先"));
-    await screen.findByText("QA-risk");
-    await act(async () => old.resolve(workflows("QA-old-blocked")));
-    expect(screen.queryByText("QA-old-blocked")).not.toBeInTheDocument();
-    act(() =>
-      window.history.pushState(null, "", "/dashboard?workflowView=pending"),
-    );
-    await screen.findByText("QA-pending");
-    act(() => window.history.back());
-    await screen.findByText("QA-risk");
-    act(() => window.history.forward());
-    await screen.findByText("QA-pending");
-    expect(window.location.search).toBe("?workflowView=pending");
-  });
-});
-
 describe("经营执行应用期间返回上下文", () => {
   it("草稿不应用；已应用期间→销售明细→Back/Forward和重新挂载保持日期/报表", async () => {
     window.history.replaceState(
       null,
       "",
-      "/dashboard/reports?source=qa#report",
+      "/dashboard/finance/analysis?source=qa#report",
     );
     const view = render(<Routes />);
     await screen.findByText("¥200.00");
@@ -363,7 +239,11 @@ describe("经营执行应用期间返回上下文", () => {
     ["?startDate=not-a-date", {}],
     ["?startDate=2026-10-06&endDate=2026-10-05", {}],
   ])("日期查询 %s 只提交有效日期范围", async (query, period) => {
-    window.history.replaceState(null, "", "/dashboard/reports" + query);
+    window.history.replaceState(
+      null,
+      "",
+      "/dashboard/finance/analysis" + query,
+    );
     render(<Routes />);
     await screen.findByText("¥200.00");
     expect(mocks.overview).toHaveBeenCalledTimes(1);
@@ -376,7 +256,7 @@ describe("经营执行应用期间返回上下文", () => {
     window.history.replaceState(
       null,
       "",
-      "/dashboard/reports?startDate=2026-10-05&endDate=2026-10-05",
+      "/dashboard/finance/analysis?startDate=2026-10-05&endDate=2026-10-05",
     );
     mocks.nextQuery = "?startDate=2026-10-05&endDate=2026-10-05";
     render(<Routes />);
@@ -386,7 +266,7 @@ describe("经营执行应用期间返回上下文", () => {
       window.history.pushState(
         null,
         "",
-        "/dashboard/reports?endDate=2026-12-31",
+        "/dashboard/finance/analysis?endDate=2026-12-31",
       ),
     );
     await waitFor(() =>
@@ -411,7 +291,7 @@ describe("经营执行应用期间返回上下文", () => {
       mocks.overview.mockImplementation((period) =>
         period.startDate ? old.promise : Promise.resolve(report({}, 46)),
       );
-      window.history.replaceState(null, "", "/dashboard/reports");
+      window.history.replaceState(null, "", "/dashboard/finance/analysis");
       render(<Routes />);
       await screen.findByText("¥200.00");
       editDates("2026-10-05", "2026-10-05");
@@ -440,7 +320,7 @@ describe("经营执行应用期间返回上下文", () => {
     },
   );
   it("日期草稿倒序时禁用应用，重置后恢复", async () => {
-    window.history.replaceState(null, "", "/dashboard/reports");
+    window.history.replaceState(null, "", "/dashboard/finance/analysis");
     render(<Routes />);
     await screen.findByText("¥200.00");
     editDates("2026-10-06", "2026-10-05");

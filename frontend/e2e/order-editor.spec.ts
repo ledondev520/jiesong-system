@@ -94,7 +94,7 @@ test.describe("order editor", () => {
     const created = await mockEditor(page);
     await signInAsAdmin(page, "/dashboard/orders/new");
     await page.getByRole("button", { name: "创建订单" }).click();
-    await expect(page.getByRole("alert")).toContainText("现汇");
+    await expect(page.getByRole("alert").filter({ hasText: "现汇" })).toBeVisible(); // Next also renders a route-announcer alert
     expect(created).toHaveLength(0);
   });
 

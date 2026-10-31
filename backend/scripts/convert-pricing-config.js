@@ -4,6 +4,7 @@
  * Output: 新结构 pricing.json（exchangeRate/exchangeAdjustment/defaultMarkup/categoryMarkups/roundUpTo）
  * Pos: 运行时 pricing.json 的一次性迁移（部署保留服务器文件，合并不会转换它）。默认 dry-run，只打印结果；
  *      --confirm 需同时给 --backup-dir：先备份(0700 目录/0600 文件)，再原子替换，最后用后端同一校验器核对。
+ *  取整步长默认取仓库 config/pricing.json 的 roundUpTo（负责人终版 5），不另定规则。
  * 不读取 .env 和数据库；分类加价（如瓷砖 10%）需转换后由 ADMIN 在 设置 > 报价规则 中添加。
  */
 const fs = require('node:fs');

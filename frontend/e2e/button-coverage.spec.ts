@@ -40,10 +40,10 @@ const pageCases: PageCase[] = [
   { name: "商品管理", path: "/dashboard/products" },
   { name: "供应商管理", path: "/dashboard/suppliers" },
   { name: "用户管理", path: "/dashboard/settings/users" },
-  { name: "应付账款", path: "/dashboard/payments?tab=payable", minClicks: 0 },
+  { name: "应付账款", path: "/dashboard/finance/payable", minClicks: 0 },
   {
     name: "应收账款",
-    path: "/dashboard/payments?tab=receivable",
+    path: "/dashboard/finance/receivable",
     minClicks: 0,
   },
   { name: "通知中心", path: "/dashboard/notifications" },

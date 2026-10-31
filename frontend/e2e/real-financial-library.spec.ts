@@ -39,7 +39,7 @@ for (const width of [390, 1440]) {
      */
     async function enterLibrary(page: Page, role: "ADMIN" | "FINANCE") {
       await loginLibrary(page, fixture, role);
-      await page.goto("/dashboard/finance/statements");
+      await page.goto("/dashboard/finance/statements?view=library");
       const library = page.getByTestId("financial-evidence-library");
       await expect(library).toBeVisible();
       await expect(

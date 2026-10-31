@@ -66,4 +66,4 @@ const getPayablesSummary = async (db = require('../utils/prisma'), now = new Dat
   )
 );
 
-module.exports = { PAYABLE_STATUSES, isInEffect, payableWhere, outstandingOf, summarizePayables, getPayablesSummary };
+module.exports = { PAYABLE_STATUSES, PAYABLE_SELECT, isInEffect, payableWhere, outstandingOf, summarizePayables, getPayablesSummary };

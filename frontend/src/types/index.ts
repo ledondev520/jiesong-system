@@ -421,6 +421,9 @@ export interface SalesContract {
   amountVerifiedAt?: string;
   receivedAmount: number;
   exchangeRate: number;
+  // 详情接口给出：报价转换的订单 exchangeRate 存的是计价汇率（现汇 − 调整），spotRate 是对应现汇
+  rateBasis?: "spot" | "effective";
+  spotRate?: number | null;
   status: SalesStatus; // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED
   signedAt?: string;
   note?: string;

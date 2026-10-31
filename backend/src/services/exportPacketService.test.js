@@ -165,3 +165,13 @@ test('订单已确认单价（商品 × 门店唯一价）优先于公式价与�
     readiness(), [], options());
   assert.equal(sameTwice.lines[0].unitPriceUsd, 777);
 });
+
+test('评审 R1-1：报价转换的订单未填现汇时用保存的计价汇率，填了现汇时按现汇；调整都只做一次', () => {
+  const converted = contract({ quoteId: 'quote-1', exchangeRate: 6.6 });
+  const { spotRate: _typed, ...withoutSpot } = options();
+  const untouched = evaluateExportPacket(converted, readiness(), [], withoutSpot);
+  assert.equal(untouched.pricingPolicy.effectiveRate, 6.6);
+  assert.equal(untouched.lines[0].unitPriceUsd, evaluateExportPacket(contract(), readiness(), [], options()).lines[0].unitPriceUsd);
+  const typed = evaluateExportPacket(converted, readiness(), [], { ...withoutSpot, spotRate: 6.8 });
+  assert.equal(typed.pricingPolicy.effectiveRate, 6.6);
+});

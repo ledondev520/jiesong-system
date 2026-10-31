@@ -5,10 +5,12 @@ let path = "/dashboard/reports";
 vi.mock("next/navigation", () => ({ usePathname: () => path }));
 describe("中文业务面包屑", () => {
   it.each([
-    ["/dashboard/reports", "经营执行"],
+    ["/dashboard/reports", "经营分析"],
+    ["/dashboard/finance/analysis", "经营分析"],
     ["/dashboard/notifications", "通知中心"],
     ["/dashboard/settings/logs", "操作日志"],
     ["/dashboard/settings/ai-usage", "AI 用量"],
+    ["/dashboard/settings/ai-access", "AI 接入"],
     ["/dashboard/settings/customs-brokers", "报关行"],
   ])("%s使用中文", (pathname, title) => {
     path = pathname;

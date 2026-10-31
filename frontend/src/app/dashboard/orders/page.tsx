@@ -35,6 +35,17 @@ const dateText = (value?: string) => (value ? value.slice(0, 10) : "—");
 function OrdersList() {
   const router = useRouter();
   const [filters, setFilters] = useListUrlState(listUrlFields.orders);
+  // useListUrlState returns a fresh object every render; depend on its values or load() loops forever.
+  const {
+    page,
+    pageSize,
+    keyword,
+    status,
+    shipped,
+    shippedFrom,
+    shippedTo,
+    storeId,
+  } = filters;
   const [items, setItems] = useState<SalesContract[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -44,14 +55,14 @@ function OrdersList() {
     setLoading(true);
     try {
       const response = await salesService.getAll?.({
-        page: filters.page,
-        pageSize: filters.pageSize,
-        keyword: filters.keyword || undefined,
-        status: (filters.status as SalesStatus) || undefined,
-        shipped: filters.shipped === "true" ? true : undefined,
-        shippedFrom: filters.shippedFrom || undefined,
-        shippedTo: filters.shippedTo || undefined,
-        storeId: filters.storeId || undefined,
+        page,
+        pageSize,
+        keyword: keyword || undefined,
+        status: (status as SalesStatus) || undefined,
+        shipped: shipped === "true" ? true : undefined,
+        shippedFrom: shippedFrom || undefined,
+        shippedTo: shippedTo || undefined,
+        storeId: storeId || undefined,
         lite: true,
       });
       setItems(response?.data.items ?? []);
@@ -62,7 +73,16 @@ function OrdersList() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [
+    page,
+    pageSize,
+    keyword,
+    status,
+    shipped,
+    shippedFrom,
+    shippedTo,
+    storeId,
+  ]);
 
   useEffect(() => {
     void load();

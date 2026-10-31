@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 
 const routeLabelMap: Record<string, string> = {
   dashboard: "首页",
-  reports: "经营执行",
+  reports: "经营分析",
+  analysis: "经营分析",
   system: "系统管理",
   logs: "操作日志",
   notifications: "通知中心",
@@ -44,7 +45,7 @@ const routeLabelMap: Record<string, string> = {
   inventory: "库存",
   "inventory-status": "库存",
   finance: "财务",
-  payments: "收付管理",
+  payments: "应收应付",
   statements: "财务报表",
   "bank-flow": "银行流水",
   "hs-codes": "HS 编码",

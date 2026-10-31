@@ -99,61 +99,12 @@ async function mockContext(page: Page) {
 }
 
 for (const width of [390, 1440]) {
-  test(`工作台范围明细返回和原生历史 ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    const { writes } = await mockContext(page);
-    const errors: string[] = [];
-    page.on("pageerror", (error) => errors.push(error.message));
-    await signInAsAdmin(page, "/dashboard?source=qa#tasks");
-    await expect(page.getByText("QA-recent", { exact: true })).toBeVisible();
-    const blocked = page.getByRole("button", { name: "阻塞", exact: true });
-    await blocked.click();
-    await expect(blocked).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByText("QA-blocked", { exact: true })).toBeVisible();
-    await expect(page).toHaveURL(
-      /\/dashboard\?source=qa&workflowView=blocked#tasks$/,
-    );
-    await page.getByRole("button", { name: "查看全部", exact: true }).click();
-    // 查看全部仍沿用原有未过滤销售列表；验收的是返回时的工作台范围。
-    await expect(page).toHaveURL(/\/dashboard\/sales$/);
-    await page.goBack();
-    await expect(blocked).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByText("QA-blocked", { exact: true })).toBeVisible();
-    await page.goForward();
-    await expect(page).toHaveURL(/\/dashboard\/sales$/);
-    await page.goBack();
-    await expect(blocked).toHaveAttribute("aria-pressed", "true");
-    await page.reload();
-    await expect(blocked).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByText("QA-blocked", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "待处理", exact: true }).click();
-    await page.getByRole("button", { name: "风险优先", exact: true }).click();
-    await expect(page.getByText("QA-risk", { exact: true })).toBeVisible();
-    await page.evaluate(() =>
-      window.history.pushState(
-        null,
-        "",
-        "/dashboard?source=qa&workflowView=pending#tasks",
-      ),
-    );
-    await expect(page.getByText("QA-pending", { exact: true })).toBeVisible();
-    await page.goBack();
-    await expect(page.getByText("QA-risk", { exact: true })).toBeVisible();
-    await page.goForward();
-    await expect(page.getByText("QA-pending", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "最近更新", exact: true }).click();
-    await expect(page).toHaveURL(/\/dashboard\?source=qa#tasks$/);
-    await expect(page.getByText("QA-recent", { exact: true })).toBeVisible();
-    expect(writes).toEqual([]);
-    expect(errors).toEqual([]);
-  });
-
   test(`经营期间草稿、明细返回和刷新 ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     const { writes, periods } = await mockContext(page);
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await signInAsAdmin(page, "/dashboard/reports?source=qa#report");
+    await signInAsAdmin(page, "/dashboard/finance/analysis?source=qa#report");
     const start = page.getByLabel("发运开始日期");
     const end = page.getByLabel("发运结束日期");
     const summary = page.getByText(/^发运期间：/);

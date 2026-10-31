@@ -7,9 +7,12 @@ import {
   matchStore,
   orderTotal,
   parsePastedRows,
+  pricingInputs,
+  pricingPending,
   resolvePastedRows,
   storeSubtotals,
   validateOrder,
+  withCurrentPricing,
   type OrderHeader,
   type OrderLine,
 } from "./order-lines";
@@ -82,7 +85,7 @@ describe("validateOrder / buildCreationPayload", () => {
     );
     expect(validateOrder(header, [line()])).toBeNull();
   });
-  it("载荷为 USD、整数建议价，人工价覆盖，空条款不发送", () => {
+  it("载荷为 USD，人工价显式发送，建议价不发送（由服务端按同一规则计算，评审 R1-2），空条款不发送", () => {
     const payload = buildCreationPayload(header, [
       line(),
       line({ manualPrice: "2100", storeId: "s2" }),
@@ -103,9 +106,51 @@ describe("validateOrder / buildCreationPayload", () => {
         item.sellingPrice,
       ]),
     ).toEqual([
-      ["s1", 10, 10000, 1995],
+      ["s1", 10, 10000, undefined],
       ["s2", 10, 10000, 2100],
     ]);
+    expect("sellingPrice" in payload.items[0]).toBe(false);
+  });
+});
+
+describe("stale suggested prices (R1-2)", () => {
+  const priced = (rate: string, patch: Partial<OrderLine> = {}) => {
+    const base = line(patch);
+    return { ...base, suggestedFor: pricingInputs(base, rate) };
+  };
+  it("a suggestion counts only for the rate, product and cost it was computed for", () => {
+    const current = priced("6.72");
+    expect(withCurrentPricing([current], "6.72")[0].suggested).toBe(1995);
+    expect(pricingPending([current], "6.72")).toBe(false);
+    // FX changed 6.72 -> 3.36: the old $1995 must not survive as a price
+    expect(withCurrentPricing([current], "3.36")[0].suggested).toBeNull();
+    expect(pricingPending([current], "3.36")).toBe(true);
+    expect(
+      validateOrder(
+        { ...header, exchangeRate: "3.36" },
+        withCurrentPricing([current], "3.36"),
+      ),
+    ).toBe("第 1 行：没有可用单价，请检查成本或填写人工单价");
+    // cost or product changed: same
+    expect(
+      withCurrentPricing([{ ...current, costCny: "20000" }], "6.72")[0]
+        .suggested,
+    ).toBeNull();
+    expect(
+      withCurrentPricing([{ ...current, productId: "p2" }], "6.72")[0]
+        .suggested,
+    ).toBeNull();
+  });
+  it("manual prices and lines without cost are not pending", () => {
+    expect(
+      pricingPending([priced("6.72", { manualPrice: "2100" })], "3.36"),
+    ).toBe(false);
+    expect(
+      pricingPending([line({ costCny: "", suggested: null })], "6.72"),
+    ).toBe(false);
+    expect(pricingPending([line({ suggestedFor: undefined })], "6.72")).toBe(
+      true,
+    );
   });
 });
 

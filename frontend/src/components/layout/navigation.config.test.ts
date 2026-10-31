@@ -90,6 +90,7 @@ describe("navigation.config helpers", () => {
     const owner: Record<string, string> = {
       "/dashboard": "home",
       "/dashboard/reports": "finance",
+      "/dashboard/finance/analysis": "finance",
       "/dashboard/purchases": "purchases",
       "/dashboard/purchases/new": "purchases",
       "/dashboard/suppliers": "suppliers",
@@ -118,9 +119,13 @@ describe("navigation.config helpers", () => {
       );
     expect(labels("finance")).toEqual([
       "财务概览",
+      "应收",
+      "应付",
+      "银行流水",
+      "发票",
+      "对账",
       "财务报表",
-      "收付管理",
-      "经营执行",
+      "经营分析",
     ]);
     expect(labels("documents")).toEqual([]);
     expect(labels("admin")).toEqual(["系统配置", "账号管理", "系统日志"]);
@@ -171,21 +176,27 @@ describe("navigation.config helpers", () => {
         "/dashboard/finance/statements",
       ),
     ).toBe(true);
-    expect(
-      isTabRouteActive("/dashboard/finance/statements", "/dashboard/payments"),
-    ).toBe(false);
-    expect(
-      isTabRouteActive("/dashboard/finance/receivable", "/dashboard/payments"),
-    ).toBe(true);
-    expect(
-      isTabRouteActive("/dashboard/finance/bank-flow", "/dashboard/payments"),
-    ).toBe(true);
+    // 财务页签各自精确激活：应收/应付/银行流水/发票/对账互不串扰
+    for (const tab of [
+      "/dashboard/finance/receivable",
+      "/dashboard/finance/payable",
+      "/dashboard/finance/bank-flow",
+      "/dashboard/finance/invoices",
+      "/dashboard/finance/reconciliation",
+    ]) {
+      expect(isTabRouteActive(tab, tab)).toBe(true);
+      expect(isTabRouteActive(`${tab}/x`, tab)).toBe(true);
+      expect(isTabRouteActive(tab, "/dashboard/finance")).toBe(false);
+      expect(isTabRouteActive(tab, "/dashboard/finance/statements")).toBe(
+        false,
+      );
+    }
     expect(
       isTabRouteActive(
-        "/dashboard/finance/reconciliation",
-        "/dashboard/payments",
+        "/dashboard/finance/payable",
+        "/dashboard/finance/receivable",
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("单证与退税单一入口：报关单与退税详情都归属该菜单", () => {

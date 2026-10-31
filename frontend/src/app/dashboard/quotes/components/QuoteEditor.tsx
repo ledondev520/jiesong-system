@@ -23,8 +23,21 @@ import { Label } from "@/components/ui/label";
 import { SemanticBadge } from "@/components/ui/semantic-badge";
 import { describeFailure } from "@/lib/error-reason";
 import { formatMoney } from "@/lib/format";
-import { emptyLine, effectivePrice, isManualPrice, lineTotal, orderTotal, storeSubtotals, type OrderLine } from "@/lib/order-lines";
-import { linesFromItems, parseSpotRate, toItemsPayload, validateLines } from "@/lib/quote";
+import {
+  emptyLine,
+  effectivePrice,
+  isManualPrice,
+  lineTotal,
+  orderTotal,
+  storeSubtotals,
+  type OrderLine,
+} from "@/lib/order-lines";
+import {
+  linesFromItems,
+  parseSpotRate,
+  toItemsPayload,
+  validateLines,
+} from "@/lib/quote";
 import { customerService, INCOTERM_OPTIONS } from "@/services/customer.service";
 import { pricingPreviewService } from "@/services/pricing-preview.service";
 import { quoteService, type Quote } from "@/services/quote.service";
@@ -40,11 +53,19 @@ export function QuoteEditor({ quote, onSaved }: Props) {
   const [stores, setStores] = useState<Store[]>([]);
   const [customerId, setCustomerId] = useState(quote?.customerId ?? "");
   const [incoterm, setIncoterm] = useState(quote?.incoterm ?? "FOB");
-  const [lines, setLines] = useState<OrderLine[]>(() => (quote?.items?.length ? linesFromItems(quote.items) : [emptyLine()]));
-  const [spotRate, setSpotRate] = useState(quote?.spotRate ? String(quote.spotRate) : "");
+  const [lines, setLines] = useState<OrderLine[]>(() =>
+    quote?.items?.length ? linesFromItems(quote.items) : [emptyLine()],
+  );
+  const [spotRate, setSpotRate] = useState(
+    quote?.spotRate ? String(quote.spotRate) : "",
+  );
   const [paymentTerms, setPaymentTerms] = useState(quote?.paymentTerms ?? "");
-  const [portOfLoading, setPortOfLoading] = useState(quote?.portOfLoading ?? "");
-  const [validUntil, setValidUntil] = useState(quote?.validUntil?.slice(0, 10) ?? "");
+  const [portOfLoading, setPortOfLoading] = useState(
+    quote?.portOfLoading ?? "",
+  );
+  const [validUntil, setValidUntil] = useState(
+    quote?.validUntil?.slice(0, 10) ?? "",
+  );
   const [note, setNote] = useState(quote?.note ?? "");
   const [pasting, setPasting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -59,14 +80,17 @@ export function QuoteEditor({ quote, onSaved }: Props) {
   }, []);
 
   // 换客户：带出客户默认条款，并清空已选门店（门店属于客户）
-  const chooseCustomer = useCallback((customer: Customer) => {
-    setCustomerId(customer.id);
-    setIncoterm(customer.defaultIncoterm || "FOB");
-    setPaymentTerms(customer.defaultPaymentTerms ?? "");
-    setPortOfLoading(customer.defaultPortOfLoading ?? "");
-    setLines((current) => current.map((line) => ({ ...line, storeId: "" })));
-    loadStores(customer.id);
-  }, [loadStores]);
+  const chooseCustomer = useCallback(
+    (customer: Customer) => {
+      setCustomerId(customer.id);
+      setIncoterm(customer.defaultIncoterm || "FOB");
+      setPaymentTerms(customer.defaultPaymentTerms ?? "");
+      setPortOfLoading(customer.defaultPortOfLoading ?? "");
+      setLines((current) => current.map((line) => ({ ...line, storeId: "" })));
+      loadStores(customer.id);
+    },
+    [loadStores],
+  );
 
   useEffect(() => {
     customerService
@@ -84,23 +108,43 @@ export function QuoteEditor({ quote, onSaved }: Props) {
 
   // 实时规则价：成本/商品/现汇变化后 350ms 请求服务端；迟到的旧响应丢弃
   const previewKey = useMemo(
-    () => JSON.stringify([spotRate, lines.map((line) => [line.key, line.productId, line.costCny])]),
+    () =>
+      JSON.stringify([
+        spotRate,
+        lines.map((line) => [line.key, line.productId, line.costCny]),
+      ]),
     [spotRate, lines],
   );
   useEffect(() => {
-    const priced = lines.filter((line) => line.productId && Number(line.costCny) > 0);
+    const priced = lines.filter(
+      (line) => line.productId && Number(line.costCny) > 0,
+    );
     if (priced.length === 0) return;
     const ticket = ++previewTicket.current;
     const timer = setTimeout(async () => {
       try {
         const spot = Number(spotRate);
         const response = await pricingPreviewService.preview(
-          priced.map((line) => ({ productId: line.productId, costCny: Number(line.costCny) })),
+          priced.map((line) => ({
+            productId: line.productId,
+            costCny: Number(line.costCny),
+          })),
           Number.isFinite(spot) && spot > 0 ? spot : undefined,
         );
         if (ticket !== previewTicket.current) return;
-        const byKey = new Map(priced.map((line, index) => [line.key, response.data.results[index]]));
-        setLines((current) => current.map((line) => (byKey.has(line.key) ? { ...line, suggested: byKey.get(line.key)?.unitPriceUsd ?? null } : line)));
+        const byKey = new Map(
+          priced.map((line, index) => [line.key, response.data.results[index]]),
+        );
+        setLines((current) =>
+          current.map((line) =>
+            byKey.has(line.key)
+              ? {
+                  ...line,
+                  suggested: byKey.get(line.key)?.unitPriceUsd ?? null,
+                }
+              : line,
+          ),
+        );
       } catch {
         // 预览失败时保留旧规则价；保存后以服务端计算为准
       }
@@ -110,7 +154,9 @@ export function QuoteEditor({ quote, onSaved }: Props) {
   }, [previewKey]);
 
   const patchLine = (key: string, patch: Partial<OrderLine>) =>
-    setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+    setLines((current) =>
+      current.map((line) => (line.key === key ? { ...line, ...patch } : line)),
+    );
 
   const save = async (markSent: boolean) => {
     const rateInput = parseSpotRate(spotRate);
@@ -130,7 +176,9 @@ export function QuoteEditor({ quote, onSaved }: Props) {
         note: note.trim() || null,
         items: toItemsPayload(lines),
       };
-      const response = quote ? await quoteService.update(quote.id, body) : await quoteService.create(body);
+      const response = quote
+        ? await quoteService.update(quote.id, body)
+        : await quoteService.create(body);
       onSaved(response.data, { markSent });
     } catch (error) {
       toast.error(describeFailure("保存报价失败", error));
@@ -141,13 +189,20 @@ export function QuoteEditor({ quote, onSaved }: Props) {
 
   const total = orderTotal(lines);
   const subtotals = storeSubtotals(lines);
-  const storeName = (id: string) => stores.find((store) => store.id === id)?.name ?? id;
+  const storeName = (id: string) =>
+    stores.find((store) => store.id === id)?.name ?? id;
 
   return (
     <div className="space-y-5">
-      {loadError ? <p role="alert" className="text-sm text-destructive">{loadError}</p> : null}
+      {loadError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {loadError}
+        </p>
+      ) : null}
       <Card>
-        <CardHeader><CardTitle className="text-base">报价条款</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">报价条款</CardTitle>
+        </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="quote-customer">客户</Label>
@@ -156,39 +211,78 @@ export function QuoteEditor({ quote, onSaved }: Props) {
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={customerId}
               onChange={(event) => {
-                const customer = customers.find((item) => item.id === event.target.value);
+                const customer = customers.find(
+                  (item) => item.id === event.target.value,
+                );
                 if (customer) chooseCustomer(customer);
               }}
             >
               <option value="">请选择</option>
-              {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="quote-incoterm">贸易术语</Label>
-            <select id="quote-incoterm" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={incoterm} onChange={(event) => setIncoterm(event.target.value)}>
-              {INCOTERM_OPTIONS.map((term) => <option key={term} value={term}>{term}</option>)}
+            <select
+              id="quote-incoterm"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={incoterm}
+              onChange={(event) => setIncoterm(event.target.value)}
+            >
+              {INCOTERM_OPTIONS.map((term) => (
+                <option key={term} value={term}>
+                  {term}
+                </option>
+              ))}
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="quote-spot">现汇（留空用报价规则现汇）</Label>
-            <Input id="quote-spot" inputMode="decimal" value={spotRate} onChange={(e) => setSpotRate(e.target.value)} placeholder="如 6.72" />
+            <Input
+              id="quote-spot"
+              inputMode="decimal"
+              value={spotRate}
+              onChange={(e) => setSpotRate(e.target.value)}
+              placeholder="如 6.72"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="quote-valid">报价有效期</Label>
-            <Input id="quote-valid" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+            <Input
+              id="quote-valid"
+              type="date"
+              value={validUntil}
+              onChange={(e) => setValidUntil(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="quote-port">装货港</Label>
-            <Input id="quote-port" value={portOfLoading} onChange={(e) => setPortOfLoading(e.target.value)} placeholder="如 Shanghai" />
+            <Input
+              id="quote-port"
+              value={portOfLoading}
+              onChange={(e) => setPortOfLoading(e.target.value)}
+              placeholder="如 Shanghai"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="quote-terms">付款条件</Label>
-            <Input id="quote-terms" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
+            <Input
+              id="quote-terms"
+              value={paymentTerms}
+              onChange={(e) => setPaymentTerms(e.target.value)}
+            />
           </div>
           <div className="space-y-2 sm:col-span-2 lg:col-span-3">
             <Label htmlFor="quote-note">备注</Label>
-            <Input id="quote-note" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Input
+              id="quote-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -197,23 +291,48 @@ export function QuoteEditor({ quote, onSaved }: Props) {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">明细（商品 × 门店）</CardTitle>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={!customerId} onClick={() => setPasting(true)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!customerId}
+              onClick={() => setPasting(true)}
+            >
               <ClipboardPaste className="mr-1 h-4 w-4" /> 从 Excel 粘贴
             </Button>
-            <Button type="button" size="sm" onClick={() => setLines((current) => [...current, emptyLine()])}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setLines((current) => [...current, emptyLine()])}
+            >
               <Plus className="mr-1 h-4 w-4" /> 添加一行
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {lines.map((line, index) => (
-            <div key={line.key} className="grid items-end gap-2 rounded-lg border p-3 md:grid-cols-[2fr_1.4fr_0.8fr_1fr_1fr_auto]" data-testid={`quote-line-${index}`}>
+            <div
+              key={line.key}
+              className="grid items-end gap-2 rounded-lg border p-3 md:grid-cols-[2fr_1.4fr_0.8fr_1fr_1fr_auto]"
+              data-testid={`quote-line-${index}`}
+            >
               <div className="space-y-1">
                 <Label className="text-xs">商品 *</Label>
                 <ProductPicker
                   ariaLabel={`第 ${index + 1} 行搜索商品`}
-                  value={line.productId ? { id: line.productId, name: line.productName } : null}
-                  onSelect={(product) => patchLine(line.key, { productId: product.id, productName: product.customsName, unit: product.unit ?? "", suggested: null })}
+                  value={
+                    line.productId
+                      ? { id: line.productId, name: line.productName }
+                      : null
+                  }
+                  onSelect={(product) =>
+                    patchLine(line.key, {
+                      productId: product.id,
+                      productName: product.customsName,
+                      unit: product.unit ?? "",
+                      suggested: null,
+                    })
+                  }
                 />
               </div>
               <div className="space-y-1">
@@ -222,36 +341,104 @@ export function QuoteEditor({ quote, onSaved }: Props) {
                   aria-label={`第 ${index + 1} 行门店`}
                   className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                   value={line.storeId}
-                  onChange={(event) => patchLine(line.key, { storeId: event.target.value })}
+                  onChange={(event) =>
+                    patchLine(line.key, { storeId: event.target.value })
+                  }
                 >
-                  <option value="">{customerId ? "选择门店" : "先选客户"}</option>
-                  {stores.filter((store) => store.isActive).map((store) => (
-                    <option key={store.id} value={store.id}>{store.code ? `${store.code} · ${store.name}` : store.name}</option>
-                  ))}
+                  <option value="">
+                    {customerId ? "选择门店" : "先选客户"}
+                  </option>
+                  {stores
+                    .filter((store) => store.isActive)
+                    .map((store) => (
+                      <option key={store.id} value={store.id}>
+                        {store.code
+                          ? `${store.code} · ${store.name}`
+                          : store.name}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">数量 *</Label>
-                <Input aria-label={`第 ${index + 1} 行数量`} inputMode="decimal" className="h-9" value={line.quantity} onChange={(event) => patchLine(line.key, { quantity: event.target.value })} />
+                <Input
+                  aria-label={`第 ${index + 1} 行数量`}
+                  inputMode="decimal"
+                  className="h-9"
+                  value={line.quantity}
+                  onChange={(event) =>
+                    patchLine(line.key, { quantity: event.target.value })
+                  }
+                />
               </div>
               <div className="space-y-1">
-                <Label className="flex items-center gap-1 text-xs">参考成本 ¥ {line.costCny.trim() === "" ? <SemanticBadge tone="warning">缺成本</SemanticBadge> : null}</Label>
-                <Input aria-label={`第 ${index + 1} 行参考成本`} inputMode="decimal" className="h-9" value={line.costCny} onChange={(event) => patchLine(line.key, { costCny: event.target.value, suggested: null })} />
+                <Label className="flex items-center gap-1 text-xs">
+                  参考成本 ¥{" "}
+                  {line.costCny.trim() === "" ? (
+                    <SemanticBadge tone="warning">缺成本</SemanticBadge>
+                  ) : null}
+                </Label>
+                <Input
+                  aria-label={`第 ${index + 1} 行参考成本`}
+                  inputMode="decimal"
+                  className="h-9"
+                  value={line.costCny}
+                  onChange={(event) =>
+                    patchLine(line.key, {
+                      costCny: event.target.value,
+                      suggested: null,
+                    })
+                  }
+                />
               </div>
               <div className="space-y-1">
-                <Label className="flex items-center gap-1 text-xs">单价 $ {isManualPrice(line) ? <SemanticBadge tone="warning">手动价</SemanticBadge> : null}</Label>
+                <Label className="flex items-center gap-1 text-xs">
+                  单价 ${" "}
+                  {isManualPrice(line) ? (
+                    <SemanticBadge tone="warning">手动价</SemanticBadge>
+                  ) : null}
+                </Label>
                 <Input
                   aria-label={`第 ${index + 1} 行单价`}
                   inputMode="decimal"
                   className="h-9"
-                  value={isManualPrice(line) ? line.manualPrice : line.suggested === null ? "" : String(line.suggested)}
+                  value={
+                    isManualPrice(line)
+                      ? line.manualPrice
+                      : line.suggested === null
+                        ? ""
+                        : String(line.suggested)
+                  }
                   placeholder={line.suggested === null ? "待报价" : undefined}
-                  onChange={(event) => patchLine(line.key, { manualPrice: event.target.value === String(line.suggested ?? "") ? "" : event.target.value })}
+                  onChange={(event) =>
+                    patchLine(line.key, {
+                      manualPrice:
+                        event.target.value === String(line.suggested ?? "")
+                          ? ""
+                          : event.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="flex items-center justify-between gap-2 md:justify-end">
-                <span className="text-sm tabular-nums text-muted-foreground">{formatMoney(effectivePrice(line) === null ? 0 : lineTotal(line), "USD")}</span>
-                <Button type="button" variant="ghost" size="icon" aria-label={`删除第 ${index + 1} 行`} disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {formatMoney(
+                    effectivePrice(line) === null ? 0 : lineTotal(line),
+                    "USD",
+                  )}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`删除第 ${index + 1} 行`}
+                  disabled={lines.length === 1}
+                  onClick={() =>
+                    setLines((current) =>
+                      current.filter((item) => item.key !== line.key),
+                    )
+                  }
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -263,14 +450,26 @@ export function QuoteEditor({ quote, onSaved }: Props) {
       <Card>
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1 text-sm">
-            <p className="font-semibold">报价合计 {formatMoney(total, "USD")}</p>
+            <p className="font-semibold">
+              报价合计 {formatMoney(total, "USD")}
+            </p>
             {[...subtotals].map(([storeId, amount]) => (
-              <p key={storeId} className="text-muted-foreground">{storeName(storeId)}：{formatMoney(amount, "USD")}</p>
+              <p key={storeId} className="text-muted-foreground">
+                {storeName(storeId)}：{formatMoney(amount, "USD")}
+              </p>
             ))}
           </div>
           <div className="flex flex-wrap justify-end gap-3">
-            <Button variant="outline" disabled={saving} onClick={() => void save(false)}>{quote ? "保存修改" : "保存草稿"}</Button>
-            <Button disabled={saving} onClick={() => void save(true)}>保存并标记已发送</Button>
+            <Button
+              variant="outline"
+              disabled={saving}
+              onClick={() => void save(false)}
+            >
+              {quote ? "保存修改" : "保存草稿"}
+            </Button>
+            <Button disabled={saving} onClick={() => void save(true)}>
+              保存并标记已发送
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -279,7 +478,14 @@ export function QuoteEditor({ quote, onSaved }: Props) {
         <PasteRowsDialog
           stores={stores}
           onClose={() => setPasting(false)}
-          onAdd={(added) => setLines((current) => [...current.filter((line) => line.productId || line.quantity || line.costCny), ...added])}
+          onAdd={(added) =>
+            setLines((current) => [
+              ...current.filter(
+                (line) => line.productId || line.quantity || line.costCny,
+              ),
+              ...added,
+            ])
+          }
         />
       ) : null}
     </div>

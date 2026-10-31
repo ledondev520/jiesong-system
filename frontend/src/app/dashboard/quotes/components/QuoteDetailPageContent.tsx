@@ -17,22 +17,46 @@ import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth.store";
 import { Role } from "@/types";
 import { quoteService, type Quote } from "@/services/quote.service";
-import { formatUsd, primaryActionFor, secondaryTransitionsFor, type QuoteStatus } from "@/lib/quote";
+import {
+  formatUsd,
+  primaryActionFor,
+  secondaryTransitionsFor,
+  type QuoteStatus,
+} from "@/lib/quote";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SemanticBadge } from "@/components/ui/semantic-badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
-  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { QuoteEditor } from "./QuoteEditor";
 import { QuoteStatusBadge } from "./QuoteStatusBadge";
 
 const WRITE_ROLES: Role[] = [Role.ADMIN, Role.SALES];
-const EXPORT_ROLES: Role[] = [Role.ADMIN, Role.SALES, Role.PURCHASE, Role.FINANCE];
-const message = (error: unknown, fallback: string) => (error instanceof Error && error.message ? error.message : fallback);
+const EXPORT_ROLES: Role[] = [
+  Role.ADMIN,
+  Role.SALES,
+  Role.PURCHASE,
+  Role.FINANCE,
+];
+const message = (error: unknown, fallback: string) =>
+  error instanceof Error && error.message ? error.message : fallback;
 
 export function QuoteDetailPageContent({ id }: { id: string }) {
   const router = useRouter();
@@ -42,7 +66,10 @@ export function QuoteDetailPageContent({ id }: { id: string }) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [confirm, setConfirm] = useState<{ to: QuoteStatus; label: string } | null>(null);
+  const [confirm, setConfirm] = useState<{
+    to: QuoteStatus;
+    label: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -53,26 +80,45 @@ export function QuoteDetailPageContent({ id }: { id: string }) {
       setLoading(false);
     }
   }, [id]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const run = async (task: () => Promise<void>, fallback: string) => {
     setBusy(true);
-    try { await task(); } catch (error) { toast.error(message(error, fallback)); } finally { setBusy(false); }
+    try {
+      await task();
+    } catch (error) {
+      toast.error(message(error, fallback));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const transition = (to: QuoteStatus) => run(async () => {
-    const response = await quoteService.transition(id, to);
-    setQuote(response.data);
-    if (to === "CONVERTED" && response.data.convertedOrder) {
-      toast.success(`已转为出口订单 ${response.data.convertedOrder.contractNo}`);
-      router.push(`/dashboard/sales/${response.data.convertedOrder.id}`);
-    } else {
-      toast.success("状态已更新");
-    }
-  }, "状态更新失败");
+  const transition = (to: QuoteStatus) =>
+    run(async () => {
+      const response = await quoteService.transition(id, to);
+      setQuote(response.data);
+      if (to === "CONVERTED" && response.data.convertedOrder) {
+        toast.success(
+          `已转为出口订单 ${response.data.convertedOrder.contractNo}`,
+        );
+        router.push(`/dashboard/sales/${response.data.convertedOrder.id}`);
+      } else {
+        toast.success("状态已更新");
+      }
+    }, "状态更新失败");
 
-  if (loading) return <div className="py-12 text-center text-muted-foreground">加载中...</div>;
-  if (!quote) return <div className="py-12 text-center text-muted-foreground">报价不存在或无权查看。</div>;
+  if (loading)
+    return (
+      <div className="py-12 text-center text-muted-foreground">加载中...</div>
+    );
+  if (!quote)
+    return (
+      <div className="py-12 text-center text-muted-foreground">
+        报价不存在或无权查看。
+      </div>
+    );
 
   const primary = primaryActionFor(quote.status);
   const secondary = secondaryTransitionsFor(quote.status);
@@ -88,21 +134,52 @@ export function QuoteDetailPageContent({ id }: { id: string }) {
             <QuoteStatusBadge status={quote.status} expired={quote.isExpired} />
             {canExport && (
               <>
-                <Button variant="outline" className="h-11 rounded-xl" onClick={() => run(() => quoteService.downloadXlsx(id, `${quote.quoteNo}.xlsx`), "导出失败")}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />导出 Excel
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-xl"
+                  onClick={() =>
+                    run(
+                      () =>
+                        quoteService.downloadXlsx(id, `${quote.quoteNo}.xlsx`),
+                      "导出失败",
+                    )
+                  }
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  导出 Excel
                 </Button>
-                <Button variant="outline" className="h-11 rounded-xl" onClick={() => run(() => quoteService.openPrintView(id), "打印视图加载失败")}>
-                  <Printer className="mr-2 h-4 w-4" />打印
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-xl"
+                  onClick={() =>
+                    run(
+                      () => quoteService.openPrintView(id),
+                      "打印视图加载失败",
+                    )
+                  }
+                >
+                  <Printer className="mr-2 h-4 w-4" />
+                  打印
                 </Button>
               </>
             )}
             {canWrite && (
-              <Button variant="outline" className="h-11 rounded-xl" disabled={busy} onClick={() => run(async () => {
-                const copy = await quoteService.create({ copyFromQuoteId: id });
-                toast.success(`已复制为 ${copy.data.quoteNo}`);
-                router.push(`/dashboard/quotes/${copy.data.id}`);
-              }, "复制失败")}>
-                <Copy className="mr-2 h-4 w-4" />复制为新报价
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl"
+                disabled={busy}
+                onClick={() =>
+                  run(async () => {
+                    const copy = await quoteService.create({
+                      copyFromQuoteId: id,
+                    });
+                    toast.success(`已复制为 ${copy.data.quoteNo}`);
+                    router.push(`/dashboard/quotes/${copy.data.id}`);
+                  }, "复制失败")
+                }
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                复制为新报价
               </Button>
             )}
           </>
@@ -121,35 +198,71 @@ export function QuoteDetailPageContent({ id }: { id: string }) {
       ) : (
         <>
           <Card className="surface-panel">
-            <CardHeader><CardTitle className="text-base">报价信息</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">报价信息</CardTitle>
+            </CardHeader>
             <CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <Fact label="金额" value={formatUsd(quote.totalAmount)} />
-              <Fact label="现汇 / 报价汇率" value={quote.spotRate ? `${quote.spotRate} / ${quote.pricingRate ?? "-"}` : "-"} />
-              <Fact label="有效期" value={quote.validUntil?.slice(0, 10) ?? "-"} />
+              <Fact
+                label="现汇 / 报价汇率"
+                value={
+                  quote.spotRate
+                    ? `${quote.spotRate} / ${quote.pricingRate ?? "-"}`
+                    : "-"
+                }
+              />
+              <Fact
+                label="有效期"
+                value={quote.validUntil?.slice(0, 10) ?? "-"}
+              />
               <Fact label="付款条件" value={quote.paymentTerms ?? "-"} />
               <Fact label="备注" value={quote.note ?? "-"} />
             </CardContent>
           </Card>
           <Card className="surface-panel">
-            <CardHeader><CardTitle className="text-base">商品 × 门店</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">商品 × 门店</CardTitle>
+            </CardHeader>
             <CardContent className="overflow-x-auto px-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>商品</TableHead><TableHead>门店</TableHead>
-                    <TableHead className="text-right">数量</TableHead><TableHead className="text-right">参考成本 ¥</TableHead>
-                    <TableHead className="text-right">单价</TableHead><TableHead className="text-right">金额</TableHead>
+                    <TableHead>商品</TableHead>
+                    <TableHead>门店</TableHead>
+                    <TableHead className="text-right">数量</TableHead>
+                    <TableHead className="text-right">参考成本 ¥</TableHead>
+                    <TableHead className="text-right">单价</TableHead>
+                    <TableHead className="text-right">金额</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(quote.items ?? []).map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.product?.customsName ?? item.productId}</TableCell>
-                      <TableCell>{item.store?.code || item.store?.name || "-"}</TableCell>
-                      <TableCell className="text-right">{item.quantity} {item.unit ?? ""}</TableCell>
-                      <TableCell className="text-right">{item.costCny === null ? <SemanticBadge tone="warning">缺成本</SemanticBadge> : item.costCny}</TableCell>
-                      <TableCell className="text-right">{formatUsd(item.unitPrice)} {item.isManualPrice && <SemanticBadge tone="info">手动价</SemanticBadge>}</TableCell>
-                      <TableCell className="text-right">{formatUsd(item.totalPrice)}</TableCell>
+                      <TableCell>
+                        {item.product?.customsName ?? item.productId}
+                      </TableCell>
+                      <TableCell>
+                        {item.store?.code || item.store?.name || "-"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {item.quantity} {item.unit ?? ""}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {item.costCny === null ? (
+                          <SemanticBadge tone="warning">缺成本</SemanticBadge>
+                        ) : (
+                          item.costCny
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatUsd(item.unitPrice)}{" "}
+                        {item.isManualPrice && (
+                          <SemanticBadge tone="info">手动价</SemanticBadge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatUsd(item.totalPrice)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -161,34 +274,69 @@ export function QuoteDetailPageContent({ id }: { id: string }) {
 
       {(primary || secondary.length > 0) && quote.status !== "DRAFT" && (
         <div className="flex flex-wrap justify-end gap-3">
-          {canWrite && secondary.map((action) => (
-            <Button key={action.to} variant="outline" disabled={busy} onClick={() => (action.to === "CANCELLED" || action.to === "REJECTED" ? setConfirm(action) : transition(action.to))}>
-              {action.label}
-            </Button>
-          ))}
+          {canWrite &&
+            secondary.map((action) => (
+              <Button
+                key={action.to}
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  action.to === "CANCELLED" || action.to === "REJECTED"
+                    ? setConfirm(action)
+                    : transition(action.to)
+                }
+              >
+                {action.label}
+              </Button>
+            ))}
           {primary?.kind === "transition" && canWrite && (
-            <Button disabled={busy} onClick={() => transition(primary.to)}>{primary.label}</Button>
+            <Button disabled={busy} onClick={() => transition(primary.to)}>
+              {primary.label}
+            </Button>
           )}
           {primary?.kind === "viewOrder" && quote.salesContract && (
-            <Button asChild><Link href={`/dashboard/sales/${quote.salesContract.id}`}>{primary.label}</Link></Button>
+            <Button asChild>
+              <Link href={`/dashboard/sales/${quote.salesContract.id}`}>
+                {primary.label}
+              </Link>
+            </Button>
           )}
         </div>
       )}
       {quote.status === "DRAFT" && canWrite && (
         <div className="flex justify-end">
-          <Button variant="outline" disabled={busy} onClick={() => setConfirm({ to: "CANCELLED", label: "作废" })}>作废</Button>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => setConfirm({ to: "CANCELLED", label: "作废" })}
+          >
+            作废
+          </Button>
         </div>
       )}
 
-      <AlertDialog open={confirm !== null} onOpenChange={(open) => !open && setConfirm(null)}>
+      <AlertDialog
+        open={confirm !== null}
+        onOpenChange={(open) => !open && setConfirm(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{confirm?.label}这张报价？</AlertDialogTitle>
-            <AlertDialogDescription>报价不会被删除，状态将变为终态，之后不能再修改。</AlertDialogDescription>
+            <AlertDialogDescription>
+              报价不会被删除，状态将变为终态，之后不能再修改。
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { const to = confirm!.to; setConfirm(null); void transition(to); }}>确认</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => {
+                const to = confirm!.to;
+                setConfirm(null);
+                void transition(to);
+              }}
+            >
+              确认
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

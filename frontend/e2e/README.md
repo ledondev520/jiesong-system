@@ -66,3 +66,4 @@
 - `helpers.ts` 为 `/api/v1/system/pricing-config` 提供专用 GET/PUT 夹具，复用共用 pricing JSON/schema，返回完整 config/revision/schema；PUT 校验版本并仅修改每项测试内存，重载可读回，不写仓库配置或业务数据库。`pricing-settings.spec.ts` 持续检查未捕获页面异常，异常响应不得移除系统配置标题和主导航，不得伪报成功或丢弃草稿。浏览器无法启动时，定义检查和组件回归通过不代表 E2E 执行通过。
 
 settings-sections.spec.ts：设置分区链接与旧地址（用户、系统日志、通知、关于、AI 会话）重定向，只读。
+home-todos.spec.ts：首页待办卡片（合成只读 API，390/1440px），无写入请求。

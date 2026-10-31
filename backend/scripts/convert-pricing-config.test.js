@@ -39,6 +39,15 @@ test('CLI dry-run 打印的结果也是 ×5 配置，并可用 --round-up-to 显
   assert.deepEqual(JSON.parse(fs.readFileSync(file)), oldTiered);
 });
 
+test('转换后的取整步长与仓库报价规则一致：同成本同现汇得到同一单价（评审 R1-8）', () => {
+  const committed = require('../../config/pricing.json');
+  const converted = convertPricingConfig(oldTiered, 6.72);
+  assert.equal(converted.roundUpTo, committed.roundUpTo);
+  // 1005 × 1.3 ÷ 6.52 = 200.38 → 201 → 最近的 5 的倍数 200（旧转换器步长 1 得 201）
+  assert.equal(priceFor({ costCny: 1005 }, converted).unitPriceUsd, 200);
+  assert.equal(priceFor({ costCny: 1005 }, converted).unitPriceUsd, priceFor({ costCny: 1005 }, { ...committed, exchangeRate: 6.72, categoryMarkups: [] }).unitPriceUsd);
+});
+
 test('已是新结构返回 null；未知结构或非法现汇抛错', () => {
   const current = convertPricingConfig(oldTiered, 6.72);
   assert.equal(convertPricingConfig(current, 6.72), null);

@@ -495,7 +495,20 @@ const getBusinessOverview = async (req, res, next) => {
   }
 };
 
+/**
+ * 职责：按登录角色返回首页待办（只读，规格 §4.9）
+ */
+const getTodos = async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    success(res, await require('../services/dashboardTodosService').getDashboardTodos(req.user.role));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
+  getTodos,
   getStats,
   trackProduct,
   getAnalytics,
