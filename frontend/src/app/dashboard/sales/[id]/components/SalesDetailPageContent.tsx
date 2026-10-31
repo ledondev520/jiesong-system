@@ -1564,7 +1564,11 @@ export default function SalesDetailPage({ params }: PageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {contract.packingItems && contract.packingItems.length > 0 ? (
+              {isMobile ? (
+                <div className="flex h-40 items-center justify-center rounded-md border border-dashed px-4 text-center text-sm text-muted-foreground">
+                  3D 装箱视图仅在电脑上提供，手机请查看「装箱明细」
+                </div>
+              ) : contract.packingItems && contract.packingItems.length > 0 ? (
                 <Suspense
                   fallback={
                     <div className="h-[500px] flex items-center justify-center">
