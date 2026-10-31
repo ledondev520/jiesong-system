@@ -17,7 +17,7 @@
 1. **The owner can run the whole business in the system:** quote → export order → purchase from a supplier → receiving and inventory → shipping and customs documents → invoices → finance → export tax refund (出口退税).
 2. **When buying, the system shows which supplier to buy from,** based on past purchase prices for that product.
 3. **One customer (Seapot), many stores.** The customer is chosen once per order. Each line says which Seapot store (门店) it is for, so every purchased, received and shipped quantity can be traced to a store.
-4. **One pricing rule in one place:** purchase cost × 1.3 (× 1.1 for special categories such as 瓷砖 tiles), convert at (spot rate − 0.2), round **up** to whole USD. The spot rate is set in settings.
+4. **One pricing rule in one place:** purchase cost × 1.3 (× 1.1 for special categories such as 瓷砖 tiles), convert at (spot rate − 0.2), round **up** to whole USD, then up to a multiple of 5. The spot rate is set in settings.
 5. **An AI assistant on every page,** docked at the side so it never covers content.
 6. **A new visual design and information architecture,** simpler than today: fewer pages, one name per object, one primary action per screen.
 
@@ -32,7 +32,7 @@ Decisions 1–9 date from v1; 10–15 are the owner decisions of 2026-10-30 (Sta
 7. Redesign the visuals and IA from scratch.
 8. Pure UI changes get a lightweight process (§14). **Approved by the owner;** implemented by task card JP. Rulesets and the 9 required checks stay as they are.
 9. Container loading (集装箱装货图) is a separate effort (§11).
-10. **Sell price = purchase cost (CNY) × 1.3** for normal goods (a markup on cost, not a margin on price) and **× 1.1** for special goods such as 瓷砖 (tiles). **Locked 2026-10-31:** convert at FX used = spot rate − 0.2, then **round up to whole USD** (after conversion, not whole yuan before it). The round-up step is a config value, default 1 (§7.2).
+10. **Sell price = purchase cost (CNY) × 1.3** for normal goods (a markup on cost, not a margin on price) and **× 1.1** for special goods such as 瓷砖 (tiles). **Locked 2026-10-31:** convert at FX used = spot rate − 0.2, then **round up to whole USD** and then **up to the next multiple of 5** (after conversion, not whole yuan before it). The round-up step is a config value, default 5 (§7.2).
 11. **Seapot buys FOB.** FOB is the default Incoterm on the Seapot customer, its quotes and its orders (§4.1, §5).
 12. **Draft purchase contracts are not payables (应付).** Only contracts that are in effect count, and every page computes payables with one shared function (§4.7).
 13. **Test data and suppliers marked 存疑 are archived, never hard-deleted** (§4.11).
@@ -581,7 +581,7 @@ This table describes the code **before** the pricing PRs. The 6.8 default, the z
 | `config/pricing.json` + `pricing.schema.json` | `mode` tiered/multiplier, `exchangeAdjustment −0.2`, `refundableMarkup 0.3`, `noRefundMarkup 0.1`, `multiplier 1.3`. Used by `exportPricing.js`, `exportReadinessService.js`, `exportPacketService.js`, and reimplemented in `scripts/prepare_export_packet.py`. The 10% tier keys off a **zero tax-refund rate**, not a category. Rounding picks a total ending in 0/5 or an integer unit price closest to the target markup. |
 
 ### 7.2 New rule (one formula, one file, one implementation)
-Owner decision 10, locked 2026-10-31: sell_CNY = cost_CNY × 1.3 (tiles × 1.1); FX used = spot − 0.2; sell_USD = sell_CNY ÷ FX used, rounded **up** to whole USD.
+Owner decision 10, locked 2026-10-31: sell_CNY = cost_CNY × 1.3 (tiles × 1.1); FX used = spot − 0.2; sell_USD = sell_CNY ÷ FX used, rounded **up** to whole USD, then rounded **up** to the next multiple of 5 (the price ends in 0 or 5).
 ```
 spot        = pricing.exchangeRate                    // spot CNY per 1 USD, set in 设置 > 报价规则
 fxUsed      = spot − pricing.exchangeAdjustment       // adjustment 0.2 (owner rule)
@@ -589,29 +589,32 @@ markup      = markup of the product's category, else the nearest ancestor catego
               listed in pricing.categoryMarkups, else pricing.defaultMarkup (0.3)
               // 瓷砖 is listed with 0.1
 sellCny     = costCny × (1 + markup)                  // costCny = unit purchase cost ¥ (basis: Q5c)
-step        = pricing.roundUpTo                       // default 1 → whole USD
-unitPrice   = Math.ceil(Number((sellCny / fxUsed / step).toFixed(6))) * step
-              // float guard: 13.000000000000002 stays 13
+step        = pricing.roundUpTo                       // default 5
+wholeUsd    = Math.ceil(Number((sellCny / fxUsed).toFixed(6)))      // 1 — round up to whole USD
+unitPrice   = Math.ceil(Number((wholeUsd / step).toFixed(6))) * step // 2 — round up to a multiple of step
+              // float guard: 13.000000000000002 stays 13, then 15 (not 14 → 15 by chance)
 lineTotal   = round2(unitPrice × quantity)
 ```
 - **Markup is on cost** (× 1.3 / × 1.1), not a margin on price.
 - **The 0.2 adjustment stays**, as one config value next to the spot rate. Nothing else adjusts the rate.
-- **Rounding happens once, in USD, after conversion** — not to whole yuan before converting.
-- **Owner example:** cost ¥10,000 → ¥13,000; spot 6.72 → 6.52; 13,000 ÷ 6.52 = 1,993.865 → the owner wrote **1,995**, while ceil to whole USD gives **1,994**. Either the example uses a step of 5 or it rounds a line total. Q5f asks; until answered, J6 implements the stated rule (step 1, per unit price) and keeps `roundUpTo` configurable.
+- **Rounding happens in USD, after conversion** — not to whole yuan before converting. Two steps: up to whole USD, then up to the next multiple of 5. Exact multiples stay (2,000 stays 2,000; 1,996 → 2,000).
+- **Owner example (final, 2026-10-31):** cost ¥10,000 → ¥13,000; spot 6.72 → 6.52; 13,000 ÷ 6.52 = 1,993.87 → **1,994** → **1,995**. The 1,995 is intentional. `roundUpTo` stays a config value (default 5; 1 gives plain whole-USD rounding).
 - **No zero-refund tier.** The × 1.1 multiplier keys off the product's **category**, not its tax-refund rate. Products with a 0% refund rate get × 1.3 unless their category is listed (Q5d).
-- **Unit price does not depend on quantity.** The "total ends in 0/5" logic is dropped (but see Q5f).
+- **Unit price does not depend on quantity.** The old "line total ends in 0/5" logic is dropped; the multiple-of-5 rule applies to the **unit price**.
 - **Missing or zero cost → no suggested price.** The line is flagged 缺成本, and the user enters a price manually, which gets the 手动价 badge.
 - **Spot rate must be a positive finite number** (≤ 4 decimals) greater than the adjustment. An invalid file stops pricing with a clear error and no hidden default, as today.
 
-**Examples** (spot 6.72, adjustment 0.2 → FX used 6.52, step 1):
+**Examples** (spot 6.72, adjustment 0.2 → FX used 6.52, step 5):
 
-| Cost ¥ | Category | × | sell ¥ | ÷ 6.52 | Price $ |
-|---|---|---|---|---|---|
-| 10,000.00 | normal | 1.3 | 13,000.00 | 1,993.8650 | **1,994** (owner example says 1,995: Q5f) |
-| 100.00 | 餐具 (normal) | 1.3 | 130.00 | 19.9387 | **20** |
-| 100.00 | 瓷砖 | 1.1 | 110.00 | 16.8712 | **17** |
-| 65.20 | normal | 1.3 | 84.76 | 13.000000000000002 (float) | **13** (plain `ceil` would give 14) |
-| 0 / missing | any | — | — | — | 缺成本 |
+| Cost ¥ | Category | × | sell ¥ | ÷ 6.52 | Whole USD | Price $ (×5) |
+|---|---|---|---|---|---|---|
+| 10,000.00 | normal | 1.3 | 13,000.00 | 1,993.8650 | 1,994 | **1,995** (owner example) |
+| 100.00 | 餐具 (normal) | 1.3 | 130.00 | 19.9387 | 20 | **20** |
+| 100.00 | 瓷砖 | 1.1 | 110.00 | 16.8712 | 17 | **20** |
+| 65.20 | normal | 1.3 | 84.76 | 13.000000000000002 (float) | 13 (plain `ceil` would give 14) | **15** |
+| — | — | — | — | 1,996 | 1,996 | **2,000** |
+| — | — | — | — | 2,000 | 2,000 | **2,000** (unchanged) |
+| 0 / missing | any | — | — | — | — | 缺成本 |
 
 ### 7.3 Config file and settings UI
 `config/pricing.json` stays the only source. It keeps the existing revision, lock and atomic save, the deploy-time backup and restore, and the stderr audit of field names and hashes. Only the shape changes:
@@ -621,14 +624,14 @@ lineTotal   = round2(unitPrice × quantity)
   "exchangeAdjustment": 0.2,
   "defaultMarkup": 0.3,
   "categoryMarkups": [{ "categoryId": "<ProductCategory.id>", "categoryName": "瓷砖", "markup": 0.1 }],
-  "roundUpTo": 1
+  "roundUpTo": 5
 }
 ```
 - `pricing.schema.json` is updated to match:
   - `exchangeRate` (spot) a positive number up to 100 (≤ 4 decimals), greater than `exchangeAdjustment`;
   - `exchangeAdjustment` between 0 and 1, default 0.2;
   - markups between 0 and 1;
-  - `roundUpTo` a positive whole number, default 1;
+  - `roundUpTo` a positive whole number, default 5;
   - `categoryId` must exist when saved;
   - `categoryName` is a display snapshot.
 - **设置 > 报价规则** is one card containing:
@@ -809,7 +812,7 @@ Numbers are stable (task cards refer to them). Answered questions stay listed, m
 
 ### 13.1 Answered (2026-10-30)
 - **Q5 (part) Markup basis:** markup on cost, × 1.3 normal / × 1.1 tiles.
-- **Q5a Rounding (locked 2026-10-31):** FX used = spot − 0.2; round **up to whole USD** after conversion, not whole yuan. (But see Q5f.)
+- **Q5a Rounding (final, 2026-10-31; also answers the former 5f):** FX used = spot − 0.2; after conversion round **up to whole USD**, then **up to the next multiple of 5** (1,993.87 → 1,994 → 1,995; 1,996 → 2,000; 2,000 stays). Not whole yuan. The 1,995 in the owner's example is intentional.
 - **Q6 Payables:** draft purchase contracts are not payables; one shared computation on every page (§4.7).
 - **Q7 (part) Currency and Incoterm:** USD; Seapot buys **FOB** (§4.1, §5).
 - **Q11 (part) Archiving:** test data and 存疑 suppliers may be archived, never hard-deleted (§4.11).
@@ -823,8 +826,7 @@ Numbers are stable (task cards refer to them). Answered questions stay listed, m
 3. **Quote lifecycle.** Is "accepted" a simple button, or do you need the customer's signed PI uploaded as proof?
 4. **Supplier comparison.** Compare on the tax-included price or the price after tax refund? Should 1% invoice suppliers be flagged as "no refund"?
 5. **Pricing, remaining points.**
-   - *5a. Answered (§13.1).*
-   - **5f. Your example gives 1,995, the rule gives 1,994.** ¥13,000 ÷ 6.52 = 1,993.865. Ceil to whole USD is 1,994. Is the step 5 (prices end in 0 or 5), or is the rounding applied to the line total rather than the unit price? **Blocks merging the pricing PR (J6).**
+   - *5a and the former 5f (rounding): Answered (§13.1).*
    - **5b. Which categories get × 1.1** besides 瓷砖? Does a 瓷砖 product category already exist in production, and should its sub-categories inherit 1.1?
    - **5c. Cost basis.** Is "purchase price" the tax-included price (价税合计 per unit, as the 13% VAT invoice shows) or the price before tax? The purchase contract template prints 不含税单价 + 13% tax.
    - **5d. Zero-refund goods.** The old SOP capped products with a 0% refund rate at 10% markup. Under the new rule they get × 1.3 unless their category is listed. Confirm.
@@ -925,7 +927,7 @@ Each row names its task card in `claude-tasks-20261031/` (outside the repo). **D
 ### Phase 2: One pricing rule and the owner's business rules
 | PR | Card | Scope | Files | Effort | Process | Depends on |
 |---|---|---|---|---|---|---|
-| 2.1 | J6 | New `pricing.json` shape and schema; `priceFor()` (× 1.3 / × 1.1 by category, round up, step default 1); `POST /pricing/preview`; settings card 报价规则; delete the frontend constants and 基础参数 fields; live-config conversion steps in the PR body | §7.4 list (backend, config, frontend settings, docs, fixtures) | 3 | **Full**; merge waits for Q5f; live conversion needs owner approval | J0 |
+| 2.1 | J6 | New `pricing.json` shape and schema; `priceFor()` (× 1.3 / × 1.1 by category, round up to whole USD then to a multiple of 5, step default 5); `POST /pricing/preview`; settings card 报价规则; delete the frontend constants and 基础参数 fields; live-config conversion steps in the PR body | §7.4 list (backend, config, frontend settings, docs, fixtures) | 3 | **Full**; live conversion needs owner approval | J0 |
 | 2.2 | J7 | Rate consumers: customs, forex, patrol, AI context and `routes/sales.js` use the order rate or the config; AI write tool removed; packet uses the confirmed order price (after Q5e); Python duplicate retired or delegated; SOP pricing section replaced | services listed in §7.1, `openAgentService.js`, `prepare_export_packet.py`, `docs/出口清单快速制单SOP.md` | 3 | **Full** (finance-adjacent) | J6 |
 | 2.3 | J8 | **Payables, one basis** (§4.7): map every payables computation, one shared backend function excluding DRAFT/CANCELLED, every endpoint uses it, frontends only display | `financeService.js`, `dashboardController.js`, AI context, exports (+ consistency test) | 2 | **Full** (finance) | J0 |
 | 2.4 | J9 | **Archive, never delete** (§4.11): reuse `isActive` or add nullable `archivedAt`/`archivedReason`; 「已归档」 filter and ADMIN restore; `archive-test-data.js` (`--dry-run` default, `--confirm`, `--backup-dir`, receipt); no production run | services/routes of the affected objects, `backend/scripts/archive-test-data.js` (+ tests), migration only if needed | 2 | **Full**; one-way door if it adds a migration | J0 |
