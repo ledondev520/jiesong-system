@@ -3,7 +3,7 @@
  * Output: quote detail — DRAFT shows the editor; other states show header facts and the product × store lines.
  *         One primary button per status (标记已发送 / 客户已接受 / 转为出口订单 / 查看订单), plus 导出 Excel, 打印, 复制为新报价.
  * Pos: /dashboard/quotes/[id]. Writes are shown to ADMIN/SALES only (backend enforces the same); BOSS has no export (denied server-side).
- * PROVISIONAL (owner questions open): conversion copies the quote's spot rate to the order; no manual-price gate.
+ * Owner decisions 2026-10-31: conversion sets the order FX to spot − 0.2 (server side); manual unit price accepts any value >= 0.
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */

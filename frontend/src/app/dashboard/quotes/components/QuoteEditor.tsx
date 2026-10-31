@@ -3,8 +3,7 @@
  * Output: header + line editor; saves via POST/PUT /quotes. The server prices every line (priceFor); the editor only sends
  *         cost, quantity, store and an optional manual price. 保存并标记已发送 saves first, then transitions.
  * Pos: quote create page and DRAFT detail. Self-contained row editor — swap for the J18 order grid once work/J18 is rebased in.
- * PROVISIONAL (owner questions open): the order keeps the quote's spot rate on conversion; manual prices are not gated
- *   against the rule price; the PI prints only the company name (no bank details).
+ * Owner decisions 2026-10-31: conversion sets the order FX to spot − 0.2; a manual unit price is any value >= 0 (no comparison with the rule price).
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
