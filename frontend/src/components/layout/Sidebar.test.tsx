@@ -7,7 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { Role } from "@/types";
 import { Sidebar } from "./Sidebar";
@@ -95,6 +95,25 @@ describe("Sidebar", () => {
     ]) {
       expect(getByText(label)).toBeInTheDocument();
     }
+  });
+
+  it("hover/focus/click 侧边栏链接不启动竞争预取，也不手动 push", () => {
+    vi.useFakeTimers();
+    const { getByText } = render(<Sidebar />);
+    const financeLink = getByText("财务").closest("a");
+
+    expect(financeLink).not.toBeNull();
+    fireEvent.mouseEnter(financeLink!);
+    fireEvent.focus(financeLink!);
+    fireEvent.mouseEnter(financeLink!);
+
+    expect(mockPrefetch).not.toHaveBeenCalled();
+    expect(financeLink).toHaveAttribute("data-prefetch", "auto");
+
+    fireEvent.click(financeLink!);
+    expect(mockPush).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
   });
 
   it("不渲染 AI 助手菜单项，也不渲染尚未上线的报价与客户与门店", () => {
