@@ -99,21 +99,23 @@ describe("Sidebar", () => {
 
   it("hover/focus/click 侧边栏链接不启动竞争预取，也不手动 push", () => {
     vi.useFakeTimers();
-    const { getByText } = render(<Sidebar />);
-    const financeLink = getByText("财务").closest("a");
+    try {
+      const { getByText } = render(<Sidebar />);
+      const financeLink = getByText("财务").closest("a");
 
-    expect(financeLink).not.toBeNull();
-    fireEvent.mouseEnter(financeLink!);
-    fireEvent.focus(financeLink!);
-    fireEvent.mouseEnter(financeLink!);
+      expect(financeLink).not.toBeNull();
+      fireEvent.mouseEnter(financeLink!);
+      fireEvent.focus(financeLink!);
+      fireEvent.mouseEnter(financeLink!);
 
-    expect(mockPrefetch).not.toHaveBeenCalled();
-    expect(financeLink).toHaveAttribute("data-prefetch", "auto");
+      expect(mockPrefetch).not.toHaveBeenCalled();
+      expect(financeLink).toHaveAttribute("data-prefetch", "auto");
 
-    fireEvent.click(financeLink!);
-    expect(mockPush).not.toHaveBeenCalled();
-
-    vi.useRealTimers();
+      fireEvent.click(financeLink!);
+      expect(mockPush).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("不渲染 AI 助手菜单项，也不渲染尚未上线的报价与客户与门店", () => {
@@ -195,11 +197,13 @@ describe("Sidebar", () => {
 
   it("初始渲染和空闲阶段不批量预取业务路由", () => {
     vi.useFakeTimers();
-    render(<Sidebar />);
-    vi.runOnlyPendingTimers();
+    try {
+      render(<Sidebar />);
+      vi.runOnlyPendingTimers();
 
-    expect(mockPrefetch).not.toHaveBeenCalled();
-
-    vi.useRealTimers();
+      expect(mockPrefetch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
