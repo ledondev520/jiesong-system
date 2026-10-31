@@ -602,6 +602,8 @@ describe("SalesDetailPage 交互逻辑", () => {
       await screen.findByRole("button", { name: "确认发运" }),
     ).toBeDisabled();
     expect(screen.queryByText(/满足出柜条件/)).not.toBeInTheDocument();
+    // 装箱完成时间线同样取明细合计（1 CBM），而非合同头（60 CBM）
+    expect(screen.getByText("1 箱，1.00 CBM")).toBeInTheDocument();
   });
 
   it("合同头偏低但明细合计达标时允许确认发运（与后端同源取明细合计）", async () => {

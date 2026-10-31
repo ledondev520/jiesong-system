@@ -709,7 +709,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       timeline.push({
         date: contract.updatedAt,
         label: "装箱完成",
-        description: `${contract.totalBoxes || 0} 箱，${(contract.volume || 0).toFixed(2)} CBM`,
+        description: `${contract.totalBoxes || 0} 箱，${sumPackingTotals(contract.packingItems).cargoCbm.toFixed(2)} CBM`,
         state:
           currentStep >= STATUS_ORDER[SalesStatus.PACKING]
             ? ("completed" as const)
