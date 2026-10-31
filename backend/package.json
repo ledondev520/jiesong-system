@@ -53,7 +53,7 @@
     "pdfjs-dist": "5.4.624",
     "pdfkit": "^0.16.0",
     "saxes": "^5.0.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "acorn": "8.15.0",
