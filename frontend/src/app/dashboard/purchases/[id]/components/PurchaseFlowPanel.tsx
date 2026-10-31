@@ -74,6 +74,7 @@ import {
 } from "@/services/purchase.service";
 import { uploadContractFile } from "@/services/contractFile.service";
 import { PaymentType, type PurchaseContract } from "@/types";
+import { isPayable } from "../../components/purchaseListHelpers";
 import {
   calculatePurchaseLineAmounts,
   summarizePurchaseAmounts,
@@ -393,7 +394,10 @@ export function PurchaseFlowPanel({
             {amountSummary.overpaidAmount > 0
               ? `，超付 ${formatMoney(amountSummary.overpaidAmount)}`
               : remaining > 0
-                ? `，待付 ${formatMoney(remaining)}`
+                ? // 草稿/已取消合同不计应付（与摘要卡、列表同口径），不显示「待付」
+                  isPayable(contract)
+                  ? `，待付 ${formatMoney(remaining)}`
+                  : ""
                 : "，已付清"}
             {invoiceNumbers.length > 0 ? (
               <Badge

@@ -165,6 +165,29 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it.each([
+    ["SHIPPED", true],
+    ["DRAFT", false],
+    ["CANCELLED", false],
+  ])(
+    "%s 合同在付款与发票说明中按应付口径显示待付（payable=%s）",
+    (status, payable) => {
+      render(
+        <PurchaseFlowPanel
+          contract={{ ...contract, status, paidAmount: 0 } as PurchaseContract}
+          onUpdated={vi.fn()}
+        />,
+      );
+      const description = screen.getByText(/合同含税额/);
+      if (payable) {
+        expect(description).toHaveTextContent("待付");
+      } else {
+        expect(description).not.toHaveTextContent("待付");
+        expect(description).not.toHaveTextContent("已付清");
+      }
+    },
+  );
+
   it("手机付款卡片完整显示金额、日期、方式和备注", () => {
     mockIsMobile.mockReturnValue(true);
     render(
