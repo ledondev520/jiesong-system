@@ -144,7 +144,8 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   const boss = await todos("BOSS");
   assert.deepEqual(keys(boss), ["overdueReceivables"]);
   assert.equal(boss.figures.payable, 600, "BOSS payable uses the shared in-effect basis");
-  assert.equal(typeof boss.figures.receivable, "number");
+  // Four non-cancelled export contracts of 1000 each, nothing received: finance-overview basis.
+  assert.equal(boss.figures.receivable, 4000, "BOSS receivable equals the finance overview unreceived total");
   assert.ok("monthGrossProfit" in boss.figures);
   assert.ok(boss.figures.definitions.payable);
 
