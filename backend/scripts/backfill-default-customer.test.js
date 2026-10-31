@@ -9,6 +9,11 @@ test('dry-run is the default and needs no backup arguments', () => {
   assert.equal(parseArguments([...base, '--dry-run']).confirm, false);
 });
 
+test('customer name defaults to Seapot but an explicit blank is rejected', () => {
+  assert.equal(parseArguments(['--database', '/a.db']).customerName, 'Seapot');
+  assert.equal(parseArguments(['--database', '/a.db', '--customer-name', ' Other ']).customerName, 'Other');
+});
+
 test('confirm requires both --backup-dir and --receipt', () => {
   const ok = parseArguments([...base, '--confirm', '--backup-dir', '/b', '--receipt', '/r.json']);
   assert.equal(ok.confirm, true);
@@ -23,7 +28,6 @@ test('rejects backup args without confirm, dry-run with confirm, relative or mis
   assert.throws(() => parseArguments(['--database', 'rel.db', '--customer-name', 'Seapot']));
   assert.throws(() => parseArguments(['--database', '/a.db?x=1', '--customer-name', 'Seapot']));
   assert.throws(() => parseArguments(['--customer-name', 'Seapot']));
-  assert.throws(() => parseArguments(['--database', '/a.db']));
   assert.throws(() => parseArguments(['--database', '/a.db', '--customer-name', '  ']));
   assert.throws(() => parseArguments([...base, '--database', '/other.db']));
   assert.throws(() => parseArguments([...base, '--unknown']));

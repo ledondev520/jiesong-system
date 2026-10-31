@@ -35,6 +35,23 @@
       }
     },
     {
+      "id": "quotes",
+      "routeFile": "backend/src/routes/quotes.js",
+      "routes": ["POST /", "PUT /:id"],
+      "update": { "file": "backend/src/controllers/quoteController.js", "handler": "update" },
+      "matrix": {
+        "path": "/api/v1/quotes",
+        "table": "quotes",
+        "create": { "note": "Synthetic matrix quote", "paymentTerms": "Original terms" },
+        "edit": { "note": "Synthetic edited quote" },
+        "invalid": [{ "currency": "EUR" }, { "incoterm": "XYZ" }, { "status": "BOGUS" }, { "status": "SENT", "note": "mixed" }],
+        "blank": { "paymentTerms": "   " },
+        "clear": { "paymentTerms": null },
+        "clearStatus": 200,
+        "filter": "Synthetic edited quote"
+      }
+    },
+    {
       "id": "customers",
       "routeFile": "backend/src/routes/customers.js",
       "routes": ["POST /", "PUT /:id"],
