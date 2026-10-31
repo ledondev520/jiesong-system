@@ -4,10 +4,10 @@
  * Pos: 出口三单工作台前端数据 Module
  */
 
-import api from '@/lib/axios';
-import { getAuthToken } from '@/lib/auth-token';
-import { downloadResponseBlob } from './fileDownload';
-import type { ApiResponse } from '@/types';
+import api from "@/lib/axios";
+import { getAuthToken } from "@/lib/auth-token";
+import { downloadResponseBlob } from "./fileDownload";
+import type { ApiResponse } from "@/types";
 
 export interface ExportPacketInput {
   spotRate: number;
@@ -21,7 +21,7 @@ export interface ExportPacketInput {
 
 export interface ExportPacketIssue {
   code: string;
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
   message: string;
   packingItemId?: string | null;
   productName?: string;
@@ -51,7 +51,7 @@ export interface ExportPacketLine {
   rawTotalUsd: number;
   targetMarkup: number;
   realizedMarkup: number | null;
-  pricingSource: 'formula' | 'history' | 'manual';
+  pricingSource: "formula" | "history" | "manual";
   pricingReference: string;
   roundingMethod: string;
   rejectedHistoricalQuote?: {
@@ -71,15 +71,15 @@ export interface ExportPacketPreview {
   packageKind: string;
   documentDate: string;
   portName: string;
-  currency: 'USD';
+  currency: "USD";
   tradeTerm: string;
   ready: boolean;
   pricingPolicy: {
     spotRate: number;
     fxBuffer: number;
     effectiveRate: number;
-    refundableMarkup: number;
-    noRefundMarkupCap: number;
+    defaultMarkup: number;
+    roundUpTo: number;
     historyRule: string;
   };
   issues: ExportPacketIssue[];
@@ -109,22 +109,24 @@ export interface GeneratedExportPacket {
 }
 
 export const exportPacketService = {
-  preview: async (salesContractId: string, input: ExportPacketInput) => api.post<
-    ApiResponse<ExportPacketPreview>,
-    ApiResponse<ExportPacketPreview>,
-    ExportPacketInput
-  >(`/sales/${salesContractId}/export-packet/preview`, input),
+  preview: async (salesContractId: string, input: ExportPacketInput) =>
+    api.post<
+      ApiResponse<ExportPacketPreview>,
+      ApiResponse<ExportPacketPreview>,
+      ExportPacketInput
+    >(`/sales/${salesContractId}/export-packet/preview`, input),
 
-  generate: async (salesContractId: string, input: ExportPacketInput) => api.post<
-    ApiResponse<GeneratedExportPacket>,
-    ApiResponse<GeneratedExportPacket>,
-    ExportPacketInput
-  >(`/sales/${salesContractId}/export-packet/generate`, input),
+  generate: async (salesContractId: string, input: ExportPacketInput) =>
+    api.post<
+      ApiResponse<GeneratedExportPacket>,
+      ApiResponse<GeneratedExportPacket>,
+      ExportPacketInput
+    >(`/sales/${salesContractId}/export-packet/generate`, input),
 
   download: async (fileId: string, fileName: string) => {
     const token = getAuthToken();
     const response = await fetch(`/api/v1/files/${fileId}/download`, {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
+      headers: { Authorization: token ? `Bearer ${token}` : "" },
     });
     await downloadResponseBlob(response, fileName);
   },

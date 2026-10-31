@@ -9,7 +9,8 @@ const { createError } = require('../middleware/errorHandler');
 const { normalizePurchaseTaxRate, roundMoney } = require('./purchaseAmountService');
 
 const { loadPricingConfig } = require('./pricingConfigService');
-const { calculateFormulaPrice, targetMarkupFor, round } = require('./exportPricing');
+const { effectiveRateFor, markupFor, priceFor, round } = require('./exportPricing');
+const { withCategoryChains } = require('./productCategoryChain');
 const PRICE_EPSILON = 0.01;
 
 const toFiniteOrNull = (value) => {
@@ -98,7 +99,7 @@ const evaluateExportReadiness = (contract = {}, {
   activeTaxRates = [],
 } = {}, config = loadPricingConfig()) => {
   const exchangeRate = toPositiveOrNull(contract.exchangeRate);
-  const effectiveExchangeRate = round((toFiniteOrNull(contract.exchangeRate) || 0) + config.exchangeAdjustment, 6);
+  const effectiveExchangeRate = effectiveRateFor(contract.exchangeRate, config);
   const overrideByPackingItem = getFirstByKey(overrides, 'packingItemId');
   const historyByProduct = getFirstByKey(historicalItems, 'productId');
   const hsByCode = new Map(
@@ -164,15 +165,11 @@ const evaluateExportReadiness = (contract = {}, {
     }
 
     const refundRate = toFiniteOrNull(hsRecord?.refundRate);
-    const targetMarkup = targetMarkupFor(config, refundRate);
-    const formula = purchaseCostCny && exchangeRate && effectiveExchangeRate > 0 && quantity
-      ? calculateFormulaPrice({
-          costCny: purchaseCostCny,
-          quantity,
-          effectiveRate: effectiveExchangeRate,
-          targetMarkup,
-          strictCap: config.mode === 'tiered' && refundRate === 0,
-        })
+    const categoryIds = item?.product?.categoryIds || [];
+    const targetMarkup = markupFor(categoryIds, config);
+    // 唯一报价规则：单位成本 = 行采购成本 ÷ 数量；缺成本/缺现汇不给建议价
+    const formula = purchaseCostCny && exchangeRate && quantity
+      ? priceFor({ costCny: purchaseCostCny / quantity, categoryIds, spotRate: exchangeRate }, config)
       : null;
     if (refundRate === null) {
       issues.push(makeIssue('MISSING_REFUND_RATE', 'error', 'tax_refund', '当前税则未提供出口退税率'));
@@ -238,8 +235,8 @@ const evaluateExportReadiness = (contract = {}, {
       unitPriceUsd: unitPriceUsd || 0,
       totalPriceUsd: calculatedTotalPriceUsd || 0,
       storedTotalPriceUsd: storedTotalPriceUsd || 0,
-      recommendedUnitPriceUsd: formula?.unitPriceUsd ?? null,
-      pricingFormula: `purchaseCostCny × ${1 + targetMarkup} ÷ effectiveExchangeRate ÷ quantity（整数单价或总额尾数 0/5 凑整）`,
+      recommendedUnitPriceUsd: formula?.status === 'OK' ? formula.unitPriceUsd : null,
+      pricingFormula: `单位采购成本¥ × ${round(1 + targetMarkup, 6)} ÷ 报价汇率（现汇${config.exchangeAdjustment}），向上取整到 ${config.roundUpTo}`,
       pricingProfitRate: 1 + targetMarkup,
       effectiveExchangeRate,
       exchangeRate: exchangeRate || 0,
@@ -292,8 +289,7 @@ const evaluateExportReadiness = (contract = {}, {
     portName: contract.port?.name || '',
     note: contract.note || '',
     exchangeRate: exchangeRate || 0,
-    profitRate: 1 + targetMarkupFor(config, null),
-    pricingMode: config.mode,
+    profitRate: round(1 + config.defaultMarkup, 6),
     effectiveExchangeRate,
     customsReady: !hasErrorsFor('customs'),
     taxRefundReady: !hasErrorsFor('tax_refund'),
@@ -336,6 +332,7 @@ const getExportReadiness = async (salesContractId, {
     },
   });
   if (!contract) throw createError('出口合同不存在', 404);
+  contract.packingItems = await withCategoryChains(contract.packingItems, prismaClient);
 
   const packingItemIds = new Set(contract.packingItems.map((item) => item.id));
   const unknownOverride = overrides.find((item) => !packingItemIds.has(item?.packingItemId));
