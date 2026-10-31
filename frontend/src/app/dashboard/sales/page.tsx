@@ -80,6 +80,15 @@ import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { MobileListCard } from "@/components/mobile";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 
+// 后端列表接口附带的 40HQ 汇总利用率（未排柜，百分比未取整）。
+type SalesRow = SalesContract & {
+  loadingUtilisation?: {
+    weightPct: number;
+    volumePct: number;
+    utilisationReady: boolean;
+  };
+};
+
 const LazyBatchImportDialog = lazy(() =>
   import("@/components/batch-import").then((module) => ({
     default: module.BatchImportDialog,
@@ -556,7 +565,7 @@ export default function SalesPage() {
   const ContainerInfo = ({ contract }: { contract: SalesContract }) => {
     if (!contract.totalBoxes && !contract.volume && !contract.grossWeight)
       return null;
-    const utilisation = contract.loadingUtilisation;
+    const utilisation = (contract as SalesRow).loadingUtilisation;
     const pctText = (pct: number) => (Math.floor(pct * 10) / 10).toFixed(1);
     const beforeShipment =
       contract.status === SalesStatus.DRAFT ||
