@@ -4,9 +4,19 @@
  * Pos: quote list and detail
  */
 import { SemanticBadge } from "@/components/ui/semantic-badge";
-import { QUOTE_STATUS_LABEL, QUOTE_STATUS_TONE, isQuoteStatus } from "@/lib/quote";
+import {
+  QUOTE_STATUS_LABEL,
+  QUOTE_STATUS_TONE,
+  isQuoteStatus,
+} from "@/lib/quote";
 
-export function QuoteStatusBadge({ status, expired = false }: { status: string; expired?: boolean }) {
+export function QuoteStatusBadge({
+  status,
+  expired = false,
+}: {
+  status: string;
+  expired?: boolean;
+}) {
   const known = isQuoteStatus(status);
   return (
     <span className="inline-flex items-center gap-1.5">

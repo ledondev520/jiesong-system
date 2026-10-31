@@ -47,7 +47,11 @@ export const listUrlFields = {
   },
   quotes: {
     keyword: { default: "", resetPage: true },
-    status: { default: "ALL", values: ["ALL", ...QUOTE_STATUSES], resetPage: true },
+    status: {
+      default: "ALL",
+      values: ["ALL", ...QUOTE_STATUSES],
+      resetPage: true,
+    },
     page: { default: 1 },
     pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
   },

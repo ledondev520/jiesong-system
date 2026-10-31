@@ -17,17 +17,28 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(window.location.search),
   usePathname: () => window.location.pathname,
 }));
-vi.mock("@/services/quote.service", () => ({ quoteService: { getAll: mocks.getAll } }));
+vi.mock("@/services/quote.service", () => ({
+  quoteService: { getAll: mocks.getAll },
+}));
 vi.mock("@/lib/hooks/useBusinessReadOnly", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/hooks/useBusinessReadOnly")>()),
   useBusinessReadOnly: () => mocks.readOnly,
-  BusinessWrite: ({ children }: { children: React.ReactNode }) => (mocks.readOnly ? null : children),
+  BusinessWrite: ({ children }: { children: React.ReactNode }) =>
+    mocks.readOnly ? null : children,
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 const quote = (extra = {}) => ({
-  id: "q1", quoteNo: "QT2610-001", status: "SENT", customer: { id: "c1", name: "Seapot" }, totalAmount: 1234.5,
-  validUntil: "2026-12-01T00:00:00.000Z", createdAt: "2026-10-31T01:00:00.000Z", isExpired: false, _count: { items: 3 }, ...extra,
+  id: "q1",
+  quoteNo: "QT2610-001",
+  status: "SENT",
+  customer: { id: "c1", name: "Seapot" },
+  totalAmount: 1234.5,
+  validUntil: "2026-12-01T00:00:00.000Z",
+  createdAt: "2026-10-31T01:00:00.000Z",
+  isExpired: false,
+  _count: { items: 3 },
+  ...extra,
 });
 
 describe("quote list", () => {
@@ -35,31 +46,63 @@ describe("quote list", () => {
     vi.clearAllMocks();
     mocks.readOnly = false;
     window.history.replaceState({}, "", "/dashboard/quotes");
-    mocks.getAll.mockResolvedValue({ data: { items: [quote(), quote({ id: "q2", quoteNo: "QT2610-002", isExpired: true })], pagination: { total: 2 } } });
+    mocks.getAll.mockResolvedValue({
+      data: {
+        items: [
+          quote(),
+          quote({ id: "q2", quoteNo: "QT2610-002", isExpired: true }),
+        ],
+        pagination: { total: 2 },
+      },
+    });
   });
 
   it("renders rows with status, amount and computed 已过期", async () => {
     render(<QuoteListPageContent />);
-    expect((await screen.findAllByText("QT2610-001")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("QT2610-001")).length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getAllByText("USD 1,234.50").length).toBeGreaterThan(0);
     expect(screen.getAllByText("已过期").length).toBeGreaterThan(0);
-    expect(mocks.getAll).toHaveBeenCalledWith({ page: 1, pageSize: 20, keyword: undefined, status: undefined });
+    expect(mocks.getAll).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 20,
+      keyword: undefined,
+      status: undefined,
+    });
   });
 
   it("search and status filter go through the URL and reset clears both", async () => {
     render(<QuoteListPageContent />);
     await screen.findAllByText("QT2610-001");
-    fireEvent.change(screen.getByLabelText("搜索报价"), { target: { value: "SEA" } });
+    fireEvent.change(screen.getByLabelText("搜索报价"), {
+      target: { value: "SEA" },
+    });
     expect(window.location.search).toBe("?keyword=SEA");
-    await waitFor(() => expect(mocks.getAll).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SEA" })));
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ keyword: "SEA" }),
+      ),
+    );
     fireEvent.click(screen.getByText("重置"));
     expect(window.location.search).toBe("");
   });
 
   it("restores filters from the URL on load", async () => {
-    window.history.replaceState({}, "", "/dashboard/quotes?keyword=X&status=ACCEPTED&page=2&pageSize=50");
+    window.history.replaceState(
+      {},
+      "",
+      "/dashboard/quotes?keyword=X&status=ACCEPTED&page=2&pageSize=50",
+    );
     render(<QuoteListPageContent />);
-    await waitFor(() => expect(mocks.getAll).toHaveBeenCalledWith({ page: 2, pageSize: 50, keyword: "X", status: "ACCEPTED" }));
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenCalledWith({
+        page: 2,
+        pageSize: 50,
+        keyword: "X",
+        status: "ACCEPTED",
+      }),
+    );
   });
 
   it("clicking a row opens the detail; 新建报价 goes to /create", async () => {

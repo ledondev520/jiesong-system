@@ -6,7 +6,14 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-export const QUOTE_STATUSES = ["DRAFT", "SENT", "ACCEPTED", "REJECTED", "CONVERTED", "CANCELLED"] as const;
+export const QUOTE_STATUSES = [
+  "DRAFT",
+  "SENT",
+  "ACCEPTED",
+  "REJECTED",
+  "CONVERTED",
+  "CANCELLED",
+] as const;
 export type QuoteStatus = (typeof QUOTE_STATUSES)[number];
 
 export const QUOTE_STATUS_LABEL: Record<QuoteStatus, string> = {
@@ -18,7 +25,10 @@ export const QUOTE_STATUS_LABEL: Record<QuoteStatus, string> = {
   CANCELLED: "已作废",
 };
 
-export const QUOTE_STATUS_TONE: Record<QuoteStatus, "neutral" | "info" | "success" | "danger" | "secondary"> = {
+export const QUOTE_STATUS_TONE: Record<
+  QuoteStatus,
+  "neutral" | "info" | "success" | "danger" | "secondary"
+> = {
   DRAFT: "neutral",
   SENT: "info",
   ACCEPTED: "success",
@@ -35,26 +45,43 @@ export type QuotePrimaryAction =
 
 export const primaryActionFor = (status: QuoteStatus): QuotePrimaryAction => {
   switch (status) {
-    case "DRAFT": return { kind: "transition", to: "SENT", label: "标记已发送" };
-    case "SENT": return { kind: "transition", to: "ACCEPTED", label: "客户已接受" };
-    case "ACCEPTED": return { kind: "transition", to: "CONVERTED", label: "转为出口订单" };
-    case "CONVERTED": return { kind: "viewOrder", label: "查看订单" };
-    default: return null;
+    case "DRAFT":
+      return { kind: "transition", to: "SENT", label: "标记已发送" };
+    case "SENT":
+      return { kind: "transition", to: "ACCEPTED", label: "客户已接受" };
+    case "ACCEPTED":
+      return { kind: "transition", to: "CONVERTED", label: "转为出口订单" };
+    case "CONVERTED":
+      return { kind: "viewOrder", label: "查看订单" };
+    default:
+      return null;
   }
 };
 
 /** 次要动作（与后端状态机一致）：SENT 可重开编辑或拒绝；DRAFT/SENT/ACCEPTED 可作废。 */
-export const secondaryTransitionsFor = (status: QuoteStatus): { to: QuoteStatus; label: string }[] => {
+export const secondaryTransitionsFor = (
+  status: QuoteStatus,
+): { to: QuoteStatus; label: string }[] => {
   const out: { to: QuoteStatus; label: string }[] = [];
-  if (status === "SENT") out.push({ to: "DRAFT", label: "重新编辑" }, { to: "REJECTED", label: "客户已拒绝" });
-  if (status === "DRAFT" || status === "SENT" || status === "ACCEPTED") out.push({ to: "CANCELLED", label: "作废" });
+  if (status === "SENT")
+    out.push(
+      { to: "DRAFT", label: "重新编辑" },
+      { to: "REJECTED", label: "客户已拒绝" },
+    );
+  if (status === "DRAFT" || status === "SENT" || status === "ACCEPTED")
+    out.push({ to: "CANCELLED", label: "作废" });
   return out;
 };
 
 export const isQuoteStatus = (value: unknown): value is QuoteStatus =>
-  typeof value === "string" && (QUOTE_STATUSES as readonly string[]).includes(value);
+  typeof value === "string" &&
+  (QUOTE_STATUSES as readonly string[]).includes(value);
 
-import { effectivePrice, isManualPrice, type OrderLine } from "@/lib/order-lines";
+import {
+  effectivePrice,
+  isManualPrice,
+  type OrderLine,
+} from "@/lib/order-lines";
 
 const num = (value: string) => {
   const parsed = Number(value);
@@ -74,7 +101,9 @@ export const toItemsPayload = (lines: OrderLine[]) =>
       quantity: Number(line.quantity),
       unit: line.unit || undefined,
       costCny: num(line.costCny),
-      ...(isManualPrice(line) && manual !== null ? { isManualPrice: true, unitPrice: manual } : {}),
+      ...(isManualPrice(line) && manual !== null
+        ? { isManualPrice: true, unitPrice: manual }
+        : {}),
     };
   });
 
@@ -87,9 +116,11 @@ export const validateLines = (lines: OrderLine[]): string | null => {
     const quantity = num(line.quantity);
     if (quantity === null || quantity <= 0) return `${row}：数量必须大于 0`;
     const cost = num(line.costCny);
-    if (line.costCny.trim() !== "" && (cost === null || cost <= 0)) return `${row}：成本必须大于 0`;
+    if (line.costCny.trim() !== "" && (cost === null || cost <= 0))
+      return `${row}：成本必须大于 0`;
     const manual = num(line.manualPrice);
-    if (isManualPrice(line) && (manual === null || manual < 0)) return `${row}：手动单价无效`;
+    if (isManualPrice(line) && (manual === null || manual < 0))
+      return `${row}：手动单价无效`;
   }
   return null;
 };
@@ -105,8 +136,14 @@ export const formatUsd = (value: number) =>
   `USD ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 type ItemLike = {
-  productId: string; storeId: string | null; quantity: number; unit: string | null;
-  costCny: number | null; isManualPrice: boolean; unitPrice: number; formulaPrice: number | null;
+  productId: string;
+  storeId: string | null;
+  quantity: number;
+  unit: string | null;
+  costCny: number | null;
+  isManualPrice: boolean;
+  unitPrice: number;
+  formulaPrice: number | null;
   product?: { customsName: string } | null;
 };
 
