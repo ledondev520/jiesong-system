@@ -342,10 +342,11 @@ test('addSalesItem: 门店属于其他客户时拒绝写入（评审 R1-3）', a
 });
 
 test('addSalesItem: 报价转换订单（有 quoteId）已存计价汇率，定价不再重复扣调整', async () => {
-  const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.product.findUnique];
+  const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.product.findUnique, prisma.store.findMany];
   let created = null;
   prisma.product.findUnique = async () => ({ id: 'p-1', categoryId: null });
-  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 6.52, quoteId: 'q-1' });
+  prisma.store.findMany = async () => [{ id: 's-1', customerId: 'c-1' }];
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 6.52, quoteId: 'q-1', customerId: 'c-1' });
   prisma.salesItem.create = async (args) => { created = args; return { id: 'si-1', ...args.data }; };
   prisma.salesItem.findMany = async () => [];
   prisma.salesContract.update = async () => ({ id: 'sc-1' });
@@ -354,7 +355,7 @@ test('addSalesItem: 报价转换订单（有 quoteId）已存计价汇率，定�
     // 成本 ¥10000 × 1.3 ÷ 6.52 = 1993.87 → 1994 → 1995；若再扣 0.2 会得到 2055
     assert.equal(created.data.sellingPrice, 1995);
   } finally {
-    [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.product.findUnique] = originals;
+    [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.product.findUnique, prisma.store.findMany] = originals;
   }
 });
 
