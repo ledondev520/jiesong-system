@@ -51,10 +51,6 @@ import {
 } from "recharts";
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
-  ModuleTabHeader,
-  OPERATIONS_TABS,
-} from "@/components/layout/ModuleTabHeader";
-import {
   reportsService,
   type BusinessOverview,
 } from "@/services/reports.service";
@@ -234,7 +230,6 @@ function BusinessReportsContent() {
     return (
       <div className="space-y-6">
         <PageHeader title="经营执行" showBack={false} />
-        <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/60" />
         </div>
@@ -246,7 +241,6 @@ function BusinessReportsContent() {
     return (
       <div className="space-y-6">
         <PageHeader title="经营执行" showBack={false} />
-        <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
         <Card className="border-border/40">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
             <span className="rounded-full bg-muted/60 p-4">
@@ -279,7 +273,6 @@ function BusinessReportsContent() {
   return (
     <div className="space-y-6">
       <PageHeader title="经营执行" showBack={false} />
-      <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
 
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 pt-4">

@@ -36,10 +36,6 @@ import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  EXPORT_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -240,7 +236,6 @@ export function TaxRefundListPageContent() {
 
   return (
     <div className="space-y-6 pb-10">
-      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="出口退税"
         description="从待申报清单、进项发票核验到申报明细生成，在一个工作台完成税局操作前准备。"

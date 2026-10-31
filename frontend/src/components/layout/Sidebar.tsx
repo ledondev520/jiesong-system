@@ -1,114 +1,128 @@
 /**
  * Input: 用户认证状态、路由信息
- * Output: 侧边导航栏组件（顶级模块分区）
+ * Output: 分组侧边导航栏（首页 / 业务 / 资料 / 设置），激活项展开子页面
  * Pos: 全局布局组件，提供系统导航功能
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  *
- * 导航分区结构：
- * - 经营中台：工作台、经营执行
- * - 采购模块：采购合同、供应商管理、库存状态
- * - 出口模块：出口合同、出口退税、HS 编码
- * - 财务模块：财务概览、财务报表、收付管理
- * - AI 助手：AI 会话
- * - 系统管理：系统配置、用户管理、商品档案、系统日志
- *
- * 侧边栏只负责模块入口与选中态，不拉取业务数据、不显示待办数量徽标、不竞争预取。
+ * 菜单结构来自 navigation.config.ts（指向现有 URL，角色可见性同样在该文件配置）；
+ * 侧边栏只负责入口与选中态，不拉取业务数据、不显示待办数量徽标。
  */
 
-'use client';
+"use client";
 
-import { useSyncExternalStore } from 'react';
-import { usePathname } from 'next/navigation';
-import Link from 'next/link';
-import { cn } from '@/lib/utils';
-import { Ship } from 'lucide-react';
-import { useAuthStore } from '@/store/auth.store';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { Ship } from "lucide-react";
+import { useAuthStore } from "@/store/auth.store";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  getModuleTargetHref,
-  getVisibleModuleNavItems,
+  getMenuNavItems,
   isModuleRouteActive,
-} from './navigation.config';
+  isTabRouteActive,
+  NAV_GROUP_LABELS,
+  type ModuleNavItem,
+  type NavGroup,
+} from "./navigation.config";
 
-// ==================== 组件 ====================
-
-const subscribeHydration = () => () => {};
-const getClientHydrationSnapshot = () => true;
-const getServerHydrationSnapshot = () => false;
+const GROUP_ORDER: NavGroup[] = ["main", "business", "data", "system"];
 
 /**
- * 职责：渲染侧边导航栏（顶级模块入口）
+ * 职责：渲染分组侧边导航栏
  * 思路：
- *   1. 侧边栏只显示 6 个模块入口，不列子页面
- *   2. 模块激活判断：当前路径属于该模块任一子路由前缀即高亮
- *   3. 子页面切换由各页面顶部的 ModuleTabHeader 水平 Tab 栏负责
- *   4. 不显示跨模块待办数量，避免导航与业务数据耦合
- *   5. 记忆目标直接写入 Link href，由 Next Link 统一处理生产预取与原生导航
+ *   1. 按 group 分段（首页 / 业务 / 资料 / 设置），分段标题来自配置
+ *   2. 当前路径属于某项或其 childPrefixes 时高亮；该项有 children 时展开子页面
+ *   3. 链接直接使用 defaultHref，由 Next Link 统一处理预取与导航
  */
 export function Sidebar() {
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
-  const hydrated = useSyncExternalStore(
-    subscribeHydration,
-    getClientHydrationSnapshot,
-    getServerHydrationSnapshot,
-  );
 
-  const visibleItems = getVisibleModuleNavItems(user?.role);
+  const items = getMenuNavItems(user?.role);
+  const groups = GROUP_ORDER.map((group) => ({
+    group,
+    items: items.filter((item) => item.group === group),
+  })).filter((entry) => entry.items.length > 0);
+
+  const renderItem = (item: ModuleNavItem) => {
+    const isActive = isModuleRouteActive(pathname, item);
+    return (
+      <div key={item.key}>
+        <Link
+          href={item.defaultHref}
+          aria-current={isActive ? "page" : undefined}
+          className={cn(
+            "group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            isActive
+              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
+          )}
+        >
+          {isActive && (
+            <span className="absolute -left-0.5 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
+          )}
+          <item.icon
+            className={cn(
+              "h-4 w-4 shrink-0",
+              isActive ? "text-primary" : "text-sidebar-foreground/50",
+            )}
+          />
+          <span className="flex-1">{item.label}</span>
+        </Link>
+        {isActive && item.children.length > 0 && (
+          <div className="ml-6 mt-1 grid gap-0.5 border-l border-sidebar-border pl-2">
+            {item.children.map((child) => {
+              const childActive = isTabRouteActive(pathname, child.href);
+              return (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  aria-current={childActive ? "page" : undefined}
+                  className={cn(
+                    "rounded-md px-2 py-1.5 text-[13px] transition-colors",
+                    childActive
+                      ? "font-medium text-foreground"
+                      : "text-sidebar-foreground/60 hover:text-sidebar-accent-foreground",
+                  )}
+                >
+                  {child.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo / 品牌区 */}
       <div className="flex h-16 items-center border-b border-sidebar-border px-5">
-        <Link href="/dashboard" className="flex items-center gap-3 font-semibold tracking-tight transition-opacity hover:opacity-80">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-3 font-semibold tracking-tight transition-opacity hover:opacity-80"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20">
             <Ship className="h-4 w-4" />
           </span>
           <span>捷淞国际物流</span>
         </Link>
       </div>
 
-      {/* 导航区：模块入口 */}
       <ScrollArea className="flex-1">
-        <nav className="px-3 py-4">
-          <div className="grid gap-1">
-            {visibleItems.map((item) => {
-              const isActive = isModuleRouteActive(pathname, item);
-              // SSR 首屏使用默认地址；hydration 后将真实记忆目标写进 href，
-              // 让 Next Link 原生导航，不再阻止默认跳转后额外执行 router.push。
-              const targetHref = item.key === 'ai'
-                ? item.defaultHref
-                : hydrated
-                  ? (isActive ? pathname : getModuleTargetHref(item))
-                  : item.defaultHref;
-              return (
-                <Link
-                  key={item.href}
-                  href={targetHref}
-                  className={cn(
-                    'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground',
-                  )}
-                >
-                  {isActive && (
-                    <span className="absolute -left-0.5 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
-                  )}
-                  <span className={cn(
-                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors',
-                    isActive
-                      ? 'bg-primary/15 text-primary'
-                      : 'bg-sidebar-accent/40 text-sidebar-foreground/50 group-hover:bg-sidebar-accent/70 group-hover:text-sidebar-foreground/80',
-                  )}>
-                    <item.icon className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="flex-1">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
+        <nav className="px-3 py-4" aria-label="侧边导航">
+          {groups.map(({ group, items: groupItems }) => (
+            <div key={group} className="mb-4 last:mb-0">
+              {NAV_GROUP_LABELS[group] && (
+                <p className="mb-1 px-3 text-xs font-medium text-sidebar-foreground/50">
+                  {NAV_GROUP_LABELS[group]}
+                </p>
+              )}
+              <div className="grid gap-1">{groupItems.map(renderItem)}</div>
+            </div>
+          ))}
         </nav>
       </ScrollArea>
 
