@@ -183,11 +183,12 @@ test.describe("关键按钮交互", () => {
 
   test("采购模块：供应商与库存入口可达", async ({ page }) => {
     await signInAsAdmin(page, "/dashboard/purchases");
-    await page.getByRole("link", { name: "供应商管理", exact: true }).click();
+    const sidebar = page.getByRole("navigation", { name: "侧边导航" });
+    await sidebar.getByRole("link", { name: "供应商", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "供应商管理", exact: true }),
     ).toBeVisible();
-    await page.getByRole("link", { name: "库存", exact: true }).click();
+    await sidebar.getByRole("link", { name: "库存", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "库存", exact: true }),
     ).toBeVisible();

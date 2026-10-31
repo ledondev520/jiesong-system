@@ -311,7 +311,10 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   // has no module tabs, so use its existing Return action before the menu path.
   await page.getByRole("button", { name: "返回", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/sales$/);
-  await page.getByRole("link", { name: "单证与退税", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "侧边导航" })
+    .getByRole("link", { name: "单证与退税", exact: true })
+    .click();
   await page.getByRole("tab", { name: "报关单", exact: true }).click();
   await page
     .getByRole("button", {
@@ -343,7 +346,10 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
     .locator('[data-slot="card-content"]');
   await expect(customsAmount).toBeVisible();
   await expect(customsAmount).toHaveText("USD 20");
-  await page.getByRole("link", { name: "单证与退税", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "侧边导航" })
+    .getByRole("link", { name: "单证与退税", exact: true })
+    .click();
   await page.getByRole("tab", { name: "退税记录", exact: true }).click();
   await page
     .getByRole("button", {

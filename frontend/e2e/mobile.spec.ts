@@ -120,9 +120,7 @@ for (const width of [320, 390, 430]) {
       await expect(
         sheet.getByRole("button", { name: "设置", exact: true }),
       ).toBeVisible();
-      await sheet
-        .getByRole("button", { name: "系统管理", exact: true })
-        .click();
+      await sheet.getByRole("button", { name: "设置", exact: true }).click();
       await expect(page).toHaveURL(/\/dashboard\/settings$/);
       await page.getByRole("button", { name: /搜索商品/ }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
