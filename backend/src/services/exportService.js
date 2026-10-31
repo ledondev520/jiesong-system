@@ -7,7 +7,7 @@
  */
 
 const ExcelJS = require('exceljs');
-const { withUtf8Bom } = require('../utils/csvExport');
+const { withUtf8Bom, csvSafeText } = require('../utils/csvExport');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
@@ -53,7 +53,7 @@ const exportData = async (type, query = {}) => {
 const toCSV = (headers, rows) => {
   const headerLine = headers.map(h => `"${h}"`).join(',');
   const dataLines = rows.map(row => 
-    row.map(cell => `"${(cell ?? '').toString().replace(/"/g, '""')}"`).join(',')
+    row.map(cell => `"${csvSafeText(cell).replace(/"/g, '""')}"`).join(',')
   );
   return withUtf8Bom([headerLine, ...dataLines].join('\n'));
 };
@@ -600,5 +600,6 @@ const exportSalesContractExcel = async (contractId) => {
 
 module.exports = {
   exportData,
+  toCSV,
   exportSalesContractExcel,
 };
