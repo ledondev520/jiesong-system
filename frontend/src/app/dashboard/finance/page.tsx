@@ -338,7 +338,7 @@ export default function FinancePage() {
                 公司财务进度
               </p>
               <h3 className="text-lg font-semibold tracking-tight">
-                先看收付压力，再下钻经营执行
+                先看收付压力，再下钻经营分析
               </h3>
               <p className="text-sm leading-6 text-muted-foreground">
                 财务概览先给出应付完成率、应收完成率和待付待收风险；三表导入、账期选择和收入利润、成本结构、资产负债下钻集中放在报表分析页面。
@@ -346,9 +346,9 @@ export default function FinancePage() {
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <Button asChild className="h-11 rounded-xl">
-                <Link href="/dashboard/payments">
+                <Link href="/dashboard/finance/receivable">
                   <Wallet className="mr-2 h-4 w-4" />
-                  进入收付管理
+                  进入应收（收款池）
                 </Link>
               </Button>
               <Button asChild variant="outline" className="h-11 rounded-xl">
@@ -727,14 +727,14 @@ export default function FinancePage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/payments" className="group">
+        <Link href="/dashboard/finance/receivable" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">收付管理</p>
+                  <p className="text-sm font-medium">收款池与分配</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    流水明细与登记操作
+                    记录到账、自动匹配与分配
                   </p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />

@@ -7,6 +7,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { payableWhere, outstandingOf } = require('./payablesService');
 const { createError } = require('../middleware/errorHandler');
 
 // ==================== 常量配置 ====================
@@ -170,8 +171,9 @@ async function loadPendingInvoices(limit = 500) {
  * 职责：加载所有有效采购合同（含供应商）
  */
 async function loadPurchaseContracts() {
+  // 应付口径唯一来源 payablesService：草稿/已取消合同不是应付，不参与付款匹配，未付余额同口径。
   const contracts = await prisma.purchaseContract.findMany({
-    where: { NOT: { status: 'CANCELLED' } },
+    where: payableWhere(),
     take: 1000,
     include: { supplier: true },
   });
@@ -181,7 +183,7 @@ async function loadPurchaseContracts() {
       c.supplier?.name,
       c.supplier?.shortName,
     ].filter(Boolean),
-    unpaidAmount: Math.max(c.totalAmount - c.paidAmount, 0),
+    unpaidAmount: outstandingOf(c),
   }));
 }
 
@@ -642,6 +644,7 @@ async function listContractsForMatch(contractType, search = '') {
 }
 
 module.exports = {
+  loadPurchaseContracts,
   runAutoMatch,
   getUnmatchedItems,
   manualMatch,

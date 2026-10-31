@@ -10,7 +10,7 @@ import { mockApiRoutes, signInAsAdmin } from "./helpers";
 // 合成数据验收布局和交互；不向真实业务接口提交记录。
 const routes = [
   "/dashboard",
-  "/dashboard/reports",
+  "/dashboard/finance/analysis",
   "/dashboard/contracts",
   "/dashboard/purchase/create",
   "/dashboard/purchase/pc-001",

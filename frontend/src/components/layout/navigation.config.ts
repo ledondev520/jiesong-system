@@ -167,7 +167,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       { href: "/dashboard/finance/invoices", label: "发票" },
       { href: "/dashboard/finance/reconciliation", label: "对账" },
       { href: "/dashboard/finance/statements", label: "财务报表" },
-      { href: "/dashboard/reports", label: "经营分析" },
+      { href: "/dashboard/finance/analysis", label: "经营分析" },
     ],
     group: "business",
   },

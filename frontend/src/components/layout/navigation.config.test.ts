@@ -86,6 +86,7 @@ describe("navigation.config helpers", () => {
     const owner: Record<string, string> = {
       "/dashboard": "home",
       "/dashboard/reports": "finance",
+      "/dashboard/finance/analysis": "finance",
       "/dashboard/contracts": "purchases",
       "/dashboard/purchase/create": "purchases",
       "/dashboard/suppliers": "suppliers",

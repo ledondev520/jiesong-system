@@ -153,7 +153,7 @@ for (const width of [390, 1440]) {
     const { writes, periods } = await mockContext(page);
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await signInAsAdmin(page, "/dashboard/reports?source=qa#report");
+    await signInAsAdmin(page, "/dashboard/finance/analysis?source=qa#report");
     const start = page.getByLabel("发运开始日期");
     const end = page.getByLabel("发运结束日期");
     const summary = page.getByText(/^发运期间：/);
