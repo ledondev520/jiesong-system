@@ -3,6 +3,7 @@
  * Output: 统一 CNY 口径的趋势和现金流预测
  * Pos: 财务图表的币种换算 Module
  */
+import { roundMoney } from './money';
 
 export interface PaymentTrendPoint {
   label: string;
@@ -28,7 +29,6 @@ export const convertPaymentTrendsToCny = (
   usdToCnyRate: number,
 ): CnyPaymentTrendPoint[] => {
   if (!Number.isFinite(usdToCnyRate) || usdToCnyRate <= 0) return [];
-  const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
   return trends.map((point) => {
     const receivablesCny = roundMoney((Number(point.receivables) || 0) * usdToCnyRate);
@@ -49,7 +49,6 @@ export const buildCnyCashFlowForecast = (
   const last = trends[trends.length - 1];
   const previous = trends[trends.length - 2];
   const delta = last.netCashFlowCny - previous.netCashFlowCny;
-  const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
   return [
     { label: `${last.label} (实际)`, value: last.netCashFlowCny, type: 'actual' },

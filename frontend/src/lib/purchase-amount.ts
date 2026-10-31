@@ -3,6 +3,7 @@
  * Output: 页面统一使用的价税、待付、超付和历史数据诊断
  * Pos: 采购详情、付款和催票展示的金额 Module；契约与后端 purchaseAmountService 一致
  */
+import { roundMoney } from './money';
 
 export interface PurchaseAmountIssue {
   code:
@@ -33,7 +34,6 @@ const toNumber = (value: unknown, fallback = 0) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 };
-const roundMoney = (value: unknown) => Math.round((toNumber(value) + Number.EPSILON) * 100) / 100;
 
 export const normalizePurchaseTaxRate = (value: unknown) => {
   const rate = toNumber(value, 13);
