@@ -18,7 +18,7 @@ const mockGetAgentToolRegistry = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
-  usePathname: () => "/dashboard/ai/sessions",
+  usePathname: () => "/dashboard/settings/ai-usage",
   useSearchParams: () => stableParams,
 }));
 vi.mock("@/services/ai.service", () => ({

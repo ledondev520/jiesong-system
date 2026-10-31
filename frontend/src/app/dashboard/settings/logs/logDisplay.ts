@@ -8,64 +8,64 @@
 
 /** 职责：审计动作代码 → 简短中文（未知则回退原文） */
 export function labelForAction(action: string | null | undefined): string {
-  if (!action) return '-';
+  if (!action) return "-";
   const map: Record<string, string> = {
-    CREATE: '新建',
-    UPDATE: '修改',
-    DELETE: '删除',
-    GENERATE: '生成',
-    UPLOAD: '上传',
-    IMPORT: '导入',
-    EXPORT: '导出',
-    LOGIN: '登录',
-    LOGOUT: '登出',
+    CREATE: "新建",
+    UPDATE: "修改",
+    DELETE: "删除",
+    GENERATE: "生成",
+    UPLOAD: "上传",
+    IMPORT: "导入",
+    EXPORT: "导出",
+    LOGIN: "登录",
+    LOGOUT: "登出",
   };
   return map[action] ?? action;
 }
 
 /** 职责：实体代码 → 业务名称（未知则回退原文） */
 export function labelForEntity(entity: string | null | undefined): string {
-  if (!entity) return '-';
+  if (!entity) return "-";
   const map: Record<string, string> = {
-    StoreRecommend: '门店采购建议',
-    ContractFile: '合同文件',
-    SalesContractFile: '出口合同文件',
-    ContractTemplate: '合同模板',
-    PurchaseContract: '采购合同',
-    PurchaseItem: '采购明细',
-    SalesContract: '销售合同',
-    SalesItem: '销售明细',
-    Supplier: '供应商',
-    SupplierAlias: '供应商别名',
-    Product: '商品',
-    ProductSupplier: '商品供应商',
-    PriceHistory: '商品价格历史',
-    ProductCategory: '商品分类',
-    User: '用户',
-    SystemConfig: '系统配置',
-    DataImport: '数据导入',
-    DataExport: '数据导出',
-    Container: '货柜',
-    ContainerItem: '货柜明细',
-    PackingItem: '装箱项目',
-    Payment: '收付款',
-    TaxRefund: '出口退税',
-    TaxRate: '税率',
-    ForexVerification: '外汇核销',
-    CustomsDeclaration: '报关单',
-    ChatSession: 'AI 会话',
-    Inventory: '库存',
-    OpsExecution: '经营执行',
-    OpsExecutionPurchaseTemplate: '经营执行采购模板',
-    Notification: '通知',
-    Store: '门店',
-    Port: '港口',
+    StoreRecommend: "门店采购建议",
+    ContractFile: "合同文件",
+    SalesContractFile: "出口合同文件",
+    ContractTemplate: "合同模板",
+    PurchaseContract: "采购合同",
+    PurchaseItem: "采购明细",
+    SalesContract: "销售合同",
+    SalesItem: "销售明细",
+    Supplier: "供应商",
+    SupplierAlias: "供应商别名",
+    Product: "商品",
+    ProductSupplier: "商品供应商",
+    PriceHistory: "商品价格历史",
+    ProductCategory: "商品分类",
+    User: "用户",
+    SystemConfig: "系统配置",
+    DataImport: "数据导入",
+    DataExport: "数据导出",
+    Container: "货柜",
+    ContainerItem: "货柜明细",
+    PackingItem: "装箱项目",
+    Payment: "收付款",
+    TaxRefund: "出口退税",
+    TaxRate: "税率",
+    ForexVerification: "外汇核销",
+    CustomsDeclaration: "报关单",
+    ChatSession: "AI 会话",
+    Inventory: "库存",
+    OpsExecution: "经营执行",
+    OpsExecutionPurchaseTemplate: "经营执行采购模板",
+    Notification: "通知",
+    Store: "门店",
+    Port: "港口",
   };
   return map[entity] ?? entity;
 }
 
 const tryParseJson = (raw: string | null | undefined): unknown => {
-  if (!raw || typeof raw !== 'string') return null;
+  if (!raw || typeof raw !== "string") return null;
   try {
     return JSON.parse(raw);
   } catch {
@@ -76,14 +76,22 @@ const tryParseJson = (raw: string | null | undefined): unknown => {
 /** 职责：从记录对象中提取主要显示名称（按常见字段优先级） */
 function extractName(obj: Record<string, unknown>): string | null {
   const candidates = [
-    'name', 'title', 'username', 'email',
-    'contractNo', 'declarationNo', 'containerNo',
-    'storeName', 'supplierName', 'productName',
-    'key', 'id',
+    "name",
+    "title",
+    "username",
+    "email",
+    "contractNo",
+    "declarationNo",
+    "containerNo",
+    "storeName",
+    "supplierName",
+    "productName",
+    "key",
+    "id",
   ] as const;
   for (const key of candidates) {
     const val = obj[key];
-    if (val != null && val !== '') return String(val);
+    if (val != null && val !== "") return String(val);
   }
   return null;
 }
@@ -91,9 +99,10 @@ function extractName(obj: Record<string, unknown>): string | null {
 /** 职责：金额 + 货币格式化 */
 function fmtAmount(obj: Record<string, unknown>): string | null {
   const amount = obj.amount ?? obj.totalAmount ?? obj.invoiceAmount;
-  const currency = obj.currency ?? obj.currencyCode ?? '';
+  const currency = obj.currency ?? obj.currencyCode ?? "";
   if (amount == null) return null;
-  const amtStr = typeof amount === 'number' ? amount.toLocaleString() : String(amount);
+  const amtStr =
+    typeof amount === "number" ? amount.toLocaleString() : String(amount);
   return currency ? `${amtStr} ${currency}` : amtStr;
 }
 
@@ -115,59 +124,75 @@ export function describeLogValues(log: {
   const ov = tryParseJson(log.oldValue ?? undefined);
   const entityLabel = labelForEntity(log.entity);
   const actionLabel = labelForAction(log.action);
-  const nvObj = nv && typeof nv === 'object' ? (nv as Record<string, unknown>) : null;
-  const ovObj = ov && typeof ov === 'object' ? (ov as Record<string, unknown>) : null;
+  const nvObj =
+    nv && typeof nv === "object" ? (nv as Record<string, unknown>) : null;
+  const ovObj =
+    ov && typeof ov === "object" ? (ov as Record<string, unknown>) : null;
   const refObj = nvObj ?? ovObj;
 
   // ── 专属：门店采购建议（生成接口摘要） ──────────────────────────────
-  if (log.entity === 'StoreRecommend' && log.action === 'GENERATE' && nvObj) {
+  if (log.entity === "StoreRecommend" && log.action === "GENERATE" && nvObj) {
     const sid = nvObj.storeId;
-    const storePart = sid == null ? '未指定门店' : `门店 ID：${String(sid)}`;
-    const reqLines = typeof nvObj.requestedItems === 'number' ? `${nvObj.requestedItems} 行` : '—';
-    const out = typeof nvObj.resultCount === 'number' ? `${nvObj.resultCount} 条` : '—';
-    hints.push(`【生成采购建议】${storePart}；请求携带商品明细 ${reqLines}；接口返回推荐 ${out}。`);
+    const storePart = sid == null ? "未指定门店" : `门店 ID：${String(sid)}`;
+    const reqLines =
+      typeof nvObj.requestedItems === "number"
+        ? `${nvObj.requestedItems} 行`
+        : "—";
+    const out =
+      typeof nvObj.resultCount === "number" ? `${nvObj.resultCount} 条` : "—";
+    hints.push(
+      `【生成采购建议】${storePart}；请求携带商品明细 ${reqLines}；接口返回推荐 ${out}。`,
+    );
     return { hints };
   }
 
   // ── 专属：合同文件（由采购合同生成购销合同） ───────────────────────
-  if (log.entity === 'ContractFile' && log.action === 'GENERATE' && nvObj) {
-    const pid = nvObj.purchaseContractId ?? '—';
-    const sn = nvObj.storeName != null && nvObj.storeName !== '' ? String(nvObj.storeName) : '—';
+  if (log.entity === "ContractFile" && log.action === "GENERATE" && nvObj) {
+    const pid = nvObj.purchaseContractId ?? "—";
+    const sn =
+      nvObj.storeName != null && nvObj.storeName !== ""
+        ? String(nvObj.storeName)
+        : "—";
     hints.push(`【生成合同文件】采购合同 ID：${pid}；门店名称：${sn}。`);
     return { hints };
   }
 
   // ── 专属：用户登录/登出 ────────────────────────────────────────────
-  if (log.entity === 'User' && (log.action === 'LOGIN' || log.action === 'LOGOUT')) {
-    hints.push(log.action === 'LOGIN' ? '用户登录系统。' : '用户退出登录。');
+  if (
+    log.entity === "User" &&
+    (log.action === "LOGIN" || log.action === "LOGOUT")
+  ) {
+    hints.push(log.action === "LOGIN" ? "用户登录系统。" : "用户退出登录。");
     return { hints };
   }
 
   // ── 专属：系统配置修改 ────────────────────────────────────────────
-  if (log.entity === 'SystemConfig' && log.action === 'UPDATE' && nvObj) {
-    const keys = Object.keys(nvObj).filter((k) => k !== 'id' && k !== 'updatedAt');
+  if (log.entity === "SystemConfig" && log.action === "UPDATE" && nvObj) {
+    const keys = Object.keys(nvObj).filter(
+      (k) => k !== "id" && k !== "updatedAt",
+    );
     if (keys.length > 0) {
-      const keyList = keys.slice(0, 5).join('、');
-      const more = keys.length > 5 ? `等 ${keys.length} 项` : '';
+      const keyList = keys.slice(0, 5).join("、");
+      const more = keys.length > 5 ? `等 ${keys.length} 项` : "";
       hints.push(`修改了系统配置项：${keyList}${more}。`);
     } else {
-      hints.push('修改了系统配置。');
+      hints.push("修改了系统配置。");
     }
     return { hints };
   }
 
   // ── 专属：数据导入 ───────────────────────────────────────────────
-  if (log.entity === 'DataImport' && nvObj) {
-    const type = nvObj.type ?? nvObj.dataType ?? '—';
+  if (log.entity === "DataImport" && nvObj) {
+    const type = nvObj.type ?? nvObj.dataType ?? "—";
     const count = nvObj.count ?? nvObj.rowCount ?? nvObj.totalRows;
-    const countStr = count != null ? `共 ${count} 条` : '';
+    const countStr = count != null ? `共 ${count} 条` : "";
     hints.push(`导入数据（类型：${type}）${countStr}。`);
     return { hints };
   }
 
   // ── 专属：数据导出 ───────────────────────────────────────────────
-  if (log.entity === 'DataExport' && nvObj) {
-    const type = nvObj.type ?? nvObj.dataType ?? '—';
+  if (log.entity === "DataExport" && nvObj) {
+    const type = nvObj.type ?? nvObj.dataType ?? "—";
     hints.push(`导出数据（类型：${type}）。`);
     return { hints };
   }
@@ -180,17 +205,20 @@ export function describeLogValues(log: {
     let sentence = `${actionLabel}${entityLabel}`;
     if (displayName) sentence += `「${displayName}」`;
     if (amtStr) sentence += `，金额：${amtStr}`;
-    sentence += '。';
+    sentence += "。";
     hints.push(sentence);
 
     // 对 UPDATE，额外显示字段变更摘要
-    if (log.action === 'UPDATE' && nvObj && ovObj) {
+    if (log.action === "UPDATE" && nvObj && ovObj) {
       const changedKeys = Object.keys(nvObj).filter(
-        (k) => k !== 'id' && k !== 'updatedAt' && k !== 'createdAt'
-          && JSON.stringify(nvObj[k]) !== JSON.stringify(ovObj[k]),
+        (k) =>
+          k !== "id" &&
+          k !== "updatedAt" &&
+          k !== "createdAt" &&
+          JSON.stringify(nvObj[k]) !== JSON.stringify(ovObj[k]),
       );
       if (changedKeys.length > 0 && changedKeys.length <= 6) {
-        const keyList = changedKeys.slice(0, 6).join('、');
+        const keyList = changedKeys.slice(0, 6).join("、");
         hints.push(`变更字段：${keyList}。`);
       } else if (changedKeys.length > 6) {
         hints.push(`共 ${changedKeys.length} 个字段发生变更。`);

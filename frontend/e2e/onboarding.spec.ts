@@ -37,7 +37,7 @@ for (const width of [390, 1440]) {
         });
       }
     });
-    await signInAsAdmin(page, "/dashboard/users");
+    await signInAsAdmin(page, "/dashboard/settings/users");
     await page
       .getByRole("button", { name: "未开通/已停用（1）", exact: true })
       .click();

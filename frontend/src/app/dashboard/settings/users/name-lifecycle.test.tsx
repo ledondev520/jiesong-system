@@ -26,7 +26,6 @@ import {
 } from "vitest";
 import type { User } from "@/types";
 import UsersPage from "./page";
-import SettingsUsersPage from "../settings/users/page";
 import {
   accountNameApi,
   readAccountName,
@@ -172,10 +171,7 @@ describe("ordinary account-name lifecycle through real localhost APIs", () => {
     setAccountNameFault(fixture);
   });
 
-  it.each([
-    ["row31", UsersPage],
-    ["row33", SettingsUsersPage],
-  ] as const)(
+  it.each([["row31", UsersPage]] as const)(
     "%s cancellation sends zero PUTs; saved name survives reopen and reload",
     async (label, Page) => {
       const target = fixture.first;
@@ -222,10 +218,7 @@ describe("ordinary account-name lifecycle through real localhost APIs", () => {
     },
   );
 
-  it.each([
-    ["row31", UsersPage],
-    ["row33", SettingsUsersPage],
-  ] as const)(
+  it.each([["row31", UsersPage]] as const)(
     "%s real failed update retains draft and requires explicit retry",
     async (label, Page) => {
       const target = fixture.first;
@@ -275,10 +268,7 @@ describe("ordinary account-name lifecycle through real localhost APIs", () => {
     },
   );
 
-  it.each([
-    ["row31", UsersPage],
-    ["row33", SettingsUsersPage],
-  ] as const)(
+  it.each([["row31", UsersPage]] as const)(
     "%s search finds independently seeded target beyond the first 100 users",
     async (label, Page) => {
       const target = fixture.later;
