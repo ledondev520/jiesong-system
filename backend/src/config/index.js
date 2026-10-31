@@ -92,14 +92,41 @@ if (envResult.error && envResult.error.code !== 'ENOENT') {
 }
 
 const aiProvider = (process.env.AI_PROVIDER || 'kimi').trim().toLowerCase();
-if (!['kimi', 'deepseek'].includes(aiProvider)) {
-  throw new Error('AI_PROVIDER 仅支持 kimi 或 deepseek');
+if (!['kimi', 'deepseek', 'openai'].includes(aiProvider)) {
+  throw new Error('AI_PROVIDER 仅支持 kimi、deepseek 或 openai');
 }
 const kimi = {
   provider: 'kimi',
   apiKey: process.env.KIMI_API_KEY || '',
   baseUrl: process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1',
 };
+
+// OpenAI：密钥只来自进程环境（systemd/pm2 的 EnvironmentFile，如 /etc/openai/openai.env），不入库、不写仓库、不打印。
+const boundedInt = (value, fallback, min, max) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
+};
+const openai = {
+  provider: 'openai',
+  apiKey: (process.env.OPENAI_API_KEY || '').trim(),
+  baseUrl: (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').trim(),
+  model: (process.env.OPENAI_MODEL || '').trim(),
+  // 429/5xx 的有限重试次数（共用同一完整响应 deadline）；0 = 单次调用
+  maxRetries: boundedInt(process.env.OPENAI_MAX_RETRIES, 1, 0, 2),
+  maxOutputTokens: boundedInt(process.env.OPENAI_MAX_OUTPUT_TOKENS, 16000, 256, 128000),
+};
+if (aiProvider === 'openai') {
+  if (!openai.apiKey || !openai.model) {
+    throw new Error('AI_PROVIDER=openai 需要同时配置 OPENAI_API_KEY 与 OPENAI_MODEL');
+  }
+  // 密钥只发往 https；http 仅允许本机回环（本地模拟服务）。
+  let endpoint;
+  try { endpoint = new URL(openai.baseUrl); } catch { throw new Error('OPENAI_BASE_URL 无效'); }
+  const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname);
+  if (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && loopback)) {
+    throw new Error('OPENAI_BASE_URL 必须使用 https（仅本机回环可用 http）');
+  }
+}
 
 // Optional email registration must be either fully configured or disabled.
 const emailKeys = ['ALIBABA_CLOUD_ACCESS_KEY_ID', 'ALIBABA_CLOUD_ACCESS_KEY_SECRET', 'JIESONG_EMAIL_FROM'];
@@ -121,12 +148,13 @@ const config = {
   },
   
   // 活动 AI 供系统聊天、HS 推荐与 Agent 使用；Kimi 独立配置保留兼容既有集成。
-  ai: aiProvider === 'deepseek' ? {
+  ai: aiProvider === 'openai' ? openai : aiProvider === 'deepseek' ? {
     provider: 'deepseek',
     apiKey: process.env.DEEPSEEK_API_KEY || '',
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
   } : kimi,
   kimi,
+  openai,
 
   // HSCIQ API 配置（海关编码智能查询）
   hsciq: {

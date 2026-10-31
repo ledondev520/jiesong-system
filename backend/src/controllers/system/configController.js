@@ -154,6 +154,10 @@ const getConfigs = async (req, res, next) => {
       formatted.deepseekApiKey = formatted.deepseekApiKey ||
         normalizeConfigValueForResponse('deepseekApiKey', activeAi.apiKey || '');
       formatted.apiKey = formatted.deepseekApiKey;
+    } else if (formatted.aiProvider === 'openai') {
+      // OpenAI 密钥只来自进程环境，从不经 API 返回（连掩码后缀也不给）；仅暴露"已配置"与模型名。
+      formatted.openaiConfigured = Boolean(activeAi.apiKey);
+      formatted.openaiModel = activeAi.model;
     } else if (!formatted.apiKey && activeAi.apiKey) {
       formatted.apiKey = normalizeConfigValueForResponse('apiKey', activeAi.apiKey);
     }

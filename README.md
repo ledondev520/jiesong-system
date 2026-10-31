@@ -28,7 +28,7 @@
 
 - **Frontend**: Next.js 16 (App Router) + Tailwind CSS + shadcn/ui
 - **Backend**: Express + Prisma 5 + SQLite（当前 schema 与已提交迁移，详见 `backend/`）
-- **AI**: Kimi 或 DeepSeek，由 `AI_PROVIDER` 选择；需另外配置密钥，未配置不代表已验证真实调用
+- **AI**: Kimi、DeepSeek 或 OpenAI，由 `AI_PROVIDER` 选择；需另外配置密钥，未配置不代表已验证真实调用
 
 ## 项目结构
 

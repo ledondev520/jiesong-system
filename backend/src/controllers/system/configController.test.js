@@ -117,6 +117,27 @@ test('getConfigs: DeepSeek 使用独立密钥，旧 Kimi 配置不冒充当前�
   }
 });
 
+test('getConfigs: OpenAI 环境密钥从不返回（连脱敏后缀也没有），只给已配置标记与模型名', async () => {
+  const config = require('../../config');
+  const originalAi = config.ai;
+  const originalFindMany = prisma.systemConfig.findMany;
+  try {
+    config.ai = { provider: 'openai', apiKey: 'test-only-openai-env-5555', model: 'synthetic-openai-model' };
+    prisma.systemConfig.findMany = async () => [];
+    const res = createMockRes();
+    await configController.getConfigs({}, res, (error) => { throw error; });
+    assert.equal(res.payload.data.aiProvider, 'openai');
+    assert.equal(res.payload.data.openaiConfigured, true);
+    assert.equal(res.payload.data.openaiModel, 'synthetic-openai-model');
+    assert.equal(Object.hasOwn(res.payload.data, 'apiKey'), false);
+    assert.equal(JSON.stringify(res.payload).includes('5555'), false);
+    assert.equal(JSON.stringify(res.payload).includes('test-only-'), false);
+  } finally {
+    config.ai = originalAi;
+    prisma.systemConfig.findMany = originalFindMany;
+  }
+});
+
 test('updateConfig: upsert 时会 JSON.stringify(value)', async () => {
   const originalUpsert = prisma.systemConfig.upsert;
   let upsertArgs = null;

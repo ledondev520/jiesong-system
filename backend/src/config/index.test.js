@@ -100,6 +100,27 @@ test('config: DeepSeek 是独立活动配置，不覆盖保留的 Kimi 配置', 
   assert.notEqual(config.ai, config.kimi);
 });
 
+test('config: OpenAI 需要密钥与模型，密钥只发往 https（本机回环除外），重试/输出上限有界', () => {
+  const base = { AI_PROVIDER: 'openai', JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx', OPENAI_BASE_URL: '' };
+  const config = loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'non-production-openai-test-placeholder', OPENAI_MODEL: ' synthetic-model ' });
+  assert.equal(config.ai, config.openai);
+  assert.deepEqual({ ...config.ai }, {
+    provider: 'openai', apiKey: 'non-production-openai-test-placeholder', baseUrl: 'https://api.openai.com/v1',
+    model: 'synthetic-model', maxRetries: 1, maxOutputTokens: 16000,
+  });
+  assert.throws(() => loadConfigWithEnv({ ...base, OPENAI_API_KEY: '', OPENAI_MODEL: 'm' }), /OPENAI_API_KEY/);
+  assert.throws(() => loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: '' }), /OPENAI_MODEL/);
+  assert.throws(() => loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_BASE_URL: 'http://api.example.test/v1' }), /https/);
+  assert.throws(() => loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_BASE_URL: 'not a url' }), /OPENAI_BASE_URL/);
+  assert.equal(loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_BASE_URL: 'http://127.0.0.1:9/v1' }).ai.baseUrl, 'http://127.0.0.1:9/v1');
+  const bounded = loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_MAX_RETRIES: '9', OPENAI_MAX_OUTPUT_TOKENS: '10' }).ai;
+  assert.equal(bounded.maxRetries, 1, 'out-of-range retries fall back to the default');
+  assert.equal(bounded.maxOutputTokens, 16000);
+  assert.equal(loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_MAX_RETRIES: '0' }).ai.maxRetries, 0);
+  // Other providers do not require any OpenAI variable.
+  assert.equal(loadConfigWithEnv({ AI_PROVIDER: 'kimi', JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx', OPENAI_API_KEY: '', OPENAI_MODEL: '' }).ai.provider, 'kimi');
+});
+
 test('config: 未知供应商在启动时拒绝，Kimi 活动配置复用原对象', () => {
   assert.throws(() => loadConfigWithEnv({ AI_PROVIDER: 'unsupported-provider' }), /AI_PROVIDER/);
   const config = loadConfigWithEnv({ AI_PROVIDER: 'kimi', JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx' });
