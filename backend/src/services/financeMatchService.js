@@ -22,6 +22,8 @@ const CONTRACT_TYPE = {
   PURCHASE: 'PURCHASE',
   SALES: 'SALES',
 };
+// 选择器用途：PAYMENT = 银行付款/收款匹配，INVOICE = 发票关联
+const MATCH_PURPOSE = { PAYMENT: 'PAYMENT', INVOICE: 'INVOICE' };
 
 const SCORE_THRESHOLD = 70; // 高置信度阈值
 const AMOUNT_TOLERANCE = 0.001; // ±0.1%
@@ -170,10 +172,12 @@ async function loadPendingInvoices(limit = 500) {
 /**
  * 职责：加载所有有效采购合同（含供应商）
  */
-async function loadPurchaseContracts() {
-  // 应付口径唯一来源 payablesService：草稿/已取消合同不是应付，不参与付款匹配，未付余额同口径。
+async function loadPurchaseContracts(purpose = MATCH_PURPOSE.PAYMENT) {
+  // 付款匹配：应付口径唯一来源 payablesService（草稿/已取消合同不是应付，未付余额同口径）。
+  // 发票关联：只是把进项发票挂到合同上，不涉及欠款，保持"未取消"范围与原有未付余额算法不变。
+  const forPayment = purpose !== MATCH_PURPOSE.INVOICE;
   const contracts = await prisma.purchaseContract.findMany({
-    where: payableWhere(),
+    where: forPayment ? payableWhere() : { NOT: { status: 'CANCELLED' } },
     take: 1000,
     include: { supplier: true },
   });
@@ -183,7 +187,7 @@ async function loadPurchaseContracts() {
       c.supplier?.name,
       c.supplier?.shortName,
     ].filter(Boolean),
-    unpaidAmount: outstandingOf(c),
+    unpaidAmount: forPayment ? outstandingOf(c) : Math.max(c.totalAmount - c.paidAmount, 0),
   }));
 }
 
@@ -345,10 +349,11 @@ function matchInvoiceToSales(inv, contracts) {
  *   5. 更新关联合同的已付/已收金额
  */
 async function runAutoMatch() {
-  const [bankTxns, invoices, purchaseContracts, salesContracts] = await Promise.all([
+  const [bankTxns, invoices, purchaseContracts, invoicePurchaseContracts, salesContracts] = await Promise.all([
     loadPendingBankTxns(),
     loadPendingInvoices(),
-    loadPurchaseContracts(),
+    loadPurchaseContracts(MATCH_PURPOSE.PAYMENT),
+    loadPurchaseContracts(MATCH_PURPOSE.INVOICE),
     loadSalesContracts(),
   ]);
 
@@ -398,7 +403,7 @@ async function runAutoMatch() {
 
   // 2. 匹配发票
   for (const inv of invoices) {
-    const pBest = matchInvoiceToPurchase(inv, purchaseContracts);
+    const pBest = matchInvoiceToPurchase(inv, invoicePurchaseContracts);
     const sBest = matchInvoiceToSales(inv, salesContracts);
 
     let best;
@@ -594,10 +599,11 @@ async function ignore(entityType, entityId) {
 /**
  * 职责：获取可用于人工匹配的合同列表（按类型筛选）
  */
-async function listContractsForMatch(contractType, search = '') {
+async function listContractsForMatch(contractType, search = '', purpose = MATCH_PURPOSE.PAYMENT) {
   if (contractType === CONTRACT_TYPE.PURCHASE) {
     const where = {
-      NOT: { status: 'CANCELLED' },
+      // 付款匹配只列已生效合同（草稿/已取消不是应付）；发票关联可含草稿，仅排除已取消
+      ...(purpose === MATCH_PURPOSE.INVOICE ? { NOT: { status: 'CANCELLED' } } : payableWhere()),
       ...(search
         ? {
             OR: [
@@ -644,6 +650,7 @@ async function listContractsForMatch(contractType, search = '') {
 }
 
 module.exports = {
+  MATCH_PURPOSE,
   loadPurchaseContracts,
   runAutoMatch,
   getUnmatchedItems,

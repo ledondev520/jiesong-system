@@ -122,12 +122,17 @@ const ignore = async (req, res, next) => {
 const listContracts = async (req, res, next) => {
   try {
     const { contractType, search } = req.query;
+    // purpose：PAYMENT（默认，付款匹配，不含草稿）或 INVOICE（发票关联，含草稿、不含已取消）
+    const purpose = req.query.purpose === undefined ? 'PAYMENT' : req.query.purpose;
+    if (!['PAYMENT', 'INVOICE'].includes(purpose)) {
+      return next(createError('purpose 必须是 PAYMENT 或 INVOICE', 400));
+    }
 
     if (!contractType || !['PURCHASE', 'SALES'].includes(contractType)) {
       return next(createError('contractType 必须是 PURCHASE 或 SALES', 400));
     }
 
-    const contracts = await financeMatchService.listContractsForMatch(contractType, search);
+    const contracts = await financeMatchService.listContractsForMatch(contractType, search, purpose);
     success(res, contracts);
   } catch (error) {
     next(error);

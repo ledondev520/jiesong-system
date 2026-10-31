@@ -121,6 +121,10 @@ export default function ReconciliationPage() {
     "PURCHASE",
   );
   const [contractSearch, setContractSearch] = useState("");
+  // 选中银行流水 = 付款匹配（不含草稿采购合同）；否则按发票关联（含草稿）
+  const pickerPurpose: "PAYMENT" | "INVOICE" = selectedBankId
+    ? "PAYMENT"
+    : "INVOICE";
   const [contracts, setContracts] = useState<ContractForMatch[]>([]);
   const [contractsLoading, setContractsLoading] = useState(false);
 
@@ -175,7 +179,12 @@ export default function ReconciliationPage() {
   const fetchContracts = useCallback(
     () =>
       runAwait(
-        () => getContractsForMatch(contractType, contractSearch || undefined),
+        () =>
+          getContractsForMatch(
+            contractType,
+            contractSearch || undefined,
+            pickerPurpose,
+          ),
         (list) => {
           setContracts(list);
         },
@@ -186,7 +195,7 @@ export default function ReconciliationPage() {
           setContractsLoading(false);
         },
       ),
-    [contractType, contractSearch],
+    [contractType, contractSearch, pickerPurpose],
   );
 
   const loadContracts = useCallback(() => {
@@ -210,7 +219,11 @@ export default function ReconciliationPage() {
   }
 
   // 合同查询条件变化（含首次渲染，与原挂载 effect 一致）时在渲染期同步进入加载态
-  const contractsKey = JSON.stringify([contractType, contractSearch]);
+  const contractsKey = JSON.stringify([
+    contractType,
+    contractSearch,
+    pickerPurpose,
+  ]);
   const [prevContractsKey, setPrevContractsKey] = useState<string | null>(null);
   if (prevContractsKey !== contractsKey) {
     setPrevContractsKey(contractsKey);
