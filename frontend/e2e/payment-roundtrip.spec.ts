@@ -68,7 +68,7 @@ for (const width of [390, 1440]) {
         json: { code: 201, data: contract.payments[0] },
       });
     });
-    await signInAsAdmin(page, "/dashboard/purchase/pc-001");
+    await signInAsAdmin(page, "/dashboard/purchases/pc-001");
     const open = () =>
       page.getByRole("button", { name: "登记付款", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "录入付款" });

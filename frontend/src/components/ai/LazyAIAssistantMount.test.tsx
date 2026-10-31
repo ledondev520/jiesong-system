@@ -39,7 +39,7 @@ describe('LazyAIAssistantMount', () => {
   });
 
   it('手机工作台通过更多进入 AI，不再用悬浮入口遮挡列表', () => {
-    mockPathname = '/dashboard/contracts';
+    mockPathname = '/dashboard/purchases';
     mockMobile = true;
     render(<LazyAIAssistantMount />);
     expect(screen.queryByText('AI 助手挂载体')).not.toBeInTheDocument();

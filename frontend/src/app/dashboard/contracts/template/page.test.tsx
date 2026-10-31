@@ -17,6 +17,6 @@ describe('ContractTemplateUploadPage', () => {
   it('旧模板上传路由回到采购合同页', () => {
     ContractTemplateUploadPage();
 
-    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/contracts');
+    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/purchases');
   });
 });

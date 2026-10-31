@@ -17,6 +17,6 @@ describe('ContractTemplatesPage', () => {
   it('旧模板管理路由回到采购合同页', () => {
     ContractTemplatesPage();
 
-    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/contracts');
+    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/purchases');
   });
 });

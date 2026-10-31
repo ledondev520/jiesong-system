@@ -11,8 +11,7 @@ export function BusinessWrite({ children }: { children: ReactNode }) {
 }
 
 export const isBossRestrictedPath = (pathname: string) => (
-  /\/(create|edit)(\/|$)/.test(pathname)
+  /\/(create|edit|new)(\/|$)/.test(pathname)
   || /^\/dashboard\/(ai|settings|users)(\/|$)/.test(pathname)
   || (/^\/dashboard\/system(\/|$)/.test(pathname) && pathname !== '/dashboard/system/notifications')
-  || /^\/dashboard\/contracts\/(template|templates)(\/|$)/.test(pathname)
 );

@@ -16,13 +16,13 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('PurchasePage 重定向', () => {
-  it('访问 /dashboard/purchase 时跳转到采购合同列表', () => {
+  it('访问 /dashboard/purchase 时跳转到采购列表', () => {
     try {
       PurchasePage();
     } catch {
       // next redirect throws by design
     }
 
-    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/contracts');
+    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/purchases');
   });
 });

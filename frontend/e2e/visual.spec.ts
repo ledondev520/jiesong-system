@@ -39,7 +39,7 @@ test.describe('visual regression', () => {
   });
 
   test('visual-procurement', async ({ page }) => {
-    await signInAsAdmin(page, '/dashboard/contracts');
+    await signInAsAdmin(page, '/dashboard/purchases');
     await expect(page.getByText('采购执行概览')).toBeVisible();
     await expect(page).toHaveScreenshot('procurement-page.png', {
       ...screenshotOptions,

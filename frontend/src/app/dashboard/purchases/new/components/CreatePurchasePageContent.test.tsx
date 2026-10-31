@@ -130,7 +130,7 @@ describe("采购表单编号", () => {
       items: [{ productId: "product-1", quantity: 2, unitPrice: 10 }],
     });
     expect(mocks.update).not.toHaveBeenCalled();
-    expect(mocks.push).toHaveBeenCalledWith("/dashboard/contracts");
+    expect(mocks.push).toHaveBeenCalledWith("/dashboard/purchases");
   });
 
   it("草稿更正继续发送原始显式编号，不查询新增预览", async () => {
@@ -153,7 +153,7 @@ describe("采购表单编号", () => {
     );
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.getNextContractNo).not.toHaveBeenCalled();
-    expect(mocks.push).toHaveBeenCalledWith("/dashboard/purchase/draft-1");
+    expect(mocks.push).toHaveBeenCalledWith("/dashboard/purchases/draft-1");
   });
 });
 

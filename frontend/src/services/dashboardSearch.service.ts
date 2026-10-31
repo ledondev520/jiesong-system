@@ -133,7 +133,7 @@ export const getDashboardSearchHref = (result: DashboardSearchResult) => {
     case 'supplier':
       return `/dashboard/suppliers?keyword=${encodeURIComponent(result.title)}`;
     case 'purchase':
-      return `/dashboard/purchase/${result.id}`;
+      return `/dashboard/purchases/${result.id}`;
     case 'sales':
       return `/dashboard/sales/${result.id}`;
   }

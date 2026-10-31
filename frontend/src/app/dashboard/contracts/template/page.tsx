@@ -7,5 +7,5 @@
 import { redirect } from 'next/navigation';
 
 export default function ContractTemplateUploadPage() {
-  redirect('/dashboard/contracts');
+  redirect('/dashboard/purchases');
 }

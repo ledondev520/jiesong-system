@@ -572,7 +572,7 @@ export const mockApiRoutes = async (page: Page) => {
         stages: labels.map((label, index) => ({ key: `stage-${index}`, label,
           status: index < 2 ? 'completed' : index === 2 ? 'current' : 'pending',
           reason: index === 2 ? '核对生产进度后安排到货验收。' : '按业务进度完成此阶段。' })),
-        nextAction: { label: '查看生产进度', href: '/dashboard/purchase/pc-001' }, issues: [],
+        nextAction: { label: '查看生产进度', href: '/dashboard/purchases/pc-001' }, issues: [],
       }]);
       return;
     }

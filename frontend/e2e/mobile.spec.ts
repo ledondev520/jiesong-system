@@ -11,9 +11,9 @@ import { mockApiRoutes, signInAsAdmin } from "./helpers";
 const routes = [
   "/dashboard",
   "/dashboard/reports",
-  "/dashboard/contracts",
-  "/dashboard/purchase/create",
-  "/dashboard/purchase/pc-001",
+  "/dashboard/purchases",
+  "/dashboard/purchases/new",
+  "/dashboard/purchases/pc-001",
   "/dashboard/suppliers",
   "/dashboard/products",
   "/dashboard/inventory-status",
@@ -49,7 +49,6 @@ const routes = [
   "/dashboard/system",
   "/dashboard/logistics",
   "/dashboard/logistics/containers",
-  "/dashboard/contracts/templates",
 ];
 
 async function expectFitsViewport(page: Page) {
@@ -307,7 +306,7 @@ test.describe("手机核心操作", () => {
   });
 
   test("采购供应商选择与手机档案定位", async ({ page }) => {
-    await signInAsAdmin(page, "/dashboard/purchase/create");
+    await signInAsAdmin(page, "/dashboard/purchases/new");
     await page.getByRole("combobox", { name: "商品 *", exact: true }).click();
     await page.getByRole("option", { name: /不锈钢门/ }).click();
     await page
@@ -362,7 +361,7 @@ test.describe("平板与桌面保持可用", () => {
       await signInAsAdmin(page);
       for (const route of [
         "/dashboard",
-        "/dashboard/contracts",
+        "/dashboard/purchases",
         "/dashboard/sales",
         "/dashboard/settings",
       ]) {

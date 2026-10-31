@@ -58,12 +58,12 @@ test.describe('登录与权限', () => {
 
 test.describe('侧边栏导航全覆盖', () => {
   test('所有导航入口可点击并进入对应页面', async ({ page }) => {
-    await signInAsAdmin(page, '/dashboard/contracts');
+    await signInAsAdmin(page, '/dashboard/purchases');
     const sidebarNav = page.locator('nav').first();
 
     const navCases = [
       { label: '首页', path: '/dashboard', url: /\/dashboard$/, heading: '工作台' },
-      { label: '采购', path: '/dashboard/contracts', url: /\/dashboard\/contracts$/, heading: '采购合同' },
+      { label: '采购', path: '/dashboard/purchases', url: /\/dashboard\/purchases$/, heading: '采购合同' },
       { label: '出口订单', path: '/dashboard/sales', url: /\/dashboard\/sales$/, heading: '出口合同' },
       { label: '财务', path: '/dashboard/finance', url: /\/dashboard\/finance$/, heading: '财务概览' },
       { label: '设置', path: '/dashboard/settings', url: /\/dashboard\/settings$/, heading: '系统配置' },
@@ -85,7 +85,7 @@ test.describe('侧边栏导航全覆盖', () => {
   });
 
   test('点击退出登录会回到登录页', async ({ page }) => {
-    await signInAsAdmin(page, '/dashboard/contracts');
+    await signInAsAdmin(page, '/dashboard/purchases');
     await safeClick(page.getByRole('button', { name: '用户菜单' }));
     await safeClick(page.getByRole('menuitem', { name: '退出登录' }));
     await expect(page).toHaveURL(/\/login$/);
@@ -98,7 +98,7 @@ test.describe('关键按钮交互', () => {
     await signInAsAdmin(page, '/dashboard');
 
     await safeClick(page.getByRole('button', { name: /^新建采购合同/ }));
-    await expect(page).toHaveURL(/\/dashboard\/purchase\/create$/);
+    await expect(page).toHaveURL(/\/dashboard\/purchases\/new$/);
     await expect(page.getByRole('heading', { name: '新增采购合同' })).toBeVisible();
 
     await page.goto('/dashboard');
@@ -109,11 +109,11 @@ test.describe('关键按钮交互', () => {
   });
 
   test('采购合同页：新增采购按钮跳转', async ({ page }) => {
-    await signInAsAdmin(page, '/dashboard/contracts');
+    await signInAsAdmin(page, '/dashboard/purchases');
     await expect(page.getByRole('heading', { name: '采购合同' })).toBeVisible();
 
     await safeClick(page.getByRole('button', { name: /^新增采购|^新建采购/ }));
-    await expect(page).toHaveURL(/\/dashboard\/purchase\/create$/);
+    await expect(page).toHaveURL(/\/dashboard\/purchases\/new$/);
     await expect(page.getByRole('heading', { name: '新增采购合同' })).toBeVisible();
   });
 
@@ -140,7 +140,7 @@ test.describe('关键按钮交互', () => {
   });
 
   test('采购模块：供应商与库存入口可达', async ({ page }) => {
-    await signInAsAdmin(page, '/dashboard/contracts');
+    await signInAsAdmin(page, '/dashboard/purchases');
     await page.getByRole('link', { name: '供应商管理', exact: true }).click();
     await expect(page.getByRole('heading', { name: '供应商管理', exact: true })).toBeVisible();
     await page.getByRole('link', { name: '库存状态', exact: true }).click();

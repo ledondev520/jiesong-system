@@ -29,7 +29,7 @@ const OUTPUT_DIR = path.resolve(process.cwd(), 'tmp/performance');
 const allRoutes = [
   { id: 'dashboard_home', path: '/dashboard' },
   { id: 'reports', path: '/dashboard/reports' },
-  { id: 'contracts', path: '/dashboard/contracts' },
+  { id: 'purchases', path: '/dashboard/purchases' },
   { id: 'suppliers', path: '/dashboard/suppliers' },
   { id: 'inventory_status', path: '/dashboard/inventory-status' },
   { id: 'sales_list', path: '/dashboard/sales' },

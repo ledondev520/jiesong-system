@@ -37,7 +37,7 @@ vi.mock("@/lib/hooks/useBusinessReadOnly", () => ({
 vi.mock("@/lib/hooks/useMobile", () => ({ useMobile: () => false }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
-  usePathname: () => "/dashboard/purchase/A",
+  usePathname: () => "/dashboard/purchases/A",
 }));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },

@@ -318,7 +318,7 @@ function DashboardContent() {
             <BusinessWrite>
               <Button
                 className="justify-start rounded-md"
-                onClick={() => router.push("/dashboard/purchase/create")}
+                onClick={() => router.push("/dashboard/purchases/new")}
               >
                 <ShoppingCart className="mr-2 h-4 w-4" />
                 新建采购合同

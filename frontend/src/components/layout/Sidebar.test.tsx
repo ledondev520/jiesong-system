@@ -15,7 +15,7 @@ import { Sidebar } from "./Sidebar";
 const mockLogout = vi.fn();
 const mockPrefetch = vi.fn();
 const mockPush = vi.fn();
-let mockPathname = "/dashboard/contracts";
+let mockPathname = "/dashboard/purchases";
 
 const mockUser = {
   role: Role.ADMIN,
@@ -71,13 +71,13 @@ describe("Sidebar", () => {
     mockPrefetch.mockReset();
     mockPush.mockReset();
     mockUser.role = Role.ADMIN;
-    mockPathname = "/dashboard/contracts";
+    mockPathname = "/dashboard/purchases";
   });
 
   it("渲染分组导航并标记当前路由", () => {
     const { getByText } = render(<Sidebar />);
 
-    // 当前路由是 /dashboard/contracts，对应 "采购"
+    // 当前路由是 /dashboard/purchases，对应 "采购"
     const current = getByText("采购").closest("a");
     expect(current?.className.includes("bg-sidebar-accent")).toBe(true);
     for (const label of [

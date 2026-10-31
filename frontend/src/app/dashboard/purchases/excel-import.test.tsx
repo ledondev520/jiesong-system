@@ -26,7 +26,7 @@ const mockToastSuccess = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
   useSearchParams: () => ({ get: () => "" }),
-  usePathname: () => "/dashboard/contracts",
+  usePathname: () => "/dashboard/purchases",
 }));
 vi.mock("@/services/purchase.service", () => ({
   purchaseService: {

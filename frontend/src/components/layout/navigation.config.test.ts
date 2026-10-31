@@ -71,7 +71,7 @@ describe("navigation.config helpers", () => {
     expect(hrefs).toMatchObject({
       home: "/dashboard",
       orders: "/dashboard/sales",
-      purchases: "/dashboard/contracts",
+      purchases: "/dashboard/purchases",
       inventory: "/dashboard/inventory-status",
       documents: "/dashboard/customs-declarations",
       finance: "/dashboard/finance",
@@ -86,8 +86,8 @@ describe("navigation.config helpers", () => {
     const owner: Record<string, string> = {
       "/dashboard": "home",
       "/dashboard/reports": "finance",
-      "/dashboard/contracts": "purchases",
-      "/dashboard/purchase/create": "purchases",
+      "/dashboard/purchases": "purchases",
+      "/dashboard/purchases/new": "purchases",
       "/dashboard/suppliers": "suppliers",
       "/dashboard/inventory-status": "inventory",
       "/dashboard/logistics": "inventory",
