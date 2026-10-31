@@ -26,7 +26,9 @@ const REDACTED_AUDIT_FIELDS = new Set([
 
 const CRITICAL_FIELDS_BY_ENTITY = {
   User: ['username', 'name', 'role', 'email', 'phone', 'isActive', 'avatar'],
-  Store: ['name', 'portId', 'contactName', 'contactPhone', 'contactEmail', 'address', 'isActive'],
+  Store: ['name', 'portId', 'customerId', 'code', 'legalName', 'contactName', 'contactPhone', 'contactEmail', 'address', 'isActive'],
+  // 客户联系人字段为 Confidential，不进入审计字段清单
+  Customer: ['name', 'legalName', 'country', 'defaultCurrency', 'defaultIncoterm', 'defaultPaymentTerms', 'defaultPortOfLoading', 'isActive'],
   Supplier: ['name', 'shortName', 'contactName', 'contactPhone', 'contactEmail', 'address', 'phone', 'taxId', 'bankAccountName', 'bankName', 'bankBranch', 'bankCode', 'bankAccount', 'isActive', 'hasQualityIssue', 'qualityNote'],
   Product: ['customsName', 'description', 'specification', 'unit', 'categoryId', 'grossWeight', 'netWeight', 'volume', 'packingSpec', 'length', 'width', 'height', 'isActive'],
   ProductCategory: ['name', 'parentId'],

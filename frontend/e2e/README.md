@@ -37,6 +37,7 @@
 - `contract-attachment-auth.spec.ts`：390/1440px 标签 Bearer 登录下的合成文件下载/PNG 解码/PDF Blob 嵌入、403 错误原样显示并重试、关闭后迟到响应与历史返回。检查下载文件名/字节、临时 URL 释放、请求头无凭据 URL 与移动无溢出；不访问生产数据。PDF 仅验证认证读取与嵌入路径，显示仍取决于浏览器 PDF 支持。
 
 - `supplier-editor.spec.ts`：390/1440px 合成供应商档案与采购内联新建，失败保留可重试草稿，取消重开清空未提交值，迟到保存不覆盖新选择、搜索或新弹窗。API全部通过本地route mock，不访问生产业务；质量/别名持久化与冲突回滚由真实隔离HTTP/SQLite回归覆盖。
+- `price-comparison.spec.ts`：390/1440px 商品详情「采购价格」页签，合成 bySupplier 响应下只读比价、仅一处「最低」标注、显示 13% 发票说明且无「用此供应商」入口。API 全部本地 route mock。
 
 - `real-role-lifecycle.spec.ts` / `real-role-fixture.ts`：4项1440px真实角色浏览器验收并检查未捕获页面异常，分别覆盖 PURCHASE 到货取消/保存/重载且待验不入库，WAREHOUSE 30件合格与10件待复验/操作者/验货来源/库存自动流转，SALES 缺合格库存发运失败原子回滚、仓库真实HTTP复验后50件发运及重复请求不再扣库，BOSS 采购/销售只读UI与真实403不改业务库。每项/重试独占临时0700目录和0600 SQLite，固定测试账号和密钥仅用于合成夹具；跳过创建表单，不跳过登录或被验收的写事务。
 - 角色验收 API 仅透传到 `127.0.0.1` 隔离 Express，没有业务响应 mock 或测试HTTP入口；独立只读 SQLite 连接核对落库。沿用既有 hosted Playwright workflow 与锁定依赖，不改变产品权限、Schema或CI权限。`playwright test real-role-lifecycle.spec.ts --list` 仅验证定义；真实浏览器通过情况以 hosted CI 为准，不把本地HTTP/DB、类型或lint通过称为浏览器通过。

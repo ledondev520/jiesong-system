@@ -7,7 +7,9 @@ const READ_PATHS = [
   /^\/auth\/(me|session)$/,
   /^\/dashboard\/(wps-sync|stats|analytics|trade-workflows|track-product)$/,
   /^\/reports\/business-overview$/,
-  /^\/(suppliers|stores|products|sales|containers|inventory|customs-declarations|forex-verifications|tax-refunds)(\/[^/]+)?$/,
+  /^\/(suppliers|stores|customers|products|sales|containers|inventory|customs-declarations|forex-verifications|tax-refunds)(\/[^/]+)?$/,
+  // Quotes incl. cost columns are readable by BOSS; export.xlsx has a second segment and stays denied.
+  /^\/quotes(\/[^/]+)?$/,
   /^\/purchases(\/(?!export$)[^/]+)?$/,
   /^\/purchases\/[^/]+\/(files|invoice-preparation|receipts)$/,
   /^\/purchases\/[^/]+\/receipts\/[^/]+\/inspections$/,
@@ -16,6 +18,7 @@ const READ_PATHS = [
   /^\/products\/[^/]+\/(suppliers|price-history|price-trend)$/,
   /^\/products\/options\/categories$/,
   /^\/stores\/options\/ports$/,
+  /^\/customers\/[^/]+\/stores$/,
   /^\/sales\/[^/]+\/(files|packing-list-checks|finance-summary)$/,
   /^\/sales\/files\/[^/]+\/download$/,
   /^\/inventory\/(product|contract)\/[^/]+$/,

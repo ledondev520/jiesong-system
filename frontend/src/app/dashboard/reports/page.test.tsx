@@ -96,6 +96,8 @@ describe("经营报表范围与追溯", () => {
     });
     render(<BusinessReportsPage />);
     expect(await screen.findByRole("alert")).toHaveTextContent("毛利待核验");
+    expect(screen.getByRole("alert")).toHaveTextContent("共 1 笔需要处理");
+    await userEvent.click(screen.getByText("查看清单（1 笔）"));
     expect(
       screen.getByRole("link", { name: "核验第1笔：缺少汇率" }),
     ).toHaveAttribute("href", "/dashboard/sales/synthetic-sale?tab=finance");

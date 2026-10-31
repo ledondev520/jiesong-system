@@ -99,6 +99,7 @@ model User {
   purchaseReceiptsCreated    PurchaseReceipt[] @relation("ReceiptCreatedBy")
   purchaseReceiptInspections PurchaseReceiptInspection[] @relation("ReceiptInspectedBy")
   browserSessions           BrowserSession[]
+  quotesCreated             Quote[]           @relation("QuoteCreatedBy")
   operationLogs             OperationLog[]
   chatHistories             ChatHistory[]
   agentReplaySummaries      AgentReplaySummary[]
@@ -222,6 +223,32 @@ model SupplierAlias {
   @@map("supplier_aliases")
 }
 
+// Confidential: customer contact data. One row per buying customer; Seapot is the only active one in v1.
+model Customer {
+  id                   String   @id @default(cuid())
+  name                 String   @unique // "Seapot"
+  legalName            String? // buyer name printed on PI / export documents (spec Q16)
+  country              String? // ISO-3166 alpha-2, e.g. "US"
+  address              String?
+  contactName          String?
+  contactEmail         String?
+  contactPhone         String?
+  defaultCurrency      String   @default("USD") // v1 accepts only "USD"
+  defaultIncoterm      String   @default("FOB") // owner decision: Seapot buys FOB
+  defaultPaymentTerms  String?
+  defaultPortOfLoading String? // free text, e.g. "Shanghai"; prints as "FOB <port>" (spec Q7)
+  note                 String?
+  isActive             Boolean  @default(true) // archive flag; customers are never hard-deleted
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  stores         Store[]
+  salesContracts SalesContract[]
+  quotes         Quote[]
+
+  @@map("customers")
+}
+
 model Store {
   id           String   @id @default(cuid())
   name         String   @unique
@@ -231,13 +258,20 @@ model Store {
   contactEmail String?
   address      String?
   isActive     Boolean  @default(true)
+  customerId   String? // nullable for the migration; new stores must set it (API rule, J12)
+  code         String?  @unique // short code for shipping marks / PI lines, e.g. "SAC" (spec Q17)
+  legalName    String? // the store's operating entity (spec Q16)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  port         Port          @relation(fields: [portId], references: [id])
-  salesItems   SalesItem[]
-  packingItems PackingItem[]
+  port          Port           @relation(fields: [portId], references: [id])
+  customer      Customer?      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  salesItems    SalesItem[]
+  packingItems  PackingItem[]
+  purchaseItems PurchaseItem[]
+  quoteItems    QuoteItem[]
 
+  @@index([customerId])
   @@map("stores")
 }
 
@@ -274,6 +308,7 @@ model Product {
   customsDeclarationItems CustomsDeclarationItem[]
   priceHistories          PriceHistory[]
   taxRates                TaxRate[]
+  quoteItems              QuoteItem[]
 
   @@map("products")
 }
@@ -346,19 +381,22 @@ model PurchaseContract {
   expectedDate          DateTime?
   productionCompletedAt DateTime? // 生产资料完整并确认完工的时间
   invoiceNo             String?
-  storeName             String? // 发货店铺名称
+  storeName             String? // 发货店铺名称（旧字段，新界面不再写入/显示）
   note                  String?
+  salesContractId       String? // 生成该采购单的出口订单（迁移 B1）
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  supplier Supplier       @relation(fields: [supplierId], references: [id])
-  items    PurchaseItem[]
-  payments Payment[]
-  files    ContractFile[]
-  receipts PurchaseReceipt[]
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  salesContract SalesContract? @relation(fields: [salesContractId], references: [id], onDelete: SetNull)
+  items         PurchaseItem[]
+  payments      Payment[]
+  files         ContractFile[]
+  receipts      PurchaseReceipt[]
 
   @@index([status])
   @@index([supplierId])
+  @@index([salesContractId])
   @@index([createdAt])
   @@map("purchase_contracts")
 }
@@ -380,17 +418,20 @@ model PurchaseItem {
   width              Float? // 单箱宽度 (mm)
   height             Float? // 单箱高度 (mm)
   note               String?
+  storeId            String? // 这批数量送往的门店；null = 库存/未知（旧数据）（迁移 B1）
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
   purchaseContract PurchaseContract @relation(fields: [purchaseContractId], references: [id], onDelete: Cascade)
   product          Product          @relation(fields: [productId], references: [id])
+  store            Store?           @relation(fields: [storeId], references: [id], onDelete: Restrict)
   inventories      Inventory[]
   packingItems     PackingItem[]
   receiptItems     PurchaseReceiptItem[]
 
   @@index([purchaseContractId])
   @@index([productId])
+  @@index([storeId])
   @@map("purchase_items")
 }
 
@@ -484,14 +525,24 @@ model SalesContract {
   isFumigated      Boolean?
   hasTaxRefund     Boolean?
   containerLabel   String? // 物理货柜编号（如 "02-振宗"），与 EXP 合同号区分
+  // 订单级条款（迁移 A）
+  customerId       String?
+  currency         String    @default("USD") // v1 仅 USD
+  incoterm         String? // 新订单复制 Customer.defaultIncoterm；旧订单为空 = 显示客户默认
+  paymentTerms     String?
+  portOfLoading    String? // 自由文本，复制自 Customer.defaultPortOfLoading
+  quoteId          String?   @unique // 本订单由哪张报价转换而来
   // 时间戳
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   port                Port?                @relation(fields: [portId], references: [id])
+  customer            Customer?            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  quote               Quote?               @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   customsDeclarations CustomsDeclaration[]
   forexVerifications  ForexVerification[]
   items               SalesItem[]
+  purchaseContracts   PurchaseContract[] // 由本订单生成的采购单（迁移 B1）
   packingItems        PackingItem[] // 装箱明细
   payments            Payment[]
   inventories         Inventory[]
@@ -502,8 +553,69 @@ model SalesContract {
   @@index([status])
   @@index([amountSource])
   @@index([portId])
+  @@index([customerId])
   @@index([createdAt])
   @@map("sales_contracts")
+}
+
+// Confidential: quote prices and reference costs. Generated PI files are streamed, never stored.
+model Quote {
+  id              String    @id @default(cuid())
+  quoteNo         String    @unique              // "QT" + yyMM + "-" + 3-digit monthly sequence (Asia/Shanghai), e.g. QT2611-003
+  customerId      String?                        // defaults to the only active customer; required before SENT
+  currency        String    @default("USD")      // v1: "USD" only
+  incoterm        String    @default("FOB")
+  paymentTerms    String?
+  portOfLoading   String?
+  validUntil      DateTime?
+  spotRate        Float?                         // spot CNY/USD used at the last pricing; required before SENT
+  pricingRate     Float?                         // FX actually used = spotRate − adjustment (locked rule: spot − 0.2)
+  pricingRevision String?                        // pricing.json revision (sha256) used at the last pricing
+  status          String    @default("DRAFT")    // DRAFT / SENT / ACCEPTED / REJECTED / CONVERTED / CANCELLED
+  totalAmount     Float     @default(0)
+  note            String?
+  createdById     String
+  sentAt          DateTime?
+  acceptedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  customer      Customer?      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy     User           @relation("QuoteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  items         QuoteItem[]
+  salesContract SalesContract?
+
+  @@index([status])
+  @@index([customerId])
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id             String  @id @default(cuid())
+  quoteId        String
+  productId      String
+  storeId        String?                         // required before SENT
+  quantity       Float
+  unit           String?
+  specification  String?
+  costCny        Float?                          // reference unit cost ¥ chosen in the comparison (null = 缺成本)
+  costSupplierId String?                         // snapshot of the supplier id the cost came from (no FK)
+  costContractNo String?                         // snapshot of the purchase contract number the cost came from
+  markup         Float?                          // markup applied (0.3 / 0.1); null when costCny is null
+  formulaPrice   Float?                          // server-computed rule price in USD (whole number); null when costCny is null
+  unitPrice      Float                           // final USD unit price; 0 allowed only in DRAFT
+  isManualPrice  Boolean @default(false)         // true = user override, shows 手动价
+  totalPrice     Float                           // round2(unitPrice × quantity)
+  note           String?
+  sortOrder      Int     @default(0)
+
+  quote   Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  store   Store?  @relation(fields: [storeId], references: [id], onDelete: Restrict)
+
+  @@index([quoteId])
+  @@index([productId])
+  @@map("quote_items")
 }
 
 model SalesItem {

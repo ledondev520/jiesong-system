@@ -35,6 +35,60 @@
       }
     },
     {
+      "id": "quotes",
+      "routeFile": "backend/src/routes/quotes.js",
+      "routes": ["POST /", "PUT /:id"],
+      "update": { "file": "backend/src/controllers/quoteController.js", "handler": "update" },
+      "matrix": {
+        "path": "/api/v1/quotes",
+        "table": "quotes",
+        "create": { "note": "Synthetic matrix quote", "paymentTerms": "Original terms" },
+        "edit": { "note": "Synthetic edited quote" },
+        "invalid": [{ "currency": "EUR" }, { "incoterm": "XYZ" }, { "status": "BOGUS" }, { "status": "SENT", "note": "mixed" }],
+        "blank": { "paymentTerms": "   " },
+        "clear": { "paymentTerms": null },
+        "clearStatus": 200,
+        "filter": "Synthetic edited quote"
+      }
+    },
+    {
+      "id": "customers",
+      "routeFile": "backend/src/routes/customers.js",
+      "routes": ["POST /", "PUT /:id"],
+      "update": { "file": "backend/src/controllers/customerController.js", "handler": "update" },
+      "matrix": {
+        "path": "/api/v1/customers",
+        "table": "customers",
+        "create": { "name": "Synthetic matrix customer", "legalName": "Synthetic Original LLC", "defaultIncoterm": "FOB", "contactName": "Original contact" },
+        "edit": { "name": "Synthetic edited customer", "legalName": "Synthetic Edited LLC", "country": "US" },
+        "invalid": [
+          { "name": "   ", "legalName": "Unwanted" },
+          { "name": null, "legalName": "Unwanted" },
+          { "isActive": "false" },
+          { "defaultCurrency": "EUR" },
+          { "country": "USA" }
+        ],
+        "blank": { "contactName": "", "contactPhone": "   " },
+        "clear": { "contactName": null },
+        "clearStatus": 200,
+        "filter": "Synthetic edited customer"
+      }
+    },
+    {
+      "id": "sales-purchase-drafts",
+      "kind": "action",
+      "routeFile": "backend/src/routes/sales.js",
+      "routes": ["POST /:id/purchase-drafts"],
+      "test": "backend/src/integration/purchase-drafts.integration.js"
+    },
+    {
+      "id": "pricing-preview",
+      "kind": "action",
+      "routeFile": "backend/src/routes/pricing.js",
+      "routes": ["POST /preview"],
+      "test": "backend/src/integration/pricing-preview.integration.js"
+    },
+    {
       "id": "pricing-config",
       "kind": "singleton-config",
       "routeFile": "backend/src/routes/system.js",
@@ -49,53 +103,94 @@
         "adapter": "pricing-config-file",
         "path": "/api/v1/system/pricing-config",
         "initial": {
-          "mode": "tiered",
+          "exchangeRate": 6.72,
           "exchangeAdjustment": -0.2,
-          "refundableMarkup": 0.3,
-          "noRefundMarkup": 0.1,
-          "multiplier": 1.3
+          "defaultMarkup": 0.3,
+          "categoryMarkups": [],
+          "roundUpTo": 5
         },
         "replace": {
-          "mode": "multiplier",
+          "exchangeRate": 7.1,
           "exchangeAdjustment": -0.1,
-          "refundableMarkup": 0.25,
-          "noRefundMarkup": 0.15,
-          "multiplier": 1.5
+          "defaultMarkup": 0.25,
+          "categoryMarkups": [],
+          "roundUpTo": 1
         },
         "invalid": [
           {},
           null,
           [],
           {
-            "mode": "tiered"
+            "exchangeRate": 6.72
           },
           {
-            "mode": "invalid",
+            "exchangeRate": 0,
             "exchangeAdjustment": -0.2,
-            "refundableMarkup": 0.3,
-            "noRefundMarkup": 0.1,
-            "multiplier": 1.3
+            "defaultMarkup": 0.3,
+            "categoryMarkups": [],
+            "roundUpTo": 1
           },
           {
-            "mode": "tiered",
+            "exchangeRate": "6.72",
             "exchangeAdjustment": -0.2,
-            "refundableMarkup": 0.3,
-            "noRefundMarkup": 0.1,
-            "multiplier": 0
+            "defaultMarkup": 0.3,
+            "categoryMarkups": [],
+            "roundUpTo": 1
           },
           {
-            "mode": "tiered",
-            "exchangeAdjustment": "-0.2",
-            "refundableMarkup": 0.3,
-            "noRefundMarkup": 0.1,
-            "multiplier": 1.3
-          },
-          {
-            "mode": "tiered",
+            "exchangeRate": 6.72001,
             "exchangeAdjustment": -0.2,
-            "refundableMarkup": 0.3,
-            "noRefundMarkup": 0.1,
-            "multiplier": 1.3,
+            "defaultMarkup": 0.3,
+            "categoryMarkups": [],
+            "roundUpTo": 1
+          },
+          {
+            "exchangeRate": 6.72,
+            "exchangeAdjustment": -0.2,
+            "defaultMarkup": 1.5,
+            "categoryMarkups": [],
+            "roundUpTo": 1
+          },
+          {
+            "exchangeRate": 6.72,
+            "exchangeAdjustment": -0.2,
+            "defaultMarkup": 0.3,
+            "categoryMarkups": [],
+            "roundUpTo": 0
+          },
+          {
+            "exchangeRate": 6.72,
+            "exchangeAdjustment": -0.2,
+            "defaultMarkup": 0.3,
+            "categoryMarkups": [],
+            "roundUpTo": 1.5
+          },
+          {
+            "exchangeRate": 6.72,
+            "exchangeAdjustment": -0.2,
+            "defaultMarkup": 0.3,
+            "categoryMarkups": [
+              {
+                "categoryId": "x",
+                "categoryName": "x",
+                "markup": 2
+              }
+            ],
+            "roundUpTo": 1
+          },
+          {
+            "exchangeRate": 0.1,
+            "exchangeAdjustment": -0.2,
+            "defaultMarkup": 0.3,
+            "categoryMarkups": [],
+            "roundUpTo": 1
+          },
+          {
+            "exchangeRate": 6.72,
+            "exchangeAdjustment": -0.2,
+            "defaultMarkup": 0.3,
+            "categoryMarkups": [],
+            "roundUpTo": 1,
             "unknown": 1
           }
         ]

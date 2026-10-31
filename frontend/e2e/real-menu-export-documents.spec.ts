@@ -119,7 +119,7 @@ test.afterEach(async () => {
  */
 async function enterFromMenu(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
-  await page.getByRole("link", { name: "出口", exact: true }).first().click();
+  await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
   await expect(page).toHaveURL(/\/dashboard\/sales$/);
   await page
     .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
@@ -308,13 +308,8 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   // has no module tabs, so use its existing Return action before the menu path.
   await page.getByRole("button", { name: "返回", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/sales$/);
-  await page.getByRole("link", { name: "出口", exact: true }).first().click();
-  const exportTabs = page.getByRole("navigation", {
-    name: "出口",
-    exact: true,
-  });
-  await expect(exportTabs).toBeVisible();
-  await exportTabs.getByRole("link", { name: "出口退税", exact: true }).click();
+  await page.getByRole("link", { name: "单证与退税", exact: true }).click();
+  await page.getByRole("link", { name: "出口退税", exact: true }).click();
   await page.getByRole("tab", { name: "报关单", exact: true }).click();
   await page
     .getByRole("button", {
@@ -347,10 +342,8 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
     .locator('[data-slot="card-content"]');
   await expect(customsAmount).toBeVisible();
   await expect(customsAmount).toHaveText("USD 20");
-  await page.getByRole("link", { name: "出口", exact: true }).first().click();
-  // Customs detail already renders the same module tabs after reload.
-  await expect(exportTabs).toBeVisible();
-  await exportTabs.getByRole("link", { name: "出口退税", exact: true }).click();
+  await page.getByRole("link", { name: "单证与退税", exact: true }).click();
+  await page.getByRole("link", { name: "出口退税", exact: true }).click();
   await page.getByRole("tab", { name: "退税记录", exact: true }).click();
   await page
     .getByRole("button", {
@@ -458,7 +451,8 @@ test("SALES commercial prerequisites and cancelled preview do not reprice or arc
   ).toBeDisabled();
   await fillPacket(dialog);
   const preview = await previewPacket(page, dialog);
-  expect(preview.summary.totalUsd).toBe(20);
+  // final rule: 11.3 × 1.3 ÷ 7 = 2.10 → 3 USD → next multiple of 5 = 5 USD per piece × 10
+  expect(preview.summary.totalUsd).toBe(50);
   expect(preview.summary.purchaseCostCny).toBe(113);
   expect(readExportDocuments(fixture)).toEqual(before);
   await dialog

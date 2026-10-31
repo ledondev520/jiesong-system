@@ -8,6 +8,7 @@ const BASE = '56426be209e270024008b761dbd835a54a6c4c47';
 const REGISTRY = 'lifecycle/resources.json';
 const TEMPLATE = 'lifecycle/resource.template.json';
 const SINGLETON_TEMPLATE = 'lifecycle/singleton-config.template.json';
+const ACTION_TEMPLATE = 'lifecycle/action.template.json';
 const MATRIX = 'backend/src/integration/resource-lifecycle.integration.js';
 const LIST_MATRIX = 'frontend/src/lib/hooks/list-lifecycle.test.tsx';
 
@@ -184,12 +185,32 @@ function check(root = ROOT, { baselineRoutes } = {}) {
     }
     const m = resource.matrix;
     const singleton = resource.kind === 'singleton-config';
+    const action = resource.kind === 'action';
     if (
       resource.kind !== undefined &&
-      !['archive', 'singleton-config'].includes(resource.kind)
+      !['archive', 'singleton-config', 'action'].includes(resource.kind)
     )
       fail(`${REGISTRY}: ${resource.id} has unsupported resource kind`);
-    if (singleton) {
+    if (action) {
+      // One-shot action route (e.g. generate drafts): one POST, no CRUD matrix, proven by a named test file.
+      const route = resource.routes?.[0] || '';
+      const path = route.slice(5);
+      const testSource = exists(resource.test) ? read(resource.test) : '';
+      const pattern = new RegExp(
+        path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/:[A-Za-z]\w*/g, '[^/\'"`\\s]+'),
+      );
+      if (
+        resource.routes?.length !== 1 ||
+        !route.startsWith('POST /') ||
+        resource.matrix !== undefined ||
+        resource.update !== undefined ||
+        !exists(resource.test) ||
+        !pattern.test(testSource)
+      )
+        fail(
+          `${REGISTRY}: ${resource.id} action needs exactly one POST route, no matrix/update, and a test file that calls the route path; copy ${ACTION_TEMPLATE}`,
+        );
+    } else if (singleton) {
       // Each singleton adapter owns an exact route and persistence contract.
       if (
         resource.id !== 'pricing-config' ||
@@ -204,6 +225,35 @@ function check(root = ROOT, { baselineRoutes } = {}) {
           `${REGISTRY}: ${resource.id} singleton matrix must exercise its own registered PUT route with a supported file adapter; copy ${SINGLETON_TEMPLATE}`,
         );
       const schema = readJson(root, 'config/pricing.schema.json');
+      const validNumber = (rule, item) => {
+        const aboveMin =
+          rule.exclusiveMinimum !== undefined
+            ? item > rule.exclusiveMinimum
+            : item >= rule.minimum;
+        return (
+          typeof item === 'number' &&
+          Number.isFinite(item) &&
+          aboveMin &&
+          item <= rule.maximum &&
+          (rule.type !== 'integer' || Number.isInteger(item)) &&
+          (rule.maxDecimals === undefined ||
+            Number((item * 10 ** rule.maxDecimals).toFixed(6)) % 1 === 0)
+        );
+      };
+      // Mirrors config/pricing.schema.json item rules (string/number fields only).
+      const validItem = (rules, item) =>
+        !!item &&
+        typeof item === 'object' &&
+        !Array.isArray(item) &&
+        Object.keys(item).every((key) => Object.hasOwn(rules.properties, key)) &&
+        rules.required.every((key) => {
+          const rule = rules.properties[key];
+          return rule.type === 'string'
+            ? typeof item[key] === 'string' &&
+                item[key].length >= (rule.minLength ?? 0) &&
+                item[key].length <= rule.maxLength
+            : validNumber(rule, item[key]);
+        });
       const validConfig = (value) => {
         if (!value || typeof value !== 'object' || Array.isArray(value))
           return false;
@@ -213,21 +263,27 @@ function check(root = ROOT, { baselineRoutes } = {}) {
           )
         )
           return false;
-        return schema.required.every((key) => {
+        const fieldsValid = schema.required.every((key) => {
           const rule = schema.properties[key];
           const item = value[key];
-          return rule.type === 'number'
-            ? typeof item === 'number' &&
-                Number.isFinite(item) &&
-                item >= rule.minimum &&
-                item <= rule.maximum
-            : rule.enum.includes(item);
+          if (rule.type === 'array')
+            return (
+              Array.isArray(item) &&
+              item.length <= rule.maxItems &&
+              item.every((entry) => validItem(rule.items, entry))
+            );
+          return validNumber(rule, item);
         });
+        // Cross-field rule from pricingConfigService: effective FX must stay positive.
+        return fieldsValid && value.exchangeRate + value.exchangeAdjustment > 0;
       };
       if (
         !validConfig(m?.initial) ||
         !validConfig(m?.replace) ||
-        schema.required.every((key) => m.initial[key] === m.replace[key]) ||
+        schema.required.every(
+          (key) =>
+            JSON.stringify(m.initial[key]) === JSON.stringify(m.replace[key]),
+        ) ||
         !Array.isArray(m?.invalid) ||
         !m.invalid.length ||
         m.invalid.some(validConfig)
@@ -278,6 +334,7 @@ function check(root = ROOT, { baselineRoutes } = {}) {
         );
       }
     }
+    if (action) continue;
     matrixPaths.add(m?.path);
     const update = resource.update;
     if (

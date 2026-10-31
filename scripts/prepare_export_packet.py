@@ -23,7 +23,6 @@ from typing import Any, Iterable
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from pricing_config import load_pricing_config
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -264,8 +263,7 @@ def historical_quote_allowed(
     mode: str = "tiered",
 ) -> tuple[bool, float]:
     if refundable_markup is None:
-        config = load_pricing_config()
-        refundable_markup = round(config["multiplier"] - 1, 10) if mode == "multiplier" else config["refundableMarkup"]
+        raise ValueError("refundable_markup is required: the shared pricing rule moved to the Node service")
     markup = realized_markup(unit_price_usd, quantity, effective_rate, cost_cny)
     if mode == "tiered" and refund_rate == 0 and math.isfinite(markup):
         return -1e-9 <= markup <= no_refund_markup_cap + 1e-9, markup
@@ -761,24 +759,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--refund-dbf", type=Path, required=True)
     parser.add_argument("--refund-version", default="2026B")
     args = parser.parse_args(argv)
-    try:
-        config = load_pricing_config()
-    except ValueError as error:
-        parser.error(str(error))
-    target = round(config["multiplier"] - 1, 10) if config["mode"] == "multiplier" else config["refundableMarkup"]
-    values = {"fx_buffer": -config["exchangeAdjustment"], "refundable_markup": target,
-              "no_refund_markup": target if config["mode"] == "multiplier" else config["noRefundMarkup"]}
-    for key, value in values.items():
-        supplied = getattr(args, key)
-        if supplied is not None and (not math.isfinite(supplied) or supplied != value):
-            parser.error(f"--{key.replace('_', '-')} 与共用报价配置不一致，请修改 JIESONG_PRICING_CONFIG 指定的文件")
-        setattr(args, key, value)
+    # 报价规则已移到 Node 服务 backend/src/services/exportPricing.js 的 priceFor()（config/pricing.json 新结构）。
+    # 本脚本的 Python 公式副本不再维护：待负责人确认生产不再使用后删除；在此之前拒绝运行，避免产出与系统不一致的价格。
+    parser.error("报价规则已迁移到系统服务（priceFor），本脚本不再计算报价；请使用出口备单页面")
     if not math.isfinite(args.spot_rate) or args.spot_rate <= 0:
         parser.error("现汇必须是大于零的有限数字")
     if not math.isfinite(args.history_markup_tolerance) or not 0 <= args.history_markup_tolerance <= 1:
         parser.error("历史报价容差必须是 0 至 1 的有限数字")
-    args.pricing_mode = config["mode"]
-    args.multiplier = config["multiplier"]
     return args
 
 

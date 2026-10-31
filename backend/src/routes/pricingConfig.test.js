@@ -45,10 +45,10 @@ test('HTTP pricing settings require ADMIN, persist a real file, reject invalid/s
   assert.equal(initial.status, 200); assert.equal(initial.cache, 'no-store');
   const snapshot = initial.body.data;
   assert.deepEqual(snapshot.config, defaults);
-  const invalid = await send('PUT', 'ADMIN', { config: { ...defaults, multiplier: '1.4' }, revision: snapshot.revision });
-  assert.equal(invalid.status, 400); assert.match(invalid.body.message, /multiplier.*有限数字/);
+  const invalid = await send('PUT', 'ADMIN', { config: { ...defaults, defaultMarkup: '0.4' }, revision: snapshot.revision });
+  assert.equal(invalid.status, 400); assert.match(invalid.body.message, /defaultMarkup.*有限数字/);
   assert.deepEqual(JSON.parse(fs.readFileSync(target)), defaults);
-  const config = { ...defaults, mode: 'multiplier', multiplier: 1.4 };
+  const config = { ...defaults, defaultMarkup: 0.4, roundUpTo: 1 }; // 默认步长已是 5，故改成 1 才产生变更
   const saved = await send('PUT', 'ADMIN', { config, revision: snapshot.revision });
   assert.equal(saved.status, 200);
   assert.deepEqual(JSON.parse(fs.readFileSync(target)), config);
@@ -56,7 +56,7 @@ test('HTTP pricing settings require ADMIN, persist a real file, reject invalid/s
   assert.equal((await send('PUT', 'ADMIN', { config: defaults, revision: snapshot.revision })).status, 409);
   const updated = logs.filter(event => event.event === 'pricing_config_updated');
   assert.equal(updated.length, 1);
-  assert.deepEqual(updated[0].changedFields, ['mode', 'multiplier']);
+  assert.deepEqual(updated[0].changedFields, ['defaultMarkup', 'roundUpTo']);
   assert.equal(updated[0].actorId, 'synthetic-admin');
   assert.deepEqual(updated, [{
     timestamp: '2026-10-18T01:01:01.400Z',
@@ -64,8 +64,30 @@ test('HTTP pricing settings require ADMIN, persist a real file, reject invalid/s
     actorId: 'synthetic-admin',
     previousRevision: snapshot.revision,
     revision: saved.body.data.revision,
-    changedFields: ['mode', 'multiplier'],
+    changedFields: ['defaultMarkup', 'roundUpTo'],
   }]);
+  // 预览：同一 priceFor 规则；仅 ADMIN；不写文件
+  const preview = async (role, query) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/system/pricing-config/preview?${new URLSearchParams(query)}`, {
+      headers: role ? { 'x-synthetic-role': role } : {},
+    });
+    return { status: response.status, body: await response.json() };
+  };
+  assert.equal((await preview(undefined, { costCny: '100' })).status, 401);
+  for (const role of ['BOSS', 'SALES', 'PURCHASE', 'WAREHOUSE', 'FINANCE']) assert.equal((await preview(role, { costCny: '100' })).status, 403);
+  const before = fs.readFileSync(target, 'utf8');
+  const ok = await preview('ADMIN', { costCny: '100', spotRate: '7.2' });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.data.status, 'OK');
+  assert.equal(ok.body.data.unitPriceUsd, Math.ceil(Number(((100 * 1.4) / (7.2 - 0.2)).toFixed(6))));
+  assert.equal((await preview('ADMIN', { costCny: '0' })).body.data.status, 'MISSING_COST');
+  const draft = await preview('ADMIN', { costCny: '100', spotRate: '7.2', config: JSON.stringify({ ...defaults, roundUpTo: 1 }) });
+  assert.equal(draft.body.data.unitPriceUsd, 19); // 草稿：加价 30%、步长 1 → 130/7=18.57 → 19
+  const stepFive = await preview('ADMIN', { costCny: '100', spotRate: '7.2', config: JSON.stringify(defaults) });
+  assert.equal(stepFive.body.data.unitPriceUsd, 20); // 默认步长 5：18.57 → 19 → 20
+  assert.equal((await preview('ADMIN', { costCny: '100', config: '{bad' })).status, 400);
+  assert.equal((await preview('ADMIN', { costCny: '100', config: JSON.stringify({ ...defaults, roundUpTo: 0 }) })).status, 400);
+  assert.equal(fs.readFileSync(target, 'utf8'), before);
   const evidence = process.env.JIESONG_TEST_EVIDENCE_DIR;
   if (evidence) { fs.mkdirSync(evidence, { recursive: true }); fs.writeFileSync(path.join(evidence, 'pricing-http-receipt.json'), JSON.stringify({ initial, invalid, saved, fileReadback: JSON.parse(fs.readFileSync(target)), audit: updated }, null, 2)); }
 });

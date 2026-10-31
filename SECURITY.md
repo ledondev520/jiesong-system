@@ -157,18 +157,21 @@ Legacy `/api/v1/import` and `/api/v1/system/import` share `tabularUpload` from `
 
 Pricing requires a finite positive spot rate and a positive adjusted rate rounded
 to six decimal places. Positive adjustments cannot make missing or invalid spot
-rates usable. Python rejects invalid spot rates before reading proposal sources.
+rates usable.
 
-`config/pricing.json` contains non-secret policy values. Both export services and
-`scripts/prepare_export_packet.py` use this same file, or the explicit
-`JIESONG_PRICING_CONFIG` path. The shared `config/pricing.schema.json` defines
-strict keys and numeric bounds. Invalid or missing files stop pricing without
-fallback. Readiness recommendations use the same adjusted exchange rate, tiered
-markups and rounding as packet. Request-level profitRate does not override the
-shared file. Multiplier mode requires explicit selection. No environment file or
-business database is read by the loaders.
+`config/pricing.json` contains non-secret policy values (spot rate, adjustment,
+default markup, category markups, round-up step). Both export services use this
+file, or the explicit `JIESONG_PRICING_CONFIG` path, through the single
+`priceFor()` implementation. The shared `config/pricing.schema.json` defines
+strict keys and numeric bounds; category IDs are checked against the database on
+save. Invalid or missing files, including the retired tiered/multiplier shape,
+stop pricing without fallback. No environment file or business database is read
+by the file loader.
 
-`GET/PUT /system/pricing-config` require authenticated ADMIN. Updates replace the
+`GET/PUT /system/pricing-config` and the read-only `GET /system/pricing-config/preview`
+require authenticated ADMIN (preview is GET because the lifecycle contract forbids new
+unregistered write routes). Preview with a draft config validates it and never writes.
+Updates replace the
 whole validated document atomically, require the last revision, and use an
 exclusive lock file. Structured stderr events retain only operator ID, field
 names and policy hashes. No request values, contract data or secrets are logged.
@@ -180,3 +183,17 @@ operator to confirm no writer is active before removing it.
 
 - 采购 Excel 导入 `/api/v1/purchases/import` 在原认证/角色鉴权后使用 `backend/src/utils/purchaseExcelUpload.js` 的 memoryStorage，仅允许 .xlsx/.xls，沿用 config.upload.maxSize；`purchaseImportExportController.js` 只传文件名标签/Buffer，`purchaseImportExportService.js` 在解析/数据库访问前拒绝路径，仅解析内存字节，不留存 Confidential 原始工作簿于普通附件存储。
 - `backend/src/middleware/errorHandler.js` 将无 statusCode 的 Busboy 请求解析错误按精确消息白名单（七条消息及 `Unsupported content type: ` 前缀）返回中文400，含 NUL 的畸形 multipart 因此不再返回500。显式状态、Multer处理及原始错误日志保持，畸形上传解析错误即使开发环境也不返回英文堆栈，未知内部错误仍500；回归见 `backend/src/routes/purchases.import-upload.test.js` 和 `backend/src/middleware/errorHandler.test.js`。
+
+## Customer / order terms (Migration A)
+
+Migration A (customers, stores.customerId/code/legalName, sales_contracts customer and order terms) is additive and nullable; `backend/scripts/backfill-default-customer.js` links NULL stores and orders to one customer, Seapot by default per the owner decision that every existing store belongs to it (dry-run default; --confirm needs --backup-dir and --receipt, reuses `financial-sqlite-safety.js`, 0600 receipt, counts-only output, never reads .env, never rewrites old order terms). Customer contact data is Confidential. Production run only after owner approval and a prior `npm run db:backup` snapshot; see `docs/redesign/DATA-MODEL-2026.md` §2.
+
+## Quotes (Migration B2)
+
+`backend/src/services/quoteService.js` + `quoteStateMachine.js` implement Quote/QuoteItem (DATA-MODEL-2026 §4): DRAFT-only edits, CANCELLED instead of delete (no DELETE route), prices only from `priceFor()` (client formulaPrice ignored; manual price needs `isManualPrice`), ACCEPTED→CONVERTED creates one DRAFT sales order in a single transaction guarded by `updateMany` status and unique `sales_contracts.quoteId`. `/api/v1/quotes` read: ADMIN/SALES/PURCHASE/FINANCE/BOSS (cost columns visible to them), write: ADMIN/SALES; WAREHOUSE denied; BOSS whitelist is `/quotes` and `/quotes/:id` only (the J21 export stays denied). Quote prices and reference costs are Confidential. Migration is a one-way door: back up before deploy.
+Migration A (customers, stores.customerId/code/legalName, sales_contracts customer and order terms) is additive and nullable; `backend/scripts/backfill-default-customer.js` links NULL rows to one customer (dry-run default; --confirm needs --backup-dir and --receipt, reuses `financial-sqlite-safety.js`, 0600 receipt, counts-only output, never reads .env, never rewrites old order terms). Customer contact data is Confidential. Production run only after owner approval and a prior `npm run db:backup` snapshot; see `docs/redesign/DATA-MODEL-2026.md` §2.
+
+### Customers API (J12)
+`backend/src/routes/customers.js` (`customerController.js`, `services/customerService.js`): read for every authenticated role (BOSS only via the `bossReadOnly.js` GET whitelist, including `/customers/:id/stores`), write ADMIN/SALES with `withAuditLog`. There is no DELETE: archive = `PUT isActive:false`, and `customers` is registered in `lifecycle/resources.json`. USD only, incoterm in FOB/CFR/CIF/EXW/DDP, duplicate name 409. Customer contact fields are Confidential and are not in the audit field list (`utils/auditLog.js`). Store writes stay on `/stores` (existing roles unchanged; nested writes cannot join the lifecycle matrix): `code` is 2-12 `[A-Z0-9-]` upper-case (409 on duplicate), and a new store takes the only active customer when `customerId` is omitted, otherwise 400 请选择客户; archived customers take no new stores. Tests: `routes/customers.test.js`, `integration/customers.integration.js`.
+### Per-store purchasing and 生成采购单 (Migration B1, J16)
+Migration B1 (`purchase_items.storeId`, `purchase_contracts.salesContractId`) is additive and nullable; old lines keep `storeId = null` and there is no backfill. `POST /api/v1/sales/:id/purchase-drafts` (ADMIN/PURCHASE only, audited as `GENERATE_FROM_SALES`; BOSS stays read-only by default) calls `purchaseContractGenerationService.js`: the order must be CONFIRMED, suppliers must be active, each (product, store) may be generated once per non-cancelled contract (409), and one DRAFT contract per supplier is written in a single transaction using the existing purchase number generator and amount helper (`normalizeItem`). Drafts are not payables. The route is registered in `lifecycle/resources.json` as `kind: "action"` (checker extension in `scripts/check-lifecycle.cjs`, template `lifecycle/action.template.json`, proof test `integration/purchase-drafts.integration.js`). The migration is a one-way door: take the consistent SQLite snapshot first; this branch never ran it against a real database.
