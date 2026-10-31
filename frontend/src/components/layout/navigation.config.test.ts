@@ -28,7 +28,7 @@ describe("navigation.config helpers", () => {
     }
   });
 
-  it("菜单顺序：首页 / 业务 / 资料 / 设置，报价与客户与门店页面上线前隐藏", () => {
+  it("菜单顺序：首页 / 业务 / 资料（含客户与门店） / 设置，报价页面上线前隐藏", () => {
     expect(getMenuNavItems(Role.ADMIN).map((item) => item.label)).toEqual([
       "首页",
       "出口订单",
@@ -36,6 +36,7 @@ describe("navigation.config helpers", () => {
       "库存",
       "单证与退税",
       "财务",
+      "客户与门店",
       "供应商",
       "商品",
       "HS 编码",
@@ -48,6 +49,7 @@ describe("navigation.config helpers", () => {
       "business",
       "business",
       "business",
+      "data",
       "data",
       "data",
       "data",

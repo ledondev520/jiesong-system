@@ -81,7 +81,7 @@ export const SYSTEM_CENTER_LINKS: SystemCenterLink[] = [
   },
 ];
 
-// 菜单指向现有 URL（URL 迁移见后续 IA 卡片）。报价、客户与门店页面上线前 hidden。
+// 菜单指向现有 URL（URL 迁移见后续 IA 卡片）。报价页面上线前 hidden。
 export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
   {
     key: "home",
@@ -176,7 +176,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     childPrefixes: [],
     children: [],
     group: "data",
-    hidden: true,
   },
   {
     key: "suppliers",
