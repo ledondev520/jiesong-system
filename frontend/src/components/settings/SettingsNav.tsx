@@ -18,6 +18,8 @@ import {
   Building2,
   Download,
   History,
+  Bot,
+  BarChart3,
   Search,
   ChevronRight,
   type LucideIcon,
@@ -41,20 +43,20 @@ const navGroups: NavGroup[] = [
     items: [
       {
         href: "/dashboard/settings",
-        label: "系统配置",
+        label: "报价规则",
         icon: SlidersHorizontal,
       },
-      { href: "/dashboard/settings/users", label: "用户管理", icon: Users },
+      { href: "/dashboard/settings/users", label: "用户", icon: Users },
     ],
   },
   {
     label: "基础数据",
     items: [
-      { href: "/dashboard/settings/ports", label: "港口管理", icon: Anchor },
+      { href: "/dashboard/settings/ports", label: "港口", icon: Anchor },
       { href: "/dashboard/settings/categories", label: "商品分类", icon: Tag },
       {
         href: "/dashboard/settings/customs-brokers",
-        label: "报关公司",
+        label: "报关行",
         icon: Building2,
       },
     ],
@@ -70,9 +72,20 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    label: "AI",
+    items: [
+      { href: "/dashboard/settings/ai-access", label: "AI 接入", icon: Bot },
+      {
+        href: "/dashboard/settings/ai-usage",
+        label: "AI 用量",
+        icon: BarChart3,
+      },
+    ],
+  },
+  {
     label: "运维中心",
     items: [
-      { href: "/dashboard/system/logs", label: "系统日志", icon: History },
+      { href: "/dashboard/settings/logs", label: "系统日志", icon: History },
     ],
   },
 ];

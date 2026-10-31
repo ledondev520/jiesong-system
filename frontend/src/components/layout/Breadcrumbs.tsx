@@ -18,6 +18,8 @@ const routeLabelMap: Record<string, string> = {
   logs: "操作日志",
   notifications: "通知中心",
   sessions: "会话记录",
+  "ai-usage": "AI 用量",
+  "ai-access": "AI 接入",
   invoices: "发票",
   reconciliation: "对账",
   ports: "港口管理",

@@ -25,7 +25,7 @@ vi.mock("next/navigation", () => ({
     back: vi.fn(),
     replace: mockRouterReplace,
   }),
-  usePathname: () => "/dashboard/ai/sessions",
+  usePathname: () => "/dashboard/settings/ai-usage",
   useSearchParams: () => mockSearchParams,
 }));
 
@@ -238,7 +238,7 @@ describe("AiSessionsPage", () => {
 
   it("图表库通过延迟加载的内部 Module 隔离", () => {
     const pageSource = readFileSync(
-      "src/app/dashboard/ai/sessions/page.tsx",
+      "src/app/dashboard/settings/ai-usage/page.tsx",
       "utf8",
     );
 
@@ -999,7 +999,7 @@ describe("AiSessionsPage", () => {
     await waitFor(() => {
       expect(mockRouterReplace).toHaveBeenCalled();
       const lastCall = mockRouterReplace.mock.calls.at(-1)?.[0] as string;
-      expect(lastCall).toContain("/dashboard/ai/sessions?");
+      expect(lastCall).toContain("/dashboard/settings/ai-usage?");
       expect(lastCall).toContain("sort=latest-action");
       expect(lastCall).not.toContain("actionFilter=pending");
     });

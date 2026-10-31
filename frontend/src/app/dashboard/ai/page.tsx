@@ -17,7 +17,7 @@ export default function AiAssistantModulePage() {
         description="直接查询采购、出口、财务与系统数据；内部草稿按请求直接生成，付款、实物状态与异常操作确认一次。"
         actions={
           <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/ai/sessions">会话记录</Link>
+            <Link href="/dashboard/settings/ai-usage">会话记录</Link>
           </Button>
         }
       />

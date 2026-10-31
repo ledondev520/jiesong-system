@@ -23,7 +23,7 @@ vi.mock("@/store/auth.store", () => ({
     selector({ user: mockUser }),
 }));
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/dashboard/system/logs",
+  usePathname: () => "/dashboard/settings/logs",
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
 }));
 vi.mock("@/services/system.service", () => ({

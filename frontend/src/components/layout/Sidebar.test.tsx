@@ -134,7 +134,7 @@ describe("Sidebar", () => {
   });
 
   it("设置路由下设置菜单激活并展开子页面", () => {
-    mockPathname = "/dashboard/users";
+    mockPathname = "/dashboard/settings/users";
     const { getByText } = render(<Sidebar />);
 
     expect(
@@ -142,7 +142,7 @@ describe("Sidebar", () => {
     ).toBe(true);
     expect(getByText("账号管理").closest("a")).toHaveAttribute(
       "href",
-      "/dashboard/users",
+      "/dashboard/settings/users",
     );
   });
 

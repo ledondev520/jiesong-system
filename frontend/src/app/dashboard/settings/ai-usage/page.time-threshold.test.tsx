@@ -16,7 +16,7 @@ const mockSearchParams = new URLSearchParams("sort=risk&actionFilter=all");
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), replace: vi.fn() }),
-  usePathname: () => "/dashboard/ai/sessions",
+  usePathname: () => "/dashboard/settings/ai-usage",
   useSearchParams: () => mockSearchParams,
 }));
 
