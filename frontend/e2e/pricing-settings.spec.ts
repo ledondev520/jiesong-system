@@ -16,8 +16,8 @@ const malformedLoads = [
   },
   { name: "null data", data: null },
   {
-    name: "missing schema",
-    data: { config: defaults, revision: "a".repeat(64) },
+    name: "invalid revision",
+    data: { config: defaults, revision: "not-a-revision" },
   },
 ];
 
