@@ -141,8 +141,9 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
     assert.deepEqual(risk[0].stages.map(row => row.key),
       ['procurement', 'payment', 'production', 'loading', 'documents', 'invoice', 'tax-refund', 'finance']);
     assert.equal(risk[0].stages[0].reason, '找不到购销合同 CG-SYNTHETIC-MISSING');
-    assert.equal(risk[0].stages[3].reason, '毛重超过 22 吨安全上限');
-    assert.deepEqual(risk[0].issues, ['货柜超过 40HQ 安全上限']);
+    // Totals come from the two packing lines (25000 + 10 kg), not the editable header.
+    assert.match(risk[0].stages[3].reason, /^超重：毛重 \d+ kg，超过40HQ安全上限 22000 kg$/);
+    assert.deepEqual(risk[0].issues, [risk[0].stages[3].reason]);
     assert.equal(risk[0].nextAction.href, '/dashboard/sales/dashboard-old-risk');
     const pending = await read('/dashboard/trade-workflows?limit=100&scope=pending');
     assert.equal(pending.length, 10);

@@ -101,6 +101,7 @@
 ## Learned product & repo conventions (transcript-backed)
 - **Avoid duplicate primary UIs for the same data**: If two flows resolve to the same aggregate (e.g. 出口合同与货柜/排柜同源), keep a single navigation entry and one main surface; do not reintroduce parallel CRUD or search routes for the same entity.
 - **排柜 / 3D 可视化**: When carton length/width/height are missing, prefer deriving sensible defaults from known totals (e.g. total volume ÷ box count) for visualization instead of requiring exhaustive manual dimensions per line.
+- **柜型规格**: 20GP/40GP/40HQ 内尺寸、安全限值与出柜阈值只来自 `config/containers.json`（40HQ 默认）；后端经 `containerSpecs.js` 加载并校验（无效即失败），前端 `binPacking.ts` 的镜像常量由 `binPacking.test.ts` 与该文件比对，禁止在其他位置硬编码柜型数字或提示文案。
 - **HS 编码查询**: Keep numeric HS code (prefix) semantics consistent end-to-end for actions like「使用该编码搜索」; treat「商品名称」与「数字 HS 编码」as distinct query dimensions where mixing would confuse ranking or prefix logic.
 - **列表页模式**: Prefer shared patterns already in the app—server/client paging with page-size options (e.g. 20/50/100), search boxes paired with reset/clear, and mobile table views using `md:hidden` cards plus `hidden md:block` tables (e.g. `MobileListCard` from `@/components/mobile`).
 - **仓库可部署性**: Keep the GitHub-facing tree deployable and lean—do not commit build outputs, local DB files, or ad-hoc operational ledgers; tighten `.gitignore` when new artifact types appear.

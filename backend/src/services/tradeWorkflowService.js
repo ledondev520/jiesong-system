@@ -66,7 +66,17 @@ const hasSignedContractArchive = (purchase) => (purchase.files || []).some((file
   return isLegacyUnclassified && /\.(pdf|docx?)$/i.test(file.fileName || '');
 });
 
-const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
+const LOADING_ACTIONS = {
+  'missing-packing-items': '补充箱规数据',
+  'missing-box-count': '补充箱规数据',
+  'missing-dimensions': '补充箱规数据',
+  'over-weight': '调整装箱明细',
+  'over-volume': '调整装箱明细',
+};
+const blockersWithPrefix = (check, prefix) => check.blockers.filter((item) => item.code.startsWith(prefix));
+
+// utilisationOnly：非 recent 范围对已发运历史合同只看汇总利用率，不逐柜排箱。
+const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisationOnly = false } = {}) => {
   const packingItems = salesContract.packingItems || [];
   const purchaseContractNos = unique(packingItems.map((item) => item.purchaseContractNo));
   const linkedPurchases = purchaseContractNos
@@ -105,7 +115,8 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const salesStatus = normalizeSalesStatus(salesContract.status);
   const salesRank = SALES_RANK[salesStatus] ?? 0;
   const shipped = salesRank >= SALES_RANK[SALES_STATUS.SHIPPED];
-  const readiness = evaluateShipmentReadiness(salesContract);
+  const readiness = evaluateShipmentReadiness(salesContract, { utilisationOnly: utilisationOnly && shipped });
+  const { check } = readiness;
   const packingListChecks = [...(salesContract.packingListChecks || [])].sort((left, right) => (
     new Date(right.checkedAt || right.createdAt || 0).getTime()
     - new Date(left.checkedAt || left.createdAt || 0).getTime()
@@ -200,30 +211,20 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   let loadingStage;
   if (shipped) {
     loadingStage = { key: 'loading', label: '排柜与出货', status: 'completed', reason: '已确认发运' };
-  } else if (readiness.overloaded) {
+  } else if (check.status === 'blocked') {
+    const firstCode = check.blockers[0].code;
     loadingStage = {
-      key: 'loading', label: '排柜与出货', status: 'blocked',
-      reason: readiness.overloadReasons.includes('weight') ? '毛重超过 22 吨安全上限' : '体积超过 68 立方米安全上限',
-      action: { label: '调整装箱明细', href: `/dashboard/sales/${salesContract.id}` },
+      key: 'loading', label: '排柜与出货', status: 'blocked', reason: check.headline,
+      action: { label: LOADING_ACTIONS[firstCode] || '调整排柜', href: `/dashboard/sales/${salesContract.id}` },
     };
-  } else if (readiness.unplacedBoxCount > 0) {
-    loadingStage = {
-      key: 'loading', label: '排柜与出货', status: 'blocked', reason: `3D 排柜仍有 ${readiness.unplacedBoxCount} 箱无法装入`,
-      action: { label: '调整排柜', href: `/dashboard/sales/${salesContract.id}` },
-    };
-  } else if (readiness.missingBoxItemCount > 0 || packingItems.length === 0) {
-    loadingStage = {
-      key: 'loading', label: '排柜与出货', status: 'blocked', reason: '箱数或装箱明细未填写完整',
-      action: { label: '补充箱规数据', href: `/dashboard/sales/${salesContract.id}` },
-    };
-  } else if (readiness.ready) {
+  } else if (check.ready) {
     loadingStage = {
       key: 'loading', label: '排柜与出货', status: 'current', reason: '利用率达标且全部箱件可装下',
       action: { label: '确认发运', href: `/dashboard/sales/${salesContract.id}` },
     };
   } else {
     loadingStage = {
-      key: 'loading', label: '排柜与出货', status: 'current', reason: '毛重和体积均未达到 80% 出柜标准',
+      key: 'loading', label: '排柜与出货', status: 'current', reason: check.headline,
       action: { label: '继续排柜', href: `/dashboard/sales/${salesContract.id}` },
     };
   }
@@ -304,8 +305,13 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   if (unallocated.length) issues.push(`采购明细待分配：${unallocated.join('、')}`);
   if (purchasePaid > purchaseTotal + 0.01) issues.push('采购已付金额超过合同金额');
   if (productionIncompletePurchase) issues.push('采购生产状态已完成，但装柜输入资料不完整');
-  if (readiness.overloaded) issues.push(shipped ? '历史装箱数据超出 40HQ 参数，待核对' : '货柜超过 40HQ 安全上限');
-  if (readiness.unplacedBoxCount > 0) issues.push(shipped ? '历史箱规与 3D 排柜结果不一致，待核对' : `仍有 ${readiness.unplacedBoxCount} 箱无法装入`);
+  const overBlockers = blockersWithPrefix(check, 'over-');
+  if (overBlockers.length > 0) {
+    issues.push(...(shipped ? [`历史装箱数据超出 ${check.containerType} 参数，待核对`] : overBlockers.map((item) => item.message)));
+  }
+  if (readiness.unplacedBoxCount > 0) {
+    issues.push(...(shipped ? ['历史箱规与 3D 排柜结果不一致，待核对'] : [...blockersWithPrefix(check, 'oversize'), ...blockersWithPrefix(check, 'unplaced')].map((item) => item.message)));
+  }
   if (salesContract.shippedAt && salesContract.createdAt && new Date(salesContract.shippedAt) < new Date(salesContract.createdAt)) {
     issues.push('发运时间早于系统创建时间，请确认是否为历史补录');
   }
@@ -372,7 +378,7 @@ const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
     purchaseMap.set(contract.contractNo.replace(/^CG/, 'PO'), contract);
   });
 
-  let workflows = salesContracts.map((contract) => buildTradeWorkflow(contract, purchaseMap));
+  let workflows = salesContracts.map((contract) => buildTradeWorkflow(contract, purchaseMap, { utilisationOnly: scope !== 'recent' }));
   if (scope === 'pending') workflows = workflows.filter((item) => item.completedStageCount < item.stageCount);
   if (scope === 'blocked') workflows = workflows.filter((item) => item.stages.some((stage) => stage.status === 'blocked'));
   if (scope === 'risk') workflows.sort((a, b) => {

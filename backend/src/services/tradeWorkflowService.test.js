@@ -118,7 +118,7 @@ test('商业利用率达标但存在未装箱时装柜阶段保持阻塞', () =>
 
   const loading = workflow.stages.find((stage) => stage.key === 'loading');
   assert.equal(loading.status, 'blocked');
-  assert.match(loading.reason, /1 箱无法装入/);
+  assert.match(loading.reason, /超过40HQ内尺寸或柜门，无法装入/);
 });
 
 test('发运后的内部退税准备日为次月5日', () => {
@@ -275,7 +275,7 @@ test('待处理/阻塞/风险范围从全量合同筛选后限量，避免先取
   const calls = [];
   prisma.salesContract.findMany = async (args) => {
     calls.push(args);
-    return [{ ...baseSales, id: 'older-risk', grossWeight: 23000 }, { ...baseSales, id: 'newer', status: 'SHIPPED', packingItems: [] }];
+    return [{ ...baseSales, id: 'older-risk', grossWeight: 23000, packingItems: [{ ...baseSales.packingItems[0], grossWeight: 23000 }] }, { ...baseSales, id: 'newer', status: 'SHIPPED', packingItems: [] }];
   };
   prisma.purchaseContract.findMany = async () => [basePurchase];
   try {

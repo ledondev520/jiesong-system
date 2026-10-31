@@ -568,6 +568,41 @@ describe("SalesDetailPage 交互逻辑", () => {
     expect(screen.getByRole("button", { name: "确认发运" })).toBeDisabled();
   });
 
+  it("商业利用率达标但有明细未填箱数时禁止确认发运，与后端一致", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 0,
+        volume: 60,
+        grossWeight: 1000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-nobox",
+            productId: "p-1",
+            boxes: null,
+            quantity: 1,
+            volume: 60,
+            length: 1000,
+            width: 1000,
+            height: 1000,
+            product: { id: "p-1", customsName: "未填箱数货物" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+
+    renderPage("s-1");
+
+    expect(
+      await screen.findByText("不可出货：1 行装箱明细未填写箱数"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认发运" })).toBeDisabled();
+  });
+
   it.each(["SHIPPED", "ARRIVED", "COMPLETED"])(
     "已发运阶段 %s 的模拟异常明确标为历史核对",
     async (status) => {

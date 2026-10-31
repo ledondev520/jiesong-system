@@ -1,5 +1,5 @@
 /**
- * Input: 出口合同服务 (salesService)、binPacking（出柜双80%判定）、通用表格排序 hook、按需 Excel 导入 Module
+ * Input: 出口合同服务 (salesService)（含后端 loadingUtilisation 汇总利用率）、binPacking（柜型常量）、通用表格排序 hook、按需 Excel 导入 Module
  * Output: 出口合同列表页面（含前置搜索、删除、列排序和分页、出柜条件徽章）
  * Pos: 出口合同管理入口，展示合同列表、货柜信息与出柜双80%指标，支持删除操作
  *
@@ -23,7 +23,7 @@ import {
 } from "react";
 import { SalesContract, SalesStatus } from "@/types";
 import { salesService } from "@/services/sales.service";
-import { evaluateShippingReadiness } from "@/lib/binPacking";
+import { CONTAINER_40HQ, SHIPPING_READY_THRESHOLD_PCT } from "@/lib/binPacking";
 import { clearApiGetCache } from "@/lib/axios";
 import { runAwait } from "@/lib/run-await";
 import { useTabSync } from "@/lib/tab-sync";
@@ -549,16 +549,15 @@ export default function SalesPage() {
   };
 
   /**
-   * 职责：渲染货柜信息（含出柜双80%指标徽章）
-   * 思路：毛重(22t)/体积(68CBM)任一利用率 ≥ 80% 显示「可出柜」，仅装箱前状态显示未达标提示
+   * 职责：渲染货柜信息（含利用率徽章）
+   * 思路：使用后端 loadingUtilisation（40HQ，任一利用率 ≥ 阈值）显示「利用率达标」/「未达80%」；
+   *       列表不排柜，是否装得下以详情页为准，因此不再称「可出柜」
    */
   const ContainerInfo = ({ contract }: { contract: SalesContract }) => {
     if (!contract.totalBoxes && !contract.volume && !contract.grossWeight)
       return null;
-    const readiness = evaluateShippingReadiness(
-      contract.grossWeight || 0,
-      contract.volume || 0,
-    );
+    const utilisation = contract.loadingUtilisation;
+    const pctText = (pct: number) => (Math.floor(pct * 10) / 10).toFixed(1);
     const beforeShipment =
       contract.status === SalesStatus.DRAFT ||
       contract.status === SalesStatus.CONFIRMED ||
@@ -573,21 +572,21 @@ export default function SalesPage() {
             <span className="text-xs font-medium truncate">
               {contract.contractNo}
             </span>
-            <span className="text-[10px] text-muted-foreground">40HQ</span>
+            <span className="text-[10px] text-muted-foreground">
+              {CONTAINER_40HQ.code}
+            </span>
             {beforeShipment &&
-              (readiness.ready ? (
+              utilisation &&
+              (utilisation.utilisationReady ? (
                 <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-px text-[10px] font-medium text-emerald-700">
-                  可出柜
+                  利用率达标
                 </span>
               ) : (
                 <span
                   className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700"
-                  title={`毛重 ${readiness.weightPct.toFixed(0)}% / 体积 ${readiness.volumePct.toFixed(0)}%，任一 ≥ 80% 可出柜`}
+                  title={`毛重 ${pctText(utilisation.weightPct)}% / 体积 ${pctText(utilisation.volumePct)}%，任一 ≥ ${SHIPPING_READY_THRESHOLD_PCT}% 视为利用率达标；是否装得下以详情页排柜为准`}
                 >
-                  {Math.max(readiness.weightPct, readiness.volumePct).toFixed(
-                    0,
-                  )}
-                  % 未达80%
+                  未达{SHIPPING_READY_THRESHOLD_PCT}%
                 </span>
               ))}
           </div>
