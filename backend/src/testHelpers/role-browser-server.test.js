@@ -446,8 +446,8 @@ test('menu documents HTTP: commercial preview validates metadata and cancel-equi
   assert.equal(preview.body.data.ready, true);
   assert.equal(preview.body.data.lines[0].productName, '合成角色验收商品');
   assert.equal(preview.body.data.summary.purchaseCostCny, 113);
-  // locked rule: ceil(113/10 × 1.3 ÷ (7.2 − 0.2)) = 3 USD per piece × 10
-  assert.equal(preview.body.data.summary.totalUsd, 30);
+  // final rule: 11.3 × 1.3 ÷ 7 = 2.10 → 3 USD → next multiple of 5 = 5 USD per piece × 10
+  assert.equal(preview.body.data.summary.totalUsd, 50);
   assert.deepEqual(documentSnapshot(f), before);
 });
 test('menu documents HTTP: commercial generation archives private workbook and repeated download preserves bytes', { timeout: 60000 }, async t => {
