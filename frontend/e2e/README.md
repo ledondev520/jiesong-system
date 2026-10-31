@@ -64,3 +64,5 @@
 - `mobile.spec.ts` 的设置菜单使用精确可访问名称「数据导入导出」，对应同一路由的导入模板、只读校验与导出功能。逐项核对展开、链接可见性和 href，点击后核对 URL、自动收起与视口宽度。不得用模糊名称匹配掩盖入口变化。
 
 - `helpers.ts` 为 `/api/v1/system/pricing-config` 提供专用 GET/PUT 夹具，复用共用 pricing JSON/schema，返回完整 config/revision/schema；PUT 校验版本并仅修改每项测试内存，重载可读回，不写仓库配置或业务数据库。`pricing-settings.spec.ts` 持续检查未捕获页面异常，异常响应不得移除系统配置标题和主导航，不得伪报成功或丢弃草稿。浏览器无法启动时，定义检查和组件回归通过不代表 E2E 执行通过。
+
+settings-sections.spec.ts：设置分区链接与旧地址（用户、系统日志、通知、关于、AI 会话）重定向，只读。

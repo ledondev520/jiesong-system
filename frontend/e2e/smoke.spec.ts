@@ -193,14 +193,14 @@ test.describe("关键按钮交互", () => {
   });
 
   test("通知中心：未读筛选入口可见", async ({ page }) => {
-    await signInAsAdmin(page, "/dashboard/system/notifications");
+    await signInAsAdmin(page, "/dashboard/notifications");
     await expect(page.getByRole("heading", { name: "通知中心" })).toBeVisible();
 
     await expect(page.getByRole("button", { name: "仅未读" })).toBeVisible();
   });
 
   test("系统日志：日志列表可达", async ({ page }) => {
-    await signInAsAdmin(page, "/dashboard/system/logs");
+    await signInAsAdmin(page, "/dashboard/settings/logs");
     await expect(page.getByRole("heading", { name: "系统日志" })).toBeVisible();
 
     await expect(page.getByText("系统日志").first()).toBeVisible();

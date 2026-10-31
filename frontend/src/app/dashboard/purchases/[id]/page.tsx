@@ -348,7 +348,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
   // 系统配置：线上盖章平台链接 + 我方开票抬头（选填）
   const [stampPlatformUrl, setStampPlatformUrl] = useState("");
-  const [invoiceTitleInfo, setInvoiceTitleInfo] = useState("");
+  const [invoiceTitleText, setInvoiceTitleText] = useState("");
 
   /**
    * 职责：加载采购合同详情 + 附件列表
@@ -425,7 +425,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     void fetchData();
   }, [fetchData]);
 
-  // 加载系统配置（盖章平台链接、开票抬头），失败不阻塞页面
+  // 加载系统配置（盖章平台链接）与统一卖方信息（开票抬头），失败不阻塞页面
   useEffect(() => {
     if (readOnly) return;
     const fetchConfigs = async () => {
@@ -434,10 +434,16 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         const configs = response.data as Record<string, unknown> | undefined;
         if (typeof configs?.stampPlatformUrl === "string")
           setStampPlatformUrl(configs.stampPlatformUrl);
-        if (typeof configs?.invoiceTitleInfo === "string")
-          setInvoiceTitleInfo(configs.invoiceTitleInfo);
       } catch {
         // 配置读取失败时保持默认，不影响详情页
+      }
+      try {
+        // 开票抬头由统一的卖方信息生成（公司信息 + 旧抬头别名）；银行行仅在有权限时包含
+        const identity = await configService.getSellerIdentity();
+        if (typeof identity.data?.invoiceTitleText === "string")
+          setInvoiceTitleText(identity.data.invoiceTitleText);
+      } catch {
+        // 读取失败时催票文本不带抬头，不影响详情页
       }
     };
     void fetchConfigs();
@@ -915,7 +921,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       <PurchaseFlowPanel
         contract={contract}
         onUpdated={loadData}
-        invoiceTitleInfo={invoiceTitleInfo}
+        invoiceTitleText={invoiceTitleText}
       />
 
       {productionStageVisible ? (

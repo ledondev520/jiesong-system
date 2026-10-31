@@ -33,3 +33,17 @@
 异常加载仅显示卡片内错误且不提供保存，异常保存保留有效快照与用户草稿，不显示保存成功。
 `PricingConfigCard.test.tsx` 另覆盖通用 E2E 分页回退、空值、缺失字段/规则、非法版本及数值，
 同时验证明确重试可用；不通过本地默认值补齐不完整的服务端配置。
+
+## 分区与路径迁移（J29）
+设置侧栏按规格 §3.5 分区：报价规则、用户、港口、商品分类、报关行、数据导入导出、AI 接入、AI 用量、系统日志。公司信息（需后端字段，待负责人确认 Q9）与「高级」折叠区尚未实现。
+
+| 旧路径 | 新路径 |
+|---|---|
+| `/dashboard/users`（与旧 487 行 `settings/users`） | `settings/users`（保留 907 行版本，含 Agent 账号） |
+| `/dashboard/system/logs` | `settings/logs` |
+| `/dashboard/about` | `settings/ai-access` |
+| `/dashboard/ai/sessions` | `settings/ai-usage` |
+| `/dashboard/system/notifications` | `/dashboard/notifications`（所有角色） |
+| `/dashboard/system` | 删除，重定向到 `/dashboard/settings` |
+
+旧地址由 `frontend/next.config.ts` 永久重定向；`e2e/settings-sections.spec.ts` 覆盖分区链接与重定向。

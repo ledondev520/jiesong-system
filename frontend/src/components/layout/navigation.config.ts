@@ -60,20 +60,20 @@ export interface ModuleNavItem {
 
 export const ADMIN_TABS: TabConfig[] = [
   { href: "/dashboard/settings", label: "系统配置" },
-  { href: "/dashboard/users", label: "账号管理" },
-  { href: "/dashboard/system/logs", label: "系统日志" },
+  { href: "/dashboard/settings/users", label: "账号管理" },
+  { href: "/dashboard/settings/logs", label: "系统日志" },
 ];
 
 export const SYSTEM_CENTER_LINKS: SystemCenterLink[] = [
   {
-    href: "/dashboard/system/notifications",
+    href: "/dashboard/notifications",
     label: "通知中心",
     icon: Bell,
     desc: "查看系统通知和未读提醒",
     detail: "管理所有系统消息、操作提醒与告警通知，支持批量已读。",
   },
   {
-    href: "/dashboard/system/logs",
+    href: "/dashboard/settings/logs",
     label: "系统日志",
     icon: History,
     desc: "审计关键操作日志与变更记录",
@@ -81,7 +81,7 @@ export const SYSTEM_CENTER_LINKS: SystemCenterLink[] = [
   },
 ];
 
-// 菜单指向现有 URL（URL 迁移见后续 IA 卡片）。报价页面上线前 hidden。
+// 菜单指向现有 URL（URL 迁移见后续 IA 卡片）。
 export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
   {
     key: "home",
@@ -103,7 +103,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     childPrefixes: [],
     children: [],
     group: "business",
-    hidden: true,
   },
   {
     key: "orders",
@@ -222,8 +221,8 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
   // 通知从顶栏铃铛进入；BOSS 无其他系统入口，仅保留路由归属。
   {
     key: "notifications",
-    href: "/dashboard/system/notifications",
-    defaultHref: "/dashboard/system/notifications",
+    href: "/dashboard/notifications",
+    defaultHref: "/dashboard/notifications",
     label: "通知中心",
     icon: Bell,
     childPrefixes: [],
@@ -244,9 +243,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       "/dashboard/settings/categories",
       "/dashboard/settings/customs-brokers",
       "/dashboard/import",
-      "/dashboard/users",
-      "/dashboard/about",
-      "/dashboard/system",
     ],
     children: ADMIN_TABS,
     group: "system",

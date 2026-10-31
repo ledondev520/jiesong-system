@@ -1,7 +1,7 @@
 /**
- * Input: userService API、完整分页目录读取器、UserDialog
- * Output: 用户管理页面、完整目录搜索及保存失败保留草稿重试
- * Pos: 系统设置 > 用户管理
+ * Input: 用户服务 API、Agent 服务 API
+ * Output: 账号管理、未开通/已停用账号核对入口和完整分页目录
+ * Pos: 系统设置子页面，管理员管理所有账号
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -13,8 +13,11 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { format } from "date-fns";
 import { User, Role } from "@/types";
-import { userService } from "@/services/user.service";
+import type { AgentAccount } from "@/types";
+import { clearApiGetCache } from "@/lib/axios";
 import { loadPaginatedCatalog } from "@/services/paginatedCatalog";
+import { userService } from "@/services/user.service";
+import { agentService } from "@/services/agent.service";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -25,62 +28,47 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { SemanticBadge } from "@/components/ui/semantic-badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Bot,
+  Copy,
+  KeyRound,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  ShieldX,
+  Trash,
+  UserCog,
+  X,
+} from "lucide-react";
+import { PageSizeSelect } from "@/components/ui/page-size-select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserDialog } from "./components/UserDialog";
+import { AgentAccountDialog } from "@/components/dialog/AgentAccountDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { runAwait } from "@/lib/run-await";
-import { PageSizeSelect } from "@/components/ui/page-size-select";
-import { Input } from "@/components/ui/input";
-import { Search, X, Plus, Pencil, Trash2 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserDialog } from "../../users/components/UserDialog";
-import { PermissionMatrix } from "@/components/settings/PermissionMatrix";
 import { MobileListCard } from "@/components/mobile";
 
-const ROLE_META: Record<Role, { label: string; className: string }> = {
-  [Role.BOSS]: {
-    label: "老板（只读）",
-    className: "bg-sky-50 text-sky-700 border-sky-200",
-  },
-  [Role.ADMIN]: {
-    label: "管理员",
-    className:
-      "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-300 dark:border-rose-800",
-  },
-  [Role.PURCHASE]: {
-    label: "采购",
-    className:
-      "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800",
-  },
-  [Role.SALES]: {
-    label: "销售",
-    className:
-      "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
-  },
-  [Role.FINANCE]: {
-    label: "财务",
-    className:
-      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
-  },
-  [Role.WAREHOUSE]: {
-    label: "仓库",
-    className:
-      "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:border-slate-800",
-  },
-};
-
-function RoleBadge({ role }: { role: Role }) {
-  const meta = ROLE_META[role] || { label: role, className: "" };
-  return (
-    <Badge
-      variant="outline"
-      className={`text-[11px] font-medium ${meta.className}`}
-    >
-      {meta.label}
-    </Badge>
-  );
-}
-
-export default function SettingsUsersPage() {
+export default function UsersPage() {
+  // ── 人类用户状态 ──
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -88,23 +76,41 @@ export default function SettingsUsersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState("");
+  const [inactiveOnly, setInactiveOnly] = useState(false);
+  const [usersError, setUsersError] = useState(false);
 
-  /**
-   * 职责：逐页加载完整用户目录供现有客户端搜索和分页使用（不含 loading 置位）
-   * @returns 完成加载的 Promise；失败时沿用列表错误提示
-   */
+  // ── Agent 账号状态 ──
+  const [agents, setAgents] = useState<AgentAccount[]>([]);
+  const [agentLoading, setAgentLoading] = useState(true);
+  const [agentDialogOpen, setAgentDialogOpen] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<AgentAccount | null>(null);
+  const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
+  const [oneTimeToken, setOneTimeToken] = useState("");
+  const [tokenAction, setTokenAction] = useState<"issue" | "rotate">("issue");
+  const origin =
+    typeof window !== "undefined" && window.location?.origin
+      ? window.location.origin
+      : "https://your-vps-host";
+
+  const automatedInstallCommand = useMemo(() => {
+    if (!oneTimeToken) return "";
+    return `JIESONG_BASE_URL="${origin}" JIESONG_AGENT_TOKEN="${oneTimeToken}" curl -fsSL ${origin}/agent/install.sh | bash`;
+  }, [origin, oneTimeToken]);
+
+  // ── 数据加载 ──
   const requestUsers = useCallback(
     () =>
       runAwait(
-        // 1. 完整装载目录后才执行现有客户端搜索与分页。
         () =>
           loadPaginatedCatalog((page) =>
             userService.getAll({ page, pageSize: 100 }),
           ),
         (allUsers) => {
           setUsers(allUsers);
+          setCurrentPage(1);
         },
         () => {
+          setUsersError(true);
           toast.error("加载用户失败");
         },
         () => {
@@ -114,48 +120,81 @@ export default function SettingsUsersPage() {
     [],
   );
 
-  /**
-   * 职责：置 loading 后重新加载完整用户目录
-   * @returns 完成加载的 Promise；失败时沿用列表错误提示
-   */
+  const requestAgents = useCallback(
+    () =>
+      runAwait(
+        () => agentService.getAll({ page: 1, pageSize: 100 }),
+        (response) => {
+          setAgents(response.data?.items || []);
+        },
+        () => {
+          toast.error("加载 Agent 列表失败");
+        },
+        () => {
+          setAgentLoading(false);
+        },
+      ),
+    [],
+  );
+
   const loadUsers = useCallback(() => {
     setLoading(true);
+    setUsersError(false);
     return requestUsers();
   }, [requestUsers]);
 
-  // loading 初值为 true，挂载时原先的 setLoading(true) 不改变状态，effect 只需发请求。
+  const loadAgents = useCallback(() => {
+    setAgentLoading(true);
+    return requestAgents();
+  }, [requestAgents]);
+
+  // loading/agentLoading 初值为 true、usersError 初值为 false，挂载时原先 loadX 内的同步置位不改变状态，
+  // effect 只按原顺序（先用户、后 Agent）发请求。
   useEffect(() => {
     void requestUsers();
-  }, [requestUsers]);
+    void requestAgents();
+  }, [requestUsers, requestAgents]);
+
+  // ── 用户操作 ──
+  const getRoleBadge = (role: Role) => {
+    switch (role) {
+      case Role.BOSS:
+        return <SemanticBadge tone="info">老板（只读）</SemanticBadge>;
+      case Role.ADMIN:
+        return <SemanticBadge tone="danger">管理员</SemanticBadge>;
+      case Role.PURCHASE:
+        return <SemanticBadge tone="info">采购</SemanticBadge>;
+      case Role.SALES:
+        return <SemanticBadge tone="success">销售</SemanticBadge>;
+      case Role.FINANCE:
+        return <SemanticBadge tone="warning">财务</SemanticBadge>;
+      case Role.WAREHOUSE:
+        return <SemanticBadge tone="secondary">仓库</SemanticBadge>;
+      default:
+        return <SemanticBadge tone="secondary">{role}</SemanticBadge>;
+    }
+  };
 
   const handleCreate = () => {
     setEditingUser(null);
     setIsDialogOpen(true);
   };
-
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setIsDialogOpen(true);
   };
-
   const handleDelete = async (id: string) => {
     if (confirm("确定要删除此用户吗？")) {
       try {
         await userService.delete(id);
         setUsers(users.filter((u) => u.id !== id));
+        setCurrentPage(1);
         toast.success("用户已删除");
       } catch {
         toast.error("删除失败");
       }
     }
   };
-
-  /**
-   * 职责：保存用户并仅在成功后关闭；失败交还对话框保留当前草稿
-   * @param data 当前表单提交字段
-   * @returns 完成保存的 Promise
-   * @throws 原始保存异常，使 UserDialog 明确提示并等待用户重试
-   */
   const handleSubmit = async (data: Partial<User>) => {
     try {
       if (editingUser) {
@@ -169,15 +208,108 @@ export default function SettingsUsersPage() {
       loadUsers();
     } catch (error) {
       toast.error(editingUser ? "更新失败" : "创建失败");
-      // 1. 保存拒绝必须传回共用表单，避免成功分支清空未完成草稿。
       throw error;
     }
   };
 
+  // ── Agent 操作 ──
+  const copyText = async (text: string, successMessage: string) => {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "true");
+      textarea.style.position = "absolute";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    toast.success(successMessage);
+  };
+
+  // react-hooks/purity 警告保留：渲染期读取当前时间，每次重渲染按当时时间判断过期/即将过期。
+  // 改为挂载或加载时取一次时间会让页面长时间打开后徽标不再更新（行为变化），故不改。
+  const getCredentialRisk = (expiresAt?: string | null) => {
+    if (!expiresAt) return null;
+    const diffMs = new Date(expiresAt).getTime() - Date.now();
+    const diffDays = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+    if (diffDays < 0) return "expired";
+    if (diffDays <= 14) return "expiring";
+    return null;
+  };
+
+  const handleAgentCreateOrUpdate = async (
+    payload: Parameters<typeof agentService.create>[0],
+  ) => {
+    try {
+      if (editingAgent) {
+        await agentService.update(editingAgent.id, payload);
+        toast.success("Agent 更新成功");
+      } else {
+        await agentService.create(payload);
+        toast.success("Agent 创建成功");
+      }
+      setAgentDialogOpen(false);
+      setEditingAgent(null);
+      await loadAgents();
+    } catch {
+      toast.error(editingAgent ? "Agent 更新失败" : "Agent 创建失败");
+    }
+  };
+
+  const openIssueTokenDialog = (token: string, action: "issue" | "rotate") => {
+    setOneTimeToken(token);
+    setTokenAction(action);
+    setTokenDialogOpen(true);
+  };
+
+  const handleIssueCredential = async (agent: AgentAccount) => {
+    try {
+      const response = await agentService.issueCredential(
+        agent.id,
+        `${agent.slug}-credential`,
+        90,
+      );
+      toast.success("Agent 凭证签发成功");
+      openIssueTokenDialog(response.data?.token || "", "issue");
+      await loadAgents();
+    } catch {
+      toast.error("签发凭证失败");
+    }
+  };
+
+  const handleRotateCredential = async (credentialId: string) => {
+    try {
+      const response = await agentService.rotateCredential(credentialId, 90);
+      toast.success("Agent 凭证轮换成功");
+      openIssueTokenDialog(response.data?.token || "", "rotate");
+      await loadAgents();
+    } catch {
+      toast.error("轮换凭证失败");
+    }
+  };
+
+  const handleRevokeCredential = async (credentialId: string) => {
+    try {
+      await agentService.revokeCredential(credentialId);
+      toast.success("Agent 凭证已吊销");
+      await loadAgents();
+    } catch {
+      toast.error("吊销凭证失败");
+    }
+  };
+
+  // ── 用户筛选与分页 ──
   const filteredUsers = useMemo(() => {
-    if (!keyword.trim()) return users;
+    const candidates = inactiveOnly
+      ? users.filter((user) => !user.isActive)
+      : users;
+    if (!keyword.trim()) return candidates;
     const q = keyword.toLowerCase().trim();
-    return users.filter(
+    return candidates.filter(
       (u) =>
         (u.name || "").toLowerCase().includes(q) ||
         (u.username || "").toLowerCase().includes(q) ||
@@ -186,9 +318,9 @@ export default function SettingsUsersPage() {
           .toLowerCase()
           .includes(q),
     );
-  }, [users, keyword]);
+  }, [users, keyword, inactiveOnly]);
 
-  const sort = useTableSort<User, string>(
+  const userSort = useTableSort<User, string>(
     filteredUsers,
     useCallback((item, key) => {
       switch (key) {
@@ -206,8 +338,8 @@ export default function SettingsUsersPage() {
     }, []),
   );
 
-  const totalPages = Math.ceil(sort.sortedData.length / pageSize);
-  const pagedUsers = sort.sortedData.slice(
+  const totalPages = Math.ceil(userSort.sortedData.length / pageSize);
+  const pagedUsers = userSort.sortedData.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
   );
@@ -215,22 +347,43 @@ export default function SettingsUsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="用户管理"
-        description="管理系统用户账号与角色权限"
+        title="账号管理"
+        description="管理系统用户与外部 Agent 账号"
         actions={
-          <Button onClick={handleCreate} className="h-10 rounded-xl">
-            <Plus className="mr-2 h-4 w-4" />
-            新增用户
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingAgent(null);
+                setAgentDialogOpen(true);
+              }}
+            >
+              <Bot className="mr-2 h-4 w-4" />
+              新增 Agent
+            </Button>
+            <Button onClick={handleCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              新增用户
+            </Button>
+          </div>
         }
       />
 
+      {/* ══════════ 用户区块 ══════════ */}
       <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <UserCog className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium">系统用户</h3>
+          <Badge variant="outline" className="text-[10px]">
+            {filteredUsers.length}
+          </Badge>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              className="pl-9 h-10 rounded-xl border-border/70 bg-background/70"
+              className="pl-9 h-9"
               placeholder="搜索姓名、账号、邮箱、角色..."
               value={keyword}
               onChange={(e) => {
@@ -243,19 +396,76 @@ export default function SettingsUsersPage() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-10 rounded-xl"
               onClick={() => {
                 setKeyword("");
                 setCurrentPage(1);
               }}
             >
-              <X className="mr-1 h-4 w-4" />
+              <X className="h-4 w-4 mr-1" />
               重置
             </Button>
           )}
         </div>
 
-        {/* 移动端卡片 */}
+        <section
+          aria-label="账号开通指引"
+          className="space-y-3 rounded-lg border bg-muted/30 p-4 text-sm"
+        >
+          <p className="font-medium">有同事注册后无法登录？在这里核对并开通</p>
+          <p className="text-muted-foreground">
+            筛选未开通/已停用账号 → 搜索申请人的邮箱 → 点击「核对并开通」→
+            核对身份和角色 → 打开「账号开通」并保存。
+          </p>
+          <p className="text-muted-foreground">
+            此列表也包含已停用账号，请核对停用原因；不会自动恢复或批量开通。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={!inactiveOnly ? "default" : "outline"}
+              aria-pressed={!inactiveOnly}
+              onClick={() => {
+                setInactiveOnly(false);
+                setCurrentPage(1);
+              }}
+            >
+              全部账号
+            </Button>
+            <Button
+              type="button"
+              variant={inactiveOnly ? "default" : "outline"}
+              aria-pressed={inactiveOnly}
+              onClick={() => {
+                setInactiveOnly(true);
+                setCurrentPage(1);
+              }}
+            >
+              未开通/已停用
+              {!loading && !usersError
+                ? `（${users.filter((user) => !user.isActive).length}）`
+                : ""}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={loading}
+              onClick={() => {
+                clearApiGetCache();
+                void loadUsers();
+              }}
+            >
+              <RefreshCw className="mr-1 h-4 w-4" />
+              {loading ? "刷新中…" : "刷新账号"}
+            </Button>
+          </div>
+          {usersError && (
+            <p role="alert" className="text-destructive">
+              账号列表未能完整刷新，请重试；不要根据旧列表判断申请是否存在。
+            </p>
+          )}
+        </section>
+
+        {/* 移动端卡片列表 */}
         <div className="space-y-3 md:hidden">
           {loading ? (
             <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
@@ -263,7 +473,13 @@ export default function SettingsUsersPage() {
             </div>
           ) : pagedUsers.length === 0 ? (
             <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
-              {keyword ? "没有匹配的用户" : "暂无用户"}
+              {usersError
+                ? "列表加载失败，请刷新重试"
+                : inactiveOnly
+                  ? "没有匹配的未开通/已停用账号"
+                  : keyword
+                    ? "没有匹配的用户"
+                    : "暂无用户"}
             </div>
           ) : (
             pagedUsers.map((user) => (
@@ -271,11 +487,12 @@ export default function SettingsUsersPage() {
                 key={user.id}
                 title={user.name}
                 subtitle={user.username}
-                badge={<RoleBadge role={user.role} />}
+                badge={getRoleBadge(user.role)}
                 fields={[
                   {
                     label: "状态",
                     value: user.isActive ? "正常" : "未开通/停用",
+                    emphasis: user.isActive ? "primary" : undefined,
                   },
                   {
                     label: "最后登录",
@@ -292,7 +509,8 @@ export default function SettingsUsersPage() {
                       className="h-10 flex-1 rounded-xl"
                       onClick={() => handleEdit(user)}
                     >
-                      <Pencil className="mr-1 h-4 w-4" /> 编辑
+                      <Pencil className="mr-1 h-4 w-4" />{" "}
+                      {user.isActive ? "编辑" : "核对并开通"}
                     </Button>
                     <Button
                       variant="ghost"
@@ -300,7 +518,7 @@ export default function SettingsUsersPage() {
                       className="h-10 rounded-xl px-3"
                       onClick={() => handleDelete(user.id)}
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
                 }
@@ -310,39 +528,44 @@ export default function SettingsUsersPage() {
         </div>
 
         {/* 桌面端表格 */}
-        <div className="hidden md:block surface-panel overflow-hidden">
+        <div className="surface-panel hidden overflow-hidden md:block">
           <Table>
             <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="text-muted-foreground">用户</TableHead>
+              <TableRow>
+                <SortableTableHead
+                  sortKey="name"
+                  currentSortKey={userSort.sortKey}
+                  currentSortDir={userSort.sortDir}
+                  onSort={userSort.onSort}
+                >
+                  姓名
+                </SortableTableHead>
                 <SortableTableHead
                   sortKey="username"
-                  currentSortKey={sort.sortKey}
-                  currentSortDir={sort.sortDir}
-                  onSort={sort.onSort}
+                  currentSortKey={userSort.sortKey}
+                  currentSortDir={userSort.sortDir}
+                  onSort={userSort.onSort}
                 >
                   账号
                 </SortableTableHead>
                 <SortableTableHead
                   sortKey="role"
-                  currentSortKey={sort.sortKey}
-                  currentSortDir={sort.sortDir}
-                  onSort={sort.onSort}
+                  currentSortKey={userSort.sortKey}
+                  currentSortDir={userSort.sortDir}
+                  onSort={userSort.onSort}
                 >
                   角色
                 </SortableTableHead>
-                <TableHead className="text-muted-foreground">状态</TableHead>
+                <TableHead>状态</TableHead>
                 <SortableTableHead
                   sortKey="lastLoginAt"
-                  currentSortKey={sort.sortKey}
-                  currentSortDir={sort.sortDir}
-                  onSort={sort.onSort}
+                  currentSortKey={userSort.sortKey}
+                  currentSortDir={userSort.sortDir}
+                  onSort={userSort.onSort}
                 >
                   最后登录
                 </SortableTableHead>
-                <TableHead className="w-[100px] text-muted-foreground">
-                  操作
-                </TableHead>
+                <TableHead className="w-[170px]">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -361,75 +584,68 @@ export default function SettingsUsersPage() {
                     colSpan={6}
                     className="py-12 text-center text-muted-foreground"
                   >
-                    暂无用户。
+                    {usersError
+                      ? "列表加载失败，请刷新重试"
+                      : inactiveOnly
+                        ? "没有匹配的未开通/已停用账号"
+                        : keyword
+                          ? "没有匹配的用户"
+                          : "暂无用户。"}
                   </TableCell>
                 </TableRow>
               ) : (
                 pagedUsers.map((user) => (
-                  <TableRow
-                    key={user.id}
-                    className="group transition-colors hover:bg-muted/40"
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9 border border-border/60">
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8 border border-border/60">
                           {user.avatar ? (
                             <AvatarImage src={user.avatar} alt={user.name} />
                           ) : null}
-                          <AvatarFallback className="text-xs font-semibold">
+                          <AvatarFallback>
                             {user.name.slice(0, 1).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <p className="text-sm font-medium">{user.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {user.email || "-"}
-                          </p>
-                        </div>
+                        {user.name}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {user.username}
-                    </TableCell>
-                    <TableCell>
-                      <RoleBadge role={user.role} />
-                    </TableCell>
+                    <TableCell>{user.username}</TableCell>
+                    <TableCell>{getRoleBadge(user.role)}</TableCell>
                     <TableCell>
                       <Badge
                         variant={user.isActive ? "outline" : "secondary"}
                         className={
                           user.isActive
-                            ? "border-primary/20 bg-primary/5 text-primary text-[11px]"
-                            : "text-[11px]"
+                            ? "border-primary/20 bg-primary/5 text-primary"
+                            : ""
                         }
                       >
                         {user.isActive ? "正常" : "未开通/停用"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell>
                       {user.lastLoginAt
                         ? format(new Date(user.lastLoginAt), "yyyy-MM-dd HH:mm")
                         : "从未登录"}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleEdit(user)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={() => handleDelete(user.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                    <TableCell className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(user)}
+                        aria-label={`${user.isActive ? "编辑" : "核对并开通"} ${user.username}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        {user.isActive ? "编辑" : "核对并开通"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-xl border border-border/65 bg-background/55"
+                        onClick={() => handleDelete(user.id)}
+                      >
+                        <Trash className="h-4 w-4 text-destructive" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -441,7 +657,8 @@ export default function SettingsUsersPage() {
         {totalPages > 1 && (
           <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>
-              共 {sort.sortedData.length} 条，第 {currentPage}/{totalPages} 页
+              共 {userSort.sortedData.length} 条，第 {currentPage}/{totalPages}{" "}
+              页
             </span>
             <div className="flex items-center gap-2">
               <PageSizeSelect
@@ -474,14 +691,212 @@ export default function SettingsUsersPage() {
         )}
       </div>
 
-      <PermissionMatrix />
+      {/* ══════════ Agent 区块 ══════════ */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Bot className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-medium">外部 Agent</h3>
+          <Badge variant="outline" className="text-[10px]">
+            {agents.length}
+          </Badge>
+        </div>
 
+        {agentLoading ? (
+          <div className="surface-panel py-8 text-center text-sm text-muted-foreground">
+            加载中...
+          </div>
+        ) : agents.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-8 text-center">
+              <Bot className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
+                暂无 Agent 账号，点击上方「新增 Agent」创建
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-3">
+            {agents.map((agent) => (
+              <Card key={agent.id}>
+                <CardHeader className="pb-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Bot className="h-4 w-4 text-primary" />
+                        {agent.name}
+                        <span className="font-mono text-xs text-muted-foreground">
+                          ({agent.slug})
+                        </span>
+                      </CardTitle>
+                      {agent.description ? (
+                        <CardDescription>{agent.description}</CardDescription>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          agent.status === "ACTIVE" ? "default" : "secondary"
+                        }
+                      >
+                        {agent.status === "ACTIVE" ? "已启用" : "已停用"}
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditingAgent(agent);
+                          setAgentDialogOpen(true);
+                        }}
+                      >
+                        编辑
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleIssueCredential(agent)}
+                      >
+                        <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+                        签发凭证
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                {(agent.credentials || []).length > 0 && (
+                  <CardContent className="pt-0 space-y-2">
+                    {(agent.credentials || []).map((credential) => (
+                      <div
+                        key={credential.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+                      >
+                        <div className="space-y-0.5">
+                          <p className="font-medium text-sm">
+                            {credential.label || credential.credentialKey}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {credential.secretPreview || "hash"}
+                            {" · "}
+                            {format(
+                              new Date(credential.createdAt),
+                              "yyyy-MM-dd",
+                            )}
+                            {credential.expiresAt
+                              ? ` · 到期 ${format(new Date(credential.expiresAt), "yyyy-MM-dd")}`
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              credential.status === "ACTIVE"
+                                ? "default"
+                                : "secondary"
+                            }
+                            className="text-[10px]"
+                          >
+                            {credential.status}
+                          </Badge>
+                          {getCredentialRisk(credential.expiresAt) ===
+                            "expiring" && (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-400 text-amber-700 text-[10px]"
+                            >
+                              即将过期
+                            </Badge>
+                          )}
+                          {getCredentialRisk(credential.expiresAt) ===
+                            "expired" && (
+                            <Badge
+                              variant="destructive"
+                              className="text-[10px]"
+                            >
+                              已过期
+                            </Badge>
+                          )}
+                          {credential.status === "ACTIVE" && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleRotateCredential(credential.id)
+                                }
+                              >
+                                <RefreshCw className="mr-1 h-3.5 w-3.5" />
+                                轮换
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleRevokeCredential(credential.id)
+                                }
+                              >
+                                <ShieldX className="mr-1 h-3.5 w-3.5 text-destructive" />
+                                吊销
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── 对话框 ── */}
       <UserDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         user={editingUser}
         onSubmit={handleSubmit}
       />
+      <AgentAccountDialog
+        open={agentDialogOpen}
+        onOpenChange={setAgentDialogOpen}
+        agent={editingAgent}
+        onSubmit={handleAgentCreateOrUpdate}
+      />
+
+      <Dialog open={tokenDialogOpen} onOpenChange={setTokenDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              一次性 Token
+            </DialogTitle>
+            <DialogDescription>
+              {tokenAction === "issue" ? "新签发的 token" : "轮换后的新 token"}{" "}
+              只展示这一遍，请立即保存到安全位置。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border bg-muted/40 p-4 font-mono text-sm break-all">
+            {oneTimeToken}
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">自动化安装命令</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void copyText(automatedInstallCommand, "安装命令已复制")
+                }
+              >
+                <Copy className="mr-2 h-4 w-4" />
+                复制
+              </Button>
+            </div>
+            <div className="rounded-lg border bg-muted/40 p-4 font-mono text-xs break-all">
+              {automatedInstallCommand}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
