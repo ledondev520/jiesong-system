@@ -199,6 +199,18 @@
   ],
   "lists": [
     {
+      "id": "quotes",
+      "file": "frontend/src/app/dashboard/quotes/components/QuoteListPageContent.tsx",
+      "test": "frontend/src/app/dashboard/quotes/components/QuoteListPageContent.test.tsx",
+      "schema": "quotes",
+      "path": "/dashboard/quotes?view=quotes&source=qa#rows",
+      "keywordKey": "keyword",
+      "pageKey": "page",
+      "pageSizeKey": "pageSize",
+      "tabKey": "view",
+      "tab": "quotes"
+    },
+    {
       "id": "inventory",
       "file": "frontend/src/app/dashboard/products/components/InventoryTab.tsx",
       "test": "frontend/src/app/dashboard/products/components/InventoryTab.lifecycle.test.tsx",

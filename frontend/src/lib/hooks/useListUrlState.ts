@@ -1,6 +1,7 @@
 "use client";
 
 import { CustomsDeclarationStatus } from "@/types";
+import { QUOTE_STATUSES } from "@/lib/quote";
 import { useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { replaceBrowserQuery, useBrowserQuery } from "./useBrowserQuery";
@@ -41,6 +42,12 @@ export const listUrlFields = {
       values: ["ALL", ...Object.values(CustomsDeclarationStatus)],
       resetPage: true,
     },
+    page: { default: 1 },
+    pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
+  },
+  quotes: {
+    keyword: { default: "", resetPage: true },
+    status: { default: "ALL", values: ["ALL", ...QUOTE_STATUSES], resetPage: true },
     page: { default: 1 },
     pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
   },

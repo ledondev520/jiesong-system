@@ -88,6 +88,10 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
   // 业务流程参数：线上盖章平台链接 + 我方开票抬头
   const [stampPlatformUrl, setStampPlatformUrl] = useState('');
   const [invoiceTitleInfo, setInvoiceTitleInfo] = useState('');
+  // 报价/PI 卖方块（公司信息）；银行信息为 Restricted，仅 ADMIN/FINANCE 可读
+  const [companyName, setCompanyName] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
+  const [companyBankInfo, setCompanyBankInfo] = useState('');
 
   const form = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -138,6 +142,9 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
           // 1.5. 业务流程参数
           if (typeof configs.stampPlatformUrl === 'string') setStampPlatformUrl(configs.stampPlatformUrl);
           if (typeof configs.invoiceTitleInfo === 'string') setInvoiceTitleInfo(configs.invoiceTitleInfo);
+          if (typeof configs.companyName === 'string') setCompanyName(configs.companyName);
+          if (typeof configs.companyAddress === 'string') setCompanyAddress(configs.companyAddress);
+          if (typeof configs.companyBankInfo === 'string') setCompanyBankInfo(configs.companyBankInfo);
         }
       } catch (error) {
         console.error('加载配置失败:', error);
@@ -191,6 +198,10 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
       // 1.3. 业务流程参数（盖章平台/开票抬头）
       tasks.push(saveConfig('stampPlatformUrl', stampPlatformUrl.trim()));
       tasks.push(saveConfig('invoiceTitleInfo', invoiceTitleInfo.trim()));
+      // 公司信息：留空即不打印，不写入占位值
+      tasks.push(saveConfig('companyName', companyName.trim()));
+      tasks.push(saveConfig('companyAddress', companyAddress.trim()));
+      tasks.push(saveConfig('companyBankInfo', companyBankInfo.trim()));
       await Promise.all(tasks);
       if (apiKeyNew.trim()) {
         setApiKeyConfigured(true);
@@ -481,6 +492,34 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                   onChange={(e) => setInvoiceTitleInfo(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">催开发票时附在开票信息文本末尾，便于供应商开具增值税专用发票。</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 公司信息：报价 / PI 导出的卖方块 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">公司信息（报价 / PI 卖方）</CardTitle>
+              <CardDescription>打印在报价单和形式发票的卖方栏；留空则不打印。银行信息属于受限数据，仅管理员和财务可读取。</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium" htmlFor="company-name">公司名称</label>
+                <Input id="company-name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium" htmlFor="company-address">公司地址</label>
+                <Input id="company-address" value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium" htmlFor="company-bank-info">收款银行信息</label>
+                <textarea
+                  id="company-bank-info"
+                  className="flex min-h-[96px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                  placeholder={'开户行 / SWIFT / 账号（多行）'}
+                  value={companyBankInfo}
+                  onChange={(e) => setCompanyBankInfo(e.target.value)}
+                />
               </div>
             </CardContent>
           </Card>
