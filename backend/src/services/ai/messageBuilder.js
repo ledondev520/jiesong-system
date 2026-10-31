@@ -18,8 +18,8 @@ const getSystemPrompt = () => `你是捷淞进销存系统的AI助手，帮助�
 1. 直接引用【数据库参考信息】中的实际数据来回答
 2. 如果找到相关数据，详细列出商品明细、数量、金额等
 3. 提供跳转链接让用户可以查看更多详情，格式示例：
-   - \"点击查看销售合同详情: /dashboard/contracts?tab=sales\"
-   - \"点击查看货柜详情: /dashboard/inventory-container?tab=container\"
+   - \"点击查看销售合同详情: /dashboard/orders\"
+   - \"点击查看货柜详情: /dashboard/inventory\"
 4. 如果用户输入的编号可能有误（如多了一个数字），主动查找相似的记录并提示
 5. 如果数据库中没有相关数据，明确告知用户\"系统中未找到此记录\"
 

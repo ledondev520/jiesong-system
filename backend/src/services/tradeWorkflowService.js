@@ -152,12 +152,12 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
       : !allPurchasesSigned
         ? {
             key: 'procurement', label: '采购签约', status: 'current', reason: '仍有购销合同待签约',
-            action: { label: '完成购销合同签约', href: `/dashboard/purchase/${firstPurchase?.id}` },
+            action: { label: '完成购销合同签约', href: `/dashboard/purchases/${firstPurchase?.id}` },
           }
         : purchaseMissingSignedArchive
           ? {
               key: 'procurement', label: '采购签约', status: 'current', reason: '已签约，仍有供应商盖章件未归档',
-              action: { label: '上传供应商盖章件', href: `/dashboard/purchase/${purchaseMissingSignedArchive.id}` },
+              action: { label: '上传供应商盖章件', href: `/dashboard/purchases/${purchaseMissingSignedArchive.id}` },
             }
           : {
               key: 'procurement', label: '采购签约', status: 'completed',
@@ -169,7 +169,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
     : paymentUnverifiedPurchase
       ? {
           key: 'payment', label: '采购付款', status: 'current', reason: '历史采购付款待核验，默认已付零值不代表尚未付款',
-          action: { label: '核验采购付款', href: `/dashboard/purchase/${paymentUnverifiedPurchase.id}` },
+          action: { label: '核验采购付款', href: `/dashboard/purchases/${paymentUnverifiedPurchase.id}` },
         }
     : allPurchasesPaid
       ? { key: 'payment', label: '采购付款', status: 'completed', reason: `已付清 ¥${roundMoney(purchasePaid).toLocaleString('zh-CN')}` }
@@ -178,7 +178,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
           reason: `已付 ¥${roundMoney(purchasePaid).toLocaleString('zh-CN')}，待付 ¥${roundMoney(Math.max(purchaseTotal - purchasePaid, 0)).toLocaleString('zh-CN')}`,
           action: {
             label: purchasePaid > 0 ? '登记采购尾款' : '登记采购定金',
-            href: `/dashboard/purchase/${firstPurchase?.id}`,
+            href: `/dashboard/purchases/${firstPurchase?.id}`,
           },
         };
 
@@ -193,7 +193,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
             : '待补齐规格、箱数、毛净重和体积并确认生产完成；实物图为选填',
           action: {
             label: '补齐生产资料',
-            href: `/dashboard/purchase/${productionIncompletePurchase?.contract.id || firstPurchase?.id}`,
+            href: `/dashboard/purchases/${productionIncompletePurchase?.contract.id || firstPurchase?.id}`,
           },
         };
 
@@ -254,7 +254,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
       ? { key: 'invoice', label: '供应商发票', status: 'pending', reason: '发运后催供应商开票' }
       : {
           key: 'invoice', label: '供应商发票', status: 'current', reason: '仍有供应商发票号码未登记',
-          action: { label: '催票并登记号码', href: `/dashboard/purchase/${firstPurchase?.id || ''}` },
+          action: { label: '催票并登记号码', href: `/dashboard/purchases/${firstPurchase?.id || ''}` },
         };
 
   const taxStage = taxCompleted

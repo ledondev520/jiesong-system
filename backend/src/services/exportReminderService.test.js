@@ -103,7 +103,7 @@ test('runInvoiceMissingReminder: 已出货缺发票合同生成催票提醒', as
   assert.match(tx.created[0].content, /PO-001（供应商A）/);
   assert.match(tx.created[0].content, /发票原件附件选填/);
   assert.equal(tx.created[0].type, 'INVOICE_MISSING');
-  assert.equal(tx.created[0].link, '/dashboard/purchase/pc1');
+  assert.equal(tx.created[0].link, '/dashboard/purchases/pc1');
 });
 
 test('runInvoiceMissingReminder: 当日已提醒则跳过重复用户', async () => {

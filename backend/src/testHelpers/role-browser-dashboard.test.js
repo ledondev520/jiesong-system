@@ -188,7 +188,7 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       assert.equal(current.role, role);
       const recent = await read('/dashboard/trade-workflows?limit=6&scope=recent', role);
       const action = recent[0].nextAction;
-      assert.equal(action.href, `/dashboard/purchase/${f.purchaseId}`);
+      assert.equal(action.href, `/dashboard/purchases/${f.purchaseId}`);
       const purchase = await read(`/purchases/${f.purchaseId}`, role);
       assert.equal(purchase.id, f.purchaseId);
       assert.equal(purchase.contractNo, f.dashboardSources.purchaseNo);

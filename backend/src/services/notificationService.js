@@ -106,7 +106,7 @@ const generateForUser = async (userId) => {
           type: NOTIFICATION_TYPES.PURCHASE_DRAFT,
           title: `有待起草采购合同 ${draftPurchases.length} 份`,
           content: titles + (draftPurchases.length >= 5 ? ' 等' : ''),
-          link: '/dashboard/contracts',
+          link: '/dashboard/purchases',
         },
       });
       results.push(n);
@@ -143,7 +143,7 @@ const generateForUser = async (userId) => {
           type: NOTIFICATION_TYPES.SALES_DRAFT,
           title: `有待补录出口参数 ${pendingSales.length} 份`,
           content: titles + (pendingSales.length >= 5 ? ' 等' : ''),
-          link: '/dashboard/sales',
+          link: '/dashboard/orders',
         },
       });
       results.push(n);

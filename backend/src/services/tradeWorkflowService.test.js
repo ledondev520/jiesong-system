@@ -65,7 +65,7 @@ test('历史补录付款未核验时不把默认零值当成未付定金', () =>
     assert.match(payment.reason, /付款.*待核验/);
     assert(!payment.reason.includes('待付'));
     assert.equal(payment.action.label, '核验采购付款');
-    assert.equal(payment.action.href, '/dashboard/purchase/pc-1');
+    assert.equal(payment.action.href, '/dashboard/purchases/pc-1');
     assert.match(workflow.stages.find(s => s.key === 'finance').reason, /付款待核验/);
     const verified = buildTradeWorkflow(baseSales, new Map([[purchase.contractNo, { ...purchase, paidAmount: 5000 }]]));
     assert.equal(verified.stages.find(s => s.key === 'payment').status, 'completed');
@@ -92,7 +92,7 @@ test('从采购合同号关联整笔专项单并给出最早下一动作', () =>
   assert.equal(workflow.stages[1].key, 'payment');
   assert.equal(workflow.stages[1].status, 'current');
   assert.equal(workflow.nextAction.label, '登记采购尾款');
-  assert.equal(workflow.nextAction.href, '/dashboard/purchase/pc-1');
+  assert.equal(workflow.nextAction.href, '/dashboard/purchases/pc-1');
 });
 
 test('未关联采购合同时明确阻塞而不是伪造完成线路', () => {
