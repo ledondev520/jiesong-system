@@ -95,7 +95,10 @@
         "historical procurement templates and their store/purchase details",
         "supplier pricing and margins",
         "financial summary reports, cash-flow statements, account balances, general-ledger entries, payroll, social-security, and tax-return structured rows",
-        "inventory and shipment operational history"
+        "inventory and shipment operational history",
+        "customer master data (Customer name, legal name, address, contacts) and order-level customer terms (incoterm, payment terms, port of loading)",
+        "customers API (backend/src/routes/customers.js): ADMIN/SALES write, all roles read, BOSS GET-only; contact fields excluded from audit field lists; customers are archived, never deleted",
+        "purchase drafts generated from export orders (purchase_contracts.salesContractId, purchase_items.storeId): Confidential supplier pricing; generation limited to ADMIN/PURCHASE and written atomically as DRAFT"
       ],
       "controls": {
         "storage": [
