@@ -11,6 +11,7 @@ const { searchEntities } = require('../agent/commands/query');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
 const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
 const { createMcpServer } = require('../agent/mcp/server');
+const { logOperation } = require('../utils/auditLog');
 
 const router = Router();
 
@@ -37,13 +38,25 @@ const TOOL_POLICIES = {
   },
 };
 
-const createLocalClient = () => ({
-  searchEntities,
-  createPurchase: (input) => createPurchaseWithItems({ input }),
-  updatePurchase: (id, input) => updatePurchase({ id, input }),
-  createSupplier: (input) => createSupplier({ input }),
-  updateSupplier: (id, input) => updateSupplier({ id, input }),
-});
+// Writes are attributed to the authenticated actor in operation_logs (commands themselves take no actor).
+const actorOf = (req) => (req.authActor?.actorType === 'AGENT'
+  ? { actorType: 'AGENT', agentAccountId: req.authActor.agentAccountId || req.agent?.id || null, agentCredentialId: req.authActor.agentCredentialId || req.agentCredential?.id || null }
+  : { actorType: 'USER', userId: req.user?.id || null });
+
+const createLocalClient = (req) => {
+  const audited = (entity, action, run) => async (...args) => {
+    const result = await run(...args);
+    await logOperation({ ...actorOf(req), action, entity, entityId: result?.id || null, newValue: result, req });
+    return result;
+  };
+  return {
+    searchEntities,
+    createPurchase: audited('PurchaseContract', 'CREATE', (input) => createPurchaseWithItems({ input })),
+    updatePurchase: audited('PurchaseContract', 'UPDATE', (id, input) => updatePurchase({ id, input })),
+    createSupplier: audited('Supplier', 'CREATE', (input) => createSupplier({ input })),
+    updateSupplier: audited('Supplier', 'UPDATE', (id, input) => updateSupplier({ id, input })),
+  };
+};
 
 const canInvokeTool = (req, toolName) => {
   const policy = TOOL_POLICIES[toolName];
@@ -69,7 +82,7 @@ router.get('/', authenticate, (req, res) => {
 });
 
 router.post('/', authenticate, async (req, res) => {
-  const server = createMcpServer(createLocalClient());
+  const server = createMcpServer(createLocalClient(req));
 
   if (req.body?.method === 'tools/call') {
     const toolName = req.body?.params?.name;
@@ -98,3 +111,4 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.TOOL_POLICIES = TOOL_POLICIES;
