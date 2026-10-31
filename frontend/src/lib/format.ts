@@ -34,8 +34,10 @@ export const formatMoney = (
 ): string => {
   const n = toFinite(value);
   if (n === null) return EMPTY_VALUE;
-  const sign = n < 0 ? "-" : "";
-  return `${sign}${SYMBOL[currency]}${group(Math.abs(n), 2)}`;
+  const text = group(Math.abs(n), 2);
+  // 先按显示位数取整再决定符号：-0.001 显示 ¥0.00，而不是 -¥0.00。
+  const sign = n < 0 && Number(text.replace(/,/g, "")) !== 0 ? "-" : "";
+  return `${sign}${SYMBOL[currency]}${text}`;
 };
 
 /**

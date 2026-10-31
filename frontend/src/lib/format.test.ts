@@ -8,6 +8,13 @@ describe("formatMoney", () => {
     expect(formatMoney("12")).toBe("¥12.00");
   });
 
+  it("取整到 0.00 的极小负数不显示负号", () => {
+    expect(formatMoney(-0.001)).toBe("¥0.00");
+    expect(formatMoney(-0.004, "USD")).toBe("$0.00");
+    expect(formatMoney(-0.005)).toBe("-¥0.01");
+    expect(formatMoney(-0.01)).toBe("-¥0.01");
+  });
+
   it("负数符号在币种符号之前", () => {
     expect(formatMoney(-5, "USD")).toBe("-$5.00");
   });
