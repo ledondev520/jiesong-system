@@ -119,9 +119,13 @@ describe("navigation.config helpers", () => {
       );
     expect(labels("finance")).toEqual([
       "财务概览",
+      "应收",
+      "应付",
+      "银行流水",
+      "发票",
+      "对账",
       "财务报表",
-      "收付管理",
-      "经营执行",
+      "经营分析",
     ]);
     expect(labels("documents")).toEqual(["报关单", "出口退税"]);
     expect(labels("admin")).toEqual(["系统配置", "账号管理", "系统日志"]);
