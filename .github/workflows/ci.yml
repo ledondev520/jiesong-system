@@ -77,13 +77,26 @@ jobs:
           path: frontend/coverage/
           retention-days: 7
 
+      # 变更门禁同 test-and-acceptance.yml：仅整个 diff 为 UI-only 时才为 false，其余情况照常全测。
+      - name: Change gate
+        id: gate
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-ui-only.cjs backend-gate
+
       - name: Run backend tests
+        if: steps.gate.outputs.backend_changed != 'false'
         env:
           DATABASE_URL: file:./dev.db
         run: |
           cd backend
           npx prisma migrate deploy
           npm run test
+
+      - name: UI-only change - lifecycle contract only
+        if: steps.gate.outputs.backend_changed == 'false'
+        run: node scripts/check-lifecycle.cjs
 
   # 构建测试
   build:

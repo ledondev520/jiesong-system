@@ -1,10 +1,10 @@
 export enum Role {
-  ADMIN = 'ADMIN',
-  BOSS = 'BOSS',
-  PURCHASE = 'PURCHASE',
-  SALES = 'SALES',
-  FINANCE = 'FINANCE',
-  WAREHOUSE = 'WAREHOUSE',
+  ADMIN = "ADMIN",
+  BOSS = "BOSS",
+  PURCHASE = "PURCHASE",
+  SALES = "SALES",
+  FINANCE = "FINANCE",
+  WAREHOUSE = "WAREHOUSE",
 }
 
 export interface User {
@@ -100,21 +100,21 @@ interface CustomsBroker {
 
 export interface Supplier {
   id: string;
-  name: string;           // 供应商全称（合同用）
-  shortName?: string;     // 简称
+  name: string; // 供应商全称（合同用）
+  shortName?: string; // 简称
   // 联系人信息
   contactName?: string;
   contactPhone?: string;
   contactEmail?: string;
   // 公司信息（合同用）
-  address?: string;       // 公司地址
-  phone?: string;         // 公司电话
-  taxId?: string;         // 纳税人识别号/税号
+  address?: string; // 公司地址
+  phone?: string; // 公司电话
+  taxId?: string; // 纳税人识别号/税号
   bankAccountName?: string; // 收款户名
-  bankName?: string;      // 开户银行名称
-  bankBranch?: string;    // 开户支行
-  bankCode?: string;      // 联行号/银行编号
-  bankAccount?: string;   // 银行账号
+  bankName?: string; // 开户银行名称
+  bankBranch?: string; // 开户支行
+  bankCode?: string; // 联行号/银行编号
+  bankAccount?: string; // 银行账号
   // 状态
   hasQualityIssue: boolean;
   qualityNote?: string;
@@ -155,17 +155,17 @@ export interface Product {
   unit?: string;
   categoryId?: string;
   // 海关申报信息
-  hsCode?: string;      // HS编码（10位海关编码）
+  hsCode?: string; // HS编码（10位海关编码）
   declaration?: string; // 申报要素（汇总）
   // 重量信息
-  grossWeight?: number;  // 毛重 (kg/件)
-  netWeight?: number;    // 净重 (kg/件)
-  volume?: number;       // 体积 (CBM/件)
-  packingSpec?: string;  // 包装规格 (如: 4片/箱)
+  grossWeight?: number; // 毛重 (kg/件)
+  netWeight?: number; // 净重 (kg/件)
+  volume?: number; // 体积 (CBM/件)
+  packingSpec?: string; // 包装规格 (如: 4片/箱)
   // 尺寸信息（用于3D可视化，单位毫米）
-  length?: number;       // 长度 (mm)
-  width?: number;        // 宽度 (mm)
-  height?: number;       // 高度 (mm)
+  length?: number; // 长度 (mm)
+  width?: number; // 宽度 (mm)
+  height?: number; // 高度 (mm)
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -212,14 +212,14 @@ interface ProductSupplier {
 }
 
 export enum CustomsDeclarationStatus {
-  DRAFT = 'DRAFT',
-  DECLARED = 'DECLARED',
-  VOID = 'VOID',
-  SUBMITTED = 'SUBMITTED',
-  INSPECTING = 'INSPECTING',
-  RELEASED = 'RELEASED',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
+  DRAFT = "DRAFT",
+  DECLARED = "DECLARED",
+  VOID = "VOID",
+  SUBMITTED = "SUBMITTED",
+  INSPECTING = "INSPECTING",
+  RELEASED = "RELEASED",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
 }
 
 export interface CustomsDeclarationItem {
@@ -252,44 +252,39 @@ export interface CustomsDeclaration {
   transportMode?: string | null;
   declarationDate?: string | null;
   releaseDate?: string | null;
-  declaredAt?: string | null;    // Prisma schema 实际字段名
-  exportDate?: string | null;    // 实际出口日期
+  declaredAt?: string | null; // Prisma schema 实际字段名
+  exportDate?: string | null; // 实际出口日期
   customsBroker?: string | null;
   currency: string;
   exchangeRate?: number | null;
   totalAmount: number;
-  totalPackages?: number | null;  // 历史接口字段，仅供读取兼容
-  totalQuantity?: number | null;  // Prisma schema 实际字段名
-  grossWeight?: number | null;    // 旧字段名（schema 中为 totalGrossWeight）
+  totalPackages?: number | null; // 历史接口字段，仅供读取兼容
+  totalQuantity?: number | null; // Prisma schema 实际字段名
+  grossWeight?: number | null; // 旧字段名（schema 中为 totalGrossWeight）
   totalGrossWeight?: number | null; // Prisma schema 实际字段名
-  netWeight?: number | null;      // 旧字段名（schema 中为 totalNetWeight）
-  totalNetWeight?: number | null;   // Prisma schema 实际字段名
+  netWeight?: number | null; // 旧字段名（schema 中为 totalNetWeight）
+  totalNetWeight?: number | null; // Prisma schema 实际字段名
   remarks?: string | null;
-  note?: string | null;           // Prisma schema 实际字段名
+  note?: string | null; // Prisma schema 实际字段名
   items?: CustomsDeclarationItem[];
   createdAt: string;
   updatedAt: string;
 }
 
 export type TaxRefundStatus =
-  | 'ALL'
-  | 'DRAFT'
-  | 'APPLIED'
-  | 'APPROVED'
-  | 'REFUNDED'
-  | 'REJECTED';
+  "ALL" | "DRAFT" | "APPLIED" | "APPROVED" | "REFUNDED" | "REJECTED";
 
 export interface TaxRefund {
   id: string;
   refundNo: string;
-  status: Exclude<TaxRefundStatus, 'ALL'>;
+  status: Exclude<TaxRefundStatus, "ALL">;
   salesContractId: string;
   customsDeclarationId: string;
   forexVerificationId?: string | null;
   relation_no?: string | null;
   invoice_no?: string | null;
   vat_rate_type?: 1 | 13 | null;
-  match_status?: 'pending' | 'passed' | 'blocked';
+  match_status?: "pending" | "passed" | "blocked";
   declaredAmount: number;
   refundableAmount: number;
   refundedAmount: number;
@@ -301,14 +296,14 @@ export interface TaxRefund {
 }
 
 export enum PurchaseStatus {
-  DRAFT = 'DRAFT',
-  SIGNED = 'SIGNED',
-  PRODUCING = 'PRODUCING',
-  READY = 'READY',
-  SHIPPED = 'SHIPPED',
-  RECEIVED = 'RECEIVED',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
+  DRAFT = "DRAFT",
+  SIGNED = "SIGNED",
+  PRODUCING = "PRODUCING",
+  READY = "READY",
+  SHIPPED = "SHIPPED",
+  RECEIVED = "RECEIVED",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
 }
 
 export interface PurchaseContract {
@@ -317,13 +312,13 @@ export interface PurchaseContract {
   supplierId: string;
   totalAmount: number;
   paidAmount: number;
-  taxRate: number;  // 税率（%），通常为 1 或 13
+  taxRate: number; // 税率（%），通常为 1 或 13
   status: PurchaseStatus;
   signedAt?: string;
   expectedDate?: string;
   productionCompletedAt?: string;
   invoiceNo?: string;
-  storeName?: string;  // 发货店铺名称
+  storeName?: string; // 发货店铺名称
   note?: string;
   createdAt: string;
   updatedAt: string;
@@ -382,25 +377,25 @@ export interface PurchaseItem {
 }
 
 export enum SalesStatus {
-  DRAFT = 'DRAFT',        // 草稿
-  CONFIRMED = 'CONFIRMED', // 已确认
-  PACKING = 'PACKING',    // 装箱中
-  SHIPPED = 'SHIPPED',    // 已发运
-  ARRIVED = 'ARRIVED',    // 已到达
-  COMPLETED = 'COMPLETED', // 已完成
-  CANCELLED = 'CANCELLED', // 已取消
+  DRAFT = "DRAFT", // 草稿
+  CONFIRMED = "CONFIRMED", // 已确认
+  PACKING = "PACKING", // 装箱中
+  SHIPPED = "SHIPPED", // 已发运
+  ARRIVED = "ARRIVED", // 已到达
+  COMPLETED = "COMPLETED", // 已完成
+  CANCELLED = "CANCELLED", // 已取消
 }
 
 export interface SalesContract {
   id: string;
-  contractNo: string;  // EXP 编号，同时作为货柜标识
+  contractNo: string; // EXP 编号，同时作为货柜标识
   // 销售信息
   totalAmount: number;
-  amountSource?: 'DERIVED' | 'FORMAL_DOCUMENT';
+  amountSource?: "DERIVED" | "FORMAL_DOCUMENT";
   amountVerifiedAt?: string;
   receivedAmount: number;
   exchangeRate: number;
-  status: SalesStatus;  // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED
+  status: SalesStatus; // DRAFT/CONFIRMED/PACKING/SHIPPED/ARRIVED/COMPLETED
   signedAt?: string;
   note?: string;
   // 货柜信息（由出口合同承载）
@@ -420,11 +415,19 @@ export interface SalesContract {
   // 关联
   port?: Port;
   items?: SalesItem[];
-  packingItems?: PackingItem[];  // 装箱明细
+  packingItems?: PackingItem[]; // 装箱明细
   payments?: Payment[];
-  stores?: string[];  // 关联门店名称列表（由后端聚合自 packingItems）
+  stores?: string[]; // 关联门店名称列表（由后端聚合自 packingItems）
   hasThirdPartyCargo?: boolean;
   sourceParties?: string[];
+  /** 列表接口返回的 40HQ 汇总利用率（未排柜；百分比未取整），装得下与否仅在详情页判定 */
+  loadingUtilisation?: {
+    weightPct: number;
+    volumePct: number;
+    reachedBy: "weight" | "volume" | "both" | "none";
+    utilisationReady: boolean;
+    overReasons: Array<"weight" | "volume">;
+  };
 }
 
 interface SalesItem {
@@ -445,11 +448,11 @@ interface SalesItem {
 }
 
 export enum InventoryStatus {
-  PRODUCING = 'PRODUCING',
-  PACKING = 'PACKING',
-  SHIPPING = 'SHIPPING',
-  INBOUND = 'INBOUND',
-  OUTBOUND = 'OUTBOUND',
+  PRODUCING = "PRODUCING",
+  PACKING = "PACKING",
+  SHIPPING = "SHIPPING",
+  INBOUND = "INBOUND",
+  OUTBOUND = "OUTBOUND",
 }
 
 export interface Inventory {
@@ -477,7 +480,7 @@ export interface Inventory {
 // 装箱明细（关联 SalesContract）
 export interface PackingItem {
   id: string;
-  salesContractId: string;  // 关联出口合同（即货柜）
+  salesContractId: string; // 关联出口合同（即货柜）
   purchaseItemId?: string;
   productId: string;
   storeId?: string;
@@ -496,16 +499,16 @@ export interface PackingItem {
   purchaseContractNo?: string;
   purchaseCost?: number;
   // 价格信息（USD）
-  unitPrice?: number;   // 单价（USD）
-  totalPrice?: number;  // 总价（USD）= 单价 * 数量
+  unitPrice?: number; // 单价（USD）
+  totalPrice?: number; // 总价（USD）= 单价 * 数量
   // 商品规格尺寸（用于3D可视化，单位 mm）
-  length?: number;  // 长度 (mm)
-  width?: number;   // 宽度 (mm)
-  height?: number;  // 高度 (mm)
+  length?: number; // 长度 (mm)
+  width?: number; // 宽度 (mm)
+  height?: number; // 高度 (mm)
   // 3D 装箱位置（由装箱算法计算）
-  posX?: number;  // 在货柜中的 X 位置 (mm)
-  posY?: number;  // 在货柜中的 Y 位置 (mm)
-  posZ?: number;  // 在货柜中的 Z 位置 (mm)
+  posX?: number; // 在货柜中的 X 位置 (mm)
+  posY?: number; // 在货柜中的 Y 位置 (mm)
+  posZ?: number; // 在货柜中的 Z 位置 (mm)
   note?: string;
   createdAt: string;
   updatedAt: string;
@@ -514,10 +517,10 @@ export interface PackingItem {
 }
 
 export enum PaymentType {
-  PAYABLE = 'PAYABLE',
-  RECEIVABLE = 'RECEIVABLE',
-  RECEIVABLE_RECEIPT = 'RECEIVABLE_RECEIPT',
-  RECEIVABLE_COLLECTION = 'RECEIVABLE_COLLECTION',
+  PAYABLE = "PAYABLE",
+  RECEIVABLE = "RECEIVABLE",
+  RECEIVABLE_RECEIPT = "RECEIVABLE_RECEIPT",
+  RECEIVABLE_COLLECTION = "RECEIVABLE_COLLECTION",
 }
 
 export interface Payment {
@@ -556,12 +559,12 @@ export interface PaginatedResponse<T> {
 }
 
 export type NotificationType =
-  | 'PURCHASE_DRAFT'
-  | 'SALES_DRAFT'
-  | 'OVERDUE_RECEIVABLE'
-  | 'LOW_STOCK'
-  | 'TAX_REFUND_MONTHLY'
-  | 'INVOICE_MISSING';
+  | "PURCHASE_DRAFT"
+  | "SALES_DRAFT"
+  | "OVERDUE_RECEIVABLE"
+  | "LOW_STOCK"
+  | "TAX_REFUND_MONTHLY"
+  | "INVOICE_MISSING";
 
 export interface Notification {
   id: string;
@@ -577,7 +580,7 @@ export interface Notification {
 export interface ContractTemplate {
   id: string;
   name: string;
-  type: 'PURCHASE' | 'SALES';
+  type: "PURCHASE" | "SALES";
   supplierId?: string | null;
   taxRate?: number | null;
   note?: string | null;

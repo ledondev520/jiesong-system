@@ -1,0 +1,32 @@
+# 轻量 UI PR 流程：带 `ui-only` 标签的 PR 必须通过 scripts/check-ui-only.cjs（清单见 docs/redesign/UX-REDESIGN-2026.md §14.1）。
+# 标签只增加检查、不放宽任何必过检查；本 job 不属于 main-protection 的 9 项必过检查，合并前须人工确认其通过。
+name: UI-only Label Check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  ui-only:
+    name: UI-only Label Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.23.4'
+      - name: Verify diff against the UI-only allowlist
+        if: contains(github.event.pull_request.labels.*.name, 'ui-only')
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-ui-only.cjs ui-only
+      - name: No ui-only label
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'ui-only') }}
+        run: echo "No ui-only label; full process applies."
