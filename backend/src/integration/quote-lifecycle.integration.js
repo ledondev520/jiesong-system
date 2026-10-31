@@ -88,6 +88,13 @@ test('quote service over HTTP', async (t) => {
     assert.equal((await ok('SALES', 'POST', '/quotes', {})).quoteNo.endsWith('-002'), true);
   });
 
+  await t.test('manual unit price is never compared with the rule price (owner decision): any value >= 0 is kept', async () => {
+    const quote = await ok('SALES', 'POST', '/quotes', { items: [
+      line({ isManualPrice: true, unitPrice: 0 }), line({ isManualPrice: true, unitPrice: 1 }), line({ isManualPrice: true, unitPrice: 999999 }),
+    ] });
+    assert.deepEqual(quote.items.map((i) => [i.unitPrice, i.isManualPrice, i.formulaPrice]), [[0, true, 1995], [1, true, 1995], [999999, true, 1995]]);
+  });
+
   await t.test('changing the spot rate reprices; invalid input is atomic', async () => {
     const quote = await ok('SALES', 'POST', '/quotes', { items: [line()] });
     const repriced = await ok('SALES', 'PUT', `/quotes/${quote.id}`, { spotRate: 7.2 }); // 13000 / 7.0 = 1857.14 → 1858 → 1860
@@ -142,7 +149,7 @@ test('quote service over HTTP', async (t) => {
     assert.equal(order.status, 'DRAFT');
     assert.equal(order.customerId, customer.id);
     assert.equal([order.currency, order.incoterm, order.paymentTerms, order.portOfLoading].join('|'), 'USD|FOB|T/T 30%|Shanghai');
-    assert.equal(order.exchangeRate, 6.72);       // the order keeps the spot rate, not spot − 0.2
+    assert.equal(order.exchangeRate, 6.52);       // owner decision: order FX = spot − 0.2 (the quote's pricingRate)
     assert.equal(order.portId, port.id);          // both stores share one destination port
     assert.equal(order.totalAmount, 19950 + 3380);
     assert.equal(order.items.length, 2);
