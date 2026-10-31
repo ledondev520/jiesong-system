@@ -52,7 +52,7 @@ const allRoutes = [
   { id: 'system_home', path: '/dashboard/settings' },
   { id: 'system_logs', path: '/dashboard/settings/logs' },
   { id: 'system_notifications', path: '/dashboard/notifications' },
-  { id: 'about', path: '/dashboard/about' },
+  { id: 'about', path: '/dashboard/settings/ai-access' },
 ];
 const routes = ROUTE_IDS.length > 0
   ? allRoutes.filter((route) => ROUTE_IDS.includes(route.id))
