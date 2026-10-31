@@ -13,7 +13,6 @@ const { getExportReadiness } = require('./exportReadinessService');
 const fileService = require('./fileService');
 
 const DEFAULT_SELLER_NAME = '上海捷淞国际物流有限公司';
-const REFUNDABLE_TOLERANCE = 0.05;
 const MONEY_EPSILON = 0.01;
 const EXPORT_PACKET_DESCRIPTION = '出口三单生成版本（外销合同、商业发票、装箱单）';
 const buildPackingSourceVersion = (items) => crypto.createHash('sha256').update(JSON.stringify(
@@ -29,7 +28,8 @@ const buildPackingSourceVersion = (items) => crypto.createHash('sha256').update(
 )).digest('hex');
 
 const { loadPricingConfig } = require('./pricingConfigService');
-const { calculateFormulaPrice, historicalQuoteAllowed, realizedMarkup, targetMarkupFor, round } = require('./exportPricing');
+const { effectiveRateFor, historicalQuoteAllowed, markupFor, priceFor, realizedMarkup, round, PRICE_TOLERANCE } = require('./exportPricing');
+const { withCategoryChains } = require('./productCategoryChain');
 const toNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const normalizeText = (value) => String(value || '').trim().replace(/\s+/g, '').toLowerCase();
 const makeIssue = (code, severity, message, packingItemId = null, productName = '') => ({
@@ -48,11 +48,9 @@ const findHistoricalQuote = (historicalQuotes, item, productName) => (
 /** 纯函数：用同一组输入形成页面预览和生成器消费的冻结快照。 */
 const evaluateExportPacket = (contract, readiness, historicalQuotes = [], options = {}, config = loadPricingConfig()) => {
   const FX_BUFFER = -config.exchangeAdjustment;
-  const REFUNDABLE_MARKUP = config.refundableMarkup;
-  const NO_REFUND_MARKUP_CAP = config.noRefundMarkup;
   const spotRate = toNumber(options.spotRate ?? contract.exchangeRate);
-  const effectiveRate = round(spotRate - FX_BUFFER, 6);
-  const validRate = spotRate > 0 && effectiveRate > 0;
+  const effectiveRate = effectiveRateFor(spotRate, config);
+  const validRate = effectiveRate > 0;
   const buyerName = String(options.buyerName || '').trim();
   const sellerName = String(options.sellerName || '').trim();
   const packageKind = String(options.packageKind || '').trim();
@@ -105,8 +103,8 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     if (!declaration) lineIssues.push(makeIssue('MISSING_DECLARATION', 'error', '缺少已确认申报要素', item.id, productName));
     if (purchaseCostCny <= 0) lineIssues.push(makeIssue('MISSING_PURCHASE_COST', 'error', '缺少采购成本', item.id, productName));
 
-    const targetMarkup = targetMarkupFor(config, refundRate);
-    const strictCap = config.mode === 'tiered' && refundRate === 0;
+    const categoryIds = item.product?.categoryIds || [];
+    const targetMarkup = markupFor(categoryIds, config);
     const manualUnitPrice = priceOverrideMap.get(item.id) || 0;
     const historical = findHistoricalQuote(historicalQuotes, item, productName);
     const historicalCheck = historical && validRate && purchaseCostCny > 0 && quantity > 0
@@ -115,25 +113,27 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
           quantity,
           effectiveRate,
           costCny: purchaseCostCny,
-          refundRate,
+          categoryIds,
         }, config)
       : null;
-    const formula = validRate && purchaseCostCny > 0 && quantity > 0
-      ? calculateFormulaPrice({
-          costCny: purchaseCostCny,
-          quantity,
-          effectiveRate,
-          targetMarkup,
-          strictCap,
-        })
+    // 唯一报价规则：单位成本 = 行采购成本 ÷ 数量
+    const formulaResult = validRate && purchaseCostCny > 0 && quantity > 0
+      ? priceFor({ costCny: purchaseCostCny / quantity, categoryIds, spotRate }, config)
+      : null;
+    const formula = formulaResult?.status === 'OK'
+      ? {
+          unitPriceUsd: formulaResult.unitPriceUsd,
+          totalUsd: round(formulaResult.unitPriceUsd * quantity, 4),
+          rawUnitPriceUsd: formulaResult.rawUnitPriceUsd,
+          rawTotalUsd: formulaResult.rawUnitPriceUsd * quantity,
+          roundingMethod: 'round_up_unit',
+        }
       : null;
 
     let unitPriceUsd = formula?.unitPriceUsd || 0;
     let totalUsd = formula?.totalUsd || 0;
     let pricingSource = 'formula';
-    let pricingReference = config.mode === 'multiplier'
-      ? `固定乘数 ${config.multiplier}，目标加价 ${round(targetMarkup * 100, 6)}%`
-      : refundRate === 0 ? `退税率 0%，加价不超过 ${round(targetMarkup * 100, 6)}%` : `可退税，目标加价 ${round(targetMarkup * 100, 6)}%`;
+    let pricingReference = `目标加价 ${round(targetMarkup * 100, 6)}%，单价向上取整到 ${config.roundUpTo}`;
     let roundingMethod = formula?.roundingMethod || '';
     if (historical && historicalCheck?.allowed) {
       unitPriceUsd = historical.unitPriceUsd;
@@ -152,11 +152,8 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     const markup = effectiveRate > 0 && purchaseCostCny > 0
       ? realizedMarkup(unitPriceUsd, quantity, effectiveRate, purchaseCostCny)
       : null;
-    if (manualUnitPrice > 0 && strictCap && markup > targetMarkup + 1e-9) {
-      lineIssues.push(makeIssue('NO_REFUND_MARKUP_EXCEEDED', 'error', `人工单价使零退税商品加价超过 ${round(targetMarkup * 100, 6)}%`, item.id, productName));
-    }
-    if (manualUnitPrice > 0 && (refundRate > 0 || (config.mode === 'multiplier' && refundRate === 0)) && Math.abs(markup - targetMarkup) > REFUNDABLE_TOLERANCE + 1e-9) {
-      lineIssues.push(makeIssue('REFUNDABLE_MARKUP_OUTSIDE_POLICY', 'error', `人工单价偏离 ${round(targetMarkup * 100, 6)}% 目标超过 5 个百分点`, item.id, productName));
+    if (manualUnitPrice > 0 && markup !== null && Math.abs(markup - targetMarkup) > PRICE_TOLERANCE + 1e-9) {
+      lineIssues.push(makeIssue('MARKUP_OUTSIDE_POLICY', 'error', `人工单价偏离 ${round(targetMarkup * 100, 6)}% 目标超过 5 个百分点`, item.id, productName));
     }
 
     issues.push(...lineIssues);
@@ -232,12 +229,11 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     currency: 'USD',
     tradeTerm,
     pricingPolicy: {
-      ...(config.mode === 'multiplier' ? { mode: config.mode, multiplier: config.multiplier } : {}),
       spotRate,
       fxBuffer: FX_BUFFER,
       effectiveRate,
-      refundableMarkup: REFUNDABLE_MARKUP,
-      noRefundMarkupCap: NO_REFUND_MARKUP_CAP,
+      defaultMarkup: config.defaultMarkup,
+      roundUpTo: config.roundUpTo,
       historyRule: '同品名 + 同规格，且按本票成本复算符合利润规则',
     },
     ready: !issues.some((issue) => issue.severity === 'error'),
@@ -265,6 +261,7 @@ const loadPacketSources = async (salesContractId, options = {}, prismaClient = p
     },
   });
   if (!contract) throw createError('出口合同不存在', 404);
+  contract.packingItems = await withCategoryChains(contract.packingItems, prismaClient);
   const readiness = await getExportReadiness(salesContractId, {
     overrides: options.hsOverrides || [],
   }, prismaClient, config);
@@ -473,10 +470,7 @@ module.exports = {
   buildPackingSourceVersion,
   DEFAULT_SELLER_NAME,
   get FX_BUFFER() { return -loadPricingConfig().exchangeAdjustment; },
-  get NO_REFUND_MARKUP_CAP() { return loadPricingConfig().noRefundMarkup; },
-  get REFUNDABLE_MARKUP() { return loadPricingConfig().refundableMarkup; },
   buildExportPacketWorkbook,
-  calculateFormulaPrice,
   evaluateExportPacket,
   generateExportPacket,
   historicalQuoteAllowed,

@@ -20,6 +20,8 @@ router.use(authenticate);
 
 router.get('/pricing-config', roleAuth('ADMIN'), pricingController.getPricing);
 router.put('/pricing-config', roleAuth('ADMIN'), pricingController.updatePricing);
+// 预览只读计算，用 GET：lifecycle 契约不允许新增未登记的写路由（check-lifecycle.cjs）
+router.get('/pricing-config/preview', roleAuth('ADMIN'), pricingController.previewPricing);
 
 // GET /api/v1/system/configs - 获取系统配置（平铺格式，向后兼容）
 router.get('/configs', systemController.getConfigs);

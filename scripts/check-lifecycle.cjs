@@ -204,6 +204,35 @@ function check(root = ROOT, { baselineRoutes } = {}) {
           `${REGISTRY}: ${resource.id} singleton matrix must exercise its own registered PUT route with a supported file adapter; copy ${SINGLETON_TEMPLATE}`,
         );
       const schema = readJson(root, 'config/pricing.schema.json');
+      const validNumber = (rule, item) => {
+        const aboveMin =
+          rule.exclusiveMinimum !== undefined
+            ? item > rule.exclusiveMinimum
+            : item >= rule.minimum;
+        return (
+          typeof item === 'number' &&
+          Number.isFinite(item) &&
+          aboveMin &&
+          item <= rule.maximum &&
+          (rule.type !== 'integer' || Number.isInteger(item)) &&
+          (rule.maxDecimals === undefined ||
+            Number((item * 10 ** rule.maxDecimals).toFixed(6)) % 1 === 0)
+        );
+      };
+      // Mirrors config/pricing.schema.json item rules (string/number fields only).
+      const validItem = (rules, item) =>
+        !!item &&
+        typeof item === 'object' &&
+        !Array.isArray(item) &&
+        Object.keys(item).every((key) => Object.hasOwn(rules.properties, key)) &&
+        rules.required.every((key) => {
+          const rule = rules.properties[key];
+          return rule.type === 'string'
+            ? typeof item[key] === 'string' &&
+                item[key].length >= (rule.minLength ?? 0) &&
+                item[key].length <= rule.maxLength
+            : validNumber(rule, item[key]);
+        });
       const validConfig = (value) => {
         if (!value || typeof value !== 'object' || Array.isArray(value))
           return false;
@@ -213,21 +242,27 @@ function check(root = ROOT, { baselineRoutes } = {}) {
           )
         )
           return false;
-        return schema.required.every((key) => {
+        const fieldsValid = schema.required.every((key) => {
           const rule = schema.properties[key];
           const item = value[key];
-          return rule.type === 'number'
-            ? typeof item === 'number' &&
-                Number.isFinite(item) &&
-                item >= rule.minimum &&
-                item <= rule.maximum
-            : rule.enum.includes(item);
+          if (rule.type === 'array')
+            return (
+              Array.isArray(item) &&
+              item.length <= rule.maxItems &&
+              item.every((entry) => validItem(rule.items, entry))
+            );
+          return validNumber(rule, item);
         });
+        // Cross-field rule from pricingConfigService: effective FX must stay positive.
+        return fieldsValid && value.exchangeRate + value.exchangeAdjustment > 0;
       };
       if (
         !validConfig(m?.initial) ||
         !validConfig(m?.replace) ||
-        schema.required.every((key) => m.initial[key] === m.replace[key]) ||
+        schema.required.every(
+          (key) =>
+            JSON.stringify(m.initial[key]) === JSON.stringify(m.replace[key]),
+        ) ||
         !Array.isArray(m?.invalid) ||
         !m.invalid.length ||
         m.invalid.some(validConfig)
