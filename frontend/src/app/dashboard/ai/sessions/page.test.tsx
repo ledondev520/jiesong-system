@@ -155,6 +155,13 @@ describe("AiSessionsPage", () => {
             data: {
               items: [
                 {
+                  id: "msg-0",
+                  role: "user",
+                  content:
+                    "【当前页面：/dashboard/sales/EXP1，记录 ID：EXP1】\n这个订单还缺什么？",
+                  createdAt: "2026-03-01T09:59:00.000Z",
+                },
+                {
                   id: "msg-1",
                   role: "assistant",
                   content: "已处理",
@@ -676,6 +683,9 @@ describe("AiSessionsPage", () => {
         screen.getAllByText("补建退税草稿：已具备退税前置条件").length,
       ).toBeGreaterThan(0);
       expect(screen.getAllByText("已创建退税草稿").length).toBeGreaterThan(0);
+      // 用户消息只显示原文，不显示页面上下文行
+      expect(screen.getByText("这个订单还缺什么？")).toBeInTheDocument();
+      expect(screen.queryByText(/当前页面/)).not.toBeInTheDocument();
     });
   });
 

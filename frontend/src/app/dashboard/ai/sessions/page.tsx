@@ -67,6 +67,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { formatDateTime, formatTime } from "@/lib/date-format";
 import api from "@/lib/axios";
+import { stripPageContext } from "@/lib/ai-message-text";
 import type { ApiResponse, PaginatedResponse } from "@/types";
 import { MobileListCard } from "@/components/mobile";
 
@@ -2682,7 +2683,9 @@ export default function AiSessionsPage() {
                       </div>
                     ) : null}
                     <p className="whitespace-pre-wrap leading-relaxed">
-                      {msg.content}
+                      {msg.role === "user"
+                        ? stripPageContext(msg.content)
+                        : msg.content}
                     </p>
                   </div>
                 ))}

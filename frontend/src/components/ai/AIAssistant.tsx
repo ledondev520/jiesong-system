@@ -8,6 +8,7 @@
 
 "use client";
 
+import { stripPageContext } from "@/lib/ai-message-text";
 import { getBrowserSessionHeaders } from "@/lib/browser-session";
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -107,9 +108,7 @@ export const withPageContext = (message: string, context?: AIPageContext) =>
       }】\n${message}`
     : message;
 
-/** 去掉历史消息开头的页面上下文行（withPageContext 加的），恢复历史时只显示用户原文 */
-export const stripPageContext = (content: string) =>
-  content.replace(/^【当前页面：[^】\n]*】\r?\n/, "");
+export { stripPageContext };
 
 const formatRecommendationPriority = (
   priority?: AiActionRecommendation["priority"],
