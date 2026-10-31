@@ -142,7 +142,7 @@ export default function CustomerDetailPage() {
       header: "订单号",
       cell: (o) => (
         <Link
-          href={`/dashboard/sales/${o.id}`}
+          href={`/dashboard/orders/${o.id}`}
           className="font-medium hover:underline"
         >
           {o.contractNo}

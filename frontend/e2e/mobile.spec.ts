@@ -282,7 +282,7 @@ test.describe("手机核心操作", () => {
     await expect(
       page.getByText("请选择商品", { exact: true }).last(),
     ).toBeVisible();
-    await page.goto("/dashboard/sales/sc-001");
+    await page.goto("/dashboard/sales/sc-001?tab=container");
     await page
       .getByRole("button", { name: "编辑 不锈钢门", exact: true })
       .click();
@@ -295,7 +295,7 @@ test.describe("手机核心操作", () => {
       .scrollIntoViewIfNeeded();
     await expectFitsViewport(page);
     await dialog.getByRole("button", { name: "取消", exact: true }).click();
-    for (const name of ["合同信息", "报关信息", "财务结算", "装箱明细"]) {
+    for (const name of ["明细", "单证", "收款", "货柜"]) {
       await page.getByRole("tab", { name, exact: true }).click();
       await expectFitsViewport(page);
     }

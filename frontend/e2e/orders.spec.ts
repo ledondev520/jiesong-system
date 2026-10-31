@@ -41,7 +41,7 @@ for (const width of [390, 1440]) {
       await expect(page.getByRole("heading", { name: "出口订单" })).toBeVisible();
       await expect(page.getByRole("link", { name: /EXP260101/ }).first()).toBeVisible();
       await expect(page.getByRole("link", { name: /EXP260102/ }).first()).toBeVisible();
-      await expect(page.getByRole("link", { name: "EXP260101" }).first()).toHaveAttribute("href", "/dashboard/sales/o1");
+      await expect(page.getByRole("link", { name: "EXP260101" }).first()).toHaveAttribute("href", "/dashboard/orders/o1");
     });
 
     test("old /dashboard/sales URL redirects and keeps filters (keyword → q)", async ({ page }) => {

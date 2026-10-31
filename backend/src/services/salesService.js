@@ -138,6 +138,25 @@ const getSalesContractById = async (id) => {
       },
       payments: true,
       quote: { select: { spotRate: true } },
+      // 订单详情「采购」页签与「按门店」表；只读数量与状态，不含采购价格
+      purchaseContracts: {
+        select: {
+          id: true,
+          contractNo: true,
+          status: true,
+          supplier: { select: { id: true, name: true } },
+          items: {
+            select: {
+              id: true,
+              productId: true,
+              storeId: true,
+              quantity: true,
+              receiptItems: { select: { acceptedQuantity: true } },
+            },
+          },
+        },
+        orderBy: { contractNo: 'asc' },
+      },
     },
   });
 
@@ -706,6 +725,7 @@ const importPurchasePackingItems = async (salesContractId, selections = []) => {
           salesContractId,
           purchaseItemId: source.id,
           productId: source.productId,
+          storeId: source.storeId, // 保留来源门店，供订单详情「按门店」已装箱统计
           quantity: roundAllocation(Number(source.quantity) * ratio),
           unit: source.unit,
           boxes: selection.boxes,

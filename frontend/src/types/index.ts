@@ -452,6 +452,8 @@ export interface SalesContract {
   items?: SalesItem[];
   packingItems?: PackingItem[]; // 装箱明细
   payments?: Payment[];
+  /** 详情接口：由本订单生成的采购单（只读数量与状态，不含采购价格） */
+  purchaseContracts?: LinkedPurchaseContract[];
   stores?: string[]; // 关联门店名称列表（由后端聚合自 packingItems）
   hasThirdPartyCargo?: boolean;
   sourceParties?: string[];
@@ -465,7 +467,21 @@ export interface SalesContract {
   };
 }
 
-interface SalesItem {
+export interface LinkedPurchaseContract {
+  id: string;
+  contractNo: string;
+  status: PurchaseStatus;
+  supplier?: { id: string; name: string } | null;
+  items: Array<{
+    id: string;
+    productId: string;
+    storeId?: string | null;
+    quantity: number;
+    receiptItems?: Array<{ acceptedQuantity: number }>;
+  }>;
+}
+
+export interface SalesItem {
   id: string;
   salesContractId: string;
   productId: string;

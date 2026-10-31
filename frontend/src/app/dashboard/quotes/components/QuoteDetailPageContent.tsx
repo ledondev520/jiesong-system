@@ -103,7 +103,7 @@ export function QuoteDetailPageContent({ id }: { id: string }) {
         toast.success(
           `已转为出口订单 ${response.data.convertedOrder.contractNo}`,
         );
-        router.push(`/dashboard/sales/${response.data.convertedOrder.id}`);
+        router.push(`/dashboard/orders/${response.data.convertedOrder.id}`);
       } else {
         toast.success("状态已更新");
       }
@@ -296,7 +296,7 @@ export function QuoteDetailPageContent({ id }: { id: string }) {
           )}
           {primary?.kind === "viewOrder" && quote.salesContract && (
             <Button asChild>
-              <Link href={`/dashboard/sales/${quote.salesContract.id}`}>
+              <Link href={`/dashboard/orders/${quote.salesContract.id}`}>
                 {primary.label}
               </Link>
             </Button>

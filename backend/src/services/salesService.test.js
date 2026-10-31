@@ -191,6 +191,27 @@ test('getSalesContractById: 返回第三方拼柜标记与来源方', async () =
   }
 });
 
+test('getSalesContractById: 读取关联采购单的数量与状态但不读取采购价格', async () => {
+  const originalFindUnique = prisma.salesContract.findUnique;
+  let args = null;
+  prisma.salesContract.findUnique = async (callArgs) => {
+    args = callArgs;
+    return { id: 'sc-3', packingItems: [], purchaseContracts: [] };
+  };
+
+  try {
+    await salesService.getSalesContractById('sc-3');
+    const { select } = args.include.purchaseContracts;
+    assert.equal(select.status, true);
+    assert.equal(select.items.select.storeId, true);
+    assert.equal(select.items.select.unitPrice, undefined);
+    assert.equal(select.items.select.totalPrice, undefined);
+    assert.equal(select.totalAmount, undefined);
+  } finally {
+    prisma.salesContract.findUnique = originalFindUnique;
+  }
+});
+
 test('createSalesContract: 未传合同号时自动生成并写入', async () => {
   const originalCount = prisma.salesContract.count;
   const originalCreate = prisma.salesContract.create;
@@ -567,6 +588,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
   const source = {
     id: 'pi-1',
     productId: 'p-1',
+    storeId: 'st-1',
     quantity: 100,
     unit: '件',
     totalPrice: 1130,
@@ -618,6 +640,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
       salesContractId: 'sc-1',
       purchaseItemId: 'pi-1',
       productId: 'p-1',
+      storeId: 'st-1', // 部分导入（4/10 箱）仍保留来源门店
       quantity: 40,
       unit: '件',
       boxes: 4,

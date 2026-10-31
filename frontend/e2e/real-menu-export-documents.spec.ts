@@ -123,9 +123,7 @@ async function enterFromMenu(page: Page) {
     .getByRole("link", { name: "出口订单", exact: true })
     .first()
     .click();
-  await expect(page).toHaveURL(/\/dashboard\/orders$/);
-  await page.getByRole("link", { name: fixture.salesNo!, exact: true }).click();
-  await expect(page).toHaveURL(`/dashboard/sales/${fixture.salesId}`);
+  await expect(page).toHaveURL(`/dashboard/orders/${fixture.salesId}`);
   await expect(
     page.getByRole("heading", { name: fixture.salesNo!, exact: true }),
   ).toBeVisible();
@@ -138,7 +136,8 @@ async function enterFromMenu(page: Page) {
  * @throws 入口缺失或准备度未通过时断言失败
  */
 async function openForms(page: Page) {
-  await page.getByRole("button", { name: "生成申报三表", exact: true }).click();
+  await page.getByRole("button", { name: "单证", exact: true }).click();
+  await page.getByRole("menuitem", { name: /申报三表/ }).click();
   const dialog = page.getByRole("dialog", { name: "一键生成出口三张表" });
   await expect(dialog.getByRole("button", { name: /^确认生成/ })).toBeEnabled();
   return dialog;
@@ -172,9 +171,8 @@ async function generateForms(page: Page, dialog: Locator) {
  * @throws 入口点击失败或页面关闭
  */
 async function openPacket(page: Page) {
-  await page
-    .getByRole("button", { name: "出口三单工作台", exact: true })
-    .click();
+  await page.getByRole("button", { name: "单证", exact: true }).click();
+  await page.getByRole("menuitem", { name: /生成出口单证/ }).click();
   return page.getByRole("dialog", {
     name: `出口三单工作台 · ${fixture.salesNo}`,
   });

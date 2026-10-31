@@ -7,4 +7,4 @@
 - `ContractInfoEditor.tsx`｜编辑器｜展示已有合同事实、独立编辑草稿、取消复原和保存中禁用
 - `ContractInfoEditor.test.tsx`｜交互回归｜完整草稿取消/重开恢复、保存字段、合同读回同步与保存中禁用
 
-实际父页与编辑器拒绝链另由 `../../app/dashboard/sales/[id]/page.test.tsx` 覆盖。真实认证/SQLite及浏览器定义见 `../../../e2e/real-sales-header.spec.ts` 和后端 `role-browser-header.test.js`；本地组件通过不代表浏览器通过。
+实际父页与编辑器拒绝链另由 `../../app/dashboard/orders/[id]/page.test.tsx` 覆盖。真实认证/SQLite及浏览器定义见 `../../../e2e/real-sales-header.spec.ts` 和后端 `role-browser-header.test.js`；本地组件通过不代表浏览器通过。

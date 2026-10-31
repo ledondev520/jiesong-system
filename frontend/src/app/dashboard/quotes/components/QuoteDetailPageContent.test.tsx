@@ -104,7 +104,7 @@ describe("quote detail", () => {
       expect(mocks.transition).toHaveBeenCalledWith("q1", "CONVERTED"),
     );
     await waitFor(() =>
-      expect(mocks.router.push).toHaveBeenCalledWith("/dashboard/sales/ord1"),
+      expect(mocks.router.push).toHaveBeenCalledWith("/dashboard/orders/ord1"),
     );
   });
 
@@ -114,7 +114,7 @@ describe("quote detail", () => {
     });
     expect(
       screen.getByText("查看订单").closest("a")?.getAttribute("href"),
-    ).toBe("/dashboard/sales/ord1");
+    ).toBe("/dashboard/orders/ord1");
   });
 
   it("cancelling asks for confirmation first", async () => {
