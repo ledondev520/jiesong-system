@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { CustomsDeclarationDetailPageContent } from "@/app/customs-declarations/components/CustomsDeclarationDetailPageContent";
 import registry from "../../../../lifecycle/resources.json";
+import { QuoteListPageContent } from "@/app/dashboard/quotes/components/QuoteListPageContent";
 import { InventoryTab } from "@/app/dashboard/products/components/InventoryTab";
 import { CustomsDeclarationListPageContent } from "@/app/customs-declarations/components/CustomsDeclarationListPageContent";
 
@@ -34,6 +35,9 @@ vi.mock(
     navigateToCustomsList: mocks.documentNavigate,
   }),
 );
+vi.mock("@/services/quote.service", () => ({
+  quoteService: { getAll: mocks.getAll },
+}));
 vi.mock("@/services/inventory.service", () => ({
   inventoryService: { getAll: mocks.getAll },
 }));
@@ -83,6 +87,7 @@ for (const list of registry.lists) {
           if (list.id === "inventory") return <InventoryTab />;
           if (list.id === "customs")
             return <CustomsDeclarationListPageContent embedded />;
+          if (list.id === "quotes") return <QuoteListPageContent />;
           throw new Error(
             `Add an actual component adapter for ${list.id} in list-lifecycle.test.tsx`,
           );
@@ -128,9 +133,10 @@ for (const list of registry.lists) {
           );
           expect(
             screen.getByPlaceholderText(
-              list.id === "inventory"
-                ? "搜索商品/采购合同..."
-                : "搜索报关单号或报关行...",
+              {
+                inventory: "搜索商品/采购合同...",
+                quotes: "搜索编号、客户或备注...",
+              }[list.id] ?? "搜索报关单号或报关行...",
             ),
           ).toHaveValue("SYN");
           view.unmount();

@@ -98,11 +98,11 @@ describe("Sidebar", () => {
     }
   });
 
-  it("不渲染 AI 助手菜单项，也不渲染尚未上线的报价；客户与门店已上线", () => {
+  it("不渲染 AI 助手菜单项；报价、客户与门店已上线", () => {
     const { queryByText } = render(<Sidebar />);
 
     expect(queryByText("AI 助手")).not.toBeInTheDocument();
-    expect(queryByText("报价")).not.toBeInTheDocument();
+    expect(queryByText("报价")).toBeInTheDocument();
     expect(queryByText("客户与门店")).toBeInTheDocument();
     expect(queryByText("仓储物流")).not.toBeInTheDocument();
   });
@@ -135,7 +135,7 @@ describe("Sidebar", () => {
   });
 
   it("设置路由下设置菜单激活并展开子页面", () => {
-    mockPathname = "/dashboard/users";
+    mockPathname = "/dashboard/settings/users";
     const { getByText } = render(<Sidebar />);
 
     expect(
@@ -143,7 +143,7 @@ describe("Sidebar", () => {
     ).toBe(true);
     expect(getByText("账号管理").closest("a")).toHaveAttribute(
       "href",
-      "/dashboard/users",
+      "/dashboard/settings/users",
     );
   });
 

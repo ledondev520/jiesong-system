@@ -226,9 +226,9 @@ test("SALES 3D canvas renders estimated cargo, controls and resize survive tab r
       if (message.type() === "error") consoleErrors.push(message.text());
     });
     await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
-    await expect(page).toHaveURL(/\/dashboard\/sales$/);
+    await expect(page).toHaveURL(/\/dashboard\/orders$/);
     await page
-      .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
+      .getByRole("link", { name: fixture.salesNo!, exact: true })
       .click();
     await expect(page).toHaveURL(`/dashboard/orders/${fixture.salesId}`);
     await expect(

@@ -40,9 +40,9 @@ test.afterEach(async () => {
 async function enterHeader(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
   await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/dashboard\/sales$/);
+  await expect(page).toHaveURL(/\/dashboard\/orders$/);
   await page
-    .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
+    .getByRole("link", { name: fixture.salesNo!, exact: true })
     .click();
   await expect(page).toHaveURL(`/dashboard/orders/${fixture.salesId}`);
   await page.getByRole("tab", { name: "明细", exact: true }).click();

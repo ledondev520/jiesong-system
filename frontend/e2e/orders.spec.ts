@@ -39,8 +39,8 @@ for (const width of [390, 1440]) {
       await mockOrders(page);
       await signInAsAdmin(page, "/dashboard/orders");
       await expect(page.getByRole("heading", { name: "出口订单" })).toBeVisible();
-      await expect(page.getByText("EXP260101").first()).toBeVisible();
-      await expect(page.getByText("EXP260102").first()).toBeVisible();
+      await expect(page.getByRole("link", { name: /EXP260101/ }).first()).toBeVisible();
+      await expect(page.getByRole("link", { name: /EXP260102/ }).first()).toBeVisible();
       await expect(page.getByRole("link", { name: "EXP260101" }).first()).toHaveAttribute("href", "/dashboard/orders/o1");
     });
 
@@ -48,7 +48,7 @@ for (const width of [390, 1440]) {
       const requests = await mockOrders(page);
       await signInAsAdmin(page, "/dashboard/sales?keyword=EXP26&status=SHIPPED");
       await expect(page).toHaveURL(/\/dashboard\/orders\?q=EXP26&status=SHIPPED$/);
-      await expect(page.getByText("EXP260102").first()).toBeVisible();
+      await expect(page.getByRole("link", { name: /EXP260102/ }).first()).toBeVisible();
       await expect(page.getByText("EXP260101")).toHaveCount(0);
       expect(requests.some((url) => url.searchParams.get("keyword") === "EXP26" && url.searchParams.get("status") === "SHIPPED")).toBe(true);
     });
@@ -70,6 +70,6 @@ test.describe("orders list desktop filters", () => {
     await page.getByRole("button", { name: "已发运" }).click();
     await expect(page).toHaveURL(/status=SHIPPED/);
     await expect(page.getByText("EXP260101")).toHaveCount(0);
-    await expect(page.getByText("EXP260102").first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /EXP260102/ }).first()).toBeVisible();
   });
 });

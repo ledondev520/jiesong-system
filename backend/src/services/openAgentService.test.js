@@ -408,7 +408,7 @@ test('buildPurchaseExecutionDiagnostic: 聚合采购、付款、供应商质量�
     'prisma.purchaseContract.findFirst': async () => ({
       id: 'pc-1',
       contractNo: 'CG2600001',
-      status: 'CONFIRMED',
+      status: 'SIGNED',
       totalAmount: 800,
       paidAmount: 200,
       supplier: { id: 'sup-1', name: '宏达工厂', hasQualityIssue: true, qualityNote: '上批次有色差' },

@@ -24,6 +24,7 @@ const { buildGovernanceReplayProfile } = require('./governanceReplayService');
 const { buildReplaySummaryRecord, upsertReplaySummary } = require('./agentReplaySummaryService');
 const { getOpenAgentRuntimeToken } = require('../utils/openAgentRuntimeAuth');
 const { ROLES } = require('../config/constants');
+const { outstandingOf } = require('./payablesService');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
 const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
 const { validateInventoryTransition } = require('../utils/inventoryStateMachine');
@@ -640,7 +641,8 @@ const buildPurchaseExecutionDiagnostic = async ({ contractNo }) => {
     select: { id: true, status: true, quantity: true, inboundAt: true },
   });
 
-  const unpaidAmount = Math.max(Number(contract.totalAmount || 0) - Number(contract.paidAmount || 0), 0);
+  // 与应付列表同口径：草稿/已取消合同没有应付余额
+  const unpaidAmount = outstandingOf(contract);
   const inventoryStatusBreakdown = buildStatusBreakdown(inventories);
   const blockers = uniqueMessages([
     unpaidAmount > 0 ? `采购合同尚有 ${unpaidAmount} 未付款` : null,
@@ -1530,6 +1532,8 @@ const READ_TOOL_SPECS = [
     isReadOnly: true,
     isConcurrencySafe: true,
     async call(input) {
+      // Restricted company bank details are not exposed to the AI assistant.
+      if (input.key === 'companyBankInfo') return toJson({ error: '该配置项不可通过助手读取' });
       const row = await prisma.systemConfig.findUnique({ where: { key: input.key } });
       if (!row) return toJson({ error: `配置项 ${input.key} 不存在` });
       try {

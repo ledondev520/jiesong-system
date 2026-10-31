@@ -28,9 +28,10 @@ describe("navigation.config helpers", () => {
     }
   });
 
-  it("菜单顺序：首页 / 业务 / 资料（含客户与门店） / 设置，报价页面上线前隐藏", () => {
+  it("菜单顺序：首页 / 业务（报价在订单之前） / 资料（含客户与门店） / 设置", () => {
     expect(getMenuNavItems(Role.ADMIN).map((item) => item.label)).toEqual([
       "首页",
+      "报价",
       "出口订单",
       "采购",
       "库存",
@@ -44,6 +45,7 @@ describe("navigation.config helpers", () => {
     ]);
     expect(getMenuNavItems(Role.ADMIN).map((item) => item.group)).toEqual([
       "main",
+      "business",
       "business",
       "business",
       "business",
@@ -88,6 +90,7 @@ describe("navigation.config helpers", () => {
     const owner: Record<string, string> = {
       "/dashboard": "home",
       "/dashboard/reports": "finance",
+      "/dashboard/finance/analysis": "finance",
       "/dashboard/contracts": "purchases",
       "/dashboard/purchase/create": "purchases",
       "/dashboard/suppliers": "suppliers",
@@ -100,10 +103,10 @@ describe("navigation.config helpers", () => {
       "/dashboard/hs-codes": "hs-codes",
       "/dashboard/finance/statements": "finance",
       "/dashboard/payments": "finance",
-      "/dashboard/ai/sessions": "ai",
-      "/dashboard/users": "admin",
-      "/dashboard/system/logs": "admin",
-      "/dashboard/about": "admin",
+      "/dashboard/settings/ai-usage": "admin",
+      "/dashboard/settings/users": "admin",
+      "/dashboard/settings/logs": "admin",
+      "/dashboard/settings/ai-access": "admin",
     };
     for (const [path, key] of Object.entries(owner))
       expect(getModuleByPath(path)?.key, path).toBe(key);
@@ -116,21 +119,26 @@ describe("navigation.config helpers", () => {
       );
     expect(labels("finance")).toEqual([
       "财务概览",
+      "应收",
+      "应付",
+      "银行流水",
+      "发票",
+      "对账",
       "财务报表",
-      "收付管理",
-      "经营执行",
+      "经营分析",
     ]);
     expect(labels("documents")).toEqual(["报关单", "出口退税"]);
     expect(labels("admin")).toEqual(["系统配置", "账号管理", "系统日志"]);
   });
 
-  it("移动端底栏：首页·订单·采购·库存，其余进入更多（隐藏项不出现）", () => {
+  it("移动端底栏：首页·订单·采购·库存，其余进入更多（隐藏项不出现；报价进入更多）", () => {
     expect(
       getPrimaryMobileModuleNavItems(Role.ADMIN).map(
         (item) => item.mobileLabel ?? item.label,
       ),
     ).toEqual(["首页", "订单", "采购", "库存"]);
     expect(keys(getSecondaryMobileModuleNavItems(Role.ADMIN))).toEqual([
+      "quotes",
       "documents",
       "finance",
       "customers",
@@ -168,21 +176,27 @@ describe("navigation.config helpers", () => {
         "/dashboard/finance/statements",
       ),
     ).toBe(true);
-    expect(
-      isTabRouteActive("/dashboard/finance/statements", "/dashboard/payments"),
-    ).toBe(false);
-    expect(
-      isTabRouteActive("/dashboard/finance/receivable", "/dashboard/payments"),
-    ).toBe(true);
-    expect(
-      isTabRouteActive("/dashboard/finance/bank-flow", "/dashboard/payments"),
-    ).toBe(true);
+    // 财务页签各自精确激活：应收/应付/银行流水/发票/对账互不串扰
+    for (const tab of [
+      "/dashboard/finance/receivable",
+      "/dashboard/finance/payable",
+      "/dashboard/finance/bank-flow",
+      "/dashboard/finance/invoices",
+      "/dashboard/finance/reconciliation",
+    ]) {
+      expect(isTabRouteActive(tab, tab)).toBe(true);
+      expect(isTabRouteActive(`${tab}/x`, tab)).toBe(true);
+      expect(isTabRouteActive(tab, "/dashboard/finance")).toBe(false);
+      expect(isTabRouteActive(tab, "/dashboard/finance/statements")).toBe(
+        false,
+      );
+    }
     expect(
       isTabRouteActive(
-        "/dashboard/finance/reconciliation",
-        "/dashboard/payments",
+        "/dashboard/finance/payable",
+        "/dashboard/finance/receivable",
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("报关单与出口退税互不串扰", () => {
