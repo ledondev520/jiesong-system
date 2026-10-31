@@ -19,7 +19,23 @@ const toStringArray = (value: unknown, fallback: string[] = []): string[] => {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : fallback;
 };
 
+export interface SellerIdentity {
+  name: string;
+  address: string;
+  phone: string;
+  taxId: string;
+  /** 银行资料仅 ADMIN/FINANCE 返回，其他角色为空串 */
+  bank: string;
+  /** 这些字段来自旧的 invoiceTitleInfo（canonical 键尚为空） */
+  legacyFilled: Array<'name' | 'address' | 'phone' | 'taxId' | 'bank'>;
+  /** 催票等文本用的开票抬头，由统一卖方信息生成 */
+  invoiceTitleText: string;
+}
+
 export const configService = {
+  getSellerIdentity: async () =>
+    api.get<ApiResponse<SellerIdentity>, ApiResponse<SellerIdentity>>('/system/seller-identity'),
+
   getSystemConfig: async () => {
     return fetchSystemConfig();
   },

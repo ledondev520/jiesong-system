@@ -4,11 +4,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CompanySettingsPage, { changedCompanyValues } from "./page";
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn(), identity: vi.fn() }));
 vi.mock("@/services/config.service", () => ({
   configService: {
     getSystemConfig: mocks.get,
     updateSystemConfig: mocks.update,
+    getSellerIdentity: mocks.identity,
   },
 }));
 vi.mock("next/navigation", () => ({
@@ -22,15 +23,25 @@ const config = (data: Record<string, string>) => ({
   data,
 });
 
+const identity = (data: Record<string, unknown> = {}) => ({
+  code: 200,
+  message: "ok",
+  data: { name: "", address: "", phone: "", taxId: "", bank: "", legacyFilled: [], invoiceTitleText: "", ...data },
+});
+
 beforeEach(() => {
   mocks.get.mockReset();
   mocks.update.mockReset();
+  mocks.identity.mockReset();
+  mocks.identity.mockResolvedValue(identity());
 });
 
 describe("changedCompanyValues", () => {
   const saved = {
     companyName: "Synthetic Co",
+    companyTaxId: "",
     companyAddress: "",
+    companyPhone: "",
     companyBankInfo: "Bank: X",
   };
   it("只返回改动的键，忽略首尾空白差异，清空即空串", () => {
@@ -99,5 +110,49 @@ describe("CompanySettingsPage", () => {
       "银行资料最多 12 行",
     );
     expect(bank).toHaveValue("Bank: Synthetic");
+  });
+
+  it("旧开票抬头只带入尚为空的字段并提示；保存只写入这些 canonical 键（不写 invoiceTitleInfo）", async () => {
+    const user = userEvent.setup();
+    mocks.get.mockResolvedValue(config({ companyName: "Canon Co" }));
+    mocks.identity.mockResolvedValue(identity({
+      name: "Canon Co", taxId: "91-X1", address: "1 Legacy Road", phone: "555", bank: "Legacy Bank 000",
+      legacyFilled: ["taxId", "address", "phone", "bank"],
+    }));
+    mocks.update.mockResolvedValue(config({}));
+    render(<CompanySettingsPage />);
+    expect(await screen.findByRole("status")).toHaveTextContent("旧的「我方开票抬头信息」");
+    await waitFor(() => expect(screen.getByLabelText("纳税人识别号")).toHaveValue("91-X1"));
+    expect(screen.getByLabelText("公司名称")).toHaveValue("Canon Co");
+    expect(screen.getByLabelText("公司地址")).toHaveValue("1 Legacy Road");
+    expect(screen.getByLabelText("公司电话")).toHaveValue("555");
+    expect(screen.getByLabelText("银行资料（每行一项）")).toHaveValue("Legacy Bank 000");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
+      companyTaxId: "91-X1", companyAddress: "1 Legacy Road", companyPhone: "555", companyBankInfo: "Legacy Bank 000",
+    }));
+    expect(JSON.stringify(mocks.update.mock.calls)).not.toContain("invoiceTitleInfo");
+  });
+
+  it("别名读取失败时仍显示已保存的值", async () => {
+    mocks.get.mockResolvedValue(config({ companyName: "Canon Co" }));
+    mocks.identity.mockRejectedValue(new Error("boom"));
+    render(<CompanySettingsPage />);
+    await waitFor(() => expect(screen.getByLabelText("公司名称")).toHaveValue("Canon Co"));
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("编辑后离开并重新挂载只显示服务器原值，没有任何配置写请求（原「普通文本放弃编辑」验收）", async () => {
+    const user = userEvent.setup();
+    mocks.get.mockResolvedValue(config({ companyName: "合成普通设置公司" }));
+    const page = render(<CompanySettingsPage />);
+    const field = await screen.findByLabelText("公司名称");
+    await waitFor(() => expect(field).toHaveValue("合成普通设置公司"));
+    await user.clear(field);
+    await user.type(field, "合成未保存草稿");
+    page.unmount();
+    render(<CompanySettingsPage />);
+    await waitFor(() => expect(screen.getByLabelText("公司名称")).toHaveValue("合成普通设置公司"));
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });

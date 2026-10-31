@@ -1,6 +1,7 @@
 /**
- * Input: 系统配置 API 的 companyName / companyAddress / companyBankInfo（与报价/PI 卖方块读取的是同一组键）
- * Output: 设置 > 公司信息：卖方公司名称、地址和银行资料（开户行、户名、账号、SWIFT、银行地址）的编辑表单
+ * Input: 系统配置 API 的 companyName / companyAddress / companyPhone / companyTaxId / companyBankInfo（唯一的卖方信息，报价/PI、催票开票抬头读同一组键），
+ *        以及 /system/seller-identity（旧「我方开票抬头信息」文本只作为别名补全尚为空的字段）
+ * Output: 设置 > 公司信息：卖方公司名称、地址、电话、纳税人识别号和银行资料的编辑表单；来自旧抬头的值预填并提示，保存后写入公司信息
  * Pos: 系统设置（仅 ADMIN，随设置布局）；没有任何默认的真实公司/银行数据，未填写的行报价/PI 上留空
  */
 "use client";
@@ -15,11 +16,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { describeFailure } from "@/lib/error-reason";
-import { configService } from "@/services/config.service";
+import { configService, type SellerIdentity } from "@/services/config.service";
 
 export const COMPANY_KEYS = [
   "companyName",
+  "companyTaxId",
   "companyAddress",
+  "companyPhone",
   "companyBankInfo",
 ] as const;
 type CompanyKey = (typeof COMPANY_KEYS)[number];
@@ -27,8 +30,18 @@ type CompanyForm = Record<CompanyKey, string>;
 
 const EMPTY: CompanyForm = {
   companyName: "",
+  companyTaxId: "",
   companyAddress: "",
+  companyPhone: "",
   companyBankInfo: "",
+};
+
+const IDENTITY_FIELD: Record<CompanyKey, keyof Omit<SellerIdentity, "legacyFilled" | "invoiceTitleText">> = {
+  companyName: "name",
+  companyTaxId: "taxId",
+  companyAddress: "address",
+  companyPhone: "phone",
+  companyBankInfo: "bank",
 };
 
 /** 只发送改动过的键；清空 = 发送空串（后端把它存为空，打印端不印该行） */
@@ -48,6 +61,7 @@ export default function CompanySettingsPage() {
   const [draft, setDraft] = useState<CompanyForm>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
+  const [legacyFilled, setLegacyFilled] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,8 +74,22 @@ export default function CompanySettingsPage() {
         const value = response.data?.[key];
         if (typeof value === "string") next[key] = value;
       }
+      // 旧开票抬头里还没迁到新字段的内容：预填到草稿（不算已保存），保存后才写入公司信息
+      const effective = { ...next };
+      let filled: string[] = [];
+      try {
+        const identity = (await configService.getSellerIdentity()).data;
+        for (const key of COMPANY_KEYS) {
+          const value = identity?.[IDENTITY_FIELD[key]];
+          if (!next[key] && typeof value === "string") effective[key] = value;
+        }
+        filled = identity?.legacyFilled ?? [];
+      } catch {
+        // 别名读取失败时只显示已保存的值
+      }
       setSaved(next);
-      setDraft(next);
+      setDraft(effective);
+      setLegacyFilled(filled);
       setLoadError(null);
     } catch (reason) {
       setLoadError(reason ?? new Error("加载失败"));
@@ -113,9 +141,14 @@ export default function CompanySettingsPage() {
     <div className="space-y-5">
       <PageHeader
         title="公司信息"
-        description="报价单和 PI 的卖方块（公司名称、地址、收款银行）读取这里的内容；未填写的行不会打印"
+        description="唯一的卖方信息：报价单/PI 的卖方块和采购催票的开票抬头都读取这里；未填写的行不会打印"
         showBack={false}
       />
+      {legacyFilled.length > 0 ? (
+        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          部分内容来自旧的「我方开票抬头信息」，已带入下方表单；点击「保存」后写入公司信息，之后旧文本不再使用。
+        </p>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">卖方公司</CardTitle>
@@ -130,6 +163,30 @@ export default function CompanySettingsPage() {
               value={draft.companyName}
               onChange={(e) =>
                 setDraft({ ...draft, companyName: e.target.value })
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="company-tax-id">纳税人识别号</Label>
+            <Input
+              id="company-tax-id"
+              disabled={loading}
+              maxLength={50}
+              value={draft.companyTaxId}
+              onChange={(e) =>
+                setDraft({ ...draft, companyTaxId: e.target.value })
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="company-phone">公司电话</Label>
+            <Input
+              id="company-phone"
+              disabled={loading}
+              maxLength={50}
+              value={draft.companyPhone}
+              onChange={(e) =>
+                setDraft({ ...draft, companyPhone: e.target.value })
               }
             />
           </div>
