@@ -370,19 +370,9 @@ Put local history workbooks in the selected directory. An absent/empty history d
 
 `drill_sqlite_restore.py --directory <不存在的临时目录>` 使用已提交迁移和合成商品/期初库存，调用真实备份恢复CLI并保存独立读回回执。它不访问已有库或.env。详见 `docs/operations/sqlite-backup-restore.md`。
 
-## 可配置出口报价
+## 出口报价规则
 
-`prepare_export_packet.py` 通过 `pricing_config.py` 读取仓库的
-`config/pricing.json`，或与后端相同的 `JIESONG_PRICING_CONFIG` 显式文件。
-校验范围来自同一 `config/pricing.schema.json`。默认 tiered、汇率调整 -0.2、
-有退税加价 0.3、零退税上限 0.1，multiplier 模式的乘数默认为 1.3。
-所有模式沿用原有凑整规则，multiplier 对全部已核验退税商品使用同一目标加价。
-旧 `--fx-buffer`、`--refundable-markup`、`--no-refund-markup` 仅接受与共用文件一致的值，
-不再允许成为独立的报价配置来源。非法文件或值拒绝运行，日志只含文件指纹。
-
-`pricing_snapshot.cjs` 与 `tests/pricing_snapshot.py` 只运行合成输入和模拟来源。
-`verify_pricing_defaults.py --baseline-root <纯Git导出目录> --evidence <临时目录>`
-比较旧、新完整 JSON，并生成 SHA-256 回执。旧目录需能使用原有后端依赖。
-不读取真实库、税则 DBF 或历史工作簿。
-readiness 的新推荐价和定价元数据必须符合 `tests/fixtures/pricing-readiness-defaults.json`。
-`test_verify_pricing_defaults.py` 验证错误价格及元数据会使检查失败。
+报价规则只在后端 `services/exportPricing.js` 的 `priceFor()` 实现，配置为 `config/pricing.json`（新结构见 `config/pricing.schema.json`）。
+`prepare_export_packet.py` 的 Python 公式副本已退役，脚本拒绝运行（待负责人确认生产不再使用后删除）；原 `pricing_config.py`、
+`pricing_snapshot.cjs`、`verify_pricing_defaults.py` 及其测试已删除。运行时 `pricing.json` 由部署保留，旧结构用
+`node backend/scripts/convert-pricing-config.js --file <路径> --spot-rate <现汇>`（默认 dry-run）转换。
