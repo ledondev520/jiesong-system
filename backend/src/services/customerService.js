@@ -43,11 +43,11 @@ const normalizeStoreCode = (value) => {
 /**
  * 新门店所属客户：显式 customerId 必须存在且未归档；缺省时仅当恰有一个启用客户才采用，否则 400。
  */
-const resolveCustomerIdForNewStore = async (customerId, db = prisma) => {
+const resolveCustomerIdForNewStore = async (customerId, db = prisma, subject = '门店') => {
   if (customerId !== undefined && customerId !== null && customerId !== '') {
     const customer = await db.customer.findUnique({ where: { id: String(customerId) }, select: { id: true, isActive: true } });
     if (!customer) throw createError('客户不存在', 400);
-    if (!customer.isActive) throw createError('客户已归档，不能新增门店', 400);
+    if (!customer.isActive) throw createError(`客户已归档，不能新增${subject}`, 400);
     return customer.id;
   }
   const active = await db.customer.findMany({ where: { isActive: true }, select: { id: true }, take: 2 });
@@ -55,4 +55,26 @@ const resolveCustomerIdForNewStore = async (customerId, db = prisma) => {
   return active[0].id;
 };
 
-module.exports = { INCOTERMS, validateCustomerData, normalizeStoreCode, resolveCustomerIdForNewStore };
+/**
+ * 新订单的客户与条款（DATA-MODEL §2.4）：customerId 缺省时沿用"恰有一个启用客户"规则，否则 400「请选择客户」；
+ * 请求未给出的 incoterm / paymentTerms / portOfLoading 复制自客户默认值；币种目前仅 USD。
+ */
+const resolveOrderCustomerFields = async (input = {}, db = prisma) => {
+  if (input.currency !== undefined && input.currency !== null && input.currency !== 'USD') throw createError('目前仅支持美元(USD)', 400);
+  const incoterm = typeof input.incoterm === 'string' && input.incoterm.trim() ? input.incoterm.trim().toUpperCase() : undefined;
+  if (incoterm !== undefined && !INCOTERMS.includes(incoterm)) throw createError(`贸易术语须为 ${INCOTERMS.join('/')}`, 400);
+  const customerId = await resolveCustomerIdForNewStore(input.customerId, db, '订单');
+  const customer = await db.customer.findUnique({
+    where: { id: customerId },
+    select: { defaultIncoterm: true, defaultPaymentTerms: true, defaultPortOfLoading: true },
+  });
+  return {
+    customerId,
+    currency: 'USD',
+    incoterm: incoterm ?? customer.defaultIncoterm,
+    paymentTerms: input.paymentTerms || customer.defaultPaymentTerms || null,
+    portOfLoading: input.portOfLoading || customer.defaultPortOfLoading || null,
+  };
+};
+
+module.exports = { INCOTERMS, validateCustomerData, normalizeStoreCode, resolveCustomerIdForNewStore, resolveOrderCustomerFields };

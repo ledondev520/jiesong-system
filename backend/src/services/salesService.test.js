@@ -185,11 +185,15 @@ test('createSalesContract: 未传合同号时自动生成并写入', async () =>
   const originalCreate = prisma.salesContract.create;
   let createArgs = null;
 
+  const originalCustomer = { findMany: prisma.customer.findMany, findUnique: prisma.customer.findUnique };
   prisma.salesContract.count = async () => 7;
   prisma.salesContract.create = async (args) => {
     createArgs = args;
     return { id: 'sc-1', ...args.data };
   };
+  // 恰有一个启用客户：订单自动关联并复制其默认条款（DATA-MODEL §2.4）
+  prisma.customer.findMany = async () => [{ id: 'cu-1' }];
+  prisma.customer.findUnique = async () => ({ defaultIncoterm: 'FOB', defaultPaymentTerms: 'T/T 30%', defaultPortOfLoading: 'Shanghai' });
 
   try {
     const result = await salesService.createSalesContract({ exchangeRate: '6.5' });
@@ -198,9 +202,14 @@ test('createSalesContract: 未传合同号时自动生成并写入', async () =>
     assert.equal(createArgs.data.contractNo, `EXP${year}00008`);
     assert.equal(createArgs.data.exchangeRate, 6.5);
     assert.equal(result.contractNo, `EXP${year}00008`);
+    assert.deepEqual(
+      { customerId: createArgs.data.customerId, incoterm: createArgs.data.incoterm, paymentTerms: createArgs.data.paymentTerms, portOfLoading: createArgs.data.portOfLoading, currency: createArgs.data.currency },
+      { customerId: 'cu-1', incoterm: 'FOB', paymentTerms: 'T/T 30%', portOfLoading: 'Shanghai', currency: 'USD' },
+    );
   } finally {
     prisma.salesContract.count = originalCount;
     prisma.salesContract.create = originalCreate;
+    Object.assign(prisma.customer, originalCustomer);
   }
 });
 

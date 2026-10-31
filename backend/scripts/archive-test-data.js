@@ -1,12 +1,15 @@
 /**
  * Input: process DATABASE_URL (SQLite only, never read from .env), flags below
  * Output: dry-run list or confirmed archive (isActive=false) of 存疑 suppliers and QA- test records, with an ID receipt
+ * Safety: financial-sqlite-safety.js like the default-customer backfill — configuredDatabase() (existing, private, single-link file),
+ *   targetIdentity() before AND after the online backup (refuses when the database Prisma actually opened differs from DATABASE_URL),
+ *   receipt reserved (exclusive, 0600, private directory) before the backup, backup via the SQLite backup API.
  * Pos: owner decision 13 / spec §4.11 — archive, never hard-delete; restore with --restore <receipt>
  *
  * Usage (dry-run is the default and writes nothing):
  *   node scripts/archive-test-data.js [--include-damaged]
- *   node scripts/archive-test-data.js --confirm --backup-dir <private dir> [--include-damaged]
- *   node scripts/archive-test-data.js --restore <receipt.json> [--confirm --backup-dir <dir>]
+ *   node scripts/archive-test-data.js --confirm --backup-dir <private 0700 dir> --receipt <new file in a private dir> [--include-damaged]
+ *   node scripts/archive-test-data.js --restore <receipt.json> [--confirm --backup-dir <dir> --receipt <new file>]
  *
  * Selection rules (exact, case-sensitive, only rows that are still isActive=true):
  *   Supplier  name/shortName contains 「(存疑)」 or 「（存疑）」        -> reason doubtful
@@ -18,8 +21,7 @@
  * The production run is a separate, owner-approved, backed-up step.
  */
 const fs = require('node:fs');
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const { configuredDatabase, targetIdentity, backupDatabase, reservePrivateFile, writeJson, readPrivateJson } = require('./financial-sqlite-safety');
 
 const DOUBTFUL = ['(存疑)', '（存疑）'];
 const DAMAGED = ['(文件损坏)', '（文件损坏）'];
@@ -81,7 +83,7 @@ async function applyPlan(db, plan, isActive) {
 }
 
 function parseArgs(argv) {
-  const opts = { confirm: false, includeDamaged: false, backupDir: null, restore: null };
+  const opts = { confirm: false, includeDamaged: false, backupDir: null, receipt: null, restore: null };
   for (let i = 0; i < argv.length; i += 1) {
     const [flag, inline] = argv[i].split(/=(.*)/s);
     const value = () => (inline !== undefined ? inline : argv[++i]);
@@ -89,30 +91,11 @@ function parseArgs(argv) {
     else if (flag === '--dry-run') opts.confirm = false;
     else if (flag === '--include-damaged') opts.includeDamaged = true;
     else if (flag === '--backup-dir') opts.backupDir = value();
+    else if (flag === '--receipt') opts.receipt = value();
     else if (flag === '--restore') opts.restore = value();
     else throw new Error(`Unknown option: ${flag}`);
   }
   return opts;
-}
-
-function sqlitePathFromEnv() {
-  const url = process.env.DATABASE_URL || '';
-  if (!url.startsWith('file:') || !url.slice(5).split('?')[0]) {
-    throw new Error('Set a SQLite DATABASE_URL in the process environment; this script never reads .env.');
-  }
-  return path.resolve(__dirname, '../prisma', url.slice(5).split('?')[0]);
-}
-
-/** Consistent online snapshot via the shared backup tool; fail closed so nothing is written without a backup. */
-function backupDatabase(database, backupDir) {
-  const result = spawnSync('python3', [path.join(__dirname, 'sqlite_snapshot.py'), 'backup', '--database', database, '--backup-dir', backupDir], { stdio: 'inherit' });
-  if (result.error || result.status !== 0) throw new Error('Backup failed; nothing was changed.');
-}
-
-function writeReceipt(backupDir, receipt) {
-  const file = path.join(backupDir, `archive-receipt-${receipt.createdAt.replace(/[:.]/g, '-')}.json`);
-  fs.writeFileSync(file, JSON.stringify(receipt, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
-  return file;
 }
 
 function summarize(plan) {
@@ -120,37 +103,50 @@ function summarize(plan) {
 }
 
 async function main(argv = process.argv.slice(2), db) {
+  process.umask(0o077);
   const opts = parseArgs(argv);
+  // Resolve and verify the target before reading anything: a wrong or non-private database stops here.
+  const configured = configuredDatabase();
+  const target = await targetIdentity(db, configured);
   const restoring = Boolean(opts.restore);
-  const plan = restoring
-    ? JSON.parse(fs.readFileSync(opts.restore, 'utf8')).plan
-    : await selectTargets(db, opts);
+  const plan = restoring ? readPrivateJson(opts.restore).plan : await selectTargets(db, opts);
   const mode = opts.confirm ? 'CONFIRM' : 'DRY-RUN';
   console.log(`[archive-test-data] ${mode} ${restoring ? 'restore' : 'archive'}:`, JSON.stringify(summarize(plan)));
   for (const key of Object.keys(MODELS)) {
     for (const row of plan[key] || []) console.log(`  ${key} ${row.id} [${row.reason}] ${row.label}`);
   }
   if (!opts.confirm) {
-    console.log('[archive-test-data] dry-run: nothing written. Re-run with --confirm --backup-dir <dir> to apply.');
+    console.log('[archive-test-data] dry-run: nothing written. Re-run with --confirm --backup-dir <dir> --receipt <file> to apply.');
     return { applied: false, plan };
   }
-  if (!opts.backupDir) throw new Error('--confirm requires --backup-dir.');
-  const backupDir = path.resolve(opts.backupDir);
-  fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
-  fs.chmodSync(backupDir, 0o700);
-  backupDatabase(sqlitePathFromEnv(), backupDir);
-  const receipt = { createdAt: new Date().toISOString(), action: restoring ? 'restore' : 'archive', plan };
-  const receiptFile = writeReceipt(backupDir, receipt);
-  const counts = await applyPlan(db, plan, restoring);
-  console.log(`[archive-test-data] applied ${JSON.stringify(counts)}; receipt ${receiptFile}`);
-  return { applied: true, plan, counts, receiptFile };
+  if (!opts.backupDir || !opts.receipt) throw new Error('--confirm requires --backup-dir and --receipt.');
+  const receiptFd = reservePrivateFile(opts.receipt);
+  let committed = false;
+  try {
+    const backupPath = await backupDatabase(target, opts.backupDir);
+    // The database must still be the same file after the backup, before the first write.
+    if ((await targetIdentity(db, configured)).fingerprint !== target.fingerprint) throw new Error('Target database changed during the backup; nothing was written.');
+    const counts = await applyPlan(db, plan, restoring);
+    committed = true;
+    writeJson(receiptFd, {
+      format: 'jiesong-archive-receipt-v1', createdAt: new Date().toISOString(), action: restoring ? 'restore' : 'archive',
+      plan, counts, backupPath, targetFingerprint: target.fingerprint,
+    });
+    console.log(`[archive-test-data] applied ${JSON.stringify(counts)}; receipt ${opts.receipt}`);
+    return { applied: true, plan, counts, receiptFile: opts.receipt, backupPath };
+  } catch (error) {
+    if (committed) throw new Error('Database transaction committed but the receipt could not be saved; verify read-only before any re-run.');
+    throw error;
+  } finally {
+    fs.closeSync(receiptFd);
+  }
 }
 
 module.exports = { selectTargets, applyPlan, parseArgs, supplierReason, main };
 
 if (require.main === module) {
   // Prisma would otherwise auto-load backend/.env; require the target to be explicit in the process env.
-  try { sqlitePathFromEnv(); } catch (error) { console.error(`[archive-test-data] ${error.message}`); process.exit(1); }
+  if (!process.env.DATABASE_URL?.startsWith('file:')) { console.error('[archive-test-data] Set a SQLite DATABASE_URL in the process environment; this script never reads .env.'); process.exit(1); }
   const { PrismaClient } = require('@prisma/client');
   const prisma = new PrismaClient({ log: [] });
   main(process.argv.slice(2), prisma)

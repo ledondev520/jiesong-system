@@ -15,7 +15,7 @@ test('supplierReason: exact, case-sensitive markers only', () => {
 
 test('parseArgs: dry-run is the default and unknown flags are rejected', () => {
   assert.equal(parseArgs([]).confirm, false);
-  assert.deepEqual(parseArgs(['--confirm', '--backup-dir=/x', '--include-damaged']), { confirm: true, includeDamaged: true, backupDir: '/x', restore: null });
+  assert.deepEqual(parseArgs(['--confirm', '--backup-dir=/x', '--receipt', '/y.json', '--include-damaged']), { confirm: true, includeDamaged: true, backupDir: '/x', receipt: '/y.json', restore: null });
   assert.equal(parseArgs(['--restore', 'r.json']).restore, 'r.json');
   assert.throws(() => parseArgs(['--force']), /Unknown option/);
 });

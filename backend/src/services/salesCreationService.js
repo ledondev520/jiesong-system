@@ -7,6 +7,7 @@ const { createHash } = require('node:crypto');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { generateNextContractNo } = require('./shared/contractUtils');
+const { resolveOrderCustomerFields } = require('./customerService');
 
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const text = (value, label, required = false, max = 2000) => {
@@ -53,6 +54,12 @@ const normalizeCreation = (data) => {
     exchangeRate,
     signedAt: signedAt?.toISOString() || null,
     note: text(data.note, '备注'),
+    // 客户与条款（DATA-MODEL §2.4）：缺省值在事务内解析；这里只做形状校验并进入请求摘要。
+    customerId: text(data.customerId, '客户', false, 128),
+    currency: text(data.currency, '币种', false, 8),
+    incoterm: text(data.incoterm, '贸易术语', false, 8),
+    paymentTerms: text(data.paymentTerms, '付款条款', false, 500),
+    portOfLoading: text(data.portOfLoading, '装运港', false, 200),
     items,
   };
 };
@@ -108,6 +115,7 @@ const createSalesContractAtomically = async (data, context = {}) => {
         ]);
         if (products !== productIds.length || stores !== storeIds.length) throw createError('商品或门店已不存在，请刷新后重新选择', 400);
       }
+      const customerFields = await resolveOrderCustomerFields(input, tx);
       const contractNo = input.contractNo || await generateNextContractNo({ prisma: tx, year: new Date().getFullYear().toString().slice(-2) });
       const totalAmount = (input.items || []).reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0);
       if (!Number.isFinite(totalAmount) || totalAmount > Number.MAX_SAFE_INTEGER) throw createError('合同金额超出支持范围', 400);
@@ -116,6 +124,7 @@ const createSalesContractAtomically = async (data, context = {}) => {
           ...(contractId ? { id: contractId } : {}),
           contractNo,
           exchangeRate: input.exchangeRate,
+          ...customerFields,
           signedAt: input.signedAt ? new Date(input.signedAt) : null,
           note: input.note,
           totalAmount: Number(totalAmount.toFixed(2)),
