@@ -15,10 +15,12 @@ const mockGetAll = vi.fn();
 const mockToastError = vi.fn();
 const mockSearchParamGet = vi.fn();
 const mockRouterPush = vi.fn();
+const mockRouterReplace = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockRouterPush,
+    replace: mockRouterReplace,
     back: vi.fn(),
   }),
   useSearchParams: () => ({
@@ -54,9 +56,50 @@ describe("ProductsPage 交互逻辑", () => {
     mockGetAll.mockReset();
     mockToastError.mockReset();
     mockSearchParamGet.mockReset();
+    mockRouterReplace.mockReset();
     mockSearchParamGet.mockImplementation((key: string) =>
       key === "keyword" ? "" : null,
     );
+  });
+
+  it("旧书签 ?tab=inventory 仍可打开并转到库存页；普通访问不跳转", async () => {
+    mockGetAll.mockResolvedValue({ data: { items: [] } });
+    const { unmount } = render(<ProductsPage />);
+    await waitFor(() => expect(mockGetAll).toHaveBeenCalled());
+    expect(mockRouterReplace).not.toHaveBeenCalled();
+    unmount();
+
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "tab" ? "inventory" : null,
+    );
+    render(<ProductsPage />);
+    await waitFor(() =>
+      expect(mockRouterReplace).toHaveBeenCalledWith("/dashboard/inventory"),
+    );
+  });
+
+  it("仅含空白的 HS 编码按未填写处理", async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "p1",
+            customsName: "空白HS",
+            hsCode: "   ",
+            grossWeight: 1,
+            volume: 1,
+          },
+        ],
+      },
+    });
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "incomplete" ? "true" : null,
+    );
+    render(<ProductsPage />);
+    expect((await screen.findAllByText(/缺少：HS编码/)).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText("HS编码:")).not.toBeInTheDocument();
   });
 
   it("按服务端总数翻到第二页，保留低库存筛选", async () => {

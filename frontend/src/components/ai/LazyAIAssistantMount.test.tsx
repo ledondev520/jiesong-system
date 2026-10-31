@@ -109,4 +109,57 @@ describe("LazyAIAssistantMount", () => {
     fireEvent.keyDown(window, { key: "j", ctrlKey: true });
     expect(useAiPanelStore.getState().open).toBe(true);
   });
+
+  it("手机面板是模态对话框：焦点移入并被限制在内，Escape 关闭后焦点回到触发者", () => {
+    mockMobile = true;
+    render(
+      <>
+        <button>打开AI</button>
+        <LazyAIAssistantMount />
+      </>,
+    );
+    const opener = screen.getByText("打开AI");
+    opener.focus();
+    act(() => useAiPanelStore.getState().setOpen(true));
+
+    const sheet = screen.getByRole("dialog", { name: "AI 助手" });
+    expect(sheet).toHaveAttribute("aria-modal", "true");
+    const close = screen.getByText("关闭面板");
+    expect(sheet).toContainElement(document.activeElement as HTMLElement);
+
+    // 只有一个可聚焦元素时，Tab / Shift+Tab 都留在面板内
+    expect(fireEvent.keyDown(close, { key: "Tab" })).toBe(false);
+    expect(fireEvent.keyDown(close, { key: "Tab", shiftKey: true })).toBe(
+      false,
+    );
+
+    fireEvent.keyDown(close, { key: "Escape" });
+    expect(useAiPanelStore.getState().open).toBe(false);
+    expect(opener).toHaveFocus();
+  });
+
+  it("拖动调整宽度时 pointermove 不写 localStorage，松手后才写入一次", () => {
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    useAiPanelStore.setState({ open: true });
+    render(<LazyAIAssistantMount />);
+    const handle = screen.getByRole("separator");
+    setItem.mockClear();
+
+    fireEvent.pointerDown(handle);
+    fireEvent.pointerMove(window, { clientX: 700 });
+    fireEvent.pointerMove(window, { clientX: 650 });
+    fireEvent.pointerMove(window, { clientX: 600 });
+    expect(setItem).not.toHaveBeenCalled();
+    expect(useAiPanelStore.getState().width).not.toBe(window.innerWidth - 600);
+    expect(screen.getByTestId("ai-panel")).toHaveStyle({
+      width: `${Math.min(640, Math.max(320, window.innerWidth - 600))}px`,
+    });
+
+    fireEvent.pointerUp(window);
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(useAiPanelStore.getState().width).toBe(
+      Math.min(640, Math.max(320, window.innerWidth - 600)),
+    );
+    setItem.mockRestore();
+  });
 });

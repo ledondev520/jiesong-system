@@ -9,6 +9,7 @@ import { getAiPageContext } from "@/lib/ai-page-context";
 import {
   AI_PANEL_MAX_WIDTH,
   AI_PANEL_MIN_WIDTH,
+  clampAiPanelWidth,
   useAiPanelStore,
 } from "@/store/ai-panel.store";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,8 @@ const LazyAIAssistant = dynamic(
 );
 
 const KEYBOARD_STEP = 24;
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * 停靠式 AI 助手：桌面是内容区右侧的一列（内容区随之变窄，不遮挡），手机是点开后的全屏面板。
@@ -38,7 +41,11 @@ export function LazyAIAssistantMount() {
   const setWidth = useAiPanelStore((state) => state.setWidth);
   const [everOpened, setEverOpened] = useState(open);
   const dragging = useRef(false);
+  // 拖动中的宽度只在本组件内变化，松手时才写入（并持久化）一次，避免每次 pointermove 写 localStorage
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const dragWidthRef = useRef<number | null>(null);
   const initialized = useRef(false);
+  const sheetRef = useRef<HTMLDivElement>(null);
 
   if (open && !everOpened) setEverOpened(true);
 
@@ -75,18 +82,37 @@ export function LazyAIAssistantMount() {
   // 拖动左缘调整宽度；pointer 事件挂在 window 上，拖出手柄也不丢
   useEffect(() => {
     const onMove = (event: PointerEvent) => {
-      if (dragging.current) setWidth(window.innerWidth - event.clientX);
+      if (!dragging.current) return;
+      const next = clampAiPanelWidth(window.innerWidth - event.clientX);
+      dragWidthRef.current = next;
+      setDragWidth(next);
     };
     const onUp = () => {
+      if (!dragging.current) return;
       dragging.current = false;
+      if (dragWidthRef.current !== null) setWidth(dragWidthRef.current);
+      dragWidthRef.current = null;
+      setDragWidth(null);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
   }, [setWidth]);
+
+  // 手机全屏面板按模态对话框处理：打开时焦点移入，关闭后还给触发者
+  const sheetOpen = isMobile && open;
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const node = sheetRef.current;
+    if (node) (node.querySelector<HTMLElement>(FOCUSABLE) ?? node).focus();
+    return () => opener?.focus?.();
+  }, [sheetOpen]);
 
   if (readOnly || !everOpened) return null;
 
@@ -101,8 +127,45 @@ export function LazyAIAssistantMount() {
   if (isMobile) {
     return (
       <div
+        ref={sheetRef}
         data-testid="ai-panel-sheet"
-        className={cn("fixed inset-0 z-[150] bg-background", !open && "hidden")}
+        role="dialog"
+        aria-modal="true"
+        aria-label="AI 助手"
+        tabIndex={-1}
+        className={cn(
+          "fixed inset-0 z-[150] bg-background outline-none",
+          !open && "hidden",
+        )}
+        onKeyDown={(event) => {
+          if (event.defaultPrevented) return;
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            setOpen(false);
+            return;
+          }
+          if (event.key !== "Tab") return;
+          const items = Array.from(
+            event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE),
+          );
+          if (items.length === 0) {
+            event.preventDefault();
+            return;
+          }
+          const first = items[0];
+          const last = items[items.length - 1];
+          const active = document.activeElement;
+          if (
+            event.shiftKey &&
+            (active === first || active === event.currentTarget)
+          ) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && active === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
       >
         {assistant}
       </div>
@@ -116,7 +179,7 @@ export function LazyAIAssistantMount() {
         "sticky top-0 hidden h-screen shrink-0 border-l bg-background md:flex",
         !open && "md:hidden",
       )}
-      style={{ width }}
+      style={{ width: dragWidth ?? width }}
     >
       <div
         role="separator"
@@ -124,7 +187,7 @@ export function LazyAIAssistantMount() {
         aria-label="调整 AI 助手面板宽度"
         aria-valuemin={AI_PANEL_MIN_WIDTH}
         aria-valuemax={AI_PANEL_MAX_WIDTH}
-        aria-valuenow={width}
+        aria-valuenow={dragWidth ?? width}
         tabIndex={0}
         className="absolute inset-y-0 left-0 z-10 w-1.5 -translate-x-1/2 cursor-col-resize touch-none hover:bg-primary/30 focus-visible:bg-primary/40"
         onPointerDown={(event) => {

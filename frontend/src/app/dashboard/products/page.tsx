@@ -20,7 +20,7 @@ import {
   useCallback,
   useRef,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Product } from "@/types";
 import { productService } from "@/services/product.service";
 import { Button } from "@/components/ui/button";
@@ -73,12 +73,15 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+/** 仅含空白的 HS 编码视为未填写 */
+const hasHsCode = (hsCode?: string | null) => Boolean(hsCode?.trim());
+
 /** 资料不全：毛重、体积、HS 编码缺失或为 0（与后端 incomplete 筛选口径一致） */
 function missingFields(product: Product): string[] {
   const missing: string[] = [];
   if (!product.grossWeight) missing.push("毛重");
   if (!product.volume) missing.push("体积");
-  if (!product.hsCode) missing.push("HS编码");
+  if (!hasHsCode(product.hsCode)) missing.push("HS编码");
   return missing;
 }
 
@@ -88,6 +91,12 @@ const DEFAULT_PAGE_SIZE = 20;
 function ProductsPageContent() {
   const readOnly = useBusinessReadOnly();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const oldInventoryTab = searchParams.get("tab") === "inventory";
+  // 库存已迁到 /dashboard/inventory：旧书签 /dashboard/products?tab=inventory 仍可打开并转过去
+  useEffect(() => {
+    if (oldInventoryTab) router.replace("/dashboard/inventory");
+  }, [oldInventoryTab, router]);
   const initialKeyword = searchParams.get("keyword") || "";
   const lowStockParam = searchParams.get("lowStock") === "true";
   const incompleteParam = searchParams.get("incomplete") === "true";
@@ -569,7 +578,7 @@ function ProductsPageContent() {
                           {product.packingSpec || "—"}
                         </span>
                       </div>
-                      {product.hsCode && (
+                      {hasHsCode(product.hsCode) && (
                         <div className="flex items-center gap-1.5">
                           <span className="shrink-0">HS编码:</span>
                           <span className="font-mono text-foreground">
