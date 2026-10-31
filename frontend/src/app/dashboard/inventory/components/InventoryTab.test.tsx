@@ -20,9 +20,11 @@ vi.mock("@/services/inventory.service", () => ({
       batchUpdateStatus(ids, status),
   },
 }));
-vi.mock("@/services/purchase.service", () => ({
-  purchaseService: {
-    getAll: vi.fn(async () => ({ data: { summary: { stores: ["第二店"] } } })),
+vi.mock("@/services/store.service", () => ({
+  storeService: {
+    getAll: vi.fn(async () => ({
+      data: { items: [{ id: "store-2", name: "第二店" }] },
+    })),
   },
 }));
 vi.mock("@/lib/api-cache", () => ({
@@ -79,13 +81,13 @@ it("URL 中的店铺筛选发送到后端并可见", async () => {
   window.history.replaceState(
     {},
     "",
-    "/dashboard/inventory?inventoryStore=%E7%AC%AC%E4%BA%8C%E5%BA%97",
+    "/dashboard/inventory?inventoryStore=store-2",
   );
   getAll.mockClear();
   render(<InventoryTab />);
   await waitFor(() =>
     expect(getAll).toHaveBeenCalledWith(
-      expect.objectContaining({ storeName: "第二店" }),
+      expect.objectContaining({ storeId: "store-2" }),
     ),
   );
   expect((await screen.findAllByText("第二店")).length).toBeGreaterThan(0);

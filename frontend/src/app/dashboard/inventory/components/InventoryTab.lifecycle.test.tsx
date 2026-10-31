@@ -18,9 +18,11 @@ vi.mock("@/services/inventory.service", () => ({
     batchUpdateStatus: (...args: unknown[]) => batchUpdateStatus(...args),
   },
 }));
-vi.mock("@/services/purchase.service", () => ({
-  purchaseService: {
-    getAll: vi.fn(async () => ({ data: { summary: { stores: ["第二店"] } } })),
+vi.mock("@/services/store.service", () => ({
+  storeService: {
+    getAll: vi.fn(async () => ({
+      data: { items: [{ id: "store-2", name: "第二店" }] },
+    })),
   },
 }));
 vi.mock("@/lib/hooks/useBusinessReadOnly", () => ({

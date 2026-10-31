@@ -19,7 +19,7 @@ import {
 } from "react";
 import { Inventory, InventoryStatus } from "@/types";
 import { inventoryService } from "@/services/inventory.service";
-import { purchaseService } from "@/services/purchase.service";
+import { storeService } from "@/services/store.service";
 import {
   Table,
   TableBody,
@@ -111,7 +111,9 @@ export function InventoryTab() {
   const [loadError, setLoadError] = useState(false);
   const [{ keyword, store, page: currentPage, pageSize }, setListState] =
     useListUrlState(listUrlFields.inventory);
-  const [storeOptions, setStoreOptions] = useState<string[]>([]);
+  const [storeOptions, setStoreOptions] = useState<
+    { id: string; name: string }[]
+  >([]);
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(
     null,
   );
@@ -153,7 +155,7 @@ export function InventoryTab() {
             page: currentPage,
             pageSize,
             keyword: searchKeyword || undefined,
-            storeName: store || undefined,
+            storeId: store || undefined,
           }),
         (response) => {
           if (request !== inventoryRequest.current) return;
@@ -220,13 +222,16 @@ export function InventoryTab() {
     };
   }, [debouncedKeyword, fetchInventory, refreshVersion]);
 
-  // 店铺选项取自采购合同列表的店铺汇总；加载失败时只是没有可选项，不影响库存列表
+  // 店铺选项取自门店档案（按 id 筛选采购明细的送往门店）；加载失败时只是没有可选项，不影响库存列表
   useEffect(() => {
     let active = true;
-    purchaseService
-      .getAll({ page: 1, pageSize: 1, lite: true })
+    storeService
+      .getAll({ pageSize: 100, lite: true })
       .then((response) => {
-        if (active) setStoreOptions(response.data?.summary?.stores ?? []);
+        if (active)
+          setStoreOptions(
+            (response.data?.items ?? []).map(({ id, name }) => ({ id, name })),
+          );
       })
       .catch(() => {});
     return () => {
@@ -439,14 +444,15 @@ export function InventoryTab() {
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={ALL_STORES}>全部店铺</SelectItem>
-        {/* 当前筛选的店铺即使不在汇总里也保留，避免选中值显示为空 */}
-        {[...new Set([...(store ? [store] : []), ...storeOptions])].map(
-          (name) => (
-            <SelectItem key={name} value={name}>
-              {name}
-            </SelectItem>
-          ),
+        {/* 当前筛选的店铺即使不在列表里（已归档/未加载）也保留，避免选中值显示为空 */}
+        {store && !storeOptions.some((option) => option.id === store) && (
+          <SelectItem value={store}>{store}</SelectItem>
         )}
+        {storeOptions.map((option) => (
+          <SelectItem key={option.id} value={option.id}>
+            {option.name}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
