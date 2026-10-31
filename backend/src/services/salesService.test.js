@@ -455,14 +455,19 @@ test('createSalesContract: 未给汇率时用唯一报价配置的现汇，而�
   const originalCount = prisma.salesContract.count;
   const originalCreate = prisma.salesContract.create;
   let createArgs;
+  const originalCustomer = { findMany: prisma.customer.findMany, findUnique: prisma.customer.findUnique };
   prisma.salesContract.count = async () => 0;
   prisma.salesContract.create = async (args) => { createArgs = args; return { id: 'sc-new' }; };
+  // 订单必须有客户（#123）：恰有一个启用客户时自动关联
+  prisma.customer.findMany = async () => [{ id: 'cu-1' }];
+  prisma.customer.findUnique = async () => ({ defaultIncoterm: 'FOB', defaultPaymentTerms: null, defaultPortOfLoading: null });
   try {
     await salesService.createSalesContract({});
     assert.equal(createArgs.data.exchangeRate, 6.72);
   } finally {
     prisma.salesContract.count = originalCount;
     prisma.salesContract.create = originalCreate;
+    Object.assign(prisma.customer, originalCustomer);
   }
 });
 
