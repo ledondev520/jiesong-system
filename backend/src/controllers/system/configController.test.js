@@ -349,3 +349,81 @@ test('syncExchangeRate: 外部同步成功时只替换报价配置的 exchangeRa
     writePricing();
   }
 });
+
+// 同步用的假 https.get：返回一段上游响应体（可分多块）。
+const stubUpstream = (...chunks) => {
+  https.get = (url, callback) => {
+    const response = { handlers: {}, on: (event, handler) => { response.handlers[event] = handler; return response; } };
+    const request = { destroyed: false, setTimeout: () => request, on: () => request, destroy: () => { request.destroyed = true; return request; } };
+    setImmediate(() => {
+      callback(response);
+      for (const chunk of chunks) response.handlers.data?.(chunk);
+      response.handlers.end?.();
+    });
+    return request;
+  };
+};
+
+test('syncExchangeRate: 超出区间[5,10]或与当前汇率偏差>5%时 409 拒绝，不写入，提示手动设置', async () => {
+  const originalHttpsGet = https.get;
+  try {
+    for (const upstream of [4.9, 10.5, 7.5]) { // 7.5 vs 7.1 ≈ 5.6%
+      writePricing({ exchangeRate: 7.1 });
+      stubUpstream(JSON.stringify({ rates: { CNY: upstream } }));
+      let captured = null;
+      const res = createMockRes();
+      await configController.syncExchangeRate({ user: { id: 'a' } }, res, (error) => { captured = error; });
+      assert.equal(captured?.statusCode, 409, String(upstream));
+      assert.match(captured.message, /手动设置/);
+      assert.equal(res.payload, null);
+      assert.equal(JSON.parse(fs.readFileSync(pricingFile, 'utf8')).exchangeRate, 7.1);
+    }
+    // 边界内（5%）仍可同步
+    writePricing({ exchangeRate: 7.1 });
+    stubUpstream(JSON.stringify({ rates: { CNY: 7.45 } })); // 4.9%
+    const ok = createMockRes();
+    await configController.syncExchangeRate({ user: { id: 'a' } }, ok, (error) => { throw error; });
+    assert.equal(ok.payload.data.rate, 7.45);
+  } finally {
+    https.get = originalHttpsGet;
+    writePricing();
+  }
+});
+
+test('syncExchangeRate: 上游响应体超过上限即中止并降级，不解析', async () => {
+  const originalHttpsGet = https.get;
+  try {
+    writePricing({ exchangeRate: 7.1 });
+    stubUpstream('x'.repeat(40 * 1024), 'x'.repeat(40 * 1024));
+    const res = createMockRes();
+    await configController.syncExchangeRate({}, res, (error) => { throw error; });
+    assert.equal(res.payload.data.syncStatus, 'degraded');
+    assert.match(res.payload.data.error, /过大/);
+  } finally {
+    https.get = originalHttpsGet;
+    writePricing();
+  }
+});
+
+test('syncExchangeRate: 写入失败（无状态码的文件错误）如实交给错误处理，不返回成功', async () => {
+  const originalHttpsGet = https.get;
+  try {
+    writePricing({ exchangeRate: 7.1 });
+    stubUpstream(JSON.stringify({ rates: { CNY: 7.2 } }));
+    const mode = fs.statSync(pricingDir).mode & 0o777;
+    fs.chmodSync(pricingDir, 0o500); // 目录不可写：临时文件/锁创建失败
+    let captured = null;
+    const res = createMockRes();
+    try {
+      await configController.syncExchangeRate({ user: { id: 'a' } }, res, (error) => { captured = error; });
+    } finally {
+      fs.chmodSync(pricingDir, mode);
+    }
+    if (process.getuid?.() === 0) return; // root 无视目录权限，无法构造写失败
+    assert.ok(captured, '写入错误必须传给 next');
+    assert.equal(res.payload, null);
+  } finally {
+    https.get = originalHttpsGet;
+    writePricing();
+  }
+});

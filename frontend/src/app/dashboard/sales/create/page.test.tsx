@@ -18,6 +18,8 @@ const mockGetNextContractNo = vi.fn();
 const mockToastError = vi.fn();
 const mockCreateWithItems = vi.fn();
 const mockAddItem = vi.fn();
+const mockGetExchangeRate = vi.fn();
+const mockCalculatePrice = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -40,7 +42,8 @@ vi.mock("@/services/store.service", () => ({
 
 vi.mock("@/services/sales.service", () => ({
   salesService: {
-    calculatePrice: vi.fn(() => 3),
+    calculatePrice: (...args: unknown[]) => mockCalculatePrice(...args),
+    getExchangeRate: (...args: unknown[]) => mockGetExchangeRate(...args),
     getNextContractNo: (...args: unknown[]) => mockGetNextContractNo(...args),
     create: vi.fn(),
     createWithItems: (...args: unknown[]) => mockCreateWithItems(...args),
@@ -64,6 +67,12 @@ describe("CreateSalesPage 交互逻辑", () => {
     mockCreateWithItems.mockReset();
     mockAddItem.mockReset();
     mockPush.mockReset();
+    mockCalculatePrice.mockReset();
+    mockCalculatePrice.mockResolvedValue(3);
+    mockGetExchangeRate.mockReset();
+    mockGetExchangeRate.mockResolvedValue({
+      data: { rate: 6.72, buffer: 0.2, effectiveRate: 6.52 },
+    });
     mockGetNextContractNo.mockResolvedValue({
       data: { contractNo: "EXP2600001" },
     });
@@ -95,6 +104,35 @@ describe("CreateSalesPage 交互逻辑", () => {
     expect(screen.getByRole("spinbutton", { name: /成本/ })).toHaveValue(125);
     return { user, ...view };
   };
+
+  it("汇率由报价配置现汇预填；成本 10000 的推荐售价来自后端报价规则 = 1995（负责人例子）", async () => {
+    mockCalculatePrice.mockResolvedValue(1995);
+    mockGetProducts.mockResolvedValue({
+      data: { items: [{ id: "prod-1", customsName: "瓷砖" }] },
+    });
+    mockGetStores.mockResolvedValue({
+      data: { items: [{ id: "store-1", name: "上海店" }] },
+    });
+    const user = userEvent.setup();
+    render(<CreateSalesPage />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("合同编号")).toHaveValue("EXP2600001"),
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText(/汇率/)).toHaveValue(6.72),
+    );
+    await user.click(screen.getByRole("button", { name: "下一步：出口明细" }));
+    await user.clear(screen.getByRole("spinbutton", { name: /成本/ }));
+    await user.type(screen.getByRole("spinbutton", { name: /成本/ }), "10000");
+    await waitFor(() =>
+      expect(mockCalculatePrice).toHaveBeenLastCalledWith(10000, 6.72),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("spinbutton", { name: /售价/ })).toHaveValue(
+        1995,
+      ),
+    );
+  });
 
   it("完整表头和明细一次提交；数值连续输入不丢焦点，重复点击不重复创建", async () => {
     let resolve!: (value: unknown) => void;

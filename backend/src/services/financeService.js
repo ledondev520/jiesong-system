@@ -7,7 +7,7 @@
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { getPurchaseSettlementStatus } = require('./purchaseStateMachine');
-const { payableWhere, outstandingOf, getPayablesSummary } = require('./payablesService');
+const { payableWhere, isInEffect, outstandingOf, getPayablesSummary } = require('./payablesService');
 const { getSalesSettlementStatus } = require('./salesStateMachine');
 const {
   getEffectiveSalesContractTotal,
@@ -655,7 +655,7 @@ const getPayables = async ({ page, pageSize, skip, search, outstandingOnly = fal
     include: { supplier: true },
     orderBy: { createdAt: 'desc' },
   });
-  const payables = contracts.map((contract) => ({
+  const payables = contracts.filter(isInEffect).map((contract) => ({
     ...contract,
     unpaidAmount: outstandingOf(contract),
   })).filter((contract) => (!outstandingOnly || contract.unpaidAmount > 0)

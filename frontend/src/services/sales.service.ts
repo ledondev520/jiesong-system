@@ -453,15 +453,23 @@ export const salesService = {
     );
   },
 
-  /**
-   * 计算推荐售价。
-   */
-  calculatePrice: (
+  /** 当前现汇（来自唯一报价配置），用于新订单的汇率预填。 */
+  getExchangeRate: () =>
+    api.get<
+      ApiResponse<{ rate: number; buffer: number; effectiveRate: number }>,
+      ApiResponse<{ rate: number; buffer: number; effectiveRate: number }>
+    >("/system/exchange-rate"),
+
+  /** 推荐售价（USD 单价）：由后端 priceFor 计算（现汇-0.2、加价、整美元再取整到 5 的倍数）。 */
+  calculatePrice: async (
     costPrice: number,
     exchangeRate: number,
-    profitRate: number,
-  ) => {
-    const effectiveRate = Math.max(0.1, exchangeRate - 0.2);
-    return Math.ceil((costPrice / effectiveRate) * profitRate);
+  ): Promise<number> => {
+    const response = await api.post<
+      ApiResponse<{ recommended: number }>,
+      ApiResponse<{ recommended: number }>,
+      { costPrice: number; exchangeRate: number }
+    >("/sales/calculate-price", { costPrice, exchangeRate });
+    return response.data.recommended;
   },
 };

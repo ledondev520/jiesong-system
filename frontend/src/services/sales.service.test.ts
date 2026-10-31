@@ -223,19 +223,31 @@ describe("salesService api", () => {
   });
 });
 
-describe("salesService.calculatePrice", () => {
-  it("按公式计算并向上取整", () => {
-    const price = salesService.calculatePrice(100, 6.8, 1.3);
-    expect(price).toBe(Math.ceil((100 / (6.8 - 0.2)) * 1.3));
+describe("salesService.calculatePrice / getExchangeRate", () => {
+  it("推荐售价来自后端报价规则：成本 10000 @ 现汇 6.72 → 1995", async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { recommended: 1995 },
+    });
+
+    expect(await salesService.calculatePrice(10000, 6.72)).toBe(1995);
+    expect(api.post).toHaveBeenCalledWith("/sales/calculate-price", {
+      costPrice: 10000,
+      exchangeRate: 6.72,
+    });
   });
 
-  it("汇率过低时使用最小有效值", () => {
-    const price = salesService.calculatePrice(100, 0.1, 1.3);
-    expect(price).toBe(Math.ceil((100 / 0.1) * 1.3));
+  it("后端拒绝时错误向上抛出，不在前端自行估价", async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("现汇无效，无法报价"),
+    );
+    await expect(salesService.calculatePrice(100, 0)).rejects.toThrow(
+      "现汇无效",
+    );
   });
 
-  it("成本为0时结果为0", () => {
-    const price = salesService.calculatePrice(0, 6.8, 1.3);
-    expect(price).toBe(0);
+  it("getExchangeRate 读取 /system/exchange-rate", async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
+    await salesService.getExchangeRate();
+    expect(api.get).toHaveBeenCalledWith("/system/exchange-rate");
   });
 });

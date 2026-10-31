@@ -13,13 +13,23 @@ const future = new Date('2026-12-01T00:00:00Z');
 
 test('只有生效状态计入应付，DRAFT 与 CANCELLED 永不计入', () => {
   assert.deepEqual(PAYABLE_STATUSES, ['SIGNED', 'PRODUCING', 'READY', 'SHIPPED', 'RECEIVED', 'COMPLETED']);
-  assert.deepEqual(payableWhere(), { status: { in: PAYABLE_STATUSES } });
+  assert.deepEqual(payableWhere(), { status: { notIn: ['DRAFT', 'CANCELLED'] } });
   for (const status of ['DRAFT', 'CANCELLED', 'CONFIRMED', undefined]) {
     assert.equal(outstandingOf({ status, totalAmount: 1000, paidAmount: 0 }), 0, String(status));
   }
   for (const status of PAYABLE_STATUSES) {
     assert.equal(outstandingOf({ status, totalAmount: 1000, paidAmount: 250 }), 750, status);
   }
+});
+
+test('历史旧别名和小写拼写仍按生效状态计入，草稿/取消的任何拼写都不计', () => {
+  for (const status of ['PENDING_INSPECTION', 'IN_STOCK', 'signed', ' Shipped ']) {
+    assert.equal(outstandingOf({ status, totalAmount: 1000, paidAmount: 250 }), 750, status);
+  }
+  for (const status of ['draft', 'Cancelled', 'PENDING']) {
+    assert.equal(outstandingOf({ status, totalAmount: 1000, paidAmount: 0 }), 0, status);
+  }
+  assert.equal(summarizePayables([{ status: 'in_stock', totalAmount: 10, paidAmount: 4 }, { status: 'draft', totalAmount: 99, paidAmount: 0 }]).unpaid, 6);
 });
 
 test('多付合同按 0 计，不抵减其他合同；金额逐合同按分取整', () => {

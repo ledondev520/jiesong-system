@@ -25,6 +25,9 @@ const EXCHANGE_RATE_SYNC_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.EXCHANGE_RATE_SYNC_TIMEOUT_MS,
   1800,
 );
+const EXCHANGE_RATE_MAX_BODY_CHARS = 64 * 1024; // 公共汇率 API 的正常响应约 4KB
+// 同步值的合理区间与单次最大偏移；超出则拒绝自动写入（负责人决定无确认步骤，但异常值不能直接重定价）。
+const FX_SYNC_BAND = { min: 5, max: 10, maxJump: 0.05 };
 
 /**
  * 配置键到域的映射表（不改 schema，仅在应用层做域划分）
@@ -92,7 +95,13 @@ const fetchUsdCnyRate = async ({ timeoutMs = EXCHANGE_RATE_SYNC_TIMEOUT_MS } = {
   };
   const request = https.get(url, (response) => {
     let data = '';
-    response.on('data', (chunk) => { data += chunk; });
+    response.on('data', (chunk) => {
+      data += chunk;
+      if (data.length > EXCHANGE_RATE_MAX_BODY_CHARS) {
+        request.destroy();
+        finish(reject, new Error('汇率响应过大'));
+      }
+    });
     response.on('end', () => {
       try {
         const parsed = JSON.parse(data);
@@ -239,26 +248,35 @@ const getExchangeRate = async (req, res, next) => {
  * 思路：读取当前配置与版本 → 只替换 exchangeRate → 原子整份替换；不再写 SystemConfig。
  */
 const syncExchangeRate = async (req, res, next) => {
+  // 1. 上游取数失败（网络/超时/解析/过大）才降级为“返回当前汇率”；写入阶段的错误不能伪装成成功。
+  let rate;
   try {
-    const rate = await fetchUsdCnyRate();
-    const { config, revision } = loadPricingSnapshot();
-    updatePricingConfig({ ...config, exchangeRate: rate }, revision, req.user?.id);
-    const buffer = -config.exchangeAdjustment;
-    success(res, { rate, buffer, effectiveRate: Math.round((rate - buffer) * 1e6) / 1e6 }, `汇率已同步：1 USD = ${rate} CNY`);
+    rate = await fetchUsdCnyRate();
   } catch (error) {
-    // 报价配置冲突/锁/校验（带状态码）必须如实返回，不能伪装成“同步降级”。
-    if (error.statusCode) return next(error);
     try {
       const currentRate = await resolveExchangeRateConfig();
-      success(res, {
+      return success(res, {
         ...currentRate,
         source: 'cached',
         syncStatus: 'degraded',
         error: error.message,
       }, `汇率同步暂不可用，已返回当前系统汇率：${currentRate.rate}`);
     } catch (fallbackError) {
-      next(createError(`汇率同步失败: ${fallbackError.message}`, 503));
+      return next(createError(`汇率同步失败: ${fallbackError.message}`, 503));
     }
+  }
+  try {
+    const { config, revision } = loadPricingSnapshot();
+    const jump = Math.abs(rate - config.exchangeRate) / config.exchangeRate;
+    if (rate < FX_SYNC_BAND.min || rate > FX_SYNC_BAND.max || jump > FX_SYNC_BAND.maxJump) {
+      throw createError(`同步到的汇率 ${rate} 超出安全范围（区间 ${FX_SYNC_BAND.min}–${FX_SYNC_BAND.max}，与当前 ${config.exchangeRate} 偏差不得超过 ${FX_SYNC_BAND.maxJump * 100}%），未写入。请在 设置 > 报价配置 手动设置现汇`, 409);
+    }
+    updatePricingConfig({ ...config, exchangeRate: rate }, revision, req.user?.id);
+    const buffer = -config.exchangeAdjustment;
+    return success(res, { rate, buffer, effectiveRate: Math.round((rate - buffer) * 1e6) / 1e6 }, `汇率已同步：1 USD = ${rate} CNY`);
+  } catch (error) {
+    // 冲突/锁/校验/文件写入错误一律如实返回，不走“同步降级”成功路径。
+    return next(error);
   }
 };
 

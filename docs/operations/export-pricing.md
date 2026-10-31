@@ -41,15 +41,23 @@ loader 不读取 `.env`。已保存的订单/报价价格不会因配置变化�
 
 ## 线上 `pricing.json` 迁移（需负责人批准后由运维执行，不随合并自动发生）
 
-部署会保留服务器上的运行时 `config/pricing.json`；新代码读不了旧结构，**迁移前不要部署**，否则报价接口返回 503。
+部署会保留服务器上的运行时 `config/pricing.json`；**新代码读不了旧结构，旧代码也读不了新结构**。因此转换和部署之间有一个窗口：
+转换完成后、新版本启动前，仍在运行的旧后端报价校验会失败（报价接口 503）；反过来迁移前部署新版本同样 503。
+请在业务低峰的一分钟内把「转换 → 部署」连着做完，不要隔夜。
+
+取整步长默认取仓库提交的 `config/pricing.json`（锁定为 5：先整美元再向上取整到 5 的倍数），因此转换脚本必须在**新版本检出**里运行（需要能读到 git HEAD 中的新默认值）；读不到时脚本报错，可显式加 `--round-up-to 5`。
 
 ```bash
-# 1. 在服务器上先 dry-run，只打印结果、不写文件（--spot-rate 填当前现汇）
+# 1. dry-run，只打印结果、不写文件（--spot-rate 填当前现汇）；确认输出里 "roundUpTo": 5
 node backend/scripts/convert-pricing-config.js --file config/pricing.json --spot-rate <现汇>
 # 2. 确认后转换：先把原文件备份到 0700 目录（0600 文件），再原子替换并用后端校验器核对
 node backend/scripts/convert-pricing-config.js --file config/pricing.json --spot-rate <现汇> --confirm --backup-dir <私有备份目录>
-# 3. 部署新版本；登录后在 设置 > 报价规则 添加「瓷砖 10%」等分类加价
-# 回滚：把备份文件复制回 config/pricing.json，并部署旧版本
+# 3. 立刻部署新版本；登录后在 设置 > 报价规则 添加「瓷砖 10%」等分类加价
+# 4. 验证（ADMIN 登录后）：现汇 6.72 时成本 ¥10000 必须得到 1995
+#    GET /api/v1/system/pricing-config/preview?costCny=10000   →  unitPriceUsd: 1995
+#    （13000 ÷ 6.52 = 1993.865 → 整美元 1994 → 向上取整到 5 的倍数 → 1995；若得到 1994 说明 roundUpTo 不是 5，立即回滚）
 ```
+
+回滚：把备份文件复制回 `config/pricing.json` **并且部署回旧版本**；只重启不够，因为旧代码读不了新结构的文件（反之亦然）。
 
 旧 `tiered` 的 `refundableMarkup` → `defaultMarkup`（`multiplier` 模式取 `multiplier - 1`）；`noRefundMarkup`（零退税 10% 档）不再存在，改为按分类设置。

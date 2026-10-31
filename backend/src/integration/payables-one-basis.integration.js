@@ -15,8 +15,9 @@ const PAST = new Date(NOW - 40 * 86400000);
 const FUTURE = new Date(NOW + 40 * 86400000);
 
 // Expected (CNY): in effect = SIGNED 1000/200 (overdue 800), SHIPPED 500/500, RECEIVED 300/0 (future),
-// COMPLETED 100/150 overpaid → 0. DRAFT 7000/0 and CANCELLED 9000/1000 are excluded.
-const EXPECTED = { total: 1900, paid: 850, unpaid: 1100, overdue: 800 };
+// COMPLETED 100/150 overpaid → 0, legacy PENDING_INSPECTION 400/100 (overdue 300) and lowercase 'shipped' 200/0 (future)
+// still count (status aliases/spellings normalised). DRAFT 7000/0, lowercase 'draft' 5000/0 and CANCELLED 9000/1000 are excluded.
+const EXPECTED = { total: 2500, paid: 950, unpaid: 1600, overdue: 1100 };
 
 test('HTTP/SQLite: draft contracts are not payables and every endpoint shows the same totals', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-payables-'));
@@ -50,7 +51,10 @@ test('HTTP/SQLite: draft contracts are not payables and every endpoint shows the
     ['CG-SHIPPED', 'SHIPPED', 500, 500, PAST],
     ['CG-RECEIVED', 'RECEIVED', 300, 0, FUTURE],
     ['CG-OVERPAID', 'COMPLETED', 100, 150, PAST],
+    ['CG-LEGACY', 'PENDING_INSPECTION', 400, 100, PAST],
+    ['CG-LOWER', 'shipped', 200, 0, FUTURE],
     ['CG-DRAFT', 'DRAFT', 7000, 0, PAST],
+    ['CG-DRAFT-LOWER', 'draft', 5000, 0, PAST],
     ['CG-CANCELLED', 'CANCELLED', 9000, 1000, PAST],
   ];
   for (const [contractNo, status, totalAmount, paidAmount, expectedDate] of contracts) {
@@ -72,8 +76,8 @@ test('HTTP/SQLite: draft contracts are not payables and every endpoint shows the
 
   await t.test('payables list lists only in-effect contracts and its rows sum to the same unpaid total', async () => {
     const list = await getJson('/finance/payables?pageSize=100');
-    assert.deepEqual(list.items.map(row => row.contractNo).sort(), ['CG-OVERPAID', 'CG-RECEIVED', 'CG-SHIPPED', 'CG-SIGNED']);
-    assert.equal(list.pagination.total, 4);
+    assert.deepEqual(list.items.map(row => row.contractNo).sort(), ['CG-LEGACY', 'CG-LOWER', 'CG-OVERPAID', 'CG-RECEIVED', 'CG-SHIPPED', 'CG-SIGNED']);
+    assert.equal(list.pagination.total, 6);
     assert.equal(list.items.reduce((sum, row) => sum + row.unpaidAmount, 0), EXPECTED.unpaid);
   });
 
@@ -95,6 +99,7 @@ test('HTTP/SQLite: draft contracts are not payables and every endpoint shows the
     assert.equal(rows.length, contracts.length);
     assert.equal(rows.reduce((sum, row) => sum + Number(row[4]), 0), EXPECTED.unpaid);
     assert.equal(Number(rows.find(row => row[0] === 'CG-DRAFT')[4]), 0);
+    assert.equal(Number(rows.find(row => row[0] === 'CG-DRAFT-LOWER')[4]), 0);
   });
 
   await t.test('AI context 财务概况', async () => {
@@ -105,6 +110,6 @@ test('HTTP/SQLite: draft contracts are not payables and every endpoint shows the
 
   await t.test('past-delivery payables filter keeps the same basis', async () => {
     const list = await getJson('/finance/payables?pastDelivery=true&outstandingOnly=true&pageSize=100');
-    assert.deepEqual(list.items.map(row => row.contractNo), ['CG-SIGNED']);
+    assert.deepEqual(list.items.map(row => row.contractNo).sort(), ['CG-LEGACY', 'CG-SIGNED']);
   });
 });
