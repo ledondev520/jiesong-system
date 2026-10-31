@@ -6,8 +6,8 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { redirect } from 'next/navigation';
+import { redirect } from "next/navigation";
 
 export default function ContainersPage() {
-  redirect('/dashboard/orders');
+  redirect("/dashboard/orders");
 }
