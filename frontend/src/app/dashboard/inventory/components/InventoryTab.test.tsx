@@ -83,7 +83,8 @@ it("数量列只显示数量和有效单位，纯数字单位不冒充第二个�
   expect(badges.length).toBeGreaterThan(0);
   for (const badge of badges) {
     expect(badge.className).toContain("amber");
-    expect(badge.className).not.toContain("bg-destructive/10");
+    // Badge 基类自带 aria-invalid:*destructive，只排除红色变体本身
+    expect(badge.className).not.toContain("bg-destructive");
   }
 });
 

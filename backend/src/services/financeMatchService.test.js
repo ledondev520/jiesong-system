@@ -48,6 +48,14 @@ test('发票关联候选保持原范围：含草稿、只排除已取消，未�
  assert.equal(rows[0].unpaidAmount,50);
 });
 
+test('付款选择器用 isInEffect 剔除旧拼写的草稿/已取消行，发票用途保留',async(t)=>{
+ const purchase=prisma.purchaseContract.findMany;
+ t.after(()=>{prisma.purchaseContract.findMany=purchase;});
+ prisma.purchaseContract.findMany=async()=>[{id:'ok',status:'SIGNED'},{id:'old-draft',status:' draft '},{id:'old-cancel',status:'cancelled'}];
+ assert.deepEqual((await service.listContractsForMatch('PURCHASE','','PAYMENT')).map(r=>r.id),['ok']);
+ assert.equal((await service.listContractsForMatch('PURCHASE','','INVOICE')).length,3);
+});
+
 test('合同选择器按用途划分：付款匹配不含草稿，发票关联含草稿，两者都不含已取消；销售合同不受影响',async(t)=>{
  const purchase=prisma.purchaseContract.findMany;
  const sales=prisma.salesContract.findMany;

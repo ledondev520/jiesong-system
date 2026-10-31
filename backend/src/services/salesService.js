@@ -15,7 +15,7 @@ const {
   validateSalesTransition,
 } = require('./salesStateMachine');
 const inventorySnapshot = require('./inventorySnapshot');
-const { defaultSpotRate, orderMargin, priceFor } = require('./exportPricing');
+const { defaultSpotRate, orderMargin, orderRateInput, priceFor } = require('./exportPricing');
 const { categoryIdsByProduct, withCategoryChains } = require('./productCategoryChain');
 const { checkUtilisation, evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { getContainerSpec } = require('./containerSpecs');
@@ -245,7 +245,7 @@ const removeSalesContract = async (id) => prisma.$transaction(async (tx) => {
 const ruleSellingPrice = async (contract, data) => {
   const product = await prisma.product.findUnique({ where: { id: data.productId }, select: { id: true, categoryId: true } });
   const [withChain] = await withCategoryChains([{ product }], prisma);
-  const priced = priceFor({ costCny: data.costPrice, categoryIds: withChain?.product?.categoryIds || [], spotRate: contract.exchangeRate });
+  const priced = priceFor({ costCny: data.costPrice, categoryIds: withChain?.product?.categoryIds || [], ...orderRateInput(contract) });
   if (priced.status !== 'OK') throw createError('缺少有效成本或汇率，无法按报价规则定价，请填写售价', 400);
   return priced.unitPriceUsd;
 };

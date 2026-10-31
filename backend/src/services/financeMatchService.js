@@ -7,7 +7,7 @@
  */
 
 const prisma = require('../utils/prisma');
-const { payableWhere, outstandingOf } = require('./payablesService');
+const { isInEffect, payableWhere, outstandingOf } = require('./payablesService');
 const { createError } = require('../middleware/errorHandler');
 
 // ==================== 常量配置 ====================
@@ -615,12 +615,14 @@ async function listContractsForMatch(contractType, search = '', purpose = MATCH_
         : {}),
     };
 
-    return prisma.purchaseContract.findMany({
+    const rows = await prisma.purchaseContract.findMany({
       where,
       take: 50,
       orderBy: { createdAt: 'desc' },
       include: { supplier: true },
     });
+    // payableWhere 只是粗过滤，旧别名/小写拼写的草稿、已取消行要在这里剔除
+    return purpose === MATCH_PURPOSE.INVOICE ? rows : rows.filter(isInEffect);
   }
 
   if (contractType === CONTRACT_TYPE.SALES) {
