@@ -95,6 +95,7 @@
         "supplier pricing and margins",
         "financial summary reports, cash-flow statements, account balances, general-ledger entries, payroll, social-security, and tax-return structured rows",
         "inventory and shipment operational history",
+        "quotes and quote items including reference cost, supplier snapshot and price fields (generated quotation files are Restricted and streamed, never stored)",
         "customer master data (Customer name, legal name, address, contacts) and order-level customer terms (incoterm, payment terms, port of loading)"
       ],
       "controls": {

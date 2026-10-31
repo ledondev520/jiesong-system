@@ -195,3 +195,7 @@ Legacy `/api/v1/import` and `/api/v1/system/import` share `tabularUpload` from `
 ## Customer / order terms (Migration A)
 
 Migration A (customers, stores.customerId/code/legalName, sales_contracts customer and order terms) is additive and nullable; `backend/scripts/backfill-default-customer.js` links NULL stores and orders to one customer, Seapot by default per the owner decision that every existing store belongs to it (dry-run default; --confirm needs --backup-dir and --receipt, reuses `financial-sqlite-safety.js`, 0600 receipt, counts-only output, never reads .env, never rewrites old order terms). Customer contact data is Confidential. Production run only after owner approval and a prior `npm run db:backup` snapshot; see `docs/redesign/DATA-MODEL-2026.md` §2.
+
+## Quotes (Migration B2)
+
+`backend/src/services/quoteService.js` + `quoteStateMachine.js` implement Quote/QuoteItem (DATA-MODEL-2026 §4): DRAFT-only edits, CANCELLED instead of delete (no DELETE route), prices only from `priceFor()` (client formulaPrice ignored; manual price needs `isManualPrice`), ACCEPTED→CONVERTED creates one DRAFT sales order in a single transaction guarded by `updateMany` status and unique `sales_contracts.quoteId`. `/api/v1/quotes` read: ADMIN/SALES/PURCHASE/FINANCE/BOSS (cost columns visible to them), write: ADMIN/SALES; WAREHOUSE denied; BOSS whitelist is `/quotes` and `/quotes/:id` only (the J21 export stays denied). Quote prices and reference costs are Confidential. Migration is a one-way door: back up before deploy.
