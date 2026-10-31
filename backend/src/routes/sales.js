@@ -13,6 +13,7 @@
 
 const { Router } = require('express');
 const salesController = require('../controllers/salesController');
+const purchaseDraftController = require('../controllers/purchaseDraftController');
 const { exportSalesContractExcel } = require('../services/exportService');
 const { exportSalesContractPdf } = require('../services/pdfExportService');
 const { authenticate, roleAuth } = require('../middleware/auth');
@@ -107,6 +108,12 @@ const exportPacketValidation = [
   body('priceOverrides.*.unitPriceUsd').isFloat({ gt: 0 }).withMessage('人工单价必须大于 0'),
   handleValidation,
 ];
+
+// POST /api/v1/sales/:id/purchase-drafts - 生成采购单：每个供应商一份 DRAFT 采购合同（草稿不是应付）
+router.post('/:id/purchase-drafts', withIdValidation, roleAuth('ADMIN', 'PURCHASE'), withAuditLog(
+  { entity: 'PurchaseContract', action: 'GENERATE_FROM_SALES' },
+  purchaseDraftController.generate
+));
 
 // POST /api/v1/sales/:id/export-packet/preview - 只读预检和定价草案
 router.post('/:id/export-packet/preview', withIdValidation, roleAuth(...WRITE_ROLES), exportPacketValidation, salesController.previewExportPacket);

@@ -29,7 +29,7 @@ test('registered resource lifecycle matrix over HTTP, private SQLite and singlet
   // Only archive routes use response-finish database audit writes. Pricing audits
   // hashes/field names in its file service and must not store config in the DB.
   const auditedPaths = resources
-    .filter((resource) => resource.kind !== 'singleton-config')
+    .filter((resource) => resource.kind !== 'singleton-config' && resource.kind !== 'action')
     .map((resource) => resource.matrix.path);
   t.after(async () => {
     if (server) {
@@ -175,7 +175,7 @@ test('registered resource lifecycle matrix over HTTP, private SQLite and singlet
   const {
     runSingletonConfigMatrix,
   } = require('../lifecycle/runSingletonConfigMatrix');
-  for (const resource of resources) {
+  for (const resource of resources.filter((entry) => entry.kind !== 'action')) {
     await t.test(resource.id, async (t) => {
       const singleton = resource.kind === 'singleton-config';
       if (singleton) {

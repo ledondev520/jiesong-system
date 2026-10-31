@@ -23,7 +23,7 @@ function fixture(t) {
     'backend/package.json',
     'backend/src/integration/resource-lifecycle.integration.js',
     'frontend/src/lib/hooks/list-lifecycle.test.tsx',
-    ...registry.resources.map((r) => r.update.file),
+    ...registry.resources.flatMap((r) => [r.update?.file, r.test].filter(Boolean)),
     ...registry.lists.flatMap((list) => [list.file, list.test]),
   ];
   fs.cpSync(
@@ -354,4 +354,49 @@ test('singleton update cannot bypass validated complete replacement', (t) => {
   );
   fs.writeFileSync(file, original);
   assert.doesNotThrow(f.verify);
+});
+
+const actionEntry = (f) => {
+  const resource = f.registry.resources.find((r) => r.kind === 'action');
+  assert.ok(resource, 'an action resource must be registered');
+  return resource;
+};
+const saveRegistryFile = (f) =>
+  fs.writeFileSync(path.join(f.temp, 'lifecycle/resources.json'), JSON.stringify(f.registry));
+
+test('action resources: the registered POST route passes, a missing proof test fails red', (t) => {
+  const f = fixture(t);
+  const resource = actionEntry(f);
+  assert.equal(f.verify().resources, f.registry.resources.length);
+  fs.unlinkSync(path.join(f.temp, resource.test));
+  assert.throws(f.verify, /sales-purchase-drafts action needs exactly one POST route.*action\.template\.json/s);
+});
+
+test('action resources: a test file that never calls the route path fails', (t) => {
+  const f = fixture(t);
+  const resource = actionEntry(f);
+  fs.writeFileSync(path.join(f.temp, resource.test), "test('unrelated', () => {});\n");
+  assert.throws(f.verify, /sales-purchase-drafts action needs exactly one POST route/);
+});
+
+test('action resources: two routes, a matrix or an update helper are rejected', (t) => {
+  for (const mutate of [
+    (r) => r.routes.push('PUT /:id/purchase-drafts'),
+    (r) => { r.matrix = { path: '/api/v1/sales' }; },
+    (r) => { r.update = { file: 'backend/src/controllers/purchaseDraftController.js', handler: 'generate' }; },
+  ]) {
+    const f = fixture(t);
+    mutate(actionEntry(f));
+    saveRegistryFile(f);
+    assert.throws(f.verify, /action needs exactly one POST route|does not exist/);
+  }
+});
+
+test('an unregistered new POST route still fails even with the action kind available', (t) => {
+  const f = fixture(t);
+  fs.appendFileSync(
+    path.join(f.temp, 'backend/src/routes/sales.js'),
+    "\nrouter.post('/:id/synthetic-action', handler);\n",
+  );
+  assert.throws(f.verify, /sales.js:\d+: unregistered.*POST \/:id\/synthetic-action/);
 });
