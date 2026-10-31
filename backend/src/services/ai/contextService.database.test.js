@@ -16,7 +16,7 @@ const { PrismaClient } = require('@prisma/client');
 const pricingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-context-pricing-'));
 process.env.JIESONG_PRICING_CONFIG = path.join(pricingDir, 'pricing.json');
 fs.writeFileSync(process.env.JIESONG_PRICING_CONFIG, JSON.stringify({
-  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5,
+  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [],
 }), { mode: 0o600 });
 test.after(() => fs.rmSync(pricingDir, { recursive: true, force: true }));
 
@@ -98,7 +98,7 @@ test('AI 财务概况应付只含已生效合同，草稿不计', async () => {
 
 test('AI 上下文汇率来自唯一报价配置，忽略遗留 SystemConfig.exchangeRate，并继续展示财务概况', async () => {
   const context = await loadContext(stubDb()).getDbContext('价格和应收应付');
-  assert.match(context, /【汇率配置】现汇6\.72, 调整-0\.2, 报价汇率6\.52, 默认加价0\.3, 单价取整步长5（低于步长向上取整到整美元，达到步长取最近的倍数）/);
+  assert.match(context, /【汇率配置】现汇6\.72, 调整-0\.2, 报价汇率6\.52, 默认加价0\.3, 单价向上取整到整美元（老商品默认取上次确认价）/);
   assert.doesNotMatch(context, /99/);
   assert.match(context, /财务概况/);
 });

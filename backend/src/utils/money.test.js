@@ -32,6 +32,6 @@ test('toCents returns integer cents', () => {
   assert.equal(toCents(-0.005), -1);
 });
 
-test('locked USD price rule stays single-sourced in exportPricing (13000 / 6.52 = 1993.87 -> 1995)', () => {
-  assert.equal(roundUnitPrice(13000 / 6.52, 5), 1995);
+test('locked USD price rule stays single-sourced in exportPricing (13000 / 6.52 = 1993.87 -> 1994)', () => {
+  assert.equal(roundUnitPrice(13000 / 6.52), 1994);
 });

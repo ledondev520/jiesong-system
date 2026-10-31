@@ -865,7 +865,7 @@ test('AI 不能读写遗留的汇率/利润率配置：写入被拒绝，读取�
   const previous = process.env.JIESONG_PRICING_CONFIG;
   process.env.JIESONG_PRICING_CONFIG = path.join(dir, 'pricing.json');
   fs.writeFileSync(process.env.JIESONG_PRICING_CONFIG, JSON.stringify({
-    exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5,
+    exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [],
   }), { mode: 0o600 });
   let upserts = 0;
   try {

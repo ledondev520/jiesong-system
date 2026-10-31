@@ -25,7 +25,9 @@ test('shared schema rejects types, keys, nonfinite numbers, decimals and range v
   bad({ roundUpTo: 1.5 });
   bad({ exchangeRate: 0.1, exchangeAdjustment: -0.2 }); // 现汇+调整必须大于 0
   assert.equal(pricing.validatePricingConfig({ ...defaults, exchangeRate: 6.7235 }).exchangeRate, 6.7235);
-  assert.equal(pricing.validatePricingConfig({ ...defaults, roundUpTo: 1000 }).roundUpTo, 1000);
+  // 已弃用的 roundUpTo：旧线上文件（带 5）仍可加载，但不进入快照
+  assert.equal(pricing.validatePricingConfig({ ...defaults, roundUpTo: 5 }).roundUpTo, undefined);
+  assert.equal(Object.hasOwn(defaults, 'roundUpTo'), false);
 });
 
 test('category markups: shape, duplicates, range and unknown keys', () => {

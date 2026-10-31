@@ -116,8 +116,8 @@ describe("CreateSalesPage 交互逻辑", () => {
     return { user, ...view };
   };
 
-  it("汇率由报价配置现汇预填；成本 10000 的推荐售价来自后端报价规则 = 1995（负责人例子）", async () => {
-    mockCalculatePrice.mockResolvedValue(1995);
+  it("汇率由报价配置现汇预填；成本 10000 的推荐售价来自后端报价规则 = 1994（负责人例子）", async () => {
+    mockCalculatePrice.mockResolvedValue(1994);
     mockGetProducts.mockResolvedValue({
       data: { items: [{ id: "prod-1", customsName: "瓷砖" }] },
     });
@@ -144,7 +144,7 @@ describe("CreateSalesPage 交互逻辑", () => {
     );
     await waitFor(() =>
       expect(screen.getByRole("spinbutton", { name: /售价/ })).toHaveValue(
-        1995,
+        1994,
       ),
     );
   });

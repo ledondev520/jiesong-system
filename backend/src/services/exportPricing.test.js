@@ -1,7 +1,7 @@
 /**
  * Input: 报价配置与成本/分类/现汇
  * Output: priceFor 唯一规则的取整、浮点保护、缺成本、分类加价与负责人示例
- * Pos: 报价规则契约测试（UX 规范 §7.2；负责人 2026-10-31 取整决定）
+ * Pos: 报价规则契约测试（UX 规范 §7.2；负责人 2026-11-01 PRICING-LASTPRICE：只向上取整到整美元，不再取 5 的倍数）
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,7 +10,7 @@ const { chainFor } = require('./productCategoryChain');
 
 // 规范 §7.2 示例：现汇 7.2、不加调整，便于对照
 const spec = {
-  exchangeRate: 7.2, exchangeAdjustment: 0, defaultMarkup: 0.3, roundUpTo: 1,
+  exchangeRate: 7.2, exchangeAdjustment: 0, defaultMarkup: 0.3,
   categoryMarkups: [{ categoryId: 'tile', categoryName: '瓷砖', markup: 0.1 }],
 };
 
@@ -49,36 +49,25 @@ test('负责人示例：成本 10000 ¥、现汇 6.72、调整 -0.2 → 13000/6.
   const result = priceFor({ costCny: 10000 }, owner);
   assert.equal(result.effectiveRate, 6.52);
   assert.ok(Math.abs(result.rawUnitPriceUsd - 1993.865) < 0.001);
-  assert.equal(result.unitPriceUsd, 1994); // 步长 1：只取整到整美元
-  // 负责人终版：整美元后再按个位取最近的 5 的倍数，1993.87 → 1994 → 1995
-  assert.equal(priceFor({ costCny: 10000 }, { ...owner, roundUpTo: 5 }).unitPriceUsd, 1995);
+  assert.equal(result.unitPriceUsd, 1994); // 只向上取整到整美元，不再取 5 的倍数
 });
 
-test('负责人终版边界：<5 向上取整到整美元；≥5 整美元后取最近的 5 的倍数（含 5.01→5）', () => {
-  const cases = [
-    [0.2, 1], [0.0001, 1], [1, 1], [4.01, 5], [4.99, 5], [5, 5], [5.01, 5], [6, 5], [7.4, 10],
-    [1991, 1990], [1992, 1990], [1993, 1995], [1993.87, 1995], [1994, 1995], [1995, 1995], [1996, 1995],
-    [1997, 1995], [1998, 2000], [1999, 2000], [2000, 2000], [2001, 2000],
-  ];
-  for (const [raw, expected] of cases) assert.equal(roundUnitPrice(raw, 5), expected, `raw ${raw}`);
-  // 个位全表（整美元 1990…1999 之外再看 10 以内：5→5，6/7→5，8/9→10，10→10，11/12→10，13→15）
-  for (const [raw, expected] of [[5, 5], [6, 5], [7, 5], [8, 10], [9, 10], [10, 10], [11, 10], [12, 10], [13, 15]]) {
-    assert.equal(roundUnitPrice(raw, 5), expected, `raw ${raw}`);
-  }
+test('单价只向上取整到整美元：6.50→7，0.20→1，整数不变，浮点尾巴 19.0000000001→19', () => {
+  for (const [raw, expected] of [
+    [0.2, 1], [0.0001, 1], [1, 1], [4.01, 5], [5, 5], [5.01, 6], [6.5, 7], [7.4, 8], [19.0000000001, 19], [19.000001, 20],
+    [1993.87, 1994], [1994, 1994], [1995, 1995], [1996, 1996], [1998.2, 1999], [2000, 2000],
+  ]) assert.equal(roundUnitPrice(raw), expected, `raw ${raw}`);
+  assert.equal(roundUnitPrice(13000 / 6.52), 1994);
+  assert.equal(roundUnitPrice(11000 / 6.52), 1688);
+  assert.equal(roundUnitPrice(0), 0);
 });
 
-test('priceFor 按单价取整并通过同一规则：1996→1995，1998→2000，2000 不变，0.2→1', () => {
-  const five = { ...spec, exchangeRate: 6.5, exchangeAdjustment: 0, defaultMarkup: 0, roundUpTo: 5 };
-  for (const [usd, expected] of [[1996, 1995], [1998, 2000], [2000, 2000], [1995, 1995], [0.2, 1], [4.01, 5], [5.01, 5]]) {
-    assert.equal(priceFor({ costCny: usd * 6.5 }, five).unitPriceUsd, expected, String(usd));
-  }
-  // 18.0556 → 19 → 20；浮点噪声 13.000000000000002 → 13 → 15
-  assert.equal(priceFor({ costCny: 100 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 20);
-  assert.equal(priceFor({ costCny: 72 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 15);
-});
-
-test('仓库默认配置步长为 5', () => {
-  assert.equal(require('../../../config/pricing.json').roundUpTo, 5);
+test('priceFor 经同一规则取整；旧 roundUpTo 键被忽略（线上旧文件仍带 5）', () => {
+  assert.equal(priceFor({ costCny: 100 }, spec).unitPriceUsd, 19);
+  assert.equal(priceFor({ costCny: 100 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 19);
+  assert.equal(priceFor({ costCny: 72 }, spec).unitPriceUsd, 13); // 浮点噪声 13.000000000000002 → 13
+  assert.equal(priceFor({ costCny: 0.2 * 7.2 / 1.3 }, spec).unitPriceUsd, 1);
+  assert.equal(Object.hasOwn(require('../../../config/pricing.json'), 'roundUpTo'), false);
 });
 
 test('分类加价取最近已配置的祖先，否则默认加价', () => {
@@ -128,13 +117,13 @@ test('订单利润率：低于 30% 或高于 35% 给出不阻断的提示', () =
   assert.equal(orderMargin({ lines: [line(25), line(28)] }, band).warning, null);
 });
 
-test('订单利润率：负责人例子 成本 10000 @ 现汇 6.72 售价 1995 → 30.07%，在区间内', () => {
+test('订单利润率：负责人例子 成本 10000 @ 现汇 6.72 售价 1994 → 30.01%，在区间内', () => {
   const owner = { ...spec, exchangeRate: 6.72, exchangeAdjustment: -0.2 };
-  const result = orderMargin({ lines: [{ costCny: 10000, quantity: 3, unitPriceUsd: 1995 }] }, owner);
-  assert.equal(result.marginPct, 30.07);
+  const result = orderMargin({ lines: [{ costCny: 10000, quantity: 3, unitPriceUsd: 1994 }] }, owner);
+  assert.equal(result.marginPct, 30.01);
   assert.equal(result.warning, null);
   // 订单保存的现汇优先于配置现汇
-  assert.equal(orderMargin({ lines: [{ costCny: 10000, quantity: 1, unitPriceUsd: 1995 }], spotRate: 7.2 }, owner).marginPct, 39.65); // 1995 × 7.0 ÷ 10000 − 1
+  assert.equal(orderMargin({ lines: [{ costCny: 10000, quantity: 1, unitPriceUsd: 1994 }], spotRate: 7.2 }, owner).marginPct, 39.58); // 1994 × 7.0 ÷ 10000 − 1
 });
 
 test('订单利润率：瓷砖（分类加价）行不参与区间检查；只有瓷砖行不提示', () => {

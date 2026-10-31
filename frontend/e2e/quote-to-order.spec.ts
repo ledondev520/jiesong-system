@@ -8,13 +8,13 @@ import { expect, test } from "@playwright/test";
 import { mockApiRoutes, signInAsAdmin } from "./helpers";
 
 const item = {
-  id: "i1", productId: "p1", storeId: "s1", quantity: 10, unit: "PCS", costCny: 10000, formulaPrice: 1995,
-  unitPrice: 1995, isManualPrice: false, totalPrice: 19950, markup: 0.3, note: null, specification: null,
+  id: "i1", productId: "p1", storeId: "s1", quantity: 10, unit: "PCS", costCny: 10000, formulaPrice: 1994,
+  unitPrice: 1994, isManualPrice: false, totalPrice: 19940, markup: 0.3, note: null, specification: null,
   product: { id: "p1", customsName: "合成商品" }, store: { id: "s1", name: "合成门店", code: "SAC" },
 };
 const quote = (status: string, extra: Record<string, unknown> = {}) => ({
   id: "q1", quoteNo: "QT2610-001", status, currency: "USD", incoterm: "FOB", portOfLoading: "Shanghai",
-  paymentTerms: null, validUntil: null, spotRate: 6.72, pricingRate: 6.52, totalAmount: 19950, note: null,
+  paymentTerms: null, validUntil: null, spotRate: 6.72, pricingRate: 6.52, totalAmount: 19940, note: null,
   customerId: "c1", customer: { id: "c1", name: "合成客户" }, createdAt: "2026-10-31T01:00:00.000Z",
   isExpired: false, _count: { items: 1 }, items: [item], ...extra,
 });

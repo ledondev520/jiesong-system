@@ -149,7 +149,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     let unitPriceUsd = formula?.unitPriceUsd || 0;
     let totalUsd = formula?.totalUsd || 0;
     let pricingSource = 'formula';
-    let pricingReference = `目标加价 ${round(targetMarkup * 100, 6)}%，单价按报价取整规则（< ${config.roundUpTo} 美元向上取整到整美元；≥ ${config.roundUpTo} 美元整美元后取最近的 ${config.roundUpTo} 的倍数）`;
+    let pricingReference = `目标加价 ${round(targetMarkup * 100, 6)}%，单价向上取整到整美元（老商品默认取上次确认价）`;
     let roundingMethod = formula?.roundingMethod || '';
     if (historical && historicalCheck?.allowed) {
       unitPriceUsd = historical.unitPriceUsd;
@@ -257,7 +257,6 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       fxBuffer: FX_BUFFER,
       effectiveRate,
       defaultMarkup: config.defaultMarkup,
-      roundUpTo: config.roundUpTo,
       historyRule: '同品名 + 同规格，且按本票成本复算符合利润规则',
     },
     ready: !issues.some((issue) => issue.severity === 'error'),

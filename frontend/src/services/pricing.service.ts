@@ -12,7 +12,6 @@ export interface PricingConfig {
   exchangeAdjustment: number;
   defaultMarkup: number;
   categoryMarkups: CategoryMarkup[];
-  roundUpTo: number;
 }
 
 export interface PricingSnapshot {

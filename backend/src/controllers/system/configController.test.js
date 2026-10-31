@@ -15,7 +15,7 @@ const https = require('node:https');
 const pricingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'config-controller-pricing-'));
 const pricingFile = path.join(pricingDir, 'pricing.json');
 const writePricing = (overrides = {}) => fs.writeFileSync(pricingFile, JSON.stringify({
-  exchangeRate: 7.1, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5, ...overrides,
+  exchangeRate: 7.1, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], ...overrides,
 }), { mode: 0o600 });
 process.env.JIESONG_PRICING_CONFIG = pricingFile;
 writePricing();
@@ -363,7 +363,7 @@ test('syncExchangeRate: 外部同步成功时只替换报价配置的 exchangeRa
     assert.equal(res.payload.data.buffer, 0.3);
     assert.equal(upserts, 0);
     const saved = JSON.parse(fs.readFileSync(pricingFile, 'utf8'));
-    assert.deepEqual(saved, { exchangeRate: 7.23, exchangeAdjustment: -0.3, defaultMarkup: 0.35, categoryMarkups: [], roundUpTo: 5 });
+    assert.deepEqual(saved, { exchangeRate: 7.23, exchangeAdjustment: -0.3, defaultMarkup: 0.35, categoryMarkups: [] });
   } finally {
     prisma.systemConfig.upsert = originalUpsert;
     https.get = originalHttpsGet;

@@ -20,14 +20,12 @@ import {
   type PricingPreview,
 } from "@/services/pricing.service";
 
-type ScalarKey =
-  "exchangeRate" | "exchangeAdjustment" | "defaultMarkup" | "roundUpTo";
+type ScalarKey = "exchangeRate" | "exchangeAdjustment" | "defaultMarkup";
 const fields: { key: ScalarKey; label: string; scale: number; step: number }[] =
   [
     { key: "exchangeRate", label: "现汇 (¥/$)", scale: 1, step: 0.0001 },
     { key: "exchangeAdjustment", label: "汇率调整", scale: 1, step: 0.01 },
     { key: "defaultMarkup", label: "默认加价 (%)", scale: 100, step: 0.1 },
-    { key: "roundUpTo", label: "取整步长 ($)", scale: 1, step: 1 },
   ];
 
 const snapshotResponse = z.object({
@@ -37,7 +35,6 @@ const snapshotResponse = z.object({
       exchangeRate: z.number().finite(),
       exchangeAdjustment: z.number().finite(),
       defaultMarkup: z.number().finite(),
-      roundUpTo: z.number().finite(),
       categoryMarkups: z.array(
         z.object({
           categoryId: z.string(),
@@ -230,8 +227,7 @@ function AdminPricingConfigCard() {
         <CardTitle>报价规则</CardTitle>
         <CardDescription>
           单价 = 采购成本(¥) × (1 + 加价) ÷ (现汇 +
-          调整)，按单价取整：低于步长向上取整到整美元；达到步长先向上取整到整美元，再取最近的步长倍数（步长
-          5：1993.87→1995，1996→1995，1998→2000）。普通商品用默认加价，分类可单独设置（含其子分类）。已保存的订单和报价不会被重新计算。
+          调整)，向上取整到整美元（1993.87→1994，6.50→7）。老商品默认取上次确认价，只有新商品才用此公式。普通商品用默认加价，分类可单独设置（含其子分类）。已保存的订单和报价不会被重新计算。
         </CardDescription>
       </CardHeader>
       <CardContent>

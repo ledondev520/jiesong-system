@@ -21,7 +21,7 @@ async function mockOrders(page: Page) {
     const url = new URL(route.request().url());
     requests.push(url);
     const status = url.searchParams.get("status");
-    const all = [order("o1", "EXP260101", "CONFIRMED", 1995), order("o2", "EXP260102", "SHIPPED", 4000)];
+    const all = [order("o1", "EXP260101", "CONFIRMED", 1994), order("o2", "EXP260102", "SHIPPED", 4000)];
     const items = status ? all.filter((o) => o.status === status) : all;
     return reply(route, { items, pagination: { page: 1, pageSize: 20, total: items.length, totalPages: 1 } });
   });

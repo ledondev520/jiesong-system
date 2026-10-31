@@ -7,7 +7,7 @@ const path = require('node:path');
 const pricingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sales-creation-pricing-'));
 process.env.JIESONG_PRICING_CONFIG = path.join(pricingDir, 'pricing.json');
 fs.writeFileSync(process.env.JIESONG_PRICING_CONFIG, JSON.stringify({
-  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, roundUpTo: 5,
+  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3,
   categoryMarkups: [{ categoryId: 'cat-tile', categoryName: '瓷砖', markup: 0.1 }],
 }), { mode: 0o600 });
 test.after(() => fs.rmSync(pricingDir, { recursive: true, force: true }));
@@ -42,11 +42,27 @@ test('未给售价的明细按唯一报价规则补齐（瓷砖按分类 ×1.1�
   const db = {
     product: { findMany: async () => [{ id: 'p-tile', categoryId: 'cat-tile' }, { id: 'p-cup', categoryId: null }] },
     productCategory: { findMany: async () => [{ id: 'cat-tile', parentId: null }] },
+    salesItem: { findMany: async () => [] },
+    quoteItem: { findMany: async () => [] },
   };
   const input = normalizeCreation({
     exchangeRate: 6.72,
     items: [{ ...item, productId: 'p-cup', costPrice: 10000, sellingPrice: undefined }, { ...item, productId: 'p-tile', costPrice: 10000, sellingPrice: undefined }, item],
   });
   assert.equal(input.items[0].sellingPrice, undefined);
-  assert.deepEqual((await withRulePrices(input, db)).map(line => line.sellingPrice), [1995, 1690, 3]);
+  assert.deepEqual((await withRulePrices(input, db)).map(line => line.sellingPrice), [1994, 1688, 3]);
+});
+
+test('老商品未给售价时取上次确认价，新商品仍按规则', async () => {
+  const db = {
+    product: { findMany: async () => [{ id: 'p-cup', categoryId: null }, { id: 'p-new', categoryId: null }] },
+    productCategory: { findMany: async () => [] },
+    salesItem: { findMany: async () => [{ productId: 'p-cup', sellingPrice: 2500.5, updatedAt: new Date('2026-10-01') }] },
+    quoteItem: { findMany: async () => [] },
+  };
+  const input = normalizeCreation({
+    exchangeRate: 6.72,
+    items: [{ ...item, productId: 'p-cup', costPrice: 10000, sellingPrice: undefined }, { ...item, productId: 'p-new', costPrice: 10000, sellingPrice: undefined }],
+  });
+  assert.deepEqual((await withRulePrices(input, db)).map(line => line.sellingPrice), [2500.5, 1994]);
 });

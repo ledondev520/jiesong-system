@@ -17,6 +17,7 @@ const {
 const inventorySnapshot = require('./inventorySnapshot');
 const { defaultSpotRate, orderMargin, orderRateInput, priceFor } = require('./exportPricing');
 const { categoryIdsByProduct, withCategoryChains } = require('./productCategoryChain');
+const { lastConfirmedPrices } = require('./lastConfirmedPrice');
 const { checkUtilisation, evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { getContainerSpec } = require('./containerSpecs');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
@@ -241,8 +242,10 @@ const removeSalesContract = async (id) => prisma.$transaction(async (tx) => {
   await tx.salesContract.delete({ where: { id } });
 });
 
-// 未给售价时按唯一报价规则（订单已保存的现汇）定价；缺成本/汇率时拒绝，不再用代码里的 ×1.3。
+// 未给售价时：老商品取上次确认价，否则按唯一报价规则（订单已保存的现汇）定价；缺成本/汇率时拒绝，不再用代码里的 ×1.3。
 const ruleSellingPrice = async (contract, data) => {
+  const last = (await lastConfirmedPrices(prisma, [data.productId], { excludeSalesContractId: contract?.id })).get(data.productId);
+  if (last) return last.price;
   const product = await prisma.product.findUnique({ where: { id: data.productId }, select: { id: true, categoryId: true } });
   const [withChain] = await withCategoryChains([{ product }], prisma);
   const priced = priceFor({ costCny: data.costPrice, categoryIds: withChain?.product?.categoryIds || [], ...orderRateInput(contract) });
@@ -373,7 +376,7 @@ const getNextContractNo = async () => {
   return generateNextContractNo({ prisma, year });
 };
 
-// 推荐售价 = 唯一报价规则（加价、现汇 − 调整、单价取整规则见 exportPricing.roundUnitPrice）。profitRate 不再由调用方传入。
+// 推荐售价 = 唯一报价规则（加价、现汇 − 调整、向上取整到整美元见 exportPricing.roundUnitPrice）。profitRate 不再由调用方传入。
 const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate, categoryIds } = {}) => {
   if (profitRate !== undefined) throw createError('利润率由报价规则统一配置，不能在请求中指定', 400);
   const numericCostPrice = Number(costPrice);
@@ -392,10 +395,12 @@ const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate, categoryId
   };
 };
 
-/** 报价页按商品取分类链后再定价：瓷砖等分类加价与后端保存时一致。 */
+/** 报价页按商品取分类链后再定价：瓷砖等分类加价与后端保存时一致；老商品的 recommended 取上次确认价（formulaRecommended 仍是规则价）。 */
 const calculateProductSellingPrice = async ({ productId, ...input } = {}) => {
   const categoryIds = productId ? (await categoryIdsByProduct([productId], prisma)).get(productId) : undefined;
-  return calculateSellingPrice({ ...input, categoryIds });
+  const result = calculateSellingPrice({ ...input, categoryIds });
+  const last = productId ? (await lastConfirmedPrices(prisma, [productId])).get(productId) : undefined;
+  return { ...result, formulaRecommended: result.recommended, recommended: last?.price ?? result.recommended, source: last ? 'LAST_CONFIRMED' : 'RULE' };
 };
 
 /** 报价/建单预览的订单整体利润率（只提示，不阻止保存）；口径见 exportPricing.orderMargin。 */

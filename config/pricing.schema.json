@@ -1,7 +1,7 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["exchangeRate", "exchangeAdjustment", "defaultMarkup", "categoryMarkups", "roundUpTo"],
+  "required": ["exchangeRate", "exchangeAdjustment", "defaultMarkup", "categoryMarkups"],
   "properties": {
     "exchangeRate": { "type": "number", "exclusiveMinimum": 0, "maximum": 100, "maxDecimals": 4 },
     "exchangeAdjustment": { "type": "number", "minimum": -2, "maximum": 2 },
@@ -20,6 +20,6 @@
         }
       }
     },
-    "roundUpTo": { "type": "integer", "minimum": 1, "maximum": 1000 }
+    "roundUpTo": { "type": "integer", "minimum": 1, "maximum": 1000, "deprecated": true }
   }
 }

@@ -33,7 +33,7 @@ test('quote service over HTTP', async (t) => {
 
   const tileCategory = await db.productCategory.create({ data: { name: 'Synthetic tiles' } });
   fs.writeFileSync(pricingFile, JSON.stringify({
-    exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, roundUpTo: 5,
+    exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3,
     categoryMarkups: [{ categoryId: tileCategory.id, categoryName: 'Synthetic tiles', markup: 0.1 }],
   }), { mode: 0o600 });
   const port = await db.port.create({ data: { name: 'Synthetic port', code: 'SYN-P' } });
@@ -64,8 +64,8 @@ test('quote service over HTTP', async (t) => {
 
   await t.test('prices only with the one rule; defaults customer terms; client formulaPrice is ignored', async () => {
     const quote = await ok('SALES', 'POST', '/quotes', { items: [
-      line({ formulaPrice: 1 }),                                                     // owner example: 10000 ¥ at spot 6.72 → 1995
-      line({ productId: tile.id, storeId: storeB.id, quantity: 2 }),                 // tile ×1.1: 11000 / 6.52 = 1687.12 → 1688 → 1690
+      line({ formulaPrice: 1 }),                                                     // owner example: 10000 ¥ at spot 6.72 → 1994
+      line({ productId: tile.id, storeId: storeB.id, quantity: 2 }),                 // tile ×1.1: 11000 / 6.52 = 1687.12 → 1688
       line({ costCny: null }),                                                       // 缺成本
       line({ costCny: 10000, isManualPrice: true, unitPrice: 2500.5 }),              // manual override kept
     ] });
@@ -79,11 +79,11 @@ test('quote service over HTTP', async (t) => {
     assert.equal(quote.pricingRate, 6.52);
     assert.match(quote.pricingRevision, /^[0-9a-f]{64}$/);
     const [a, b, c, d] = quote.items;
-    assert.deepEqual([a.formulaPrice, a.unitPrice, a.totalPrice, a.markup, a.isManualPrice], [1995, 1995, 19950, 0.3, false]);
-    assert.deepEqual([b.formulaPrice, b.unitPrice, b.markup], [1690, 1690, 0.1]);
+    assert.deepEqual([a.formulaPrice, a.unitPrice, a.totalPrice, a.markup, a.isManualPrice], [1994, 1994, 19940, 0.3, false]);
+    assert.deepEqual([b.formulaPrice, b.unitPrice, b.markup], [1688, 1688, 0.1]);
     assert.deepEqual([c.formulaPrice, c.unitPrice, c.markup], [null, 0, null]);
-    assert.deepEqual([d.formulaPrice, d.unitPrice, d.isManualPrice, d.totalPrice], [1995, 2500.5, true, 25005]);
-    assert.equal(quote.totalAmount, 19950 + 3380 + 0 + 25005);
+    assert.deepEqual([d.formulaPrice, d.unitPrice, d.isManualPrice, d.totalPrice], [1994, 2500.5, true, 25005]);
+    assert.equal(quote.totalAmount, 19940 + 3376 + 0 + 25005);
     assert.equal(a.unit, 'PCS'); // defaulted from the product
     assert.equal((await ok('SALES', 'POST', '/quotes', {})).quoteNo.endsWith('-002'), true);
   });
@@ -92,14 +92,14 @@ test('quote service over HTTP', async (t) => {
     const quote = await ok('SALES', 'POST', '/quotes', { items: [
       line({ isManualPrice: true, unitPrice: 0 }), line({ isManualPrice: true, unitPrice: 1 }), line({ isManualPrice: true, unitPrice: 999999 }),
     ] });
-    assert.deepEqual(quote.items.map((i) => [i.unitPrice, i.isManualPrice, i.formulaPrice]), [[0, true, 1995], [1, true, 1995], [999999, true, 1995]]);
+    assert.deepEqual(quote.items.map((i) => [i.unitPrice, i.isManualPrice, i.formulaPrice]), [[0, true, 1994], [1, true, 1994], [999999, true, 1994]]);
   });
 
   await t.test('changing the spot rate reprices; invalid input is atomic', async () => {
     const quote = await ok('SALES', 'POST', '/quotes', { items: [line()] });
-    const repriced = await ok('SALES', 'PUT', `/quotes/${quote.id}`, { spotRate: 7.2 }); // 13000 / 7.0 = 1857.14 → 1858 → 1860
+    const repriced = await ok('SALES', 'PUT', `/quotes/${quote.id}`, { spotRate: 7.2 }); // 13000 / 7.0 = 1857.14 → 1858
     assert.equal(repriced.pricingRate, 7);
-    assert.equal(repriced.items[0].unitPrice, 1860);
+    assert.equal(repriced.items[0].unitPrice, 1858);
     const before = await db.quote.count();
     for (const body of [{ items: [line({ quantity: 0 })] }, { items: [line({ productId: 'missing' })] }, { items: [line({ storeId: 'missing' })] },
       { items: [line({ isManualPrice: true })] }, { spotRate: -1 }]) {
@@ -107,7 +107,7 @@ test('quote service over HTTP', async (t) => {
     }
     assert.equal((await call('SALES', 'POST', '/quotes', { items: [line({ quantity: -1 })] })).status, 400);
     assert.equal(await db.quote.count(), before);
-    assert.equal((await ok('SALES', 'GET', `/quotes/${quote.id}`)).items[0].unitPrice, 1860);
+    assert.equal((await ok('SALES', 'GET', `/quotes/${quote.id}`)).items[0].unitPrice, 1858);
   });
 
   await t.test('send guard, DRAFT-only edits, reopen, cancel and terminal states', async () => {
@@ -151,10 +151,10 @@ test('quote service over HTTP', async (t) => {
     assert.equal([order.currency, order.incoterm, order.paymentTerms, order.portOfLoading].join('|'), 'USD|FOB|T/T 30%|Shanghai');
     assert.equal(order.exchangeRate, 6.52);       // owner decision: order FX = spot − 0.2 (the quote's pricingRate)
     assert.equal(order.portId, port.id);          // both stores share one destination port
-    assert.equal(order.totalAmount, 19950 + 3380);
+    assert.equal(order.totalAmount, 19940 + 3376);
     assert.equal(order.items.length, 2);
     const item = order.items.find((i) => i.productId === normal.id);
-    assert.deepEqual([item.storeId, item.quantity, item.costPrice, item.sellingPrice], [storeA.id, 10, 10000, 1995]);
+    assert.deepEqual([item.storeId, item.quantity, item.costPrice, item.sellingPrice], [storeA.id, 10, 10000, 1994]);
     // R1-1: export pricing on the converted order applies the FX adjustment once — same cost, same rule, same price as the quote.
     const detail = await ok('SALES', 'GET', `/sales/${order.id}`);
     assert.deepEqual([detail.rateBasis, detail.spotRate, detail.exchangeRate], ['effective', 6.72, 6.52]);
@@ -162,7 +162,7 @@ test('quote service over HTTP', async (t) => {
     const { evaluateExportPacket } = require('../services/exportPacketService');
     const exported = { ...order, packingItems: [{ id: 'pk-r1', productId: normal.id, quantity: 10, purchaseCost: 100000, product: { customsName: 'Synthetic normal good' } }] };
     const readiness = evaluateExportReadiness(exported);
-    assert.equal(readiness.lines[0].recommendedUnitPriceUsd, 1995);
+    assert.equal(readiness.lines[0].recommendedUnitPriceUsd, 1994);
     const untouched = evaluateExportPacket(exported, readiness, [], {});
     assert.deepEqual([untouched.pricingPolicy.spotRate, untouched.pricingPolicy.effectiveRate], [6.72, 6.52]);
     const typed = evaluateExportPacket(exported, readiness, [], { spotRate: detail.spotRate });
@@ -199,7 +199,7 @@ test('quote service over HTTP', async (t) => {
     assert.notEqual(copy.id, source.id);
     assert.notEqual(copy.quoteNo, source.quoteNo);
     assert.equal(copy.status, 'DRAFT');
-    assert.deepEqual(copy.items.map((i) => [i.unitPrice, i.isManualPrice]), [[1995, false], [2500.5, true]]);
+    assert.deepEqual(copy.items.map((i) => [i.unitPrice, i.isManualPrice]), [[1994, false], [2500.5, true]]);
   });
 
   await t.test('list filters by keyword and status; detail reports expiry as computed', async () => {

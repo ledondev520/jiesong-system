@@ -2,6 +2,5 @@
   "exchangeRate": 6.72,
   "exchangeAdjustment": -0.2,
   "defaultMarkup": 0.3,
-  "categoryMarkups": [],
-  "roundUpTo": 5
+  "categoryMarkups": []
 }

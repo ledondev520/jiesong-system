@@ -65,7 +65,7 @@ const customer = {
   defaultIncoterm: "FOB",
 };
 // $ = ceil(13000 / (spot − 0.2)) snapped like the server; enough for the test
-const priceAt = (spot: number) => (spot === 6.72 ? 1995 : 4130);
+const priceAt = (spot: number) => (spot === 6.72 ? 1994 : 4130);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -99,11 +99,43 @@ const fillLine = async () => {
     target: { value: "10000" },
   });
   await waitFor(() =>
-    expect(screen.getByLabelText("第 1 行单价")).toHaveValue("1995"),
+    expect(screen.getByLabelText("第 1 行单价")).toHaveValue("1994"),
   );
 };
 const submit = () =>
   fireEvent.click(screen.getByRole("button", { name: "创建订单" }));
+
+describe("OrderEditor last confirmed price", () => {
+  it("shows 上次成交价 and pre-fills the last confirmed price; new products show no badge", async () => {
+    mocks.preview.mockImplementation(async (lines: unknown[]) => ({
+      data: {
+        spotRate: 6.72,
+        results: lines.map(() => ({
+          unitPriceUsd: 2500.5,
+          formulaPriceUsd: 1994,
+          source: "LAST_CONFIRMED",
+        })),
+      },
+    }));
+    render(<OrderEditor />);
+    await waitFor(() => expect(mocks.getStores).toHaveBeenCalled());
+    fireEvent.click(screen.getByLabelText("第 1 行搜索商品"));
+    await screen.findByRole("option", { name: "Store A" });
+    fireEvent.change(screen.getByLabelText("第 1 行采购成本"), {
+      target: { value: "10000" },
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("第 1 行单价")).toHaveValue("2500.5"),
+    );
+    expect(screen.getByText("上次成交价")).toBeInTheDocument();
+    // the owner edits the price: the badge gives way to 手动价
+    fireEvent.change(screen.getByLabelText("第 1 行单价"), {
+      target: { value: "2600" },
+    });
+    expect(screen.queryByText("上次成交价")).not.toBeInTheDocument();
+    expect(screen.getByText("手动价")).toBeInTheDocument();
+  });
+});
 
 describe("OrderEditor pricing (R1-2)", () => {
   it("changing FX and submitting immediately does not save the old formula price", async () => {
@@ -112,7 +144,7 @@ describe("OrderEditor pricing (R1-2)", () => {
     fireEvent.change(screen.getByLabelText("现汇 (¥/$) *"), {
       target: { value: "3.36" },
     });
-    // the old $1995 is no longer shown or submittable
+    // the old $1994 is no longer shown or submittable
     expect(screen.getByLabelText("第 1 行单价")).toHaveValue("");
     submit();
     expect(await screen.findByRole("alert")).toHaveTextContent(

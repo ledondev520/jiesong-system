@@ -18,7 +18,7 @@ const line = (extra: Partial<OrderLine> = {}): OrderLine => ({
   storeId: "s1",
   quantity: "10",
   costCny: "10000",
-  suggested: 1995,
+  suggested: 1994,
   manualPrice: "",
   ...extra,
 });
@@ -137,7 +137,7 @@ describe("linesFromItems", () => {
       product: { customsName: "合成商品" },
     };
     const [auto, manual, noStore] = linesFromItems([
-      { ...base, isManualPrice: false, unitPrice: 20 },
+      { ...base, isManualPrice: false, unitPrice: 22 }, // 上次确认价预填（公式价 20）
       { ...base, isManualPrice: true, unitPrice: 25.5 },
       {
         ...base,
@@ -153,7 +153,7 @@ describe("linesFromItems", () => {
       costCny: "100",
       quantity: "2",
       storeId: "s",
-      suggested: 20,
+      suggested: 22,
       productName: "合成商品",
     });
     expect(manual.manualPrice).toBe("25.5");

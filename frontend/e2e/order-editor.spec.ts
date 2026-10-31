@@ -27,11 +27,11 @@ async function mockEditor(page: Page) {
     return reply(route, url.pathname.endsWith("/stores") ? page$(stores) : page$([seapot]));
   });
   await page.route("**/api/v1/products?**", (route) => reply(route, page$([door])));
-  // Locked rule at spot 6.72 (FX used 6.52): ¥10,000 → 13,000 / 6.52 = 1993.87 → 1994 → 1995.
+  // Locked rule at spot 6.72 (FX used 6.52): ¥10,000 → 13,000 / 6.52 = 1993.87 → 1994.
   await page.route("**/api/v1/pricing/preview", (route) => {
     const { lines } = route.request().postDataJSON();
     const results = lines.map((line: { costCny: number }, index: number) => ({
-      index, status: "OK", unitPriceUsd: line.costCny === 10000 ? 1995 : 20, markup: 0.3, effectiveRate: 6.52,
+      index, status: "OK", unitPriceUsd: line.costCny === 10000 ? 1994 : 20, markup: 0.3, effectiveRate: 6.52,
     }));
     return reply(route, { results, spotRate: 6.72 });
   });
@@ -63,7 +63,7 @@ test.describe("order editor", () => {
     await page.getByLabel("第 1 行门店").selectOption("s1");
     await page.getByLabel("第 1 行数量").fill("10");
     await page.getByLabel("第 1 行采购成本").fill("10000");
-    await expect(page.getByLabel("第 1 行单价")).toHaveValue("1995");
+    await expect(page.getByLabel("第 1 行单价")).toHaveValue("1994");
     await expect(page.getByLabel("现汇 (¥/$) *")).toHaveValue("6.72");
 
     // Line 2 → Fremont with a manual price.
@@ -84,7 +84,7 @@ test.describe("order editor", () => {
     expect(key).toBeTruthy();
     expect(body).toMatchObject({ customerId: "c1", currency: "USD", incoterm: "FOB", exchangeRate: 6.72 });
     expect(body.items.map((item) => [item.storeId, item.quantity, item.costPrice, item.sellingPrice])).toEqual([
-      ["s1", 10, 10000, 1995],
+      ["s1", 10, 10000, 1994],
       ["s2", 2, 100, 30],
     ]);
   });
@@ -109,6 +109,6 @@ test.describe("order editor", () => {
     await page.getByRole("button", { name: "取消" }).click();
     await expect(page.getByLabel("第 1 行门店")).toHaveValue("s2");
     await expect(page.getByLabel("第 1 行数量")).toHaveValue("5");
-    await expect(page.getByLabel("第 1 行单价")).toHaveValue("1995");
+    await expect(page.getByLabel("第 1 行单价")).toHaveValue("1994");
   });
 });
