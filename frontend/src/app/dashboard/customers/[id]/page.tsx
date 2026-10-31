@@ -22,12 +22,24 @@ import api from "@/lib/axios";
 import { customerService } from "@/services/customer.service";
 import { storeService } from "@/services/store.service";
 import { useAuthStore } from "@/store/auth.store";
-import { Role, type ApiResponse, type Customer, type PaginatedResponse, type Store } from "@/types";
+import {
+  Role,
+  type ApiResponse,
+  type Customer,
+  type PaginatedResponse,
+  type Store,
+} from "@/types";
 import { CustomerDialog } from "../components/CustomerDialog";
 import { StoreDialog } from "../components/StoreDialog";
 
 const CUSTOMER_WRITE_ROLES: Role[] = [Role.ADMIN, Role.SALES];
-const STORE_WRITE_ROLES: Role[] = [Role.ADMIN, Role.PURCHASE, Role.SALES, Role.FINANCE, Role.WAREHOUSE];
+const STORE_WRITE_ROLES: Role[] = [
+  Role.ADMIN,
+  Role.PURCHASE,
+  Role.SALES,
+  Role.FINANCE,
+  Role.WAREHOUSE,
+];
 const STATUS_MAP = {
   ACTIVE: { label: "正常", tone: "success" },
   ARCHIVED: { label: "已停用", tone: "neutral" },
@@ -51,17 +63,19 @@ export default function CustomerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [editingCustomer, setEditingCustomer] = useState(false);
-  const [editingStore, setEditingStore] = useState<Store | null | undefined>(undefined);
+  const [editingStore, setEditingStore] = useState<Store | null | undefined>(
+    undefined,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [detail, sales] = await Promise.all([
         customerService.getById(id),
-        api.get<ApiResponse<PaginatedResponse<OrderRow>>, ApiResponse<PaginatedResponse<OrderRow>>>(
-          "/sales",
-          { params: { customerId: id, pageSize: 20, lite: true } },
-        ),
+        api.get<
+          ApiResponse<PaginatedResponse<OrderRow>>,
+          ApiResponse<PaginatedResponse<OrderRow>>
+        >("/sales", { params: { customerId: id, pageSize: 20, lite: true } }),
       ]);
       setCustomer(detail.data);
       setOrders(sales.data.items);
@@ -88,26 +102,61 @@ export default function CustomerDetailPage() {
   };
 
   if (loadError) {
-    return <ErrorState what="加载客户失败" error={loadError} onRetry={() => void load()} />;
+    return (
+      <ErrorState
+        what="加载客户失败"
+        error={loadError}
+        onRetry={() => void load()}
+      />
+    );
   }
 
   const stores = customer?.stores ?? [];
   const storeColumns: DataTableColumn<Store>[] = [
-    { key: "name", header: "门店", cell: (s) => <span className="font-medium">{s.name}</span>, sortValue: (s) => s.name, hideable: false },
+    {
+      key: "name",
+      header: "门店",
+      cell: (s) => <span className="font-medium">{s.name}</span>,
+      sortValue: (s) => s.name,
+      hideable: false,
+    },
     { key: "code", header: "简称", cell: (s) => s.code || "—" },
     { key: "legalName", header: "经营主体", cell: (s) => s.legalName || "—" },
     { key: "port", header: "目的港", cell: (s) => s.port?.name || "—" },
-    { key: "status", header: "状态", cell: (s) => <StatusBadge status={s.isActive ? "ACTIVE" : "ARCHIVED"} statusMap={STATUS_MAP} /> },
+    {
+      key: "status",
+      header: "状态",
+      cell: (s) => (
+        <StatusBadge
+          status={s.isActive ? "ACTIVE" : "ARCHIVED"}
+          statusMap={STATUS_MAP}
+        />
+      ),
+    },
   ];
   const orderColumns: DataTableColumn<OrderRow>[] = [
     {
       key: "contractNo",
       header: "订单号",
-      cell: (o) => <Link href={`/dashboard/sales/${o.id}`} className="font-medium hover:underline">{o.contractNo}</Link>,
+      cell: (o) => (
+        <Link
+          href={`/dashboard/sales/${o.id}`}
+          className="font-medium hover:underline"
+        >
+          {o.contractNo}
+        </Link>
+      ),
       hideable: false,
     },
     { key: "status", header: "状态", cell: (o) => o.status },
-    { key: "totalAmount", header: "金额 (USD)", cell: (o) => (o.totalAmount ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 }) },
+    {
+      key: "totalAmount",
+      header: "金额 (USD)",
+      cell: (o) =>
+        (o.totalAmount ?? 0).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+        }),
+    },
   ];
 
   return (
@@ -118,7 +167,11 @@ export default function CustomerDetailPage() {
         backHref="/dashboard/customers"
         actions={
           canEditCustomer && customer ? (
-            <Button variant="outline" className="h-10 rounded-xl" onClick={() => setEditingCustomer(true)}>
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl"
+              onClick={() => setEditingCustomer(true)}
+            >
               <Pencil className="mr-2 h-4 w-4" /> 编辑客户
             </Button>
           ) : undefined
@@ -128,13 +181,28 @@ export default function CustomerDetailPage() {
       {customer ? (
         <Card>
           <CardContent className="grid gap-3 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            <Info label="币种 / 贸易术语" value={`${customer.defaultCurrency} · ${customer.defaultIncoterm}`} />
+            <Info
+              label="币种 / 贸易术语"
+              value={`${customer.defaultCurrency} · ${customer.defaultIncoterm}`}
+            />
             <Info label="默认付款条件" value={customer.defaultPaymentTerms} />
             <Info label="默认装货港" value={customer.defaultPortOfLoading} />
             <Info label="联系人" value={customer.contactName} />
-            <Info label="电话 / 邮箱" value={[customer.contactPhone, customer.contactEmail].filter(Boolean).join(" · ")} />
-            <Info label="国家 / 地址" value={[customer.country, customer.address].filter(Boolean).join(" · ")} />
-            {!customer.isActive ? <Info label="状态" value="已归档（不能新增门店）" /> : null}
+            <Info
+              label="电话 / 邮箱"
+              value={[customer.contactPhone, customer.contactEmail]
+                .filter(Boolean)
+                .join(" · ")}
+            />
+            <Info
+              label="国家 / 地址"
+              value={[customer.country, customer.address]
+                .filter(Boolean)
+                .join(" · ")}
+            />
+            {!customer.isActive ? (
+              <Info label="状态" value="已归档（不能新增门店）" />
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -177,7 +245,13 @@ export default function CustomerDetailPage() {
           <CardTitle className="text-base">最近订单</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable columns={orderColumns} data={orders} rowKey={(order) => order.id} loading={loading} emptyTitle="该客户暂无订单" />
+          <DataTable
+            columns={orderColumns}
+            data={orders}
+            rowKey={(order) => order.id}
+            loading={loading}
+            emptyTitle="该客户暂无订单"
+          />
         </CardContent>
       </Card>
 
