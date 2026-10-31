@@ -73,7 +73,8 @@ export interface UnplacedLine {
   lineId: string;
   name: string;
   cartons: number;
-  reason: "oversize" | "door" | "missing-dimensions" | "no-space";
+  reason:
+    "oversize" | "door" | "missing-dimensions" | "no-space" | "compute-budget";
   cartonMm: Dims3 | null;
 }
 

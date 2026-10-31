@@ -433,7 +433,8 @@ const packContainers = (lines, spec, config = loadContainerConfig(), { budget = 
     });
   }
   for (const work of works) {
-    if (work.left > 0) unplaced.push(unplacedEntry(lineById.get(work.line.lineId), work.left, 'no-space'));
+    // Budget exhausted = the search stopped, not proof the cargo does not fit: report it distinctly (INT6-02).
+    if (work.left > 0) unplaced.push(unplacedEntry(lineById.get(work.line.lineId), work.left, ctx.budget <= 0 ? 'compute-budget' : 'no-space'));
   }
   return { containers, unplaced };
 };
