@@ -15,8 +15,7 @@ import {
   SystemPortItem,
 } from "@/services/system.service";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2, Anchor, Search, X } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { toast } from "sonner";
 import { runAwait } from "@/lib/run-await";
@@ -32,22 +31,23 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { RowActionsMenu } from "@/components/ui/row-actions-menu";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { ErrorState } from "@/components/ui/data-state";
 import { BatchActionBar } from "@/components/settings/BatchActionBar";
 import { ImportExportButtons } from "@/components/settings/ImportExportButtons";
 import * as XLSX from "xlsx";
 
+const PORT_STATUS_MAP = {
+  ACTIVE: { label: "正常", tone: "success" },
+  INACTIVE: { label: "已停用", tone: "neutral" },
+} as const;
+
 export default function PortsPage() {
   const [ports, setPorts] = useState<SystemPortItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPort, setEditingPort] = useState<SystemPortItem | null>(null);
   const [keyword, setKeyword] = useState("");
@@ -63,10 +63,11 @@ export default function PortsPage() {
       runAwait(
         () => getSystemPorts({ page: 1, pageSize: 100 }),
         (response) => {
+          setLoadError(null);
           setPorts(response.data?.items || []);
         },
-        () => {
-          toast.error("加载港口失败");
+        (error) => {
+          setLoadError(error ?? new Error("加载失败"));
         },
         () => {
           setLoading(false);
@@ -77,6 +78,7 @@ export default function PortsPage() {
 
   const loadPorts = useCallback(() => {
     setLoading(true);
+    setLoadError(null);
     return requestPorts();
   }, [requestPorts]);
 
@@ -99,17 +101,22 @@ export default function PortsPage() {
     setIsDialogOpen(true);
   };
 
+  const deactivatePort = async (id: string) => {
+    try {
+      await deleteSystemPort(id);
+      setPorts((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, isActive: false } : p)),
+      );
+      toast.success("港口已停用");
+    } catch {
+      toast.error("停用失败");
+    }
+  };
+
+  // 移动端卡片仍用浏览器确认；桌面表格走「更多」里的确认对话框
   const handleDelete = async (id: string) => {
     if (confirm("确定要停用此港口吗？")) {
-      try {
-        await deleteSystemPort(id);
-        setPorts(
-          ports.map((p) => (p.id === id ? { ...p, isActive: false } : p)),
-        );
-        toast.success("港口已停用");
-      } catch {
-        toast.error("停用失败");
-      }
+      await deactivatePort(id);
     }
   };
 
@@ -186,20 +193,37 @@ export default function PortsPage() {
     currentPage * pageSize,
   );
 
-  const toggleSelect = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedIds(next);
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === pagedPorts.length && pagedPorts.length > 0) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(pagedPorts.map((p) => p.id)));
-    }
-  };
+  const columns: DataTableColumn<SystemPortItem>[] = [
+    {
+      key: "name",
+      header: "名称",
+      cell: (port) => <span className="font-medium">{port.name}</span>,
+      sortValue: (port) => port.name,
+      hideable: false,
+    },
+    {
+      key: "code",
+      header: "代码",
+      cell: (port) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {port.code}
+        </span>
+      ),
+      sortValue: (port) => port.code,
+      hideable: false,
+    },
+    {
+      key: "status",
+      header: "状态",
+      cell: (port) => (
+        <StatusBadge
+          status={port.isActive ? "ACTIVE" : "INACTIVE"}
+          statusMap={PORT_STATUS_MAP}
+        />
+      ),
+      hideable: false,
+    },
+  ];
 
   const handleReset = () => {
     setKeyword("");
@@ -285,103 +309,35 @@ export default function PortsPage() {
         onClear={() => setSelectedIds(new Set())}
       />
 
-      <div className="hidden md:block surface-panel overflow-hidden">
-        {loading ? (
-          <div className="py-12 text-center text-muted-foreground">
-            加载中...
-          </div>
-        ) : pagedPorts.length === 0 ? (
-          <div className="py-16">
-            <EmptyState
-              icon={<Anchor className="h-8 w-8" />}
-              title={keyword ? "没有符合条件的港口" : "暂无港口数据"}
-              description="还没有添加任何港口，点击下方的按钮开始创建"
-              action={{
-                label: "新增港口",
-                onClick: () => setIsDialogOpen(true),
-              }}
+      <div className="hidden md:block">
+        <DataTable
+          columns={columns}
+          data={pagedPorts}
+          rowKey={(port) => port.id}
+          loading={loading}
+          error={loadError}
+          errorWhat="加载港口失败"
+          onRetry={() => void loadPorts()}
+          emptyTitle={keyword ? "没有符合条件的港口" : "暂无港口数据"}
+          emptyDescription={
+            keyword ? undefined : "还没有添加任何港口，点击下方的按钮开始创建"
+          }
+          emptyAction={
+            keyword ? undefined : (
+              <Button onClick={handleCreate}>新增港口</Button>
+            )
+          }
+          selection={{ selectedIds, onChange: setSelectedIds }}
+          renderActions={(port) => (
+            <RowActionsMenu
+              onEdit={() => handleEdit(port)}
+              onDelete={() => deactivatePort(port.id)}
+              deleteLabel="停用"
+              confirmTitle={`停用港口「${port.name}」？`}
+              confirmDescription="停用后该港口不再出现在选择列表中，已有单据不受影响。"
             />
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={
-                      pagedPorts.length > 0 &&
-                      selectedIds.size === pagedPorts.length
-                    }
-                    onCheckedChange={toggleSelectAll}
-                  />
-                </TableHead>
-                <TableHead className="w-12 text-muted-foreground">#</TableHead>
-                <TableHead className="text-muted-foreground">名称</TableHead>
-                <TableHead className="text-muted-foreground">代码</TableHead>
-                <TableHead className="text-muted-foreground">状态</TableHead>
-                <TableHead className="w-[100px] text-muted-foreground">
-                  操作
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pagedPorts.map((port, index) => (
-                <TableRow
-                  key={port.id}
-                  className="group transition-colors hover:bg-muted/40"
-                >
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedIds.has(port.id)}
-                      onCheckedChange={() => toggleSelect(port.id)}
-                    />
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {(currentPage - 1) * pageSize + index + 1}
-                  </TableCell>
-                  <TableCell className="font-medium">{port.name}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {port.code}
-                  </TableCell>
-                  <TableCell>
-                    {port.isActive ? (
-                      <Badge
-                        variant="outline"
-                        className="border-primary/20 bg-primary/5 text-primary text-[11px]"
-                      >
-                        正常
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive" className="text-[11px]">
-                        已停用
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEdit(port)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => handleDelete(port.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+          )}
+        />
       </div>
 
       {/* 移动端卡片视图 */}
@@ -392,6 +348,12 @@ export default function PortsPage() {
               加载中...
             </CardContent>
           </Card>
+        ) : loadError ? (
+          <ErrorState
+            what="加载港口失败"
+            error={loadError}
+            onRetry={() => void loadPorts()}
+          />
         ) : pagedPorts.length === 0 ? (
           <Card className="border-dashed border-border/70">
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -447,37 +409,39 @@ export default function PortsPage() {
       </div>
 
       {/* 分页控制 */}
-      <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>
-          共 {filteredPorts.length} 条
-          {totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ""}
-        </span>
-        <div className="flex flex-wrap items-center gap-2">
-          <PageSizeSelect
-            value={pageSize}
-            onChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-            }}
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            上一页
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages || totalPages <= 1}
-          >
-            下一页
-          </Button>
+      {!loading && !loadError ? (
+        <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            共 {filteredPorts.length} 条
+            {totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ""}
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <PageSizeSelect
+              value={pageSize}
+              onChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              上一页
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages <= 1}
+            >
+              下一页
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[480px]">
