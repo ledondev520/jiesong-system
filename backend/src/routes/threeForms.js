@@ -24,7 +24,6 @@ router.post('/preview', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREH
   const readiness = await threeFormsService.previewThreeForms({
     salesContractId: req.body?.salesContractId,
     items: req.body?.items || [],
-    profitRate: req.body?.profitRate,
   });
   success(res, readiness);
 }));

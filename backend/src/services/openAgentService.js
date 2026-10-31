@@ -7,6 +7,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { currentRates } = require('./exportPricing');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
 const financeService = require('./financeService');
@@ -1519,7 +1520,7 @@ const READ_TOOL_SPECS = [
     domain: 'system',
     access: 'read',
     confirmationRequired: false,
-    description: '读取系统配置（如汇率 exchangeRate、利润率 profitRate 等）',
+    description: '读取系统配置（汇率 exchangeRate、利润率 profitRate 取自报价配置）',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1530,6 +1531,13 @@ const READ_TOOL_SPECS = [
     isReadOnly: true,
     isConcurrencySafe: true,
     async call(input) {
+      // 汇率/加价：只读唯一报价配置（遗留 SystemConfig 行不再作为来源）
+      if (PRICING_CONFIG_KEYS.includes(input.key)) {
+        const rates = currentRates();
+        return toJson({ key: input.key, value: input.key === 'exchangeRate'
+          ? { rate: rates.spotRate, buffer: -rates.adjustment, effectiveRate: rates.effectiveRate }
+          : 1 + rates.defaultMarkup, note: '来自报价配置' });
+      }
       const row = await prisma.systemConfig.findUnique({ where: { key: input.key } });
       if (!row) return toJson({ error: `配置项 ${input.key} 不存在` });
       try {
@@ -1649,11 +1657,11 @@ const WRITE_TOOL_SPECS = [
     access: 'write',
     confirmationRequired: true,
     allowedRoles: [ROLES.ADMIN],
-    description: '修改系统配置（需用户确认后执行）。常用配置键：exchangeRate（汇率，值为 JSON {rate, buffer}）、profitRate（利润率）。',
+    description: '修改普通系统配置（需用户确认后执行）。汇率、加价等报价参数不可通过本工具修改，由「报价配置」统一维护。',
     inputSchema: {
       type: 'object',
       properties: {
-        key: { type: 'string', description: '配置键名，如 exchangeRate / profitRate' },
+        key: { type: 'string', description: '配置键名（不含报价参数 exchangeRate / profitRate）' },
         value: { type: 'string', description: '新值（字符串或 JSON 字符串）' },
         note: { type: 'string', description: '变更说明' },
       },
@@ -1661,21 +1669,10 @@ const WRITE_TOOL_SPECS = [
     },
     isReadOnly: false,
     async call(input, { userId, collectedIds }) {
+      if (PRICING_CONFIG_KEYS.includes(input.key)) return toJson({ error: PRICING_CONFIG_REFUSAL });
       const existing = await prisma.systemConfig.findUnique({ where: { key: input.key } });
       const oldDisplay = existing ? existing.value : '（不存在）';
-
-      let displayValue = input.value;
-      if (input.key === 'exchangeRate') {
-        const numVal = Number(input.value);
-        if (Number.isFinite(numVal) && numVal > 0) {
-          let buffer = 0.2;
-          if (existing) {
-            try { buffer = JSON.parse(existing.value).buffer || 0.2; } catch { /* keep default */ }
-          }
-          const assembled = { rate: numVal, buffer, effectiveRate: numVal - buffer };
-          displayValue = JSON.stringify(assembled);
-        }
-      }
+      const displayValue = input.value;
 
       return createPendingAction(userId, 'UpdateSystemConfig', {
         key: input.key,
@@ -2192,6 +2189,10 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
 
 // ── 执行已确认的 pendingAction ──────────────────────────
 
+// 汇率/加价只由报价配置（config/pricing.json，ADMIN 在「系统配置 > 报价配置」修改）维护；助手不能读写这两个遗留 SystemConfig 键。
+const PRICING_CONFIG_KEYS = ['exchangeRate', 'profitRate'];
+const PRICING_CONFIG_REFUSAL = '汇率和加价由报价配置统一维护，助手不能修改，请在「系统配置 > 报价配置」中调整';
+
 const ACTION_EXECUTORS = {
   /**
    * 职责：执行收款分配
@@ -2230,6 +2231,8 @@ const ACTION_EXECUTORS = {
    * 职责：更新系统配置
    */
   async UpdateSystemConfig(params, userId) {
+    // 即使存在旧的待确认动作，也不得在执行时写入报价参数
+    if (PRICING_CONFIG_KEYS.includes(params.key)) throw new Error(PRICING_CONFIG_REFUSAL);
     await prisma.systemConfig.upsert({
       where: { key: params.key },
       update: { value: params.value, note: params.note },
@@ -2914,6 +2917,7 @@ module.exports = {
   resolveSystemPrompt,
   inferRoutePlan,
   listToolRegistry,
+  buildToolPool,
   buildWriteToolPool,
   buildToolRegistryPayload,
   buildSalesContractFlowDiagnostic,

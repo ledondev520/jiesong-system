@@ -6,7 +6,20 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const https = require('node:https');
+
+// 汇率/加价只来自唯一报价配置：测试使用私有临时文件，绝不读写仓库里的 config/pricing.json。
+const pricingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'config-controller-pricing-'));
+const pricingFile = path.join(pricingDir, 'pricing.json');
+const writePricing = (overrides = {}) => fs.writeFileSync(pricingFile, JSON.stringify({
+  exchangeRate: 7.1, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5, ...overrides,
+}), { mode: 0o600 });
+process.env.JIESONG_PRICING_CONFIG = pricingFile;
+writePricing();
+test.after(() => fs.rmSync(pricingDir, { recursive: true, force: true }));
 const prisma = require('../../utils/prisma');
 const configController = require('./configController');
 
@@ -26,7 +39,8 @@ const createMockRes = () => {
 test('getConfigs: JSON 配置解析为对象，非 JSON 保留原字符串', async () => {
   const originalFindMany = prisma.systemConfig.findMany;
   prisma.systemConfig.findMany = async () => ([
-    { key: 'exchangeRate', value: '{"rate":6.8,"buffer":0.2}' },
+    { key: 'exchangeRate', value: '{"rate":6.8,"buffer":0.2}' }, // 旧遗留行：不再对外返回
+    { key: 'profitRate', value: '1.3' },
     { key: 'plainText', value: 'raw-value' },
   ]);
 
@@ -41,7 +55,8 @@ test('getConfigs: JSON 配置解析为对象，非 JSON 保留原字符串', asy
 
     assert.equal(capturedError, null);
     assert.equal(res.payload.code, 200);
-    assert.deepEqual(res.payload.data.exchangeRate, { rate: 6.8, buffer: 0.2 });
+    assert.equal(Object.hasOwn(res.payload.data, 'exchangeRate'), false);
+    assert.equal(Object.hasOwn(res.payload.data, 'profitRate'), false);
     assert.equal(res.payload.data.plainText, 'raw-value');
   } finally {
     prisma.systemConfig.findMany = originalFindMany;
@@ -128,8 +143,8 @@ test('updateConfig: upsert 时会 JSON.stringify(value)', async () => {
 
   try {
     const req = {
-      params: { key: 'exchangeRate' },
-      body: { value: { rate: 7.0, buffer: 0.1 }, note: '汇率' },
+      params: { key: 'stampPlatformUrl' },
+      body: { value: { rate: 7.0, buffer: 0.1 }, note: '链接' },
     };
     const res = createMockRes();
     let capturedError = null;
@@ -139,9 +154,26 @@ test('updateConfig: upsert 时会 JSON.stringify(value)', async () => {
     });
 
     assert.equal(capturedError, null);
-    assert.equal(upsertArgs.where.key, 'exchangeRate');
+    assert.equal(upsertArgs.where.key, 'stampPlatformUrl');
     assert.equal(upsertArgs.update.value, JSON.stringify({ rate: 7.0, buffer: 0.1 }));
     assert.equal(res.payload.message, '配置更新成功');
+  } finally {
+    prisma.systemConfig.upsert = originalUpsert;
+  }
+});
+
+test('updateConfig: exchangeRate / profitRate 不能经普通 SystemConfig 写入（只经报价配置）', async () => {
+  const originalUpsert = prisma.systemConfig.upsert;
+  let upserts = 0;
+  prisma.systemConfig.upsert = async () => { upserts += 1; return {}; };
+  try {
+    for (const key of ['exchangeRate', 'profitRate']) {
+      let captured = null;
+      await configController.updateConfig({ params: { key }, body: { value: 7 } }, createMockRes(), (error) => { captured = error; });
+      assert.equal(captured?.statusCode, 400, key);
+      assert.match(captured.message, /报价配置/);
+    }
+    assert.equal(upserts, 0);
   } finally {
     prisma.systemConfig.upsert = originalUpsert;
   }
@@ -177,37 +209,26 @@ test('updateConfig: 敏感配置写入后响应不回传完整密钥', async () 
   }
 });
 
-test('getExchangeRate: 配置缺失时返回默认值', async () => {
+test('getExchangeRate: 汇率来自唯一报价配置（现汇、调整、报价汇率），不查 SystemConfig', async () => {
   const originalFindUnique = prisma.systemConfig.findUnique;
-  prisma.systemConfig.findUnique = async () => null;
-
+  prisma.systemConfig.findUnique = async () => { throw new Error('SystemConfig must not be read for pricing'); };
+  writePricing({ exchangeRate: 6.72, exchangeAdjustment: -0.2 });
   try {
-    const req = {};
     const res = createMockRes();
     let capturedError = null;
-
-    await configController.getExchangeRate(req, res, (error) => {
-      capturedError = error;
-    });
-
+    await configController.getExchangeRate({}, res, (error) => { capturedError = error; });
     assert.equal(capturedError, null);
-    assert.deepEqual(res.payload.data, {
-      rate: 6.8,
-      buffer: 0.2,
-      effectiveRate: 6.6,
-    });
+    assert.deepEqual(res.payload.data, { rate: 6.72, buffer: 0.2, effectiveRate: 6.52 });
   } finally {
     prisma.systemConfig.findUnique = originalFindUnique;
+    writePricing();
   }
 });
 
 test('syncExchangeRate: 外部同步失败时快速降级返回当前汇率', async () => {
   const originalFindUnique = prisma.systemConfig.findUnique;
   const originalHttpsGet = https.get;
-  prisma.systemConfig.findUnique = async () => ({
-    key: 'exchangeRate',
-    value: '{"rate":7.1,"buffer":0.2}',
-  });
+  writePricing({ exchangeRate: 7.1 });
 
   https.get = () => {
     const request = {
@@ -237,7 +258,7 @@ test('syncExchangeRate: 外部同步失败时快速降级返回当前汇率', as
     assert.equal(capturedError, null);
     assert.equal(res.payload.code, 200);
     assert.equal(res.payload.data.rate, 7.1);
-    assert.equal(res.payload.data.effectiveRate, 6.8999999999999995);
+    assert.equal(res.payload.data.effectiveRate, 6.9);
     assert.equal(res.payload.data.source, 'cached');
     assert.equal(res.payload.data.syncStatus, 'degraded');
     assert.match(res.payload.message, /汇率同步暂不可用/);
@@ -278,20 +299,12 @@ test('fetchUsdCnyRate: 总超时覆盖尚未建立 socket 的连接阶段', asyn
   }
 });
 
-test('syncExchangeRate: 外部同步成功时写入当前 schema 支持的配置字段', async () => {
-  const originalFindUnique = prisma.systemConfig.findUnique;
+test('syncExchangeRate: 外部同步成功时只替换报价配置的 exchangeRate，其余字段与 SystemConfig 不变', async () => {
   const originalUpsert = prisma.systemConfig.upsert;
   const originalHttpsGet = https.get;
-  let upsertArgs = null;
-
-  prisma.systemConfig.findUnique = async () => ({
-    key: 'exchangeRate',
-    value: '{"rate":7.1,"buffer":0.3}',
-  });
-  prisma.systemConfig.upsert = async (args) => {
-    upsertArgs = args;
-    return { key: args.where.key, value: args.update.value };
-  };
+  let upserts = 0;
+  writePricing({ exchangeRate: 7.1, exchangeAdjustment: -0.3, defaultMarkup: 0.35 });
+  prisma.systemConfig.upsert = async () => { upserts += 1; return {}; };
 
   https.get = (url, callback) => {
     const response = {
@@ -315,7 +328,7 @@ test('syncExchangeRate: 外部同步成功时写入当前 schema 支持的配置
   };
 
   try {
-    const req = {};
+    const req = { user: { id: 'actor-1' } };
     const res = createMockRes();
     let capturedError = null;
 
@@ -327,12 +340,12 @@ test('syncExchangeRate: 外部同步成功时写入当前 schema 支持的配置
     assert.equal(res.payload.code, 200);
     assert.equal(res.payload.data.rate, 7.23);
     assert.equal(res.payload.data.buffer, 0.3);
-    assert.equal(upsertArgs.where.key, 'exchangeRate');
-    assert.deepEqual(Object.keys(upsertArgs.create).sort(), ['key', 'note', 'value']);
-    assert.match(upsertArgs.update.note, /汇率自动同步/);
+    assert.equal(upserts, 0);
+    const saved = JSON.parse(fs.readFileSync(pricingFile, 'utf8'));
+    assert.deepEqual(saved, { exchangeRate: 7.23, exchangeAdjustment: -0.3, defaultMarkup: 0.35, categoryMarkups: [], roundUpTo: 5 });
   } finally {
-    prisma.systemConfig.findUnique = originalFindUnique;
     prisma.systemConfig.upsert = originalUpsert;
     https.get = originalHttpsGet;
+    writePricing();
   }
 });

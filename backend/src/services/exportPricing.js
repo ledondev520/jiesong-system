@@ -68,6 +68,18 @@ const priceFor = ({ costCny, categoryIds = [], spotRate } = {}, config = loadPri
   };
 };
 
+/** 唯一配置的当前汇率/加价快照；各消费方（AI、巡检、系统汇率接口）只从这里读，不再读 SystemConfig 的 exchangeRate/profitRate。 */
+const currentRates = (config = loadPricingConfig()) => ({
+  spotRate: config.exchangeRate,
+  adjustment: config.exchangeAdjustment,
+  effectiveRate: effectiveRateFor(config.exchangeRate, config),
+  defaultMarkup: config.defaultMarkup,
+  roundUpTo: config.roundUpTo,
+});
+
+/** 新建订单未显式给汇率时的默认现汇：只取唯一报价配置，不再有 7.0/7.2 等代码内默认。 */
+const defaultSpotRate = (config = loadPricingConfig()) => config.exchangeRate;
+
 const historicalQuoteAllowed = ({ unitPriceUsd, quantity, effectiveRate, costCny, categoryIds }, config = loadPricingConfig()) => {
   const markup = realizedMarkup(unitPriceUsd, quantity, effectiveRate, costCny);
   if (markup === null) return { allowed: false, markup };
@@ -75,5 +87,5 @@ const historicalQuoteAllowed = ({ unitPriceUsd, quantity, effectiveRate, costCny
 };
 
 module.exports = {
-  PRICE_TOLERANCE, effectiveRateFor, historicalQuoteAllowed, markupFor, priceFor, realizedMarkup, round, roundUp,
+  PRICE_TOLERANCE, currentRates, defaultSpotRate, effectiveRateFor, historicalQuoteAllowed, markupFor, priceFor, realizedMarkup, round, roundUp,
 };
