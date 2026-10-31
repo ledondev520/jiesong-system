@@ -165,21 +165,22 @@ describe("navigation.config helpers", () => {
         "/dashboard/finance/statements",
       ),
     ).toBe(true);
+    // 财务页签各自精确激活：应收/应付/银行流水/发票/对账互不串扰
+    for (const tab of [
+      "/dashboard/finance/receivable",
+      "/dashboard/finance/payable",
+      "/dashboard/finance/bank-flow",
+      "/dashboard/finance/invoices",
+      "/dashboard/finance/reconciliation",
+    ]) {
+      expect(isTabRouteActive(tab, tab)).toBe(true);
+      expect(isTabRouteActive(`${tab}/x`, tab)).toBe(true);
+      expect(isTabRouteActive(tab, "/dashboard/finance")).toBe(false);
+      expect(isTabRouteActive(tab, "/dashboard/finance/statements")).toBe(false);
+    }
     expect(
-      isTabRouteActive("/dashboard/finance/statements", "/dashboard/payments"),
+      isTabRouteActive("/dashboard/finance/payable", "/dashboard/finance/receivable"),
     ).toBe(false);
-    expect(
-      isTabRouteActive("/dashboard/finance/receivable", "/dashboard/payments"),
-    ).toBe(true);
-    expect(
-      isTabRouteActive("/dashboard/finance/bank-flow", "/dashboard/payments"),
-    ).toBe(true);
-    expect(
-      isTabRouteActive(
-        "/dashboard/finance/reconciliation",
-        "/dashboard/payments",
-      ),
-    ).toBe(true);
   });
 
   it("报关单与出口退税互不串扰", () => {

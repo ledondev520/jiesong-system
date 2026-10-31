@@ -1,13 +1,10 @@
 /**
- * Input: 旧应收账款路由请求
- * Output: 重定向到收付管理应收视图
- * Pos: 财务模块旧独立页兼容入口，避免财务顶层 Tab 重新膨胀
- *
- * Note: 财务顶层 Interface 只保留概览、报表、收付管理。
+ * Input: 无
+ * Output: 财务 > 应收：出口订单的未收余额
+ * Pos: 取代旧的到收付管理的重定向；待分配收款、对账仍在收付管理页
  */
-
-import { redirect } from 'next/navigation';
+import { ContractBalanceList } from "../components/ContractBalanceList";
 
 export default function ReceivablePage() {
-  redirect('/dashboard/payments?tab=receivable');
+  return <ContractBalanceList kind="receivable" />;
 }
