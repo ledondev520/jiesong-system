@@ -180,3 +180,7 @@ operator to confirm no writer is active before removing it.
 
 - 采购 Excel 导入 `/api/v1/purchases/import` 在原认证/角色鉴权后使用 `backend/src/utils/purchaseExcelUpload.js` 的 memoryStorage，仅允许 .xlsx/.xls，沿用 config.upload.maxSize；`purchaseImportExportController.js` 只传文件名标签/Buffer，`purchaseImportExportService.js` 在解析/数据库访问前拒绝路径，仅解析内存字节，不留存 Confidential 原始工作簿于普通附件存储。
 - `backend/src/middleware/errorHandler.js` 将无 statusCode 的 Busboy 请求解析错误按精确消息白名单（七条消息及 `Unsupported content type: ` 前缀）返回中文400，含 NUL 的畸形 multipart 因此不再返回500。显式状态、Multer处理及原始错误日志保持，畸形上传解析错误即使开发环境也不返回英文堆栈，未知内部错误仍500；回归见 `backend/src/routes/purchases.import-upload.test.js` 和 `backend/src/middleware/errorHandler.test.js`。
+
+## Customer / order terms (Migration A)
+
+Migration A (customers, stores.customerId/code/legalName, sales_contracts customer and order terms) is additive and nullable; `backend/scripts/backfill-default-customer.js` links NULL rows to one customer (dry-run default; --confirm needs --backup-dir and --receipt, reuses `financial-sqlite-safety.js`, 0600 receipt, counts-only output, never reads .env, never rewrites old order terms). Customer contact data is Confidential. Production run only after owner approval and a prior `npm run db:backup` snapshot; see `docs/redesign/DATA-MODEL-2026.md` §2.

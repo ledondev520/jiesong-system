@@ -94,7 +94,8 @@
         "historical procurement templates and their store/purchase details",
         "supplier pricing and margins",
         "financial summary reports, cash-flow statements, account balances, general-ledger entries, payroll, social-security, and tax-return structured rows",
-        "inventory and shipment operational history"
+        "inventory and shipment operational history",
+        "customer master data (Customer name, legal name, address, contacts) and order-level customer terms (incoterm, payment terms, port of loading)"
       ],
       "controls": {
         "storage": [
