@@ -155,7 +155,7 @@ test("PURCHASE mounted dashboard reads literal KPIs and historical risks then op
     })
     .click();
   expect((await detail).status()).toBe(200);
-  await expect(page).toHaveURL(`/dashboard/purchase/${fixture.purchaseId}`);
+  await expect(page).toHaveURL(`/dashboard/purchases/${fixture.purchaseId}`);
   await expect(
     page.getByRole("heading", { name: task.purchaseNo, exact: true }),
   ).toBeVisible();

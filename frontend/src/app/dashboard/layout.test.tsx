@@ -73,6 +73,10 @@ vi.mock("next/navigation", () => ({
   usePathname: () => mocks.getPathname(),
 }));
 
+vi.mock("@/components/ai/LazyAIAssistantMount", () => ({
+  LazyAIAssistantMount: () => <div>AiPanelMock</div>,
+}));
+
 vi.mock("@/components/layout/Sidebar", () => ({
   Sidebar: () => <div>SidebarMock</div>,
 }));

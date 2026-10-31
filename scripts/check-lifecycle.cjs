@@ -443,8 +443,8 @@ function check(root = ROOT, { baselineRoutes } = {}) {
       !list.keywordKey ||
       !list.pageKey ||
       !list.pageSizeKey ||
-      !list.tabKey ||
-      !list.tab
+      // tabKey and tab are optional (lists without tabs) but must come as a pair.
+      Boolean(list.tabKey) !== Boolean(list.tab)
     )
       fail(
         `${REGISTRY}: ${list.id} needs a list lifecycle test and URL fields; copy ${TEMPLATE}`,

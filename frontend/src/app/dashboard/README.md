@@ -10,11 +10,11 @@
 
 导航本身不授予API权限，后端仍逐请求校验用户状态、角色和会话版本。安全协议及回滚见 `docs/security/browser-sessions.md`。
 
-出口退税内嵌报关列表同步搜索/状态时保留 `view=customs` 及父页面参数；初次挂载不重写相同URL，避免报关页签自动跳回工作台。回归见 `app/customs-declarations/components/CustomsDeclarationListPageContent.test.tsx`。
+出口退税内嵌报关列表同步搜索/状态时保留 `view=customs` 及父页面参数；初次挂载不重写相同URL，避免报关页签自动跳回工作台。回归见 `app/dashboard/customs/components/CustomsDeclarationListPageContent.test.tsx`。
 
 报关单列表按后端总数翻页并支持20/50/100条；搜索、状态及每页条数变化回到第1页，缓存按页隔离，汇总明确为本页口径。
 
-报关手工维护共用 `../customs-declarations/components/CustomsDeclarationForm.tsx`，按真实出口合同与商品档案保存；详情显示申报/出口日期、申报数量及商品明细，编辑保留明细 ID、装箱来源与税率关联。列表搜索报关单号或报关行。
+报关手工维护共用 `customs/components/CustomsDeclarationForm.tsx`，按真实出口合同与商品档案保存；详情显示申报/出口日期、申报数量及商品明细，编辑保留明细 ID、装箱来源与税率关联。列表搜索报关单号或报关行。
 
 报关路由测试覆盖真实合同/商品选择、新建失败提示、已有日期与明细回填、保留明细ID更新和详情跳转；与共享表单测试共同校验写入契约。详情明确返回通过允许列表校验的根相对 `returnTo` 恢复来源关键词/状态/普通参数与片段，缺失或非法目标保持报关页签回退；旧列表路径规范到现有页签，旧重定向及编辑流程不变。
 

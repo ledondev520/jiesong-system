@@ -18,6 +18,7 @@ import { Bot, Ship } from "lucide-react";
 import { Role } from "@/types";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
+import { useAiPanelStore } from "@/store/ai-panel.store";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { HeaderContextPills } from "./HeaderContextPills";
@@ -37,6 +38,8 @@ export function Header() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const updateProfile = useAuthStore((state) => state.updateProfile);
+  const aiOpen = useAiPanelStore((state) => state.open);
+  const toggleAiPanel = useAiPanelStore((state) => state.toggle);
   const todayLabel = useSyncExternalStore(
     subscribeNoop,
     () => headerDateFormatter.format(new Date()),
@@ -96,18 +99,17 @@ export function Header() {
       <div className="flex shrink-0 items-center gap-1 md:gap-2">
         <ThemeToggle />
         <HeaderNotifications />
-        {/* AI 助手入口：BOSS 无权限；侧栏面板上线后改为切换面板 */}
+        {/* AI 助手面板开关（Ctrl/⌘+J）：BOSS 无权限 */}
         {user?.role !== Role.BOSS && (
           <Button
-            asChild
-            variant="ghost"
+            variant={aiOpen ? "secondary" : "ghost"}
             size="icon"
-            className="hidden md:inline-flex"
+            onClick={toggleAiPanel}
             aria-label="AI 助手"
+            aria-pressed={aiOpen}
+            title="AI 助手 (Ctrl/⌘+J)"
           >
-            <Link href="/dashboard/ai">
-              <Bot className="h-4 w-4" />
-            </Link>
+            <Bot className="h-4 w-4" />
           </Button>
         )}
         {/* 用户菜单：桌面端保留，移动端通过底部TabBar"更多"入口访问 */}

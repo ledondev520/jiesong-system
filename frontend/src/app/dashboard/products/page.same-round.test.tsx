@@ -40,7 +40,6 @@ vi.mock("sonner", () => ({
   },
 }));
 vi.mock("./components/ProductDialog", () => ({ ProductDialog: () => null }));
-vi.mock("./components/InventoryTab", () => ({ InventoryTab: () => null }));
 
 function defer<T>() {
   let resolve!: (value: T) => void;

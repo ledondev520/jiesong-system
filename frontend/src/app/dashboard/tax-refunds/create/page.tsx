@@ -36,7 +36,7 @@ export default function CreateTaxRefundPage() {
       <PageHeader
         title="新建退税单"
         description="录入退税批次主键、金额与申报时间。"
-        backHref="/dashboard/tax-refunds"
+        backHref="/dashboard/customs"
       />
       <TaxRefundForm submitLabel="保存并查看详情" onSubmit={handleSubmit} />
     </div>
