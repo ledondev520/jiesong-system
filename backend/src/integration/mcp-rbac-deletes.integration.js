@@ -33,6 +33,7 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     const user = await db.user.create({ data: { username: `synthetic-mcp-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role, isActive: true } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id, role: 'ADMIN' }, config.jwt.secret) };
   }
+  const product = await db.product.create({ data: { customsName: 'SYNTHETIC MCP WIDGET', unit: '件' } });
   const app = require('../app');
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -76,6 +77,16 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     await db.invoiceRecord.create({ data: { batchId: batch.id, seller: 's', invDate: '2026-01-01', amount: 1, tax: 0, total: 1, status: '正常', isPositive: '是', matchedContractId: matched.id, matchedContractType: 'PURCHASE' } });
     const received = await make({});
     await db.purchaseReceipt.create({ data: { purchaseContractId: received.id, requestId: 'synthetic-r', requestHash: 'synthetic-h', arrivedAt: new Date(), createdById: users.PURCHASE.id } });
+    const banked = await make({});
+    const bankBatch = await db.financeDataBatch.create({ data: { type: 'BANK_FLOW', fileName: 'synthetic-bank.csv', recordCount: 1 } });
+    await db.bankTransaction.create({ data: { batchId: bankBatch.id, txnTime: '2026-01-01 10:00:00', txnDate: '2026-01-01', amount: -1, direction: 'OUT', matchedContractId: banked.id, matchedContractType: 'PURCHASE' } });
+    const packed = await make({});
+    const packedItem = await db.purchaseItem.create({ data: { purchaseContractId: packed.id, productId: product.id, quantity: 1, unitPrice: 1, totalPrice: 1 } });
+    const sale = await db.salesContract.create({ data: { contractNo: 'MCP-SALE-1', exchangeRate: 7 } });
+    const packing = await db.packingItem.create({ data: { salesContractId: sale.id, productId: product.id, quantity: 1, purchaseItemId: packedItem.id } });
+    for (const c of [banked, packed]) assert.equal((await send('DELETE', `/purchases/${c.id}`, 'ADMIN')).status, 409);
+    assert.equal((await db.packingItem.findUnique({ where: { id: packing.id } })).purchaseItemId, packedItem.id);
+    assert.equal(await db.bankTransaction.count({ where: { matchedContractId: banked.id } }), 1);
     for (const c of [paid, invoiced, matched]) {
       assert.equal((await send('DELETE', `/purchases/${c.id}`, 'PURCHASE')).status, 409);
       assert.ok(await db.purchaseContract.findUnique({ where: { id: c.id } }));
@@ -97,6 +108,25 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     assert.equal((await send('DELETE', `/suppliers/${unused.id}`, 'PURCHASE')).status, 200);
     assert.equal((await db.supplier.findUnique({ where: { id: unused.id } })).isActive, false);
     assert.equal((await send('DELETE', '/suppliers/does-not-exist', 'ADMIN')).status, 404);
+
+    // isActive changes (archive/restore) cannot bypass the DELETE role limit via PUT or MCP; other fields stay open.
+    const target = await db.supplier.create({ data: { name: 'Synthetic active-toggle supplier' } });
+    for (const role of ['SALES', 'FINANCE', 'WAREHOUSE']) {
+      assert.equal((await send('PUT', `/suppliers/${target.id}`, role, { isActive: false })).status, 403, role);
+      assert.equal((await send('PUT', `/suppliers/${target.id}`, role, { note: 'x', shortName: `s-${role}` })).status, 200, role);
+    }
+    assert.equal((await db.supplier.findUnique({ where: { id: target.id } })).isActive, true);
+    const viaMcp = await mcp('SALES', 'update_supplier', { id: target.id, isActive: false });
+    assert.notEqual(viaMcp.status, 200);
+    assert.equal((await db.supplier.findUnique({ where: { id: target.id } })).isActive, true);
+    const okMcp = await mcp('SALES', 'update_supplier', { id: target.id, shortName: 'via-mcp' });
+    assert.equal(okMcp.status, 200);
+    const upd = await db.operationLog.findFirst({ where: { entity: 'Supplier', action: 'UPDATE', userId: users.SALES.id, entityId: target.id }, orderBy: { createdAt: 'desc' } });
+    assert.ok(upd && upd.oldValue, 'MCP update records oldValue');
+    assert.equal((await mcp('PURCHASE', 'update_supplier', { id: target.id, isActive: false })).status, 200);
+    assert.equal((await db.supplier.findUnique({ where: { id: target.id } })).isActive, false);
+    assert.equal((await send('PUT', `/suppliers/${target.id}`, 'PURCHASE', { isActive: true })).status, 403);
+    assert.equal((await send('PUT', `/suppliers/${target.id}`, 'ADMIN', { isActive: true })).status, 200);
 
     // Cancelled contracts are not references; any non-cancelled one still blocks.
     const cancelledOnly = await db.supplier.create({ data: { name: 'Synthetic cancelled-only supplier' } });

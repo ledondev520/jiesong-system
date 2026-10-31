@@ -279,6 +279,10 @@ export default function SuppliersPage() {
   ).length;
   const issueCount = liveSuppliers.length - normalCount;
   const isAdmin = useAuthStore((state) => state.user?.role === "ADMIN");
+  // Archive (DELETE /suppliers/:id) is ADMIN/PURCHASE only on the server.
+  const canArchive = useAuthStore((state) =>
+    ["ADMIN", "PURCHASE"].includes(state.user?.role ?? ""),
+  );
   const hasActiveFilters = keyword.trim() || statusFilter !== "all";
 
   const resetFilters = () => {
@@ -618,22 +622,24 @@ export default function SuppliersPage() {
                   </Button>
                 </BusinessWrite>
               )}
-              <BusinessWrite>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
-                  disabled={
-                    !activeSupplier ||
-                    activeSupplier.isActive === false ||
-                    saving
-                  }
-                  onClick={handleDeleteActive}
-                >
-                  <Trash2 className="mr-1.5 h-4 w-4" />
-                  归档当前
-                </Button>
-              </BusinessWrite>
+              {canArchive && (
+                <BusinessWrite>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
+                    disabled={
+                      !activeSupplier ||
+                      activeSupplier.isActive === false ||
+                      saving
+                    }
+                    onClick={handleDeleteActive}
+                  >
+                    <Trash2 className="mr-1.5 h-4 w-4" />
+                    归档当前
+                  </Button>
+                </BusinessWrite>
+              )}
             </div>
           </div>
 

@@ -9,8 +9,9 @@ const { authenticate } = require('../middleware/auth');
 const { hasCapabilities, parseCapability } = require('../middleware/roleAuth');
 const { searchEntities } = require('../agent/commands/query');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
-const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
+const { createSupplier, updateSupplier, assertActiveChangeAllowed } = require('../agent/commands/supplier');
 const { createMcpServer } = require('../agent/mcp/server');
+const prisma = require('../utils/prisma');
 const { logOperation } = require('../utils/auditLog');
 
 const router = Router();
@@ -44,17 +45,23 @@ const actorOf = (req) => (req.authActor?.actorType === 'AGENT'
   : { actorType: 'USER', userId: req.user?.id || null });
 
 const createLocalClient = (req) => {
-  const audited = (entity, action, run) => async (...args) => {
+  // loadBefore (updates only) captures oldValue so MCP audit rows carry the same diff as REST withAuditLog.
+  const audited = (entity, action, run, loadBefore) => async (...args) => {
+    const oldValue = loadBefore ? await loadBefore(...args) : null;
     const result = await run(...args);
-    await logOperation({ ...actorOf(req), action, entity, entityId: result?.id || null, newValue: result, req });
+    await logOperation({ ...actorOf(req), action, entity, entityId: result?.id || null, oldValue, newValue: result, req });
     return result;
   };
+  const actorRole = req.authActor?.actorType === 'AGENT' ? null : req.user?.role;
   return {
     searchEntities,
     createPurchase: audited('PurchaseContract', 'CREATE', (input) => createPurchaseWithItems({ input })),
-    updatePurchase: audited('PurchaseContract', 'UPDATE', (id, input) => updatePurchase({ id, input })),
+    updatePurchase: audited('PurchaseContract', 'UPDATE', (id, input) => updatePurchase({ id, input }), (id) => prisma.purchaseContract.findUnique({ where: { id } })),
     createSupplier: audited('Supplier', 'CREATE', (input) => createSupplier({ input })),
-    updateSupplier: audited('Supplier', 'UPDATE', (id, input) => updateSupplier({ id, input })),
+    updateSupplier: audited('Supplier', 'UPDATE', (id, input) => {
+      assertActiveChangeAllowed(actorRole, input?.isActive);
+      return updateSupplier({ id, input });
+    }, (id) => prisma.supplier.findUnique({ where: { id } })),
   };
 };
 

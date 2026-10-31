@@ -12,7 +12,7 @@ const { createError } = require('../middleware/errorHandler');
 const { PURCHASE_STATUS } = require('../config/constants');
 const { archiveFilter } = require('../utils/archiveFilter');
 const { normalizePagination } = require('../utils/pagination');
-const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
+const { createSupplier, updateSupplier, assertActiveChangeAllowed } = require('../agent/commands/supplier');
 
 
 /**
@@ -105,10 +105,7 @@ const create = async (req, res, next) => {
  */
 const update = async (req, res, next) => {
   try {
-    // 恢复已归档供应商（isActive=true）仅 ADMIN；归档沿用 DELETE。
-    if (req.body?.isActive === true && req.user?.role !== 'ADMIN') {
-      throw createError('仅管理员可恢复已归档供应商', 403);
-    }
+    assertActiveChangeAllowed(req.user?.role, req.body?.isActive);
     const supplier = await updateSupplier({
       id: req.params.id,
       input: req.body,

@@ -287,20 +287,28 @@ const remove = async (req, res, next) => {
     const { id } = req.params;
     
     // Code-level guard: Payment.purchaseContract has no onDelete rule (default SetNull would orphan ledger rows).
-    const contract = await prisma.purchaseContract.findUnique({
-      where: { id },
-      select: { invoiceNo: true, _count: { select: { receipts: true, payments: true } } },
+    // Checks and delete share one transaction; the no-op UPDATE takes the SQLite writer lock first so a
+    // concurrent payment/receipt cannot slip in between (same pattern as financeService allocations).
+    await prisma.$transaction(async (tx) => {
+      const locked = await tx.$executeRaw`UPDATE purchase_contracts SET id = id WHERE id = ${id}`;
+      if (locked !== 1) throw createError('采购合同不存在', 404);
+      const contract = await tx.purchaseContract.findUnique({
+        where: { id },
+        select: { invoiceNo: true, _count: { select: { receipts: true, payments: true } } },
+      });
+      const [invoiceFiles, matchedInvoices, matchedBank, packingItems] = await Promise.all([
+        tx.contractFile.count({ where: { purchaseContractId: id, category: 'SUPPLIER_INVOICE' } }),
+        tx.invoiceRecord.count({ where: { matchedContractId: id, matchedContractType: 'PURCHASE' } }),
+        tx.bankTransaction.count({ where: { matchedContractId: id, matchedContractType: 'PURCHASE' } }),
+        tx.packingItem.count({ where: { purchaseItem: { purchaseContractId: id } } }),
+      ]);
+      if (contract._count.receipts > 0 || contract._count.payments > 0 || contract.invoiceNo
+        || invoiceFiles > 0 || matchedInvoices > 0 || matchedBank > 0 || packingItems > 0) {
+        throw createError('已有到货、付款、发票、银行流水、装箱或核销记录的合同不可删除', 409);
+      }
+      await tx.purchaseContract.delete({ where: { id } });
     });
-    if (!contract) throw createError('采购合同不存在', 404);
-    const [invoiceFiles, matchedInvoices] = await Promise.all([
-      prisma.contractFile.count({ where: { purchaseContractId: id, category: 'SUPPLIER_INVOICE' } }),
-      prisma.invoiceRecord.count({ where: { matchedContractId: id, matchedContractType: 'PURCHASE' } }),
-    ]);
-    if (contract._count.receipts > 0 || contract._count.payments > 0 || contract.invoiceNo || invoiceFiles > 0 || matchedInvoices > 0) {
-      throw createError('已有到货、付款、发票或核销记录的合同不可删除', 409);
-    }
-    await prisma.purchaseContract.delete({ where: { id } });
-    
+
     success(res, null, '采购合同删除成功');
   } catch (error) {
     next(error);

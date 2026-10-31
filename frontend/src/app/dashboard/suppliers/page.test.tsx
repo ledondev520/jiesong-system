@@ -16,6 +16,8 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SuppliersPage from "./page";
+import { useAuthStore } from "@/store/auth.store";
+import { Role } from "@/types";
 
 const mockIsMobile = vi.fn(() => false);
 
@@ -394,6 +396,10 @@ describe("supplier editor interrupted sessions (synthetic fixtures)", () => {
 describe("supplier catalog identity and deletion sessions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Archiving is ADMIN/PURCHASE only (server enforces the same).
+    useAuthStore.setState({
+      user: { id: "synthetic-purchase", role: Role.PURCHASE } as never,
+    });
     mockGetAll
       .mockReset()
       .mockResolvedValue({ data: { items: syntheticSuppliers } });
@@ -401,6 +407,18 @@ describe("supplier catalog identity and deletion sessions", () => {
     mockCreate.mockReset();
     mockDelete.mockReset();
   });
+
+  it.each([Role.SALES, Role.FINANCE, Role.WAREHOUSE])(
+    "%s does not see the archive button",
+    async (role) => {
+      useAuthStore.setState({ user: { id: "synthetic", role } as never });
+      render(<SuppliersPage />);
+      await screen.findByRole("button", { name: "选择供应商 合成供应商甲" });
+      expect(
+        screen.queryByRole("button", { name: "归档当前" }),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   it("a refreshed catalog omitting the selected record cannot turn its draft into creation", async () => {
     mockGetAll
