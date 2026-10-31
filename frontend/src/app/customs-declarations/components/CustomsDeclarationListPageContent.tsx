@@ -47,10 +47,6 @@ import {
 } from "@/components/ui/select";
 import { MobileListCard } from "@/components/mobile";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  EXPORT_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { Search, Plus, FileText } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -211,7 +207,6 @@ export function CustomsDeclarationListPageContent({
 
   return (
     <div className="space-y-6 pb-10">
-      {!embedded && <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />}
       <PageHeader
         title="报关单管理"
         description="跟踪出口报关草稿、申报进度、查验与放行状态。"

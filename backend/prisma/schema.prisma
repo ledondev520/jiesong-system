@@ -264,11 +264,12 @@ model Store {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  port         Port          @relation(fields: [portId], references: [id])
-  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  salesItems   SalesItem[]
-  packingItems PackingItem[]
-  quoteItems   QuoteItem[]
+  port          Port           @relation(fields: [portId], references: [id])
+  customer      Customer?      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  salesItems    SalesItem[]
+  packingItems  PackingItem[]
+  purchaseItems PurchaseItem[]
+  quoteItems    QuoteItem[]
 
   @@index([customerId])
   @@map("stores")
@@ -380,19 +381,22 @@ model PurchaseContract {
   expectedDate          DateTime?
   productionCompletedAt DateTime? // 生产资料完整并确认完工的时间
   invoiceNo             String?
-  storeName             String? // 发货店铺名称
+  storeName             String? // 发货店铺名称（旧字段，新界面不再写入/显示）
   note                  String?
+  salesContractId       String? // 生成该采购单的出口订单（迁移 B1）
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  supplier Supplier       @relation(fields: [supplierId], references: [id])
-  items    PurchaseItem[]
-  payments Payment[]
-  files    ContractFile[]
-  receipts PurchaseReceipt[]
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  salesContract SalesContract? @relation(fields: [salesContractId], references: [id], onDelete: SetNull)
+  items         PurchaseItem[]
+  payments      Payment[]
+  files         ContractFile[]
+  receipts      PurchaseReceipt[]
 
   @@index([status])
   @@index([supplierId])
+  @@index([salesContractId])
   @@index([createdAt])
   @@map("purchase_contracts")
 }
@@ -414,17 +418,20 @@ model PurchaseItem {
   width              Float? // 单箱宽度 (mm)
   height             Float? // 单箱高度 (mm)
   note               String?
+  storeId            String? // 这批数量送往的门店；null = 库存/未知（旧数据）（迁移 B1）
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
   purchaseContract PurchaseContract @relation(fields: [purchaseContractId], references: [id], onDelete: Cascade)
   product          Product          @relation(fields: [productId], references: [id])
+  store            Store?           @relation(fields: [storeId], references: [id], onDelete: Restrict)
   inventories      Inventory[]
   packingItems     PackingItem[]
   receiptItems     PurchaseReceiptItem[]
 
   @@index([purchaseContractId])
   @@index([productId])
+  @@index([storeId])
   @@map("purchase_items")
 }
 
@@ -535,6 +542,7 @@ model SalesContract {
   customsDeclarations CustomsDeclaration[]
   forexVerifications  ForexVerification[]
   items               SalesItem[]
+  purchaseContracts   PurchaseContract[] // 由本订单生成的采购单（迁移 B1）
   packingItems        PackingItem[] // 装箱明细
   payments            Payment[]
   inventories         Inventory[]

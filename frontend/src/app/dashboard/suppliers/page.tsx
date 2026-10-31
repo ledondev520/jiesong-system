@@ -1,5 +1,5 @@
 /**
- * Input: 供应商服务API、React Hook Form、ModuleTabHeader
+ * Input: 供应商服务API、React Hook Form
  * Output: 独立供应商编辑会话，失败保留草稿，晚到保存与目录响应不覆盖新选择
  * Pos: 采购模块基础档案表单页
  *
@@ -53,10 +53,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  PROCUREMENT_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
 import { cn } from "@/lib/utils";
 
@@ -378,7 +374,6 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader
         title="供应商管理"
         actions={

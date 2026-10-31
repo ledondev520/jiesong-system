@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   primaryActionFor, secondaryTransitionsFor, toItemsPayload, validateLines, parseSpotRate, isQuoteStatus, QUOTE_STATUSES,
-  type QuoteLineDraft,
 } from "./quote";
+import type { OrderLine } from "./order-lines";
 
-const line = (extra: Partial<QuoteLineDraft> = {}): QuoteLineDraft => ({
-  key: "k", productId: "p1", storeId: "s1", quantity: "10", costCny: "10000", manualPrice: "", ...extra,
+const line = (extra: Partial<OrderLine> = {}): OrderLine => ({
+  key: "k", productId: "p1", productName: "P", unit: "", storeId: "s1", quantity: "10", costCny: "10000", suggested: 1995, manualPrice: "", ...extra,
 });
 
 describe("quote helpers", () => {
@@ -32,7 +32,7 @@ describe("quote helpers", () => {
 
   it("payload never carries formulaPrice; a manual price sets isManualPrice, blank cost is null", () => {
     const [auto, manual, noCost] = toItemsPayload([line(), line({ manualPrice: "2500.5" }), line({ costCny: "" })]);
-    expect(auto).toEqual({ productId: "p1", storeId: "s1", quantity: 10, unit: undefined, note: undefined, costCny: 10000 });
+    expect(auto).toEqual({ productId: "p1", storeId: "s1", quantity: 10, unit: undefined, costCny: 10000 });
     expect(manual).toMatchObject({ isManualPrice: true, unitPrice: 2500.5 });
     expect(noCost.costCny).toBeNull();
     expect(JSON.stringify([auto, manual, noCost])).not.toContain("formulaPrice");
@@ -40,11 +40,13 @@ describe("quote helpers", () => {
 
   it("validates rows with 1-based Chinese messages", () => {
     expect(validateLines([line()])).toBeNull();
-    expect(validateLines([line(), line({ productId: "" })])).toBe("第2行请选择商品");
-    expect(validateLines([line({ quantity: "0" })])).toBe("第1行数量必须大于0");
-    expect(validateLines([line({ quantity: "abc" })])).toBe("第1行数量必须大于0");
-    expect(validateLines([line({ costCny: "-1" })])).toBe("第1行成本必须大于0");
-    expect(validateLines([line({ manualPrice: "-5" })])).toBe("第1行手动单价无效");
+    expect(validateLines([])).toBe("请至少添加一行商品");
+    expect(validateLines([line(), line({ productId: "" })])).toBe("第 2 行：请选择商品");
+    expect(validateLines([line({ quantity: "0" })])).toBe("第 1 行：数量必须大于 0");
+    expect(validateLines([line({ quantity: "abc" })])).toBe("第 1 行：数量必须大于 0");
+    expect(validateLines([line({ costCny: "-1" })])).toBe("第 1 行：成本必须大于 0");
+    expect(validateLines([line({ costCny: "" })])).toBeNull(); // 缺成本草稿允许
+    expect(validateLines([line({ manualPrice: "-5" })])).toBe("第 1 行：手动单价无效");
     expect(validateLines([line({ manualPrice: "0" })])).toBeNull(); // 0 allowed in DRAFT, backend gates SENT
   });
 
@@ -64,14 +66,14 @@ describe("quote helpers", () => {
 import { linesFromItems } from "./quote";
 describe("linesFromItems", () => {
   it("restores manual prices only for manual lines", () => {
-    const base = { productId: "p", storeId: "s", quantity: 2, unit: "PCS", note: null, costCny: 100, formulaPrice: 20 };
+    const base = { productId: "p", storeId: "s", quantity: 2, unit: "PCS", costCny: 100, formulaPrice: 20, product: { customsName: "合成商品" } };
     const [auto, manual, noStore] = linesFromItems([
       { ...base, isManualPrice: false, unitPrice: 20 },
       { ...base, isManualPrice: true, unitPrice: 25.5 },
       { ...base, storeId: null, costCny: null, isManualPrice: false, unitPrice: 0, formulaPrice: null },
     ]);
-    expect(auto).toMatchObject({ manualPrice: "", costCny: "100", quantity: "2", storeId: "s", serverUnitPrice: 20 });
+    expect(auto).toMatchObject({ manualPrice: "", costCny: "100", quantity: "2", storeId: "s", suggested: 20, productName: "合成商品" });
     expect(manual.manualPrice).toBe("25.5");
-    expect(noStore).toMatchObject({ storeId: "", costCny: "", formulaPrice: null });
+    expect(noStore).toMatchObject({ storeId: "", costCny: "", suggested: null });
   });
 });

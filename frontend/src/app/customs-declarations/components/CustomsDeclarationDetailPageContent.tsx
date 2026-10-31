@@ -16,10 +16,6 @@ import type { CustomsDeclaration, CustomsDeclarationItem } from "@/types";
 import { customsDeclarationService } from "@/services/customsDeclaration.service";
 import { MobileListCard } from "@/components/mobile";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  EXPORT_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -132,7 +128,6 @@ export function CustomsDeclarationDetailPageContent({
 
   return (
     <div className="space-y-6 pb-10">
-      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title={declaration.declarationNo}
         description={declaration.customsBroker || "未填写报关行"}

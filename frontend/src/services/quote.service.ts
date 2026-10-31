@@ -62,6 +62,8 @@ export interface QuoteItemInput {
   unitPrice?: number;
 }
 export interface QuoteHeaderInput {
+  customerId?: string | null;
+  incoterm?: string;
   note?: string | null;
   paymentTerms?: string | null;
   portOfLoading?: string | null;

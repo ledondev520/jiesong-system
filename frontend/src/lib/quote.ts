@@ -54,28 +54,18 @@ export const secondaryTransitionsFor = (status: QuoteStatus): { to: QuoteStatus;
 export const isQuoteStatus = (value: unknown): value is QuoteStatus =>
   typeof value === "string" && (QUOTE_STATUSES as readonly string[]).includes(value);
 
-export interface QuoteLineDraft {
-  key: string;
-  productId: string;
-  storeId: string;
-  quantity: string;
-  costCny: string;
-  /** 空 = 按规则出价；填写 = 手动价（isManualPrice） */
-  manualPrice: string;
-  unit?: string;
-  note?: string;
-  /** 仅展示：上次保存时服务端算出的规则价/最终单价（不会随请求发送） */
-  formulaPrice?: number | null;
-  serverUnitPrice?: number;
-}
+import { effectivePrice, isManualPrice, type OrderLine } from "@/lib/order-lines";
 
 const num = (value: string) => {
   const parsed = Number(value);
   return value.trim() !== "" && Number.isFinite(parsed) ? parsed : null;
 };
 
-/** 编辑器 → 后端 items；formulaPrice 永不发送（服务端按唯一规则重算）。 */
-export const toItemsPayload = (lines: QuoteLineDraft[]) =>
+/**
+ * 编辑器行（与 J18 订单网格共用 OrderLine）→ 后端 items。formulaPrice 永不发送（服务端按唯一规则重算）；
+ * 填了人工价才发送 unitPrice + isManualPrice（任意 >= 0 的值，负责人 2026-10-31 决定，不与规则价比较）。
+ */
+export const toItemsPayload = (lines: OrderLine[]) =>
   lines.map((line) => {
     const manual = num(line.manualPrice);
     return {
@@ -83,23 +73,23 @@ export const toItemsPayload = (lines: QuoteLineDraft[]) =>
       storeId: line.storeId || null,
       quantity: Number(line.quantity),
       unit: line.unit || undefined,
-      note: line.note || undefined,
       costCny: num(line.costCny),
-      ...(manual !== null ? { isManualPrice: true, unitPrice: manual } : {}),
+      ...(isManualPrice(line) && manual !== null ? { isManualPrice: true, unitPrice: manual } : {}),
     };
   });
 
-/** 提交前的行级校验，返回第一条中文错误；与后端 400 规则保持一致，但后端仍是权威。 */
-export const validateLines = (lines: QuoteLineDraft[]): string | null => {
+/** 提交前的行级校验，返回第一条中文错误；成本可空（缺成本草稿），后端仍是权威。 */
+export const validateLines = (lines: OrderLine[]): string | null => {
+  if (lines.length === 0) return "请至少添加一行商品";
   for (const [index, line] of lines.entries()) {
-    const row = `第${index + 1}行`;
-    if (!line.productId) return `${row}请选择商品`;
+    const row = `第 ${index + 1} 行`;
+    if (!line.productId) return `${row}：请选择商品`;
     const quantity = num(line.quantity);
-    if (quantity === null || quantity <= 0) return `${row}数量必须大于0`;
+    if (quantity === null || quantity <= 0) return `${row}：数量必须大于 0`;
     const cost = num(line.costCny);
-    if (line.costCny.trim() !== "" && (cost === null || cost <= 0)) return `${row}成本必须大于0`;
+    if (line.costCny.trim() !== "" && (cost === null || cost <= 0)) return `${row}：成本必须大于 0`;
     const manual = num(line.manualPrice);
-    if (line.manualPrice.trim() !== "" && (manual === null || manual < 0)) return `${row}手动单价无效`;
+    if (isManualPrice(line) && (manual === null || manual < 0)) return `${row}：手动单价无效`;
   }
   return null;
 };
@@ -115,21 +105,24 @@ export const formatUsd = (value: number) =>
   `USD ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 type ItemLike = {
-  productId: string; storeId: string | null; quantity: number; unit: string | null; note: string | null;
+  productId: string; storeId: string | null; quantity: number; unit: string | null;
   costCny: number | null; isManualPrice: boolean; unitPrice: number; formulaPrice: number | null;
+  product?: { customsName: string } | null;
 };
 
-/** 已保存明细 → 编辑器行（手动价回填为 manualPrice，其余为空表示按规则）。 */
-export const linesFromItems = (items: ItemLike[] = []): QuoteLineDraft[] =>
+/** 已保存明细 → 订单网格行：规则价作为 suggested（缺成本为 null），手动价回填 manualPrice。 */
+export const linesFromItems = (items: ItemLike[] = []): OrderLine[] =>
   items.map((item, index) => ({
     key: `saved-${index}`,
     productId: item.productId,
+    productName: item.product?.customsName ?? "",
+    unit: item.unit ?? "",
     storeId: item.storeId ?? "",
     quantity: String(item.quantity),
     costCny: item.costCny === null ? "" : String(item.costCny),
+    suggested: item.formulaPrice,
     manualPrice: item.isManualPrice ? String(item.unitPrice) : "",
-    unit: item.unit ?? undefined,
-    note: item.note ?? undefined,
-    formulaPrice: item.formulaPrice,
-    serverUnitPrice: item.unitPrice,
   }));
+
+/** 当前行的有效单价（人工价优先），用于合计预览。 */
+export const previewUnitPrice = effectivePrice;

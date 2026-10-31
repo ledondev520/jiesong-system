@@ -23,7 +23,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MobileListCard } from "@/components/mobile";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ModuleTabHeader, EXPORT_TABS } from "@/components/layout/ModuleTabHeader";
 import { QuoteStatusBadge } from "./QuoteStatusBadge";
 
 const dateOnly = (value: string | null | undefined) => value?.slice(0, 10) || "-";
@@ -56,7 +55,6 @@ export function QuoteListPageContent() {
 
   return (
     <div className="space-y-6 pb-10">
-      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="报价"
         description="给客户的报价与形式发票（PI）；客户接受后一键转为出口订单。"
