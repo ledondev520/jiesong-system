@@ -238,10 +238,12 @@ test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写�
   const originalCreate = prisma.salesItem.create;
   const originalFindMany = prisma.salesItem.findMany;
   const originalUpdate = prisma.salesContract.update;
+  const originalStoreFindMany = prisma.store.findMany;
   let createArgs = null;
   let updateArgs = null;
 
-  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5 });
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5, customerId: 'c-1' });
+  prisma.store.findMany = async () => [{ id: 's-1', customerId: 'c-1' }];
   prisma.salesItem.create = async (args) => {
     createArgs = args;
     return { id: 'si-1', ...args.data };
@@ -275,6 +277,22 @@ test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写�
     prisma.salesItem.create = originalCreate;
     prisma.salesItem.findMany = originalFindMany;
     prisma.salesContract.update = originalUpdate;
+    prisma.store.findMany = originalStoreFindMany;
+  }
+});
+
+test('addSalesItem: 门店属于其他客户时拒绝写入（评审 R1-3）', async () => {
+  const originals = [prisma.salesContract.findUnique, prisma.store.findMany, prisma.salesItem.create];
+  let created = false;
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5, customerId: 'c-B' });
+  prisma.store.findMany = async () => [{ id: 's-A', customerId: 'c-A' }];
+  prisma.salesItem.create = async () => { created = true; return {}; };
+  try {
+    await assert.rejects(salesService.addSalesItem('sc-1', { productId: 'p-1', storeId: 's-A', quantity: 1, costPrice: 1, sellingPrice: 1 }),
+      (error) => error.statusCode === 400 && /门店不属于所选客户/.test(error.message));
+    assert.equal(created, false);
+  } finally {
+    [prisma.salesContract.findUnique, prisma.store.findMany, prisma.salesItem.create] = originals;
   }
 });
 

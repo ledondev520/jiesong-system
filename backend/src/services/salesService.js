@@ -1,5 +1,6 @@
 /** 出口合同与装箱服务；表头局部保存保留省略字段，历史发运重放不重复扣库，发运后货物与出库保持一致。 */
 const prisma = require('../utils/prisma');
+const { assertStoresOwnedBy } = require('./shared/storeOwnership');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { createError } = require('../middleware/errorHandler');
 const {
@@ -202,6 +203,7 @@ const removeSalesContract = async (id) => prisma.$transaction(async (tx) => {
 
 const addSalesItem = async (id, data = {}) => {
   const contract = await prisma.salesContract.findUnique({ where: { id } });
+  if (contract) await assertStoresOwnedBy(prisma, [data.storeId], contract.customerId);
 
   const item = await prisma.salesItem.create({
     data: {
@@ -354,8 +356,11 @@ const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate = 1.3 }) =>
   };
 };
 
+const storeOwnerOf = async (tx, id) => (await tx.salesContract.findUnique({ where: { id }, select: { customerId: true } }))?.customerId;
+
 const addPackingItem = async (id, data = {}) => prisma.$transaction(async (tx) => {
   assertSalesCargoMutable(await getSalesCargoState(tx, id));
+  if (data.storeId) await assertStoresOwnedBy(tx, [data.storeId], await storeOwnerOf(tx, id));
   const unitPrice = data.unitPrice || null;
   const totalPrice = unitPrice && data.quantity ? unitPrice * data.quantity : null;
 
@@ -414,6 +419,7 @@ const updatePackingItem = async (id, itemId, data = {}) => prisma.$transaction(a
   });
   if (!existing) throw createError('装箱明细不存在', 404);
   assertSalesCargoUpdate(await getSalesCargoState(tx, id), existing, data);
+  if (data.storeId) await assertStoresOwnedBy(tx, [data.storeId], await storeOwnerOf(tx, id));
 
   const unitPrice = data.unitPrice === undefined ? existing.unitPrice : (data.unitPrice || null);
   const quantity = data.quantity === undefined ? existing.quantity : data.quantity;

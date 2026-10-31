@@ -162,4 +162,32 @@ describe("OrderEditor pricing (R1-2)", () => {
       4200,
     );
   });
+  it("switching customers clears the old stores and drops a late response for the old customer (R1-3)", async () => {
+    const stores = (name: string) => ({
+      data: { items: [{ id: name, name, isActive: true }] },
+    });
+    let resolveA: (value: unknown) => void = () => {};
+    mocks.getAll.mockResolvedValue({
+      data: {
+        items: [
+          { ...customer, id: "cA", name: "A" },
+          { ...customer, id: "cB", name: "B" },
+        ],
+      },
+    });
+    mocks.getStores.mockImplementation((id: string) =>
+      id === "cA"
+        ? new Promise((resolve) => (resolveA = resolve))
+        : Promise.resolve(stores("Store B")),
+    );
+    render(<OrderEditor />);
+    const select = await screen.findByLabelText("客户 *");
+    await screen.findByRole("option", { name: "B" });
+    fireEvent.change(select, { target: { value: "cA" } });
+    fireEvent.change(select, { target: { value: "cB" } });
+    await screen.findByRole("option", { name: "Store B" });
+    await act(async () => resolveA(stores("Store A")));
+    expect(screen.queryByRole("option", { name: "Store A" })).toBeNull();
+    expect(screen.getByRole("option", { name: "Store B" })).toBeInTheDocument();
+  });
 });

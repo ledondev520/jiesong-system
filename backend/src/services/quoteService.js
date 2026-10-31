@@ -5,6 +5,7 @@
  * Prices come only from priceFor(); a client formulaPrice is ignored, a client unitPrice counts only with isManualPrice.
  */
 const prisma = require('../utils/prisma');
+const { assertStoresOwnedBy } = require('./shared/storeOwnership');
 const { createError } = require('../middleware/errorHandler');
 const { partialUpdate } = require('../utils/partialUpdate');
 const { loadPricingSnapshot } = require('./pricingConfigService');
@@ -104,6 +105,7 @@ const normalizeItems = async (db, raw) => {
   if (products.length !== productIds.length) throw bad('包含不存在的商品');
   const storeIds = [...new Set(rows.map((r) => r.storeId).filter(Boolean))];
   if (storeIds.length && (await db.store.count({ where: { id: { in: storeIds } } })) !== storeIds.length) throw bad('包含不存在的门店');
+  // Ownership against the quote's customer is checked by the caller, which knows the final customer (R1-3).
   const byId = new Map(products.map((p) => [p.id, p]));
   return withCategoryChains(rows.map((r) => ({ ...r, product: byId.get(r.productId) })), db)
     .then((withChains) => withChains.map((r) => ({ ...r, unit: r.unit ?? r.product.unit ?? null, specification: r.specification ?? r.product.specification ?? null })));
@@ -169,6 +171,7 @@ const createQuote = async (body = {}, actor) => {
   }
   delete data.spotRate;
   const priced = rawItems === undefined ? null : priceItems(await normalizeItems(prisma, rawItems), spotInput);
+  if (priced) await assertStoresOwnedBy(prisma, priced.items.map((i) => i.storeId), data.customerId);
   const id = await createWithNumber(async (tx) => {
     const quote = await tx.quote.create({ data: {
       ...data, quoteNo: await nextQuoteNo(tx), createdById: actor.id,
@@ -195,6 +198,11 @@ const editQuote = async (id, body) => {
     priced = priceItems(await normalizeItems(prisma, raw), spot ?? undefined);
   }
   delete data.spotRate;
+  // Stores must belong to the final customer, whether the items or the customer changed (R1-3).
+  const finalCustomerId = Object.hasOwn(data, 'customerId') ? data.customerId : current.customerId;
+  if (priced || Object.hasOwn(data, 'customerId')) {
+    await assertStoresOwnedBy(prisma, (priced ? priced.items : current.items).map((i) => i.storeId), finalCustomerId);
+  }
   if (!priced && !Object.keys(data).length) return present(current);
   await prisma.$transaction(async (tx) => {
     const result = await tx.quote.updateMany({ where: { id, status: QUOTE_STATUS.DRAFT }, data: {
@@ -212,6 +220,7 @@ const editQuote = async (id, body) => {
 
 const convertToOrder = async (tx, quote) => {
   const storeIds = [...new Set(quote.items.map((i) => i.storeId))];
+  await assertStoresOwnedBy(tx, storeIds, quote.customerId); // a store relinked since the quote was sent (R1-3)
   const stores = await tx.store.findMany({ where: { id: { in: storeIds } }, select: { portId: true } });
   const ports = new Set(stores.map((s) => s.portId));
   const contractNo = await generateNextContractNo({ prisma: tx, year: new Date().getFullYear() });

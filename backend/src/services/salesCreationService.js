@@ -4,6 +4,7 @@
  * Pos: 复用 OperationLog 的既有主键和幂等字段，无需新增表；请求记录只存摘要
  */
 const { createHash } = require('node:crypto');
+const { assertStoresOwnedBy } = require('./shared/storeOwnership');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { generateNextContractNo } = require('./shared/contractUtils');
@@ -114,12 +115,7 @@ const createSalesContractAtomically = async (data, context = {}) => {
 
       if (input.items) {
         const productIds = [...new Set(input.items.map(item => item.productId))];
-        const storeIds = [...new Set(input.items.map(item => item.storeId))];
-        const [products, stores] = await Promise.all([
-          tx.product.count({ where: { id: { in: productIds } } }),
-          tx.store.count({ where: { id: { in: storeIds } } }),
-        ]);
-        if (products !== productIds.length || stores !== storeIds.length) throw createError('商品或门店已不存在，请刷新后重新选择', 400);
+        if (await tx.product.count({ where: { id: { in: productIds } } }) !== productIds.length) throw createError('商品或门店已不存在，请刷新后重新选择', 400);
       }
       // 客户（DATA-MODEL-2026 §2.4）：显式选择必须存在且未归档；缺省时仅当恰有一个启用客户才采用，
       // 没有或有多个启用客户都返回 400「请选择客户」。
@@ -134,6 +130,8 @@ const createSalesContractAtomically = async (data, context = {}) => {
         if (active.length > 1) throw createError('请选择客户', 400);
         customer = active[0];
       }
+      // 门店必须属于本单客户（评审 R1-3）；未关联客户的旧门店放行，见 shared/storeOwnership.js
+      if (input.items) await assertStoresOwnedBy(tx, input.items.map(item => item.storeId), customer?.id);
       let pricedItems = input.items;
       if (input.items?.some(item => item.sellingPrice === undefined)) {
         const rows = await tx.product.findMany({ where: { id: { in: [...new Set(input.items.map(item => item.productId))] } }, select: { id: true, categoryId: true } });
