@@ -1548,3 +1548,22 @@ model AiUsageLog {
   @@index([createdAt])
   @@map("ai_usage_logs")
 }
+
+// Agent 待确认写操作：跨进程共享，确认时用原子 UPDATE 抢占（见 agentPendingActionService.js）
+model AgentPendingAction {
+  id            String    @id
+  userId        String
+  actionType    String
+  params        String
+  description   String
+  sessionId     String?
+  status        String    @default("pending") // pending | executing | executed | failed | cancelled
+  failureReason String?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("agent_pending_actions")
+}

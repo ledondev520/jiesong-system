@@ -29,6 +29,7 @@ const { outstandingOf } = require('./payablesService');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
 const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
 const { validateInventoryTransition } = require('../utils/inventoryStateMachine');
+const pendingStore = require('./agentPendingActionService');
 
 const SUPPORTED_AGENT_TYPES = ['finance', 'export', 'executive', 'unified'];
 const PRIMARY_AGENT_TYPE = 'unified';
@@ -36,23 +37,7 @@ const LEGACY_AGENT_TYPES = ['finance', 'export', 'executive'];
 const TOOL_TRACE_ITEMS_LIMIT = 40;
 const ACTION_RECOMMENDATIONS_LIMIT = 20;
 
-// ── Pending Action Store（内存，30 分钟 TTL）────────────────
-const PENDING_ACTION_TTL_MS = 30 * 60 * 1000;
-const pendingActionStore = new Map();
-
-/**
- * 职责：定时清理过期 pendingAction，防止内存泄漏
- */
-const cleanExpiredPendingActions = () => {
-  const now = Date.now();
-  for (const [key, action] of pendingActionStore) {
-    if (now - action.createdAt > PENDING_ACTION_TTL_MS) {
-      pendingActionStore.delete(key);
-    }
-  }
-};
-const _cleanupTimer = setInterval(cleanExpiredPendingActions, 5 * 60 * 1000);
-_cleanupTimer.unref();
+// ── Pending Action Store：SQLite（agentPendingActionService），多进程共享 ──
 
 const WRITE_CONFIRMATION_INSTRUCTION = [
   '',
@@ -351,19 +336,22 @@ const isSamePendingAction = (action, recommendation) => action
   && action.actionType === recommendation.actionType
   && JSON.stringify(action.params || {}) === JSON.stringify(recommendation.params || {});
 
-const materializeRecommendationPendingActions = ({ userId, recommendations, collectedIds = [] }) => {
+const materializeRecommendationPendingActions = async ({ userId, recommendations, collectedIds = [] }) => {
   if (!userId || !Array.isArray(recommendations) || !Array.isArray(collectedIds)) return [];
 
   const created = [];
-  summarizeActionRecommendations(recommendations).forEach((recommendation) => {
+  for (const recommendation of summarizeActionRecommendations(recommendations)) {
     if (recommendation.executionMode !== 'confirmable_write' || !recommendation.actionType || !recommendation.params) {
-      return;
+      continue;
     }
 
-    const exists = collectedIds.some((id) => isSamePendingAction(pendingActionStore.get(id), recommendation));
-    if (exists) return;
+    let exists = false;
+    for (const id of collectedIds) {
+      if (isSamePendingAction(await pendingStore.getPendingRecord(id), recommendation)) { exists = true; break; }
+    }
+    if (exists) continue;
 
-    createPendingAction(
+    await createPendingAction(
       userId,
       recommendation.actionType,
       recommendation.params,
@@ -372,15 +360,15 @@ const materializeRecommendationPendingActions = ({ userId, recommendations, coll
     );
 
     const actionId = collectedIds[collectedIds.length - 1];
-    const action = pendingActionStore.get(actionId);
-    if (!action) return;
+    const action = await pendingStore.getPendingRecord(actionId);
+    if (!action) continue;
     created.push({
       actionId,
       actionType: action.actionType,
       description: action.description,
       params: action.params,
     });
-  });
+  }
 
   return created;
 };
@@ -2120,19 +2108,10 @@ const buildToolPool = (defineTool, traceStore, recommendationStore, toolSpecs = 
  * @param {object} params - 操作参数
  * @param {string} description - 面向用户的操作说明
  * @param {string[]} collectedIds - 收集本次 run 产生的 actionId
- * @returns {string} JSON 字符串，agent 会拿到此结果
+ * @returns {Promise<string>} JSON 字符串，agent 会拿到此结果
  */
-const createPendingAction = (userId, actionType, params, description, collectedIds) => {
-  const actionId = `pa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  pendingActionStore.set(actionId, {
-    actionType,
-    params,
-    description,
-    userId,
-    createdAt: Date.now(),
-    status: 'pending',
-    sessionId: null,
-  });
+const createPendingAction = async (userId, actionType, params, description, collectedIds) => {
+  const actionId = await pendingStore.createPendingRecord({ userId, actionType, params, description });
   collectedIds.push(actionId);
   return toJson({
     __pendingAction: true,
@@ -2166,8 +2145,7 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
       if (!tool.confirmationRequired) {
         const pending = JSON.parse(result);
         if (pending.__pendingAction) {
-          pendingActionStore.get(pending.actionId).automatic = true;
-          result = toJson({ ...await executeAction(pending.actionId, userId), automatic: true });
+          result = toJson({ ...await executeAction(pending.actionId, userId, { automatic: true }), automatic: true });
           automaticResults.set(key, result);
         }
       }
@@ -2389,19 +2367,32 @@ const ACTION_EXECUTORS = {
  * @param {string} userId - 当前用户（必须与创建者一致）
  * @returns {object} 执行结果
  */
-const executeAction = async (actionId, userId) => {
-  const action = pendingActionStore.get(actionId);
+const PENDING_STATUS_MESSAGES = {
+  executed: '该操作已执行',
+  executing: '该操作正在执行中',
+  cancelled: '该操作已取消',
+  failed: '该操作已失败，请重新向 Agent 提问',
+};
+
+const executeAction = async (actionId, userId, { automatic = false } = {}) => {
+  const action = await pendingStore.getPendingRecord(actionId);
   if (!action) throw createError('该操作已过期或不存在，请重新向 Agent 提问', 404);
   if (action.userId !== userId) throw createError('无权执行此操作', 403);
-  if (action.status !== 'pending') throw createError(`该操作已${action.status === 'executed' ? '执行' : '取消'}`, 409);
+  if (action.status !== 'pending') throw createError(PENDING_STATUS_MESSAGES[action.status] || '该操作已不可执行', 409);
 
   const executor = ACTION_EXECUTORS[action.actionType];
   if (!executor) throw createError(`不支持的操作类型: ${action.actionType}`, 400);
 
+  // 原子抢占：并发/跨进程的重复确认只有一方能把 pending 改成 executing
+  if (!(await pendingStore.claimPending(actionId, userId))) {
+    const latest = await pendingStore.getPendingRecord(actionId);
+    if (!latest) throw createError('该操作已过期或不存在，请重新向 Agent 提问', 404);
+    throw createError(PENDING_STATUS_MESSAGES[latest.status] || '该操作已不可执行', 409);
+  }
+
   try {
     const result = await executor(action.params, userId);
-    action.status = 'executed';
-    action.executedAt = Date.now();
+    await pendingStore.finishClaimed(actionId, 'executed');
 
     // 写入审计日志
     await prisma.operationLog.create({
@@ -2415,7 +2406,7 @@ const executeAction = async (actionId, userId) => {
           sessionId: action.sessionId || null,
           actionType: action.actionType,
           status: 'executed',
-          automatic: action.automatic === true,
+          automatic,
           params: action.params,
           result: { success: result.success, detail: result.detail },
         }),
@@ -2424,8 +2415,8 @@ const executeAction = async (actionId, userId) => {
 
     return { actionId, actionType: action.actionType, description: action.description, ...result };
   } catch (error) {
-    action.status = 'failed';
-    action.failedAt = Date.now();
+    // 失败不回到 pending：写操作可能已部分生效，需用户重新发起
+    await pendingStore.finishClaimed(actionId, 'failed', error?.message || String(error)).catch(() => {});
     await prisma.operationLog.create({
       data: {
         actorType: 'USER',
@@ -2450,12 +2441,9 @@ const executeAction = async (actionId, userId) => {
  * 职责：取消一个 pendingAction
  */
 const cancelAction = async (actionId, userId) => {
-  const action = pendingActionStore.get(actionId);
-  if (!action) return;
-  if (action.userId !== userId) return;
-  if (action.status !== 'pending') return;
-  action.status = 'cancelled';
-  action.cancelledAt = Date.now();
+  const action = await pendingStore.getPendingRecord(actionId);
+  if (!action || action.userId !== userId) return;
+  if (!(await pendingStore.cancelPending(actionId, userId))) return;
   await prisma.operationLog.create({
     data: {
       actorType: 'USER',
@@ -2472,6 +2460,19 @@ const cancelAction = async (actionId, userId) => {
       }),
     },
   });
+};
+
+/** 把本次 run 收集到的待确认操作绑定到会话并返回摘要（已过期的略过） */
+const collectRunActions = async (ids, sessionId) => {
+  await pendingStore.attachSession(ids, sessionId);
+  const records = await Promise.all(ids.map((id) => pendingStore.getPendingRecord(id)));
+  return records.map((action, index) => (action ? {
+    actionId: ids[index],
+    actionType: action.actionType,
+    description: action.description,
+    params: action.params,
+    status: action.status,
+  } : null)).filter(Boolean);
 };
 
 const resolveSdkSessionConfig = (sessionId) => {
@@ -2721,25 +2722,12 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
     result.duration_ms = Date.now() - startedAt;
 
     const actionRecommendations = summarizeActionRecommendations(actionRecommendationTrace);
-    materializeRecommendationPendingActions({
+    await materializeRecommendationPendingActions({
       userId,
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });
-    const actions = collectedActionIds
-      .map((id) => {
-        const action = pendingActionStore.get(id);
-        if (!action) return null;
-        action.sessionId = resolvedSessionId;
-        return {
-          actionId: id,
-          actionType: action.actionType,
-          description: action.description,
-          params: action.params,
-          status: action.status,
-        };
-      })
-      .filter(Boolean);
+    const actions = await collectRunActions(collectedActionIds, resolvedSessionId);
     const pendingActions = actions.filter(action => action.status === 'pending');
 
     // 3. 持久化
@@ -2862,25 +2850,12 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
     }
 
     const actionRecommendations = summarizeActionRecommendations(actionRecommendationTrace);
-    materializeRecommendationPendingActions({
+    await materializeRecommendationPendingActions({
       userId,
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });
-    const actions = collectedActionIds
-      .map((id) => {
-        const action = pendingActionStore.get(id);
-        if (!action) return null;
-        action.sessionId = resolvedSessionId;
-        return {
-          actionId: id,
-          actionType: action.actionType,
-          description: action.description,
-          params: action.params,
-          status: action.status,
-        };
-      })
-      .filter(Boolean);
+    const actions = await collectRunActions(collectedActionIds, resolvedSessionId);
     const pendingActions = actions.filter(action => action.status === 'pending');
 
     // 3. 持久化

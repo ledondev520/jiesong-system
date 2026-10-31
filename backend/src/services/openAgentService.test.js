@@ -56,6 +56,30 @@ const withPatched = async (patchMap, callback) => {
   }
 };
 
+// In-memory stand-in for the agent_pending_actions table (real SQLite is covered by the integration test).
+const fakePendingTable = () => {
+  const rows = new Map();
+  const matches = (row, where) => Object.entries(where).every(([key, cond]) => {
+    if (cond && typeof cond === 'object' && 'in' in cond) return cond.in.includes(row[key]);
+    if (cond && typeof cond === 'object' && 'gt' in cond) return row[key] > cond.gt;
+    if (cond && typeof cond === 'object' && 'lte' in cond) return row[key] <= cond.lte;
+    return row[key] === cond;
+  });
+  return {
+    'prisma.agentPendingAction.deleteMany': async ({ where }) => {
+      for (const [id, row] of rows) if (matches(row, where)) rows.delete(id);
+      return {};
+    },
+    'prisma.agentPendingAction.create': async ({ data }) => { rows.set(data.id, { sessionId: null, status: 'pending', failureReason: null, ...data }); return data; },
+    'prisma.agentPendingAction.findFirst': async ({ where }) => [...rows.values()].find(row => matches(row, where)) || null,
+    'prisma.agentPendingAction.updateMany': async ({ where, data }) => {
+      let count = 0;
+      for (const row of rows.values()) if (matches(row, where)) { Object.assign(row, data); count += 1; }
+      return { count };
+    },
+  };
+};
+
 test('getAgentPreset: 支持三类业务 agent', () => {
   const finance = openAgentService.getAgentPreset('finance');
   const exportAgent = openAgentService.getAgentPreset('export');
@@ -74,6 +98,7 @@ test('AI 内部草稿直接创建，同一轮重复调用复用结果，保留�
   const logs = [];
   await withPatched({
     'prisma.salesContract.findUnique': async () => ({ id: 'test-sales', contractNo: 'EXP-TEST', totalAmount: 100 }),
+    ...fakePendingTable(),
     'prisma.customsDeclaration.findFirst': async () => null,
     'customsDeclarationService.createCustomsDeclaration': async input => { created++; return { id: 'test-draft', ...input }; },
     'prisma.operationLog.create': async input => { logs.push(input.data); return {}; },
@@ -103,6 +128,7 @@ test('AI 内部草稿直接创建，同一轮重复调用复用结果，保留�
 test('AI 登记实际发运复用销售状态接口，执行结果不再虚报成功', async () => {
   let changed = false;
   await withPatched({
+    ...fakePendingTable(),
     'prisma.salesContract.findFirst': async () => ({ id: 'test-sales', contractNo: 'EXP-TEST', status: 'PACKING' }),
     'salesService.updateSalesStatus': async (id, status) => { assert.equal(id, 'test-sales'); assert.equal(status, 'SHIPPED'); changed = true; return { status }; },
     'prisma.operationLog.create': async () => ({}),
@@ -472,9 +498,10 @@ test('buildTradeComplianceReadinessDiagnostic: 聚合报关/核销/退税就绪�
   });
 });
 
-test('materializeRecommendationPendingActions: 只为 confirmable_write 建议创建待确认动作并自动去重', () => {
+test('materializeRecommendationPendingActions: 只为 confirmable_write 建议创建待确认动作并自动去重', async () => {
   const collectedIds = [];
-  const pendingActions = openAgentService.materializeRecommendationPendingActions({
+  await withPatched(fakePendingTable(), async () => {
+  const pendingActions = await openAgentService.materializeRecommendationPendingActions({
     userId: 'user-1',
     collectedIds,
     recommendations: [
@@ -529,6 +556,7 @@ test('materializeRecommendationPendingActions: 只为 confirmable_write 建议�
     forexVerificationId: 'fx-2',
     refundNo: 'TR-TEST-001',
   });
+});
 });
 
 test('summarizeToolTrace: 汇总读写工具调用次数、失败数与耗时', () => {
@@ -814,6 +842,7 @@ test('AI 库存确认执行时重新检查来源，不能绕开验货/发运', a
   let managed = false;
   let updates = 0;
   await withPatched({
+    ...fakePendingTable(),
     'prisma.inventory.findUnique': async () => ({ id: 'synthetic-stock', status: 'INBOUND', salesContractId: 'synthetic-sale', ...(managed ? { purchaseItemId: 'synthetic-purchase' } : {}) }),
     'prisma.inventory.update': async () => { updates++; return {}; },
     'prisma.operationLog.create': async () => ({}),
@@ -841,6 +870,7 @@ test('AI 不能读写遗留的汇率/利润率配置：写入被拒绝，读取�
   let upserts = 0;
   try {
     await withPatched({
+      ...fakePendingTable(),
       'prisma.systemConfig.findUnique': async () => ({ key: 'exchangeRate', value: '{"rate":99,"buffer":0}', note: 'legacy' }),
       'prisma.systemConfig.upsert': async () => { upserts += 1; return {}; },
       'prisma.operationLog.create': async () => ({}),
@@ -873,6 +903,7 @@ test('AI 不能读写遗留的汇率/利润率配置：写入被拒绝，读取�
 test('AI 不能写卖方公司信息，也读不到银行资料或旧开票抬头文本（可能含银行行）', async () => {
   let upserts = 0;
   await withPatched({
+    ...fakePendingTable(),
     'prisma.systemConfig.findUnique': async ({ where }) => ({ key: where.key, value: JSON.stringify('SECRET-ACCT-123'), note: null }),
     'prisma.systemConfig.upsert': async () => { upserts += 1; return {}; },
     'prisma.operationLog.create': async () => ({}),
