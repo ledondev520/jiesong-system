@@ -13,8 +13,6 @@
  */
 const { loadPricingConfig } = require('./pricingConfigService');
 
-// 取整步长的仓库默认值（负责人终版 2026-10-31：整美元后取最近的 5 的倍数）；config/pricing.json 与迁移脚本都用它。
-
 // 历史报价/人工单价允许偏离目标加价的幅度（百分点/100）。是否保留此闸门待负责人确认（规范 Q5e）。
 const PRICE_TOLERANCE = 0.05;
 
