@@ -550,7 +550,7 @@ The quote prints with the 外销合同 sheet layout, so an accepted PI and the l
 - One row per product × store, sorted by store, then by the grid's product order. Ship-to Store prints `Store.code` (falling back to the name).
 - After each store's rows, a `SUBTOTAL <store>` row with the amount; at the end the `TOTAL / 合计` row with total quantity and amount, as in the sample.
 - Unit prices are whole numbers under the pricing rule (§7) and print with 2 decimals (`#,##0.00`), the same format as the export sheets.
-- Bank details print only if the owner confirms (Q9). Company account identifiers are Restricted data, so v1 omits them.
+- Seller block (owner decision 2026-10-31, Q9 closed): company name + address in the Seller cell, bank details in a footer block; all read from company settings (`companyName`, `companyAddress`, `companyBankInfo`), blank when unset. Bank details are Restricted data (ADMIN/FINANCE read them in settings).
 
 **Never printed:** costs, markups and supplier names.
 

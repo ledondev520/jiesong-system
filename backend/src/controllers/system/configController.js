@@ -35,6 +35,11 @@ const CONFIG_DOMAIN_MAP = {
   stampPlatformUrl: { domain: 'params', label: '基础参数', note: '线上盖章平台链接（购销合同生成后跳转盖章）' },
   invoiceTitleInfo: { domain: 'params', label: '基础参数', note: '我方开票抬头信息（催票文本附带，多行）' },
 
+  // 公司信息域：报价/PI 导出的卖方块（负责人 2026-10-31）。银行信息为 Restricted，仅 ADMIN/FINANCE 可经 GET /configs 读取。
+  companyName:     { domain: 'company', label: '公司信息', note: '报价/PI 卖方公司名称' },
+  companyAddress:  { domain: 'company', label: '公司信息', note: '报价/PI 卖方地址' },
+  companyBankInfo: { domain: 'company', label: '公司信息', note: '报价/PI 收款银行信息（多行，Restricted）' },
+
   // 数据字典域：系统枚举值与下拉列表
   units:        { domain: 'dictionary', label: '数据字典', note: '商品计量单位枚举' },
   brokers:      { domain: 'dictionary', label: '数据字典', note: '报关公司枚举' },
@@ -53,6 +58,10 @@ const CONFIG_DOMAIN_MAP = {
   // HSCIQ 海关归类 API 集成
   hsciqEnabled:   { domain: 'ai', label: 'AI集成', note: '是否启用 HSCIQ 海关归类 API（开启后 HS 编码推荐与申报要素将优先调用官方 API）' },
 };
+
+// Restricted company bank details are returned only to the roles that may already read bank evidence.
+const BANK_CONFIG_READ_ROLES = ['ADMIN', 'FINANCE'];
+const RESTRICTED_CONFIG_KEYS = ['companyBankInfo'];
 
 const getDomainMeta = (key) => CONFIG_DOMAIN_MAP[key] || { domain: 'other', label: '其他', note: '' };
 
@@ -142,6 +151,7 @@ const getConfigs = async (req, res, next) => {
     const configs = await prisma.systemConfig.findMany();
 
     const formatted = configs.reduce((acc, config) => {
+      if (RESTRICTED_CONFIG_KEYS.includes(config.key) && !BANK_CONFIG_READ_ROLES.includes(req.user?.role)) return acc;
       acc[config.key] = buildConfigValue(config.key, config.value);
       return acc;
     }, {});
