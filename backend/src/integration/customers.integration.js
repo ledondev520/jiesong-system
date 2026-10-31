@@ -15,8 +15,21 @@ test('HTTP/SQLite: customers API roles, archive-not-delete, USD/incoterm rules a
   process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = 'test-only-customers-never-for-production';
   let db, server;
+  let requestNumber = 0;
+  const expectedAuditRequests = new Set();
   t.after(async () => {
     if (server) { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
+    // Response-finish audit writes are async; let them land before the SQLite file is removed (flaky ENOTEMPTY otherwise).
+    if (db && expectedAuditRequests.size) {
+      const deadline = Date.now() + 5000;
+      for (;;) {
+        const saved = await db.operationLog.findMany({ where: { requestId: { in: [...expectedAuditRequests] } }, select: { requestId: true } });
+        const persisted = new Set(saved.map((row) => row.requestId));
+        if ([...expectedAuditRequests].every((id) => persisted.has(id))) break;
+        assert.ok(Date.now() < deadline, 'customers fixture audit writes did not settle');
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    }
     if (db) await db.$disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
   });
@@ -39,12 +52,14 @@ test('HTTP/SQLite: customers API roles, archive-not-delete, USD/incoterm rules a
   server = await new Promise((resolve) => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
   const call = async (method, url, body, role = 'ADMIN', expected = 200) => {
+    const requestId = `synthetic-customers-${++requestNumber}`;
     const response = await fetch(base + url, {
       method,
-      headers: { ...(tokens[role] ? { authorization: `Bearer ${tokens[role]}` } : {}), 'Content-Type': 'application/json' },
+      headers: { ...(tokens[role] ? { authorization: `Bearer ${tokens[role]}` } : {}), 'Content-Type': 'application/json', 'x-request-id': requestId },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const result = await response.json();
+    if (['POST', 'PUT', 'DELETE'].includes(method) && response.status >= 200 && response.status < 300) expectedAuditRequests.add(requestId);
     assert.equal(response.status, expected, `${role} ${method} ${url}: ${result.message || ''}`);
     return result.data;
   };

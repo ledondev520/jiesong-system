@@ -11,6 +11,7 @@ const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { normalizePagination } = require('../utils/pagination');
 const { normalizeStoreCode, resolveCustomerIdForNewStore } = require('../services/customerService');
+const { archiveFilter } = require('../utils/archiveFilter');
 
 const duplicateCode = (error) => error?.code === 'P2002' && String(error.meta?.target || '').includes('code');
 const optionalText = (value) => (typeof value === 'string' ? value.trim() || null : value);
@@ -23,7 +24,8 @@ const list = async (req, res, next) => {
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     const { portId, customerId } = req.query;
     const lite = req.query.lite === 'true' || req.query.lite === true;
-    const where = { ...(portId ? { portId } : {}), ...(customerId ? { customerId: String(customerId) } : {}) };
+    // 默认只列在用门店（含 lite 选择器）；status=archived 为已归档，status=all 不过滤。GET /:id 仍返回已归档门店，历史单据可解析。
+    const where = { ...archiveFilter(req.query.status), ...(portId ? { portId } : {}), ...(customerId ? { customerId: String(customerId) } : {}) };
  
     const [stores, total] = await Promise.all([
       prisma.store.findMany({
@@ -105,6 +107,8 @@ const update = async (req, res, next) => {
     const data = req.body;
     const code = normalizeStoreCode(data.code);
     if (data.isActive !== undefined && typeof data.isActive !== 'boolean') throw createError('isActive格式无效', 400);
+    // 恢复已归档门店仅 ADMIN（与供应商一致）；归档沿用各写入角色。
+    if (data.isActive === true && req.user?.role !== 'ADMIN') throw createError('仅管理员可恢复已归档门店', 403);
     // 换客户须是存在且未归档的客户；不改客户时不检查（归档客户下的旧门店仍可编辑）
     const customerId = data.customerId === undefined || data.customerId === null || data.customerId === ''
       ? undefined

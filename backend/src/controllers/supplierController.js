@@ -9,14 +9,10 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { archiveFilter } = require('../utils/archiveFilter');
 const { normalizePagination } = require('../utils/pagination');
 const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
 
-// 归档复用 isActive：默认只列在用；status=archived 为「已归档」；status=all 不过滤。
-const archiveFilter = (status) => {
-  if (status === 'all') return {};
-  return { isActive: status !== 'archived' };
-};
 
 /**
  * 职责：获取供应商列表
