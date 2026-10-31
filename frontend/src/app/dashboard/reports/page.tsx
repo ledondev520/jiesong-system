@@ -229,7 +229,7 @@ function BusinessReportsContent() {
   if (loading && !data) {
     return (
       <div className="space-y-6">
-        <PageHeader title="经营执行" showBack={false} />
+        <PageHeader title="经营分析" showBack={false} />
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/60" />
         </div>
@@ -240,7 +240,7 @@ function BusinessReportsContent() {
   if (!data) {
     return (
       <div className="space-y-6">
-        <PageHeader title="经营执行" showBack={false} />
+        <PageHeader title="经营分析" showBack={false} />
         <Card className="border-border/40">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
             <span className="rounded-full bg-muted/60 p-4">
@@ -272,7 +272,7 @@ function BusinessReportsContent() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="经营执行" showBack={false} />
+      <PageHeader title="经营分析" showBack={false} />
 
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 pt-4">
@@ -337,16 +337,32 @@ function BusinessReportsContent() {
           role="alert"
           className="rounded-md border border-destructive/30 p-3 text-sm text-destructive"
         >
-          毛利待核验，缺少汇率或已售成本。
-          {overview.unavailableContracts.map((contract, index) => (
-            <Link
-              key={contract.id}
-              className="ml-2 underline"
-              href={`/dashboard/sales/${contract.id}?tab=finance`}
-            >
-              核验第{index + 1}笔：{contract.reasons.join("；")}
-            </Link>
-          ))}
+          毛利待核验，缺少汇率或已售成本：共 {overview.unavailableContracts.length} 笔。
+          {overview.unavailableContracts.length <= 3 ? (
+            overview.unavailableContracts.map((contract, index) => (
+              <Link
+                key={contract.id}
+                className="ml-2 underline"
+                href={`/dashboard/sales/${contract.id}?tab=finance`}
+              >
+                核验第{index + 1}笔：{contract.reasons.join("；")}
+              </Link>
+            ))
+          ) : (
+            // 多笔时折叠成一个入口，避免一整排红色链接
+            <details className="mt-2">
+              <summary className="cursor-pointer underline">查看清单</summary>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {overview.unavailableContracts.map((contract, index) => (
+                  <li key={contract.id}>
+                    <Link className="underline" href={`/dashboard/sales/${contract.id}?tab=finance`}>
+                      核验第{index + 1}笔：{contract.reasons.join("；")}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       )}
       {/* 经营概览 */}
@@ -467,7 +483,7 @@ function BusinessReportsContent() {
               </div>
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
-                href="/dashboard/payments?tab=receivable"
+                href="/dashboard/finance/receivable"
               >
                 查看应收明细
               </Link>
@@ -489,7 +505,7 @@ function BusinessReportsContent() {
               </div>
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
-                href="/dashboard/payments?tab=payable"
+                href="/dashboard/finance/payable"
               >
                 查看应付明细
               </Link>
@@ -511,7 +527,7 @@ function BusinessReportsContent() {
               </div>
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
-                href="/dashboard/payments?tab=receivable&overdue=true"
+                href="/dashboard/finance/receivable?overdue=true"
               >
                 查看发运超过30天未收明细
               </Link>
@@ -533,7 +549,7 @@ function BusinessReportsContent() {
               </div>
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
-                href="/dashboard/payments?tab=payable&pastDelivery=true"
+                href="/dashboard/finance/payable?pastDelivery=true"
               >
                 查看超过交期待付明细
               </Link>

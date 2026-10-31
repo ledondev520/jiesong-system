@@ -352,7 +352,7 @@ export default function FinancePage() {
                 </Link>
               </Button>
               <Button asChild variant="outline" className="h-11 rounded-xl">
-                <Link href="/dashboard/payments?tab=payable">查看待付风险</Link>
+                <Link href="/dashboard/finance/payable">查看待付风险</Link>
               </Button>
               <Button asChild variant="outline" className="h-11 rounded-xl">
                 <Link href="/dashboard/finance/statements">查看报表分析</Link>
@@ -681,7 +681,7 @@ export default function FinancePage() {
                 <p className="text-xs text-center text-muted-foreground pt-1">
                   还有 {overdueList.length - 5} 条逾期记录，
                   <Link
-                    href="/dashboard/payments?tab=receivable"
+                    href="/dashboard/finance/receivable"
                     className="text-primary underline-offset-2 hover:underline"
                   >
                     查看全部应收明细
@@ -695,7 +695,7 @@ export default function FinancePage() {
 
       {/* 快捷导航区 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-3">
-        <Link href="/dashboard/payments?tab=payable" className="group">
+        <Link href="/dashboard/finance/payable" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
@@ -711,7 +711,7 @@ export default function FinancePage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/payments?tab=receivable" className="group">
+        <Link href="/dashboard/finance/receivable" className="group">
           <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
@@ -805,12 +805,12 @@ export default function FinancePage() {
               action={
                 <div className="flex flex-wrap justify-center gap-3">
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/dashboard/payments?tab=payable">
+                    <Link href="/dashboard/finance/payable">
                       查看应付明细
                     </Link>
                   </Button>
                   <Button asChild size="sm">
-                    <Link href="/dashboard/payments?tab=receivable">
+                    <Link href="/dashboard/finance/receivable">
                       查看应收明细
                     </Link>
                   </Button>
