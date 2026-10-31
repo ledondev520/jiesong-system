@@ -29,7 +29,7 @@ test('付款匹配候选只含已生效采购合同，未付余额与应付口�
  ];};
  for(const args of [[],['PAYMENT']]){
   const rows=await service.loadPurchaseContracts(...args);
-  assert.deepEqual(seenWhere.status.in.slice().sort(),['COMPLETED','PRODUCING','READY','RECEIVED','SHIPPED','SIGNED']);
+  assert.deepEqual(seenWhere.status,{notIn:['DRAFT','CANCELLED']}); // payablesService.payableWhere：粗过滤，权威口径是 isInEffect/outstandingOf
   assert.equal(Object.hasOwn(seenWhere,'NOT'),false);
   const unpaid=Object.fromEntries(rows.map((row)=>[row.id,row.unpaidAmount]));
   assert.equal(unpaid.signed,60);
@@ -59,9 +59,8 @@ test('合同选择器按用途划分：付款匹配不含草稿，发票关联�
  await service.listContractsForMatch('PURCHASE','甲','PAYMENT');
  await service.listContractsForMatch('PURCHASE','甲','INVOICE');
  await service.listContractsForMatch('SALES','',  'PAYMENT');
- const effective=['COMPLETED','PRODUCING','READY','RECEIVED','SHIPPED','SIGNED'];
  for(const where of wheres.slice(0,2)){
-  assert.deepEqual(where.status.in.slice().sort(),effective,'缺省与 PAYMENT 都只列已生效合同');
+  assert.deepEqual(where.status,{notIn:['DRAFT','CANCELLED']},'缺省与 PAYMENT 都排除草稿/已取消（应付口径）');
   assert.equal(Object.hasOwn(where,'NOT'),false);
   assert.equal(where.OR.length,2,'搜索条件保留');
  }
