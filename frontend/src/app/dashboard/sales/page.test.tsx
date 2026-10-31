@@ -214,6 +214,8 @@ describe("SalesPage 交互逻辑", () => {
             volume: 60,
             grossWeight: 1000,
             loadingUtilisation: {
+              containerType: "40HQ",
+              thresholdPct: 80,
               weightPct: 4.5,
               volumePct: 88.2,
               reachedBy: "volume",
@@ -228,6 +230,8 @@ describe("SalesPage 交互逻辑", () => {
             volume: 10,
             grossWeight: 1000,
             loadingUtilisation: {
+              containerType: "40HQ",
+              thresholdPct: 80,
               weightPct: 4.5,
               volumePct: 14.7,
               reachedBy: "none",

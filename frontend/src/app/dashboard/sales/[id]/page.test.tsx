@@ -17,6 +17,7 @@ const mockIsMobile = vi.fn(() => false);
 vi.mock("@/lib/hooks/useMobile", () => ({ useMobile: () => mockIsMobile() }));
 
 const mockGetById = vi.fn();
+const mockGetLoadingPlan = vi.fn();
 const mockProductGetAll = vi.fn();
 const mockStoreGetAll = vi.fn();
 const mockInventoryGetAll = vi.fn();
@@ -52,6 +53,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/services/sales.service", () => ({
   salesService: {
     getById: (...args: unknown[]) => mockGetById(...args),
+    getLoadingPlan: (...args: unknown[]) => mockGetLoadingPlan(...args),
     update: (...args: unknown[]) => mockUpdateSales(...args),
     addPackingItem: vi.fn(),
     updatePackingItem: vi.fn(),
@@ -129,10 +131,63 @@ vi.mock("@/components/finance/ForexVerificationPanel", () => ({
   },
 }));
 
+
+type PlanOverrides = {
+  ready?: boolean;
+  status?: "ready" | "under-utilised" | "blocked";
+  headline?: string;
+  blockers?: Array<{ code: string; message: string }>;
+};
+
+/** 职责：构造后端 loading-plan 响应夹具；横幅文案直接取自后端 check.headline。 */
+const planFixture = (overrides: PlanOverrides = {}) => ({
+  algorithm: "block-ep-v1",
+  containerType: "40HQ",
+  container: {
+    code: "40HQ",
+    label: "40HQ 高柜",
+    innerMm: { length: 12020, width: 2350, height: 2695 },
+    usableMm: { length: 12000, width: 2340, height: 2665 },
+    doorMm: { width: 2340, height: 2580 },
+    maxPayloadKg: 26460,
+    safeGrossKg: 22000,
+    safeVolumeCbm: 68,
+  },
+  availableTypes: [{ code: "40HQ", label: "40HQ 高柜" }],
+  lines: [],
+  containers: [],
+  unplaced: [],
+  totals: { cartons: 1, grossKg: 1000, cargoCbm: 60 },
+  check: {
+    ready: overrides.ready ?? true,
+    containerType: "40HQ",
+    status: overrides.status ?? "ready",
+    weightPct: 4.5,
+    volumePct: 88.2,
+    thresholdPct: 80,
+    reachedBy: "volume",
+    blockers: overrides.blockers ?? [],
+    warnings: [],
+    headline:
+      overrides.headline ??
+      "可出柜：体积 88.2%、毛重 4.5%，全部 1 箱已装入 1 个40HQ",
+  },
+});
+
+const blockedPlan = (code: string, message: string) =>
+  planFixture({
+    ready: false,
+    status: "blocked",
+    headline: message,
+    blockers: [{ code, message }],
+  });
+
 describe("SalesDetailPage 交互逻辑", () => {
   beforeEach(() => {
     mockIsMobile.mockReturnValue(false);
     mockGetById.mockReset();
+    mockGetLoadingPlan.mockReset();
+    mockGetLoadingPlan.mockResolvedValue({ data: planFixture() });
     mockProductGetAll.mockReset();
     mockStoreGetAll.mockReset();
     mockInventoryGetAll.mockReset();
@@ -534,6 +589,12 @@ describe("SalesDetailPage 交互逻辑", () => {
   });
 
   it("商业利用率达标但有箱件未装下时禁止确认发运", async () => {
+    mockGetLoadingPlan.mockResolvedValue({
+      data: blockedPlan(
+        "unplaced",
+        "仍有 1 箱装不下，共需 2 个40HQ，请拆分订单或更换柜型",
+      ),
+    });
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -563,12 +624,17 @@ describe("SalesDetailPage 交互逻辑", () => {
     renderPage("s-1");
 
     expect(
-      await screen.findByText("不可出货：仍有 1 箱未装下"),
+      await screen.findByText(
+        "不可出货：仍有 1 箱装不下，共需 2 个40HQ，请拆分订单或更换柜型",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认发运" })).toBeDisabled();
   });
 
   it("商业利用率达标但有明细未填箱数时禁止确认发运，与后端一致", async () => {
+    mockGetLoadingPlan.mockResolvedValue({
+      data: blockedPlan("missing-box-count", "1 行装箱明细未填写箱数"),
+    });
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -606,6 +672,12 @@ describe("SalesDetailPage 交互逻辑", () => {
   it.each(["SHIPPED", "ARRIVED", "COMPLETED"])(
     "已发运阶段 %s 的模拟异常明确标为历史核对",
     async (status) => {
+      mockGetLoadingPlan.mockResolvedValue({
+        data: blockedPlan(
+          "unplaced",
+          "仍有 1 箱装不下，共需 2 个40HQ，请拆分订单或更换柜型",
+        ),
+      });
       mockGetById.mockResolvedValue({
         data: {
           id: "s-1",
@@ -633,7 +705,9 @@ describe("SalesDetailPage 交互逻辑", () => {
       });
       renderPage("s-1");
       expect(
-        await screen.findByText("历史装箱数据待核对：仍有 1 箱未装下"),
+        await screen.findByText(
+          "历史装箱数据待核对：仍有 1 箱装不下，共需 2 个40HQ，请拆分订单或更换柜型",
+        ),
       ).toBeInTheDocument();
       expect(
         screen.getByText("当前资料的模拟结果，不代表实际发运结果"),
@@ -677,7 +751,8 @@ describe("SalesDetailPage 交互逻辑", () => {
     renderPage("s-1");
 
     const shipButton = await screen.findByRole("button", { name: "确认发运" });
-    expect(shipButton).toBeEnabled();
+    // 按钮在后端装柜计划返回前保持禁用（fail closed）。
+    await waitFor(() => expect(shipButton).toBeEnabled());
     await user.click(shipButton);
 
     expect(mockUpdateSalesStatus).toHaveBeenCalledWith("s-1", "SHIPPED");
@@ -718,6 +793,7 @@ describe("SalesDetailPage 交互逻辑", () => {
     const user = userEvent.setup();
     renderPage("s-1");
     const ship = await screen.findByRole("button", { name: "确认发运" });
+    await waitFor(() => expect(ship).toBeEnabled());
     await user.click(ship);
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith(message));
     expect(mockToastError).not.toHaveBeenCalledWith("状态推进失败");

@@ -2,6 +2,7 @@
 import { getAuthToken } from "@/lib/auth-token";
 import api from "@/lib/axios";
 import type { ApiResponse, PackingItem, SalesContract } from "@/types";
+import type { ContainerTypeCode, LoadingPlan } from "@/lib/containerLoading";
 import { createCrudService } from "./crudService";
 import { downloadResponseBlob } from "./fileDownload";
 import { runIdempotentRequest } from "@/lib/idempotentRequest";
@@ -428,6 +429,14 @@ export const salesService = {
       ApiResponse<TaxRefundPreparation>,
       ApiResponse<TaxRefundPreparation>
     >(`/sales/${id}/tax-refund-preparation`);
+  },
+
+  /** 只读装柜计划；containerType 仅用于模拟，确认发运门槛由后端固定按默认柜型。 */
+  getLoadingPlan: async (id: string, containerType?: ContainerTypeCode) => {
+    return api.get<ApiResponse<LoadingPlan>, ApiResponse<LoadingPlan>>(
+      `/sales/${id}/loading-plan`,
+      { params: containerType ? { containerType } : undefined },
+    );
   },
 
   /** 读取单柜美元收入、人民币成本、退税和现金流的统一财务口径。 */

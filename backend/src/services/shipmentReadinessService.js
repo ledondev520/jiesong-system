@@ -37,6 +37,8 @@ const checkUtilisation = (totals, spec, thresholdPct = loadContainerConfig().rea
   if (grossKg > spec.safeGrossKg) overReasons.push('weight');
   if (cargoCbm > spec.safeVolumeCbm) overReasons.push('volume');
   return {
+    containerType: spec.code,
+    thresholdPct,
     weightPct,
     volumePct,
     reachedBy: weightOk && volumeOk ? 'both' : weightOk ? 'weight' : volumeOk ? 'volume' : 'none',

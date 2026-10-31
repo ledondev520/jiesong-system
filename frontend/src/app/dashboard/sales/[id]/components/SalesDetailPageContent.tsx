@@ -1,5 +1,5 @@
 /**
- * Input: 出口合同详情、采购来源、40HQ 排柜、单证核对、退税准备与单柜财务 Interface
+ * Input: 出口合同详情、采购来源、后端装柜计划（默认 40HQ）、单证核对、退税准备与单柜财务 Interface
  * Output: 区分历史发运资料核对与实时出货门禁，原样提示阶段/合同头保存错误并保留失败头草稿，含发运后货物锁定与手机装箱明细卡片的排柜/发运、出口三单、申报单证、船司核对、退税材料、财务结算与核销跟进的专项单主页面
  * Pos: 出口专项单装柜主页面，复用采购完工资料并承载排柜到发运的唯一主线路
  *
@@ -103,15 +103,7 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  CONTAINER_40HQ,
-  SHIPPING_READY_THRESHOLD_PCT,
-  buildPackingBoxes,
-  countItemsMissingBoxes,
-  countItemsMissingDimensions,
-  evaluateShippingReadiness,
-  packBoxes,
-} from "@/lib/binPacking";
+import { summarizeLoadingPlan, type LoadingPlan } from "@/lib/containerLoading";
 import { formatDate } from "@/lib/date-format";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ContractFiles from "@/components/contract/ContractFiles";
@@ -643,15 +635,30 @@ export default function SalesDetailPage({ params }: PageProps) {
     [contract?.packingItems],
   );
   const sourceFieldsLocked = Boolean(editingItem?.purchaseItemId);
-  const packingBoxes = useMemo(
-    () => buildPackingBoxes(packingRows, products),
-    [packingRows, products],
-  );
-  const packingPlan = useMemo(() => packBoxes(packingBoxes), [packingBoxes]);
-  const estimatedDimensionCount = useMemo(
-    () => packingBoxes.filter((box) => box.isEstimated).length,
-    [packingBoxes],
-  );
+  // 排柜与出货检查全部来自后端 GET /sales/:id/loading-plan（与确认发运同一实现）。
+  // 计划绑定到取得它时的合同对象：合同刷新后旧计划立即失效（fail closed），不在 effect 内同步 setState。
+  const [planState, setPlanState] = useState<{
+    forContract: SalesContract;
+    plan: LoadingPlan | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!contract) return;
+    let cancelled = false;
+    salesService
+      .getLoadingPlan(id)
+      .then((res) => {
+        if (!cancelled) setPlanState({ forContract: contract, plan: res.data ?? null });
+      })
+      .catch(() => {
+        if (!cancelled) setPlanState({ forContract: contract, plan: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [contract, id]);
+  const loadingPlan = planState?.forContract === contract ? planState.plan : null;
+  const readiness = summarizeLoadingPlan(loadingPlan);
+  const estimatedDimensionCount = readiness.estimatedLineCount;
 
   /**
    * 职责：装箱明细行排序取值
@@ -817,28 +824,18 @@ export default function SalesDetailPage({ params }: PageProps) {
     return <div className="text-center py-10">合同不存在</div>;
   }
 
-  // 计算容量利用率
+  // 容量概览：限值来自装柜计划（后端配置），计划未加载时进度为 0。
+  const spec = loadingPlan?.container;
+  const maxWeight = spec?.safeGrossKg ?? 0;
+  const maxCBM = spec?.safeVolumeCbm ?? 0;
   const volumeUsed = contract.volume || 0;
   const weightUsed = contract.grossWeight || 0;
-  const weightPercent = Math.min(
-    (weightUsed / CONTAINER_40HQ.maxWeight) * 100,
-    100,
-  );
-
-  const maxCBM = CONTAINER_40HQ.maxVolume;
   const usedCBM = volumeUsed;
-  const cbmPercent = Math.min((usedCBM / maxCBM) * 100, 100);
-
-  // 出柜条件：毛重或体积任一利用率 ≥ 阈值（40HQ 限值与阈值见 binPacking / config/containers.json）
-  const readiness = evaluateShippingReadiness(weightUsed, usedCBM, {
-    unplacedBoxCount: packingPlan.unplacedBoxes.length,
-    packingItemCount: packingRows.length,
-    missingBoxItemCount: countItemsMissingBoxes(packingRows),
-    missingDimensionItemCount: countItemsMissingDimensions(
-      packingRows,
-      products,
-    ),
-  });
+  const weightPercent = maxWeight
+    ? Math.min((weightUsed / maxWeight) * 100, 100)
+    : 0;
+  const cbmPercent = maxCBM ? Math.min((usedCBM / maxCBM) * 100, 100) : 0;
+  const thresholdPct = readiness.thresholdPct ?? Infinity;
 
   const currentStepIndex = STATUS_ORDER[contract.status] ?? 0;
   const nextSalesAction = SALES_NEXT_ACTIONS[contract.status];
@@ -849,38 +846,10 @@ export default function SalesDetailPage({ params }: PageProps) {
     SalesStatus.ARRIVED,
     SalesStatus.COMPLETED,
   ].includes(contract.status);
-  const overloadText = [
-    readiness.overloadReasons.includes("weight")
-      ? `毛重超过 ${CONTAINER_40HQ.maxWeight / 1000}t`
-      : "",
-    readiness.overloadReasons.includes("volume")
-      ? `体积超过 ${CONTAINER_40HQ.maxVolume} CBM`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("、");
-  const readinessProblem =
-    packingRows.length === 0
-      ? "尚未录入装箱明细"
-      : readiness.missingBoxItemCount > 0
-        ? `${readiness.missingBoxItemCount} 行装箱明细未填写箱数`
-        : readiness.missingDimensionItemCount > 0
-          ? `${readiness.missingDimensionItemCount} 行缺少箱规和体积，无法排柜`
-          : readiness.overloaded
-            ? overloadText
-            : !readiness.physicalFit
-              ? `仍有 ${readiness.unplacedBoxCount} 箱未装下`
-              : readiness.ready
-                ? "满足出柜条件且全部箱件可装下"
-                : "未达出柜标准";
-  const readinessIsBlocking =
-    packingRows.length === 0 ||
-    readiness.missingBoxItemCount > 0 ||
-    readiness.overloaded ||
-    !readiness.physicalFit;
+  const readinessIsBlocking = readiness.blocking;
   const readinessHeadline = hasShipped
-    ? `历史装箱数据${readiness.ready ? "模拟核对" : "待核对"}：${readinessProblem}`
-    : `${readinessIsBlocking ? "不可出货：" : ""}${readinessProblem}`;
+    ? `历史装箱数据${readiness.ready ? "模拟核对" : "待核对"}：${readiness.headline}`
+    : `${readinessIsBlocking ? "不可出货：" : ""}${readiness.headline}`;
 
   return (
     <div className="min-w-0 space-y-6 pb-10">
@@ -1000,7 +969,9 @@ export default function SalesDetailPage({ params }: PageProps) {
           <span className="text-xs text-muted-foreground">
             {hasShipped
               ? "当前资料的模拟结果，不代表实际发运结果"
-              : `（毛重或体积任一利用率 ≥ ${SHIPPING_READY_THRESHOLD_PCT}%）`}
+              : readiness.thresholdPct !== null
+                ? `（毛重或体积任一利用率 ≥ ${readiness.thresholdPct}%）`
+                : ""}
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
@@ -1008,7 +979,7 @@ export default function SalesDetailPage({ params }: PageProps) {
           <span className="text-muted-foreground">毛重利用率</span>
           <span
             className={
-              readiness.weightPct >= SHIPPING_READY_THRESHOLD_PCT
+              readiness.weightPct >= thresholdPct
                 ? "font-semibold tabular-nums text-emerald-700 dark:text-emerald-400"
                 : "font-semibold tabular-nums"
             }
@@ -1016,7 +987,7 @@ export default function SalesDetailPage({ params }: PageProps) {
             {readiness.weightPct.toFixed(1)}%
           </span>
           <span className="text-muted-foreground">
-            / {CONTAINER_40HQ.maxWeight / 1000}t
+            / {maxWeight / 1000}t
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
@@ -1029,8 +1000,8 @@ export default function SalesDetailPage({ params }: PageProps) {
                 : "font-semibold text-red-700 dark:text-red-400"
             }
           >
-            已装 {packingPlan.placedBoxes.length} 箱 / 未装{" "}
-            {packingPlan.unplacedBoxes.length} 箱
+            已装 {readiness.placedBoxCount} 箱 / 未装{" "}
+            {readiness.unplacedBoxCount} 箱
           </span>
         </div>
         {estimatedDimensionCount > 0 && (
@@ -1045,7 +1016,7 @@ export default function SalesDetailPage({ params }: PageProps) {
           <span className="text-muted-foreground">体积利用率</span>
           <span
             className={
-              readiness.volumePct >= SHIPPING_READY_THRESHOLD_PCT
+              readiness.volumePct >= thresholdPct
                 ? "font-semibold tabular-nums text-emerald-700 dark:text-emerald-400"
                 : "font-semibold tabular-nums"
             }
@@ -1053,7 +1024,7 @@ export default function SalesDetailPage({ params }: PageProps) {
             {readiness.volumePct.toFixed(1)}%
           </span>
           <span className="text-muted-foreground">
-            / {CONTAINER_40HQ.maxVolume} CBM
+            / {maxCBM} CBM
           </span>
         </div>
       </div>
@@ -1099,7 +1070,7 @@ export default function SalesDetailPage({ params }: PageProps) {
                   {weightUsed.toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  毛重 (kg) / {CONTAINER_40HQ.maxWeight.toLocaleString()}
+                  毛重 (kg) / {maxWeight.toLocaleString()}
                 </p>
               </div>
             </div>
@@ -1158,7 +1129,7 @@ export default function SalesDetailPage({ params }: PageProps) {
               <div>
                 <p className="text-sm font-medium">{contract.contractNo}</p>
                 <p className="text-xs text-muted-foreground">
-                  {CONTAINER_40HQ.code} 标准货柜
+                  {spec?.label ?? "货柜"}
                 </p>
               </div>
             </div>
@@ -1168,8 +1139,9 @@ export default function SalesDetailPage({ params }: PageProps) {
                   尺寸
                 </p>
                 <p className="break-words text-sm font-medium tabular-nums">
-                  {CONTAINER_40HQ.length}×{CONTAINER_40HQ.width}×
-                  {CONTAINER_40HQ.height} mm
+                  {spec
+                    ? `${spec.innerMm.length}×${spec.innerMm.width}×${spec.innerMm.height} mm`
+                    : "—"}
                 </p>
               </div>
               <div className="space-y-1">
@@ -1563,12 +1535,13 @@ export default function SalesDetailPage({ params }: PageProps) {
                 3D 装箱可视化
               </CardTitle>
               <CardDescription>
-                {CONTAINER_40HQ.code} 标准货柜 ({CONTAINER_40HQ.length}×
-                {CONTAINER_40HQ.width}×{CONTAINER_40HQ.height} mm)
+                {spec
+                  ? `${spec.label} 标准货柜 (${spec.innerMm.length}×${spec.innerMm.width}×${spec.innerMm.height} mm)`
+                  : "装柜计划加载中"}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {contract.packingItems && contract.packingItems.length > 0 ? (
+              {loadingPlan && loadingPlan.containers.length > 0 ? (
                 <Suspense
                   fallback={
                     <div className="h-[500px] flex items-center justify-center">
@@ -1576,14 +1549,11 @@ export default function SalesDetailPage({ params }: PageProps) {
                     </div>
                   }
                 >
-                  <Container3DView
-                    packingItems={contract.packingItems}
-                    products={products}
-                  />
+                  <Container3DView plan={loadingPlan} />
                 </Suspense>
               ) : (
                 <div className="h-[500px] flex items-center justify-center text-muted-foreground">
-                  请先添加装箱商品以查看3D效果
+                  请先添加装箱商品并填写箱数、箱规以查看3D效果
                 </div>
               )}
             </CardContent>

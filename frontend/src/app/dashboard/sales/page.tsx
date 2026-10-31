@@ -1,5 +1,5 @@
 /**
- * Input: 出口合同服务 (salesService)（含后端 loadingUtilisation 汇总利用率）、binPacking（柜型常量）、通用表格排序 hook、按需 Excel 导入 Module
+ * Input: 出口合同服务 (salesService)（含后端 loadingUtilisation 汇总利用率）、通用表格排序 hook、按需 Excel 导入 Module
  * Output: 出口合同列表页面（含前置搜索、删除、列排序和分页、出柜条件徽章）
  * Pos: 出口合同管理入口，展示合同列表、货柜信息与出柜双80%指标，支持删除操作
  *
@@ -23,7 +23,6 @@ import {
 } from "react";
 import { SalesContract, SalesStatus } from "@/types";
 import { salesService } from "@/services/sales.service";
-import { CONTAINER_40HQ, SHIPPING_READY_THRESHOLD_PCT } from "@/lib/binPacking";
 import { clearApiGetCache } from "@/lib/axios";
 import { runAwait } from "@/lib/run-await";
 import { useTabSync } from "@/lib/tab-sync";
@@ -83,6 +82,8 @@ import { useTableSort } from "@/lib/hooks/useTableSort";
 // 后端列表接口附带的 40HQ 汇总利用率（未排柜，百分比未取整）。
 type SalesRow = SalesContract & {
   loadingUtilisation?: {
+    containerType: string;
+    thresholdPct: number;
     weightPct: number;
     volumePct: number;
     utilisationReady: boolean;
@@ -582,7 +583,7 @@ export default function SalesPage() {
               {contract.contractNo}
             </span>
             <span className="text-[10px] text-muted-foreground">
-              {CONTAINER_40HQ.code}
+              {utilisation?.containerType}
             </span>
             {beforeShipment &&
               utilisation &&
@@ -593,9 +594,9 @@ export default function SalesPage() {
               ) : (
                 <span
                   className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700"
-                  title={`毛重 ${pctText(utilisation.weightPct)}% / 体积 ${pctText(utilisation.volumePct)}%，任一 ≥ ${SHIPPING_READY_THRESHOLD_PCT}% 视为利用率达标；是否装得下以详情页排柜为准`}
+                  title={`毛重 ${pctText(utilisation.weightPct)}% / 体积 ${pctText(utilisation.volumePct)}%，任一 ≥ ${utilisation.thresholdPct}% 视为利用率达标；是否装得下以详情页排柜为准`}
                 >
-                  未达{SHIPPING_READY_THRESHOLD_PCT}%
+                  未达{utilisation.thresholdPct}%
                 </span>
               ))}
           </div>
