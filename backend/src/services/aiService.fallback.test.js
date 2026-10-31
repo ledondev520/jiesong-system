@@ -158,6 +158,11 @@ test('aiService fallback (mocked transport): chat, SSE, parse, usage model, brea
       const skipped = await ai.chat('u1', 's9', 'three');
       assert.equal(count('primary'), 2, 'open breaker skips the primary'); assert.equal(skipped.message, 'B');
       assert.equal(skipped.model, 'deepseek-flash');
+      // 13) greeting-style callers can opt out; the default client is the wrapped one
+      useFallback(); config.ai = { provider: 'kimi', apiKey: 'test-only-primary-key', baseUrl: 'https://primary.invalid/v1' };
+      assert.equal((await ai.getOpenAIClient({ fallback: false })).apiKey, 'test-only-primary-key', 'raw SDK client');
+      assert.equal((await ai.getOpenAIClient()).apiKey, undefined, 'fallback wrapper');
+      config.ai = { ...baseAi };
       console.log('fallback synthetic checks completed');
     })().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => prisma.$disconnect());
   `;

@@ -195,7 +195,7 @@ const getFallbackClient = async () => {
 };
 
 // 初始化OpenAI客户端（用于流式调用）；所有调用方（聊天、解析、HS、Agent）都经此处，回退只在这一处接入。
-const getOpenAIClient = async () => {
+const getOpenAIClient = async ({ fallback = true } = {}) => {
   if (shouldForceLocalAI) return null;
   const active = getActiveAIConfig();
   const apiKey = isDeepSeek() ? await resolveDeepSeekKey(active.apiKey) : active.apiKey;
@@ -205,12 +205,14 @@ const getOpenAIClient = async () => {
   const primary = isOpenAI()
     ? wrapOpenAIClient(client, { maxRetries: active.maxRetries, maxOutputTokens: active.maxOutputTokens })
     : client;
-  return isFallbackEnabled()
+  // 问候等极短 deadline 的调用不回退（否则 300ms 超时会触发一次被丢弃的付费调用）
+  return fallback && isFallbackEnabled()
     ? wrapWithFallback({
       primary,
       getFallback: getFallbackClient,
       breaker: getFallbackBreaker(),
-      getRequestOptions: () => getAIRequestOptions(),
+      getRequestOptions: (timeoutMs) => getAIRequestOptions(timeoutMs),
+      deadlineMs: kimiRequestTimeoutMs,
     })
     : primary;
 };
@@ -1038,7 +1040,7 @@ const MAYDAY_SONGS = [
  */
 const generateGreeting = async () => {
   if (usesUpstreamUsage()) return getLocalGreeting();
-  const client = await getOpenAIClient();
+  const client = await getOpenAIClient({ fallback: false });
   if (!client) {
     return getLocalGreeting();
   }

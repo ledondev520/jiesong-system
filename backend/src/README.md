@@ -92,7 +92,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | financialEvidenceTransferService.js | 指定资料的版本化跨机迁移包、完整性及目标预检、冲突拒绝与事务内仅新增回读；由 financial-evidence-transfer.js 强制私有文件及实际SQLite在线备份 |
 | ai/contextService.js | 按当前销售合同港口关联构造美元上下文；局部查询失败保留其他资料并提示不可用，解析汇率后继续拼接财务概况 |
 | aiService.js | OpenAI/DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量；可选 `AI_FALLBACK_PROVIDER=deepseek` 经唯一的 `getOpenAIClient` 接入，用量记录实际作答模型 |
-| ai/fallbackClient.js | 主 AI 调用失败（网络/超时/429/5xx/提供方 4xx）时同一请求透明改发 DeepSeek 一次：流已输出分片则不拼接、取消与本地错误不回退、双失败抛主错误；进程内熔断（连续失败直连、冷却后半开探测）；聊天/SSE/解析/HS/Agent 共用 |
+| ai/fallbackClient.js | 主 AI 调用失败（网络/超时/429/5xx/提供方 4xx）时同一请求透明改发 DeepSeek 一次：流已输出正文/推理/工具调用则不拼接、总预算 50s、取消与本地错误不回退、双失败抛主错误；进程内熔断（连续失败直连、冷却后半开探测）；聊天/SSE/解析/HS/Agent 共用 |
 | anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |
 | openAgentService.js | 出口详情复用销售服务从装箱行计算拼柜来源；内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放；SDK 错误终止传播为 503/SSE error，不写成功记录 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |

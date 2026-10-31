@@ -5,6 +5,8 @@
  * Note: 不含任何密钥；日志只含状态码/错误名，不含提示词。流一旦向调用方产出过分片就不再切换（不拼接两个 provider）。
  *       双方都失败时抛出主调用的原始错误，用户看到的错误文案与未启用回退时一致。
  */
+const OpenAI = require('openai');
+
 const DEEPSEEK_PROFILE = Object.freeze({
   model: 'deepseek-flash',
   thinking: Object.freeze({ type: 'enabled' }),
@@ -15,6 +17,10 @@ const DEEPSEEK_PROFILE = Object.freeze({
 const DEEPSEEK_SUPPORTS_IMAGES = true;
 // 现有 DeepSeek 路径的 max_tokens 从未超过 aiMaxTokens 上限 8192。
 const DEEPSEEK_MAX_TOKENS = 8192;
+// 整个请求（主调用 + 回退）的总预算：低于 nginx proxy_read_timeout / axios 的 60s，留出上下文构建与落库时间。
+const OVERALL_BUDGET_MS = 50000;
+// 剩余预算不足此值时不再发起回退。
+const MIN_FALLBACK_MS = 3000;
 const NETWORK_CODES = new Set([
   'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'EPIPE',
   'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT',
@@ -24,21 +30,28 @@ const hasImageInput = (body) => (Array.isArray(body?.messages) ? body.messages :
   (message) => Array.isArray(message?.content) && message.content.some((part) => part?.type === 'image_url' || part?.type === 'image'),
 );
 
+const causeChain = function* (error) {
+  for (let current = error, depth = 0; current && depth < 5; current = current.cause, depth += 1) yield current;
+};
+
 /**
+ * 真实 openai SDK 的错误类 name 都是 'Error'，必须用 instanceof；errno 在 error.cause 上。
  * 'abort'    用户/调用方取消：不回退
- * 'systemic' 网络、超时、429、5xx、401/403/404/408：回退并计入熔断
+ * 'systemic' 网络、超时、429、5xx、401/403/404/408、无状态码的 SDK 错误（如流内 error 事件）：回退并计入熔断
  * 'provider' 其他提供方 4xx（如 400/413/422）：回退，但不计入熔断（上游可达）
  * 'other'    非提供方错误（本地 TypeError、无超时原因的 AbortError 等）：不回退
  */
 const classifyFailure = (error, signal) => {
   if (signal?.aborted) return signal.reason?.name === 'TimeoutError' ? 'systemic' : 'abort';
-  const name = String(error?.name || '');
-  if (name === 'TimeoutError') return 'systemic';
-  const status = Number(error?.status);
+  if (!error) return 'other';
+  if (error instanceof OpenAI.APIUserAbortError) return 'abort';
+  if (error instanceof OpenAI.APIConnectionError || error.name === 'TimeoutError') return 'systemic';
+  const status = Number(error.status);
   if (Number.isInteger(status) && status >= 400 && status <= 599) {
     return status === 429 || status >= 500 || [401, 403, 404, 408].includes(status) ? 'systemic' : 'provider';
   }
-  if (/^API(Connection|ConnectionTimeout)?Error$/.test(name) || NETWORK_CODES.has(error?.code)) return 'systemic';
+  if (error instanceof OpenAI.APIError) return 'systemic';
+  for (const link of causeChain(error)) if (NETWORK_CODES.has(link.code)) return 'systemic';
   return 'other';
 };
 
@@ -102,16 +115,24 @@ const tag = (target, servedBy, deadlineSignal) => {
   return target;
 };
 
+/** 只有真正会展示给用户的分片（正文/推理/工具调用）才算已送达；role、usage、空分片不算。 */
+const isDeliverable = (chunk) => {
+  const delta = chunk?.choices?.[0]?.delta;
+  return Boolean(delta?.content || delta?.reasoning_content || delta?.tool_calls?.length);
+};
+
 /**
  * @param {object} deps
  * @param {object} deps.primary 主客户端（chat.completions.create）
  * @param {() => Promise<object|null>} deps.getFallback 懒加载 DeepSeek 客户端；不可用返回 null
  * @param {ReturnType<typeof createBreaker>} deps.breaker
- * @param {() => object} deps.getRequestOptions 回退调用的全新 deadline（主调用的 deadline 可能已耗尽）
+ * @param {(timeoutMs: number) => object} deps.getRequestOptions 回退调用的全新 deadline（主调用的 deadline 可能已耗尽）
+ * @param {number} deps.deadlineMs 单次调用的完整响应 deadline
  * @param {boolean} [deps.supportsImages]
  */
 const wrapWithFallback = ({
-  primary, getFallback, breaker, getRequestOptions, supportsImages = DEEPSEEK_SUPPORTS_IMAGES, log = console.warn,
+  primary, getFallback, breaker, getRequestOptions, deadlineMs,
+  supportsImages = DEEPSEEK_SUPPORTS_IMAGES, log = console.warn, now = Date.now,
 }) => {
   const servedBy = { provider: 'deepseek', model: DEEPSEEK_PROFILE.model };
 
@@ -119,19 +140,26 @@ const wrapWithFallback = ({
     try { return await getFallback(); } catch { return null; }
   };
 
-  /** 失败时抛主错误，用户看到的文案与未启用回退时一致；回退不可用同样抛主错误。 */
-  const startFallback = async (body, options, primaryError) => {
-    const client = await resolveFallback();
+  /** 剩余总预算内的全新 deadline；预算不足返回 null（不再回退）。 */
+  const budgetedOptions = (startedAt) => {
+    const remaining = OVERALL_BUDGET_MS - (now() - startedAt);
+    return remaining < MIN_FALLBACK_MS ? null : getRequestOptions(Math.min(deadlineMs, remaining));
+  };
+
+  /** 失败时抛主错误，用户看到的文案与未启用回退时一致；回退不可用/无预算同样抛主错误。 */
+  const startFallback = async (body, startedAt, primaryError) => {
+    const options = budgetedOptions(startedAt);
+    const client = options && await resolveFallback();
     if (!client) throw primaryError;
     try {
-      return await client.chat.completions.create(buildFallbackBody(body), options);
+      return { result: await client.chat.completions.create(buildFallbackBody(body), options), options };
     } catch (fallbackError) {
       log(`[ai-fallback] fallback failed (${describe(fallbackError)})`);
       throw primaryError;
     }
   };
 
-  const wrapStream = (stream, body, options) => {
+  const wrapStream = (stream, body, options, startedAt) => {
     let current = stream;
     let served;
     let deadlineSignal;
@@ -140,60 +168,89 @@ const wrapWithFallback = ({
       get servedBy() { return served; },
       get deadlineSignal() { return deadlineSignal; },
       async *[Symbol.asyncIterator]() {
-        let yielded = false;
+        let delivered = false;
+        const held = [];
+        let error;
         try {
           for await (const chunk of stream) {
-            if (!yielded) { yielded = true; breaker.record(true); }
+            if (delivered) { yield chunk; continue; }
+            held.push(chunk);
+            if (isDeliverable(chunk)) {
+              delivered = true;
+              breaker.record(true);
+              yield* held.splice(0);
+            }
+          }
+        } catch (caught) {
+          error = caught;
+        }
+        // SDK 会吞掉 deadline 的 AbortError：流“正常结束”但 signal 已中止，同样是失败
+        if (!error && !options?.signal?.aborted) {
+          if (!delivered) breaker.record(true);
+          yield* held;
+          return;
+        }
+        const kind = classifyFailure(error, options?.signal);
+        if (kind === 'abort' || kind === 'other') breaker.release();
+        else breaker.record(kind === 'provider');
+        if (delivered || kind === 'abort' || kind === 'other') {
+          if (error) throw error;
+          return; // 调用方（streamHelpers）会按 deadline 抛出
+        }
+        const primaryError = error || options.signal.reason;
+        log(`[ai-fallback] primary stream failed before any content (${describe(primaryError)}), using deepseek`);
+        const fallback = await startFallback(body, startedAt, primaryError);
+        current = fallback.result;
+        served = servedBy;
+        deadlineSignal = fallback.options.signal;
+        let fallbackDelivered = false;
+        try {
+          for await (const chunk of fallback.result) {
+            fallbackDelivered = true;
             yield chunk;
           }
-          if (!yielded) breaker.record(true);
-          return;
-        } catch (error) {
-          const kind = classifyFailure(error, options?.signal);
-          if (kind === 'abort' || kind === 'other') breaker.release();
-          else breaker.record(kind === 'provider');
-          if (yielded || kind === 'abort' || kind === 'other') throw error;
-          log(`[ai-fallback] primary stream failed before first chunk (${describe(error)}), using deepseek`);
-          const fallbackOptions = getRequestOptions();
-          const fallbackStream = await startFallback(body, fallbackOptions, error);
-          current = fallbackStream;
-          served = servedBy;
-          deadlineSignal = fallbackOptions.signal;
-          let fallbackYielded = false;
-          try {
-            for await (const chunk of fallbackStream) {
-              fallbackYielded = true;
-              yield chunk;
-            }
-          } catch (fallbackError) {
-            log(`[ai-fallback] fallback stream failed (${describe(fallbackError)})`);
-            throw fallbackYielded ? fallbackError : error;
-          }
+        } catch (fallbackError) {
+          log(`[ai-fallback] fallback stream failed (${describe(fallbackError)})`);
+          throw fallbackDelivered ? fallbackError : primaryError;
         }
       },
     };
   };
 
-  const create = async (body, options) => {
-    if (hasImageInput(body) && !supportsImages) return primary.chat.completions.create(body, options);
+  const create = async (body, requestOptions) => {
+    if (hasImageInput(body) && !supportsImages) return primary.chat.completions.create(body, requestOptions);
+    const startedAt = now();
+    let options = requestOptions;
+    let fallbackTried = false;
     if (breaker.acquire() === 'skip') {
       const client = await resolveFallback();
-      // 熔断打开时直连 DeepSeek；其错误原样抛出（没有主错误可代替）。回退不可用则仍走主调用。
-      if (client) return tag(await client.chat.completions.create(buildFallbackBody(body), options), servedBy);
+      if (client) {
+        // 熔断打开时直连 DeepSeek；它失败而主调用可能已恢复时，在剩余预算内再试一次主调用。
+        try {
+          return tag(await client.chat.completions.create(buildFallbackBody(body), options), servedBy);
+        } catch (fallbackError) {
+          const kind = classifyFailure(fallbackError, options?.signal);
+          const retryOptions = kind === 'abort' || kind === 'other' ? null : budgetedOptions(startedAt);
+          if (!retryOptions) throw fallbackError;
+          log(`[ai-fallback] breaker-open fallback failed (${describe(fallbackError)}), trying primary`);
+          options = retryOptions;
+          fallbackTried = true;
+        }
+      }
     }
     try {
       const result = await primary.chat.completions.create(body, options);
-      if (body?.stream === true) return wrapStream(result, body, options);
+      if (body?.stream === true) return wrapStream(result, body, options, startedAt);
       breaker.record(true);
       return result;
     } catch (error) {
       const kind = classifyFailure(error, options?.signal);
       if (kind === 'abort' || kind === 'other') breaker.release();
       else breaker.record(kind === 'provider');
-      if (kind === 'abort' || kind === 'other') throw error;
+      if (fallbackTried || kind === 'abort' || kind === 'other') throw error;
       log(`[ai-fallback] primary failed (${describe(error)}), using deepseek`);
-      const fallbackOptions = getRequestOptions();
-      return tag(await startFallback(body, fallbackOptions, error), servedBy, fallbackOptions.signal);
+      const fallback = await startFallback(body, startedAt, error);
+      return tag(fallback.result, servedBy, fallback.options.signal);
     }
   };
 
@@ -208,4 +265,6 @@ module.exports = {
   hasImageInput,
   DEEPSEEK_PROFILE,
   DEEPSEEK_SUPPORTS_IMAGES,
+  OVERALL_BUDGET_MS,
+  MIN_FALLBACK_MS,
 };

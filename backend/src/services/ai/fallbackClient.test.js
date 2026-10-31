@@ -7,11 +7,14 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const OpenAI = require('openai');
 const {
   wrapWithFallback, createBreaker, classifyFailure, buildFallbackBody, DEEPSEEK_PROFILE,
 } = require('./fallbackClient');
 
-const apiError = (status, extra = {}) => Object.assign(new Error(`status ${status}`), { name: 'APIError', status, ...extra });
+// 真实 SDK 错误类（name 均为 'Error'，靠 instanceof 区分）
+const apiError = (status, extra = {}) => Object.assign(new OpenAI.APIError(status, { message: `status ${status}` }, `status ${status}`, new Headers()), extra);
+const content = (text) => ({ choices: [{ delta: { content: text } }] });
 const textBody = { model: 'primary-model', messages: [{ role: 'user', content: 'hi' }], temperature: 0.6, max_tokens: 20000 };
 const imageBody = { ...textBody, messages: [{ role: 'user', content: [{ type: 'text', text: 'x' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,AA==' } }] }] };
 // 每次返回新对象：回退会给响应打非枚举 servedBy 标记，共享对象会串测试
@@ -33,17 +36,18 @@ const asyncStream = (chunks, { failAt } = {}) => ({
 });
 const collect = async (stream) => { const out = []; for await (const chunk of stream) out.push(chunk); return out; };
 
-const build = ({ primary, fallback, threshold = 3, cooldownMs = 1000, now = () => 0, supportsImages, fallbackAvailable = true }) => {
+const build = ({ primary, fallback, threshold = 3, cooldownMs = 1000, now = () => 0, supportsImages, fallbackAvailable = true, wallClock = () => 0 }) => {
   const logs = [];
   const log = (line) => logs.push(line);
   const breaker = createBreaker({ threshold, cooldownMs, now, log });
-  const freshOptions = { timeout: 1, signal: new AbortController().signal, fresh: true };
+  const freshOptions = { signal: new AbortController().signal, fresh: true };
+  const requestedTimeouts = [];
   const client = wrapWithFallback({
-    primary, breaker, log, supportsImages,
+    primary, breaker, log, supportsImages, now: wallClock, deadlineMs: 30000,
     getFallback: async () => (fallbackAvailable ? fallback : null),
-    getRequestOptions: () => freshOptions,
+    getRequestOptions: (timeoutMs) => { requestedTimeouts.push(timeoutMs); return { ...freshOptions, timeout: timeoutMs }; },
   });
-  return { client, breaker, logs, freshOptions };
+  return { client, breaker, logs, freshOptions, requestedTimeouts };
 };
 
 test('primary 5xx -> same request answered by DeepSeek, tagged, DeepSeek profile applied', async () => {
@@ -61,16 +65,18 @@ test('primary 5xx -> same request answered by DeepSeek, tagged, DeepSeek profile
   assert.equal(sent.body.max_tokens, 8192);
   assert.equal(Object.hasOwn(sent.body, 'temperature'), false);
   assert.deepEqual(sent.body.messages, textBody.messages);
-  assert.equal(sent.options, freshOptions, 'fallback gets its own deadline, not the exhausted primary one');
+  assert.equal(sent.options.signal, freshOptions.signal, 'fallback gets its own deadline, not the exhausted primary one');
 });
 
 test('fallback triggers: timeout, deadline signal, network, 429, 401/404, other provider 4xx', async () => {
   const timedOut = new AbortController();
   timedOut.abort(Object.assign(new Error('t'), { name: 'TimeoutError' }));
   const cases = [
-    [Object.assign(new Error('t'), { name: 'APIConnectionTimeoutError' }), undefined],
-    [Object.assign(new Error('x'), { name: 'APIUserAbortError' }), timedOut.signal],
-    [Object.assign(new Error('x'), { code: 'ECONNRESET' }), undefined],
+    [new OpenAI.APIConnectionTimeoutError(), undefined],
+    [new OpenAI.APIConnectionError({ cause: Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }) }), undefined],
+    [new OpenAI.APIUserAbortError(), timedOut.signal],
+    [Object.assign(new Error('x'), { cause: Object.assign(new Error('reset'), { code: 'ECONNRESET' }) }), undefined],
+    [new OpenAI.APIError(undefined, { message: 'stream error event' }, 'stream error event', new Headers()), undefined],
     [apiError(429), undefined],
     [apiError(429, { code: 'insufficient_quota' }), undefined],
     [apiError(401), undefined],
@@ -93,7 +99,8 @@ test('no fallback for our own errors or a user abort; the original error is thro
   userAbort.abort(Object.assign(new Error('cancel'), { name: 'AbortError' }));
   const cases = [
     [new TypeError('our bug'), {}],
-    [Object.assign(new Error('cancel'), { name: 'APIUserAbortError' }), { signal: userAbort.signal }],
+    [new OpenAI.APIUserAbortError(), { signal: userAbort.signal }],
+    [new OpenAI.APIUserAbortError(), {}],
     [Object.assign(new Error('cancel'), { name: 'AbortError' }), {}],
   ];
   for (const [error, options] of cases) {
@@ -104,6 +111,7 @@ test('no fallback for our own errors or a user abort; the original error is thro
     assert.equal(fallback.calls.length, 0);
   }
   assert.equal(classifyFailure(new Error('plain')), 'other');
+  assert.equal(classifyFailure(Object.assign(new Error('x'), { name: 'APIConnectionError' })), 'other', 'name alone proves nothing');
 });
 
 test('both fail -> the primary error surfaces so existing graceful messages are unchanged', async () => {
@@ -201,14 +209,14 @@ test('image request with unsupported fallback -> primary only, existing error pa
 
 test('streaming: creation failure and failure before the first chunk fall back; shape stays a chunk iterator', async () => {
   const streamBody = { ...textBody, stream: true };
-  const fbChunks = [{ choices: [{ delta: { content: 'A' } }] }, { choices: [], usage: { prompt_tokens: 1, completion_tokens: 1 } }];
+  const fbChunks = [content('A'), { choices: [], usage: { prompt_tokens: 1, completion_tokens: 1 } }];
 
   const created = build({ primary: fakeClient(() => { throw apiError(502); }), fallback: fakeClient(() => asyncStream(fbChunks)) });
   const direct = await created.client.chat.completions.create(streamBody, {});
   assert.deepEqual(await collect(direct), fbChunks);
   assert.equal(direct.servedBy.model, 'deepseek-flash');
 
-  const early = build({ primary: fakeClient(() => asyncStream([{ x: 1 }], { failAt: 0 })), fallback: fakeClient(() => asyncStream(fbChunks)) });
+  const early = build({ primary: fakeClient(() => asyncStream([content('x')], { failAt: 0 })), fallback: fakeClient(() => asyncStream(fbChunks)) });
   const wrapped = await early.client.chat.completions.create(streamBody, { signal: 'primary' });
   assert.equal(wrapped.servedBy, undefined);
   assert.deepEqual(await collect(wrapped), fbChunks);
@@ -218,12 +226,12 @@ test('streaming: creation failure and failure before the first chunk fall back; 
 });
 
 test('streaming: failure after a chunk was delivered is not spliced onto DeepSeek', async () => {
-  const fallback = fakeClient(() => asyncStream([{ choices: [{ delta: { content: 'B' } }] }]));
-  const { client } = build({ primary: fakeClient(() => asyncStream([{ a: 1 }, { a: 2 }], { failAt: 1 })), fallback });
+  const fallback = fakeClient(() => asyncStream([content('B')]));
+  const { client } = build({ primary: fakeClient(() => asyncStream([content('a1'), content('a2')], { failAt: 1 })), fallback });
   const wrapped = await client.chat.completions.create({ ...textBody, stream: true }, {});
   const seen = [];
   await assert.rejects(async () => { for await (const chunk of wrapped) seen.push(chunk); }, (error) => error.status === 503);
-  assert.deepEqual(seen, [{ a: 1 }]);
+  assert.deepEqual(seen, [content('a1')]);
   assert.equal(fallback.calls.length, 0);
 });
 
@@ -245,4 +253,76 @@ test('buildFallbackBody maps OpenAI-only fields and keeps tools/stream options',
   assert.equal(body.model, 'deepseek-flash');
   assert.deepEqual(body.tools, [{ type: 'function' }]);
   assert.deepEqual(body.stream_options, { include_usage: true });
+});
+
+test('overall budget: fallback deadline is min(deadline, 50s - elapsed); no fallback when under 3s remain', async () => {
+  let clock = 0;
+  const primary = fakeClient(() => { clock += 30000; throw apiError(503); });
+  const fallback = fakeClient(okResponse);
+  const slow = build({ primary, fallback, wallClock: () => clock });
+  const result = await slow.client.chat.completions.create(textBody, {});
+  assert.equal(result.servedBy.provider, 'deepseek');
+  assert.deepEqual(slow.requestedTimeouts, [20000], 'primary used 30s of the 50s budget');
+  assert.equal(fallback.calls[0].options.timeout, 20000);
+
+  clock = 0;
+  const fast = build({ primary: fakeClient(() => { clock += 100; throw apiError(503); }), fallback: fakeClient(okResponse), wallClock: () => clock });
+  await fast.client.chat.completions.create(textBody, {});
+  assert.deepEqual(fast.requestedTimeouts, [30000], 'a quick failure still gets the full 30s');
+
+  clock = 0;
+  const error = apiError(503);
+  const spent = fakeClient(() => { clock += 48000; throw error; });
+  const none = fakeClient(okResponse);
+  const late = build({ primary: spent, fallback: none, wallClock: () => clock });
+  await assert.rejects(late.client.chat.completions.create(textBody, {}), (thrown) => thrown === error);
+  assert.equal(none.calls.length, 0, 'under 3s left -> primary error, no fallback call');
+});
+
+test('breaker open: DeepSeek failure tries the primary once in the remaining budget; primary error wins if it fails too', async () => {
+  const breaker = (primary, fallback) => {
+    const built = build({ primary, fallback, threshold: 1 });
+    built.breaker.record(false); // open
+    return built;
+  };
+  const healthy = breaker(fakeClient(okResponse), fakeClient(() => { throw apiError(500); }));
+  const answered = await healthy.client.chat.completions.create(textBody, {});
+  assert.equal(answered.servedBy, undefined, 'primary answered');
+  assert.equal(healthy.requestedTimeouts.length, 1);
+
+  const primaryError = apiError(503);
+  const bothDown = breaker(fakeClient(() => { throw primaryError; }), fakeClient(() => { throw apiError(500); }));
+  await assert.rejects(bothDown.client.chat.completions.create(textBody, {}), (thrown) => thrown === primaryError);
+  assert.equal(bothDown.logs.filter((line) => line.includes('using deepseek')).length, 0, 'no second fallback attempt');
+});
+
+test('stream: empty role/usage chunks are held back; only content/reasoning/tool_calls count as delivered', async () => {
+  const role = { choices: [{ delta: { role: 'assistant', content: '' } }] };
+  const fbChunks = [content('F')];
+  const stalls = { controller: {}, async *[Symbol.asyncIterator]() { yield role; throw apiError(503); } };
+  const fell = build({ primary: fakeClient(() => stalls), fallback: fakeClient(() => asyncStream(fbChunks)) });
+  assert.deepEqual(await collect(await fell.client.chat.completions.create({ ...textBody, stream: true }, {})), fbChunks);
+
+  for (const delta of [{ reasoning_content: 'r' }, { tool_calls: [{ index: 0 }] }]) {
+    const chunk = { choices: [{ delta }] };
+    const delivered = { controller: {}, async *[Symbol.asyncIterator]() { yield role; yield chunk; throw apiError(503); } };
+    const kept = build({ primary: fakeClient(() => delivered), fallback: fakeClient(() => asyncStream(fbChunks)) });
+    const seen = [];
+    await assert.rejects(async () => { for await (const c of await kept.client.chat.completions.create({ ...textBody, stream: true }, {})) seen.push(c); });
+    assert.deepEqual(seen, [role, chunk], 'held role chunk is released before the first real chunk');
+  }
+
+  const usageOnly = [{ choices: [], usage: { prompt_tokens: 1 } }];
+  const ended = build({ primary: fakeClient(() => asyncStream(usageOnly)), fallback: fakeClient(okResponse) });
+  assert.deepEqual(await collect(await ended.client.chat.completions.create({ ...textBody, stream: true }, {})), usageOnly, 'held chunks are flushed on a clean end');
+});
+
+test('half-open probe whose stream ends cleanly (even empty) closes the breaker', async () => {
+  let clock = 0;
+  const primary = fakeClient(() => asyncStream([]));
+  const { client, breaker } = build({ primary, fallback: fakeClient(okResponse), threshold: 1, cooldownMs: 10, now: () => clock });
+  breaker.record(false);
+  clock = 10;
+  await collect(await client.chat.completions.create({ ...textBody, stream: true }, {}));
+  assert.equal(breaker.state, 'closed');
 });
