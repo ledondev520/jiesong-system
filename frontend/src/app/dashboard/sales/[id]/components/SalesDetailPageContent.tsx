@@ -104,15 +104,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { summarizeLoadingPlan, type LoadingPlan } from "@/lib/containerLoading";
+import ContainerLoadingPanel from "@/components/container/ContainerLoadingPanel";
 import { formatDate } from "@/lib/date-format";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ContractFiles from "@/components/contract/ContractFiles";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// 动态导入 3D 组件（避免 SSR 问题）
-const Container3DView = lazy(
-  () => import("@/components/container/Container3DView"),
-);
 const GenerateThreeFormsDialog = lazy(() =>
   import("@/components/dialog/GenerateThreeFormsDialog").then((module) => ({
     default: module.GenerateThreeFormsDialog,
@@ -1541,19 +1538,15 @@ export default function SalesDetailPage({ params }: PageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {loadingPlan && loadingPlan.containers.length > 0 ? (
-                <Suspense
-                  fallback={
-                    <div className="h-[500px] flex items-center justify-center">
-                      加载3D场景...
-                    </div>
-                  }
-                >
-                  <Container3DView plan={loadingPlan} />
-                </Suspense>
+              {loadingPlan ? (
+                <ContainerLoadingPanel
+                  plan={loadingPlan}
+                  salesContractId={contract.id}
+                  contractNo={contract.contractNo}
+                />
               ) : (
-                <div className="h-[500px] flex items-center justify-center text-muted-foreground">
-                  请先添加装箱商品并填写箱数、箱规以查看3D效果
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                  装柜计划加载中
                 </div>
               )}
             </CardContent>
