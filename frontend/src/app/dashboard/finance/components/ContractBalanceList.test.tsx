@@ -1,6 +1,6 @@
 /** 应付/应收页签：顶部合计取后端统计（与财务概览同源），行内登记只对有余额的合同可用，加载失败可重试。 */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ContractBalanceList } from "./ContractBalanceList";
 
@@ -156,5 +156,28 @@ describe("应收页签", () => {
       ),
     );
     expect(mocks.getPayables).not.toHaveBeenCalled();
+  });
+  it("切换筛选后，迟到的旧响应不覆盖当前结果（评审 R1-4）", async () => {
+    const user = userEvent.setup();
+    let resolveOld: (value: unknown) => void = () => {};
+    const row = (contractNo: string) => ({
+      id: contractNo,
+      contractNo,
+      status: "SHIPPED",
+      totalAmount: 1,
+      receivedAmount: 0,
+      unreceiveAmount: 1,
+    });
+    mocks.getReceivables.mockImplementation((query: { overdue?: boolean }) =>
+      query.overdue
+        ? Promise.resolve(page([row("EXP-OVERDUE")]))
+        : new Promise((resolve) => (resolveOld = resolve)),
+    );
+    render(<ContractBalanceList kind="receivable" />);
+    await user.click(screen.getByRole("button", { name: "已逾期" }));
+    expect(await screen.findByText("EXP-OVERDUE")).toBeInTheDocument();
+    await act(async () => resolveOld(page([row("EXP-STALE")])));
+    expect(screen.queryByText("EXP-STALE")).toBeNull();
+    expect(screen.getByText("EXP-OVERDUE")).toBeInTheDocument();
   });
 });

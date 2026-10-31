@@ -17,6 +17,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { RowActionsMenu } from "@/components/ui/row-actions-menu";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
+import { useLatestRequest } from "@/lib/hooks/useLatestRequest";
 import { describeFailure } from "@/lib/error-reason";
 import { customerService } from "@/services/customer.service";
 import { useAuthStore } from "@/store/auth.store";
@@ -43,7 +44,10 @@ export default function CustomersPage() {
   );
   const includeArchived = filters.archived === "yes";
 
+  const startRequest = useLatestRequest();
+
   const load = useCallback(async () => {
+    const isCurrent = startRequest();
     setLoading(true);
     try {
       const response = await customerService.getAll({
@@ -52,15 +56,22 @@ export default function CustomersPage() {
         keyword: filters.keyword || undefined,
         includeArchived: includeArchived || undefined,
       });
+      if (!isCurrent()) return;
       setItems(response.data.items);
       setTotal(response.data.pagination.total);
       setLoadError(null);
     } catch (error) {
-      setLoadError(error ?? new Error("加载失败"));
+      if (isCurrent()) setLoadError(error ?? new Error("加载失败"));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [filters.page, filters.pageSize, filters.keyword, includeArchived]);
+  }, [
+    startRequest,
+    filters.page,
+    filters.pageSize,
+    filters.keyword,
+    includeArchived,
+  ]);
 
   useEffect(() => {
     void load();

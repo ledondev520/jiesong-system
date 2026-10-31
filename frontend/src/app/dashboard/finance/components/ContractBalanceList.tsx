@@ -16,6 +16,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { describeFailure } from "@/lib/error-reason";
 import { formatMoney } from "@/lib/format";
+import { useLatestRequest } from "@/lib/hooks/useLatestRequest";
 import { financeService } from "@/services/finance.service";
 import { PaymentType } from "@/types";
 import { PaymentDialog, type PaymentSubmitData } from "./PaymentDialog";
@@ -89,7 +90,10 @@ export function ContractBalanceList({
   const [loadError, setLoadError] = useState<unknown>(null);
   const [selected, setSelected] = useState<BalanceRow | null>(null);
 
+  const startRequest = useLatestRequest();
+
   const load = useCallback(async () => {
+    const isCurrent = startRequest();
     setLoading(true);
     try {
       const query = {
@@ -107,6 +111,7 @@ export function ContractBalanceList({
           : financeService.getReceivables(query),
         financeService.getStats(),
       ]);
+      if (!isCurrent()) return;
       setRows(list.data.items as BalanceRow[]);
       setTotal(list.data.pagination.total);
       // 顶部合计直接取后端统计（与财务概览同源），不在前端求和
@@ -115,11 +120,20 @@ export function ContractBalanceList({
       );
       setLoadError(null);
     } catch (error) {
-      setLoadError(error ?? new Error("加载失败"));
+      if (isCurrent()) setLoadError(error ?? new Error("加载失败"));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [kind, page, pageSize, search, outstandingOnly, flagged, refreshKey]);
+  }, [
+    startRequest,
+    kind,
+    page,
+    pageSize,
+    search,
+    outstandingOnly,
+    flagged,
+    refreshKey,
+  ]);
 
   useEffect(() => {
     void load();

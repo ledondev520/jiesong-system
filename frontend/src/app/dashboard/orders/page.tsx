@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { formatMoney } from "@/lib/format";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
+import { useLatestRequest } from "@/lib/hooks/useLatestRequest";
 import { salesService } from "@/services/sales.service";
 import { SalesStatus, type SalesContract } from "@/types";
 
@@ -51,7 +52,10 @@ function OrdersList() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
 
+  const startRequest = useLatestRequest();
+
   const load = useCallback(async () => {
+    const isCurrent = startRequest();
     setLoading(true);
     try {
       const response = await salesService.getAll?.({
@@ -65,15 +69,17 @@ function OrdersList() {
         storeId: storeId || undefined,
         lite: true,
       });
+      if (!isCurrent()) return;
       setItems(response?.data.items ?? []);
       setTotal(response?.data.pagination.total ?? 0);
       setLoadError(null);
     } catch (error) {
-      setLoadError(error ?? new Error("加载失败"));
+      if (isCurrent()) setLoadError(error ?? new Error("加载失败"));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [
+    startRequest,
     page,
     pageSize,
     keyword,
