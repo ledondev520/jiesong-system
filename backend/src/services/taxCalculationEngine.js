@@ -91,6 +91,7 @@ const createFilenameBase = (contractNo) => `${contractNo || 'unknown'}_税务测
  * 退税基数直接使用准备度 Module 已按采购含税成本和采购税率推导的发票注明金额。
  */
 const calculateTaxSummary = (readiness = {}) => {
+  // shortcut: roundMoney (2 dp) also rounds rate and quantity here, as the old roundCurrency did; do not widen FX precision through it.
   const exchangeRate = roundMoney(readiness.exchangeRate || 0);
   const lines = (Array.isArray(readiness.lines) ? readiness.lines : []).map((line, index) => {
     const evidence = line.hsEvidence || null;

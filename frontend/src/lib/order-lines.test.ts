@@ -211,4 +211,11 @@ describe("paste from Excel", () => {
       "第 3 行：该客户下找不到门店「未知店」",
     ]);
   });
+
+  it("rounds line, order and store totals with the shared money rule", () => {
+    const l = line({ quantity: "1", manualPrice: "1.005" });
+    expect(lineTotal(l)).toBe(1.01);
+    expect(orderTotal([l])).toBe(1.01);
+    expect(storeSubtotals([l]).get("s1")).toBe(1.01);
+  });
 });

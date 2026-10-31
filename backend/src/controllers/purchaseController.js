@@ -674,8 +674,8 @@ function summarizePricesBySupplier(prices) {
         lastDate: last.date,
         lastContractNo: last.contractNo,
         lastTaxRate: last.taxRate,
-        minPrice: Number(Math.min(...values).toFixed(2)),
-        averagePrice: Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)),
+        minPrice: roundMoney(Math.min(...values)),
+        averagePrice: roundMoney(values.reduce((a, b) => a + b, 0) / values.length),
         count: values.length,
       };
     })

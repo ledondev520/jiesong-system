@@ -4,6 +4,8 @@
  * Pos: 统一销售金额语义的深 Module；正式合同金额与装箱货值在此分离
  */
 
+const { roundMoney } = require('../utils/money');
+
 const SALES_AMOUNT_SOURCE = Object.freeze({
   DERIVED: 'DERIVED',
   FORMAL_DOCUMENT: 'FORMAL_DOCUMENT',
@@ -40,7 +42,7 @@ const getEffectiveSalesContractTotal = (contract) => {
     isJiesongOwnedPackingItem(item) ? sum : sum + Number(item.totalPrice || 0)
   ), 0);
 
-  return Number(Math.max(contractTotal - excludedAmount, 0).toFixed(2));
+  return roundMoney(Math.max(contractTotal - excludedAmount, 0));
 };
 
 const getEffectiveSalesReceived = (
@@ -53,11 +55,11 @@ const getEffectiveSalesReceived = (
   if (contractTotal <= 0 || ownedTotalAmount <= 0 || received <= 0) return 0;
 
   if (isFormalSalesAmount(contract)) {
-    return Number(Math.min(received, ownedTotalAmount).toFixed(2));
+    return roundMoney(Math.min(received, ownedTotalAmount));
   }
 
   const ownershipRatio = Math.min(Math.max(ownedTotalAmount / contractTotal, 0), 1);
-  return Number(Math.min(received * ownershipRatio, ownedTotalAmount).toFixed(2));
+  return roundMoney(Math.min(received * ownershipRatio, ownedTotalAmount));
 };
 
 const buildDerivedSalesAmountUpdate = (contract, derivedTotalAmount) => (

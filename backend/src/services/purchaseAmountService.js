@@ -13,7 +13,6 @@ const toFiniteNumber = (value, fallback = 0) => {
   return Number.isFinite(number) ? number : fallback;
 };
 
-
 /** 历史导入曾把 1% 写成 100；只在读取兼容，不继续写入该编码。 */
 const normalizePurchaseTaxRate = (value) => {
   const rate = toFiniteNumber(value, 13);

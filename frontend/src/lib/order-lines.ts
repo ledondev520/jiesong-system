@@ -4,6 +4,7 @@
  * Pos: 订单编辑器的纯逻辑；价格口径只来自服务端（预览展示；提交时非人工价不带单价，由服务端按同一规则计算），这里不重算
  */
 import type { SalesCreationPayload } from "@/services/sales.service";
+import { roundMoney } from "@/lib/money";
 
 export interface OrderLine {
   key: string;
@@ -76,13 +77,11 @@ export const isManualPrice = (line: OrderLine) =>
 export const lineTotal = (line: OrderLine): number => {
   const quantity = positive(line.quantity);
   const price = effectivePrice(line);
-  return quantity !== null && price !== null
-    ? Number((quantity * price).toFixed(2))
-    : 0;
+  return quantity !== null && price !== null ? roundMoney(quantity * price) : 0;
 };
 
 export const orderTotal = (lines: OrderLine[]): number =>
-  Number(lines.reduce((sum, line) => sum + lineTotal(line), 0).toFixed(2));
+  roundMoney(lines.reduce((sum, line) => sum + lineTotal(line), 0));
 
 export const storeSubtotals = (lines: OrderLine[]): Map<string, number> => {
   const totals = new Map<string, number>();
@@ -90,7 +89,7 @@ export const storeSubtotals = (lines: OrderLine[]): Map<string, number> => {
     if (!line.storeId) continue;
     totals.set(
       line.storeId,
-      Number(((totals.get(line.storeId) ?? 0) + lineTotal(line)).toFixed(2)),
+      roundMoney((totals.get(line.storeId) ?? 0) + lineTotal(line)),
     );
   }
   return totals;

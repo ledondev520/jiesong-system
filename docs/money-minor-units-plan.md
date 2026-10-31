@@ -1,7 +1,8 @@
 # Money to integer minor units: plan (AUDIT-JS Top-4)
 
 Status: PLAN ONLY. No column is changed in this round. Done so far: one rounding rule
-(`backend/src/utils/money.js`, mirror `frontend/src/lib/money.ts`), used by every finance service.
+(`backend/src/utils/money.js`, mirror `frontend/src/lib/money.ts`), used by all money-arithmetic sites;
+the remaining `toFixed(2)` uses are display text or non-money values, listed under "Not converted".
 The USD price rule stays single-sourced in `services/exportPricing.js` (locked, out of scope here).
 
 ## Problem
@@ -37,3 +38,11 @@ Exchange rates and quantities stay `Float` (they are not money).
 - Percent fields, FX rates, quantities, weights stay Float.
 - Raw SQL and exports that read `x` directly must be listed (grep `$queryRaw`, `csvExport`, reports) before step 4.
 - Do this after the pricing/payables epics settle; finance files change heavily there.
+
+## Not converted (final grep of `toFixed(2)` after the fix pass)
+- Display strings only (PDF/CSV/log/message text, UI labels): `pdfExportService`, `threeFormsService`, `exportService`,
+  `patrolService`, `financialStatementsService` messages, `taxCalculationEngine` export rows, `financeImportService`
+  CSV cells, `purchaseAmountService`/`purchase-amount.ts` messages, `salesService` price `exact` label, most frontend components.
+- `purchaseController.js:75` message text, `productController.js:368` (returns a `toFixed` string average, not summed into totals).
+- `invoiceVerificationService.js:46,120`: parser returning null for bad input, different contract.
+- FX rate rounding (`configController`, `exportPricing.round`): rates, not money; locked pricing area.
