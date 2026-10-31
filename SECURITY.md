@@ -157,18 +157,21 @@ Legacy `/api/v1/import` and `/api/v1/system/import` share `tabularUpload` from `
 
 Pricing requires a finite positive spot rate and a positive adjusted rate rounded
 to six decimal places. Positive adjustments cannot make missing or invalid spot
-rates usable. Python rejects invalid spot rates before reading proposal sources.
+rates usable.
 
-`config/pricing.json` contains non-secret policy values. Both export services and
-`scripts/prepare_export_packet.py` use this same file, or the explicit
-`JIESONG_PRICING_CONFIG` path. The shared `config/pricing.schema.json` defines
-strict keys and numeric bounds. Invalid or missing files stop pricing without
-fallback. Readiness recommendations use the same adjusted exchange rate, tiered
-markups and rounding as packet. Request-level profitRate does not override the
-shared file. Multiplier mode requires explicit selection. No environment file or
-business database is read by the loaders.
+`config/pricing.json` contains non-secret policy values (spot rate, adjustment,
+default markup, category markups, round-up step). Both export services use this
+file, or the explicit `JIESONG_PRICING_CONFIG` path, through the single
+`priceFor()` implementation. The shared `config/pricing.schema.json` defines
+strict keys and numeric bounds; category IDs are checked against the database on
+save. Invalid or missing files, including the retired tiered/multiplier shape,
+stop pricing without fallback. No environment file or business database is read
+by the file loader.
 
-`GET/PUT /system/pricing-config` require authenticated ADMIN. Updates replace the
+`GET/PUT /system/pricing-config` and the read-only `GET /system/pricing-config/preview`
+require authenticated ADMIN (preview is GET because the lifecycle contract forbids new
+unregistered write routes). Preview with a draft config validates it and never writes.
+Updates replace the
 whole validated document atomically, require the last revision, and use an
 exclusive lock file. Structured stderr events retain only operator ID, field
 names and policy hashes. No request values, contract data or secrets are logged.
@@ -180,6 +183,10 @@ operator to confirm no writer is active before removing it.
 
 - 采购 Excel 导入 `/api/v1/purchases/import` 在原认证/角色鉴权后使用 `backend/src/utils/purchaseExcelUpload.js` 的 memoryStorage，仅允许 .xlsx/.xls，沿用 config.upload.maxSize；`purchaseImportExportController.js` 只传文件名标签/Buffer，`purchaseImportExportService.js` 在解析/数据库访问前拒绝路径，仅解析内存字节，不留存 Confidential 原始工作簿于普通附件存储。
 - `backend/src/middleware/errorHandler.js` 将无 statusCode 的 Busboy 请求解析错误按精确消息白名单（七条消息及 `Unsupported content type: ` 前缀）返回中文400，含 NUL 的畸形 multipart 因此不再返回500。显式状态、Multer处理及原始错误日志保持，畸形上传解析错误即使开发环境也不返回英文堆栈，未知内部错误仍500；回归见 `backend/src/routes/purchases.import-upload.test.js` 和 `backend/src/middleware/errorHandler.test.js`。
+
+## One rate source for every pricing consumer (Phase 2.2)
+
+Exchange rate and markup come from exactly two places: the order's own saved `SalesContract.exchangeRate`, or the single pricing config (`config/pricing.json` via `currentRates()` / `defaultSpotRate()` / `priceFor()` in `backend/src/services/exportPricing.js`). `GET /system/exchange-rate` and `POST /system/exchange-rate/sync` read/update that config (sync is versioned and ADMIN-only; there is no confirm step, but a synced value outside [5, 10] or more than 5% away from the current spot is rejected with 409 and must be set manually in 报价配置, the upstream body is capped at 64 KB, and write errors are returned as errors, never as a degraded success); `exchangeRate`/`profitRate` can no longer be written through `PUT /system/configs/:key` and legacy rows are not returned or read. The AI assistant cannot write them (`UpdateSystemConfig` refuses them at call and at execution) and reads them from the config; patrol checks config validity/staleness; AI context and the local fallback use the config; customs declarations and forex verifications default to the order's saved rate; new orders/imports default to the config spot rate (no 7.0/7.2 constants); `calculate-price` uses `priceFor` (an optional `productId` resolves the category markup) and rejects `profitRate`, and with `items` it returns the order margin preview (`orderMargin`: realized markup at spot + adjustment, band 30%–35% in `ORDER_MARGIN_BAND`, warning only, category-markup lines such as tiles excluded); every unit price uses `roundUnitPrice` (under the step: ceil to whole USD; otherwise ceil to whole USD, then nearest multiple of the step); the export packet prefers the order's single confirmed price per product x store (manual override still wins, multiple prices fall back with a warning). `scripts/prepare_export_packet.py` no longer contains any pricing code.
 
 ## OpenAI provider (J33)
 `AI_PROVIDER=openai` reads `OPENAI_API_KEY` from the process environment (`/etc/openai/openai.env`, root 600, loaded by Node through the PM2 app's `node_args --env-file=`, so the key never enters `pm2_env`/`dump.pm2`; `OPENAI_MODEL` defaults to `gpt-6.1-terra` for all calls), refuses to start without the key, with a non-https base URL (loopback excepted) or with an invalid retry/output bound, never stores the key in the database (the settings page has no OpenAI key input and the API rejects `openai*` config keys) and never returns it from any API. Retries are limited to `OPENAI_MAX_RETRIES` (default 1, max 2) on 429/5xx (not on exhausted quota) for request creation inside the single shared deadline; started streams are never replayed. Mocked tests only; no CI call reaches OpenAI.

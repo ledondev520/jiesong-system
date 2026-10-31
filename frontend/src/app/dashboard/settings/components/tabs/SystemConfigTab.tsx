@@ -15,15 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  FormDescription,
-} from "@/components/ui/form";
+import { Form } from "@/components/ui/form";
 import {
   Card,
   CardContent,
@@ -42,19 +34,13 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Cpu, X, Save, Loader2, Key, ExternalLink, Globe } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import {
-  DEFAULT_EXCHANGE_RATE,
-  DEFAULT_PROFIT_RATE,
-  UNITS as INITIAL_UNITS,
-} from "@/lib/constants";
+import { UNITS as INITIAL_UNITS } from "@/lib/constants";
 import { configService } from "@/services/config.service";
 import api from "@/lib/axios";
 import type { ApiResponse } from "@/types";
 
-const configSchema = z.object({
-  exchangeRate: z.number().min(0.1, "汇率必须大于0"),
-  profitRate: z.number().min(1.0, "利润率必须大于1.0"),
-});
+// 汇率/加价由「报价配置」卡片统一维护（config/pricing.json），本表单不再保存这两项。
+const configSchema = z.object({});
 
 type ConfigFormValues = z.infer<typeof configSchema>;
 type ConfigUpdateValue = string | number | string[];
@@ -118,18 +104,13 @@ export function SystemConfigTab({
     available: boolean;
   } | null>(null);
   const [hsciqToggling, setHsciqToggling] = useState(false);
-  // 汇率同步
-  const [syncing, setSyncing] = useState(false);
   // 业务流程参数：线上盖章平台链接 + 我方开票抬头
   const [stampPlatformUrl, setStampPlatformUrl] = useState("");
   const [invoiceTitleInfo, setInvoiceTitleInfo] = useState("");
 
   const form = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
-    defaultValues: {
-      exchangeRate: DEFAULT_EXCHANGE_RATE,
-      profitRate: DEFAULT_PROFIT_RATE,
-    },
+    defaultValues: {},
   });
 
   // 0. 加载系统配置
@@ -139,10 +120,6 @@ export function SystemConfigTab({
         const response = await configService.getSystemConfig();
         const configs = response.data;
         if (configs) {
-          if (typeof configs.exchangeRate === "number")
-            form.setValue("exchangeRate", configs.exchangeRate);
-          if (typeof configs.profitRate === "number")
-            form.setValue("profitRate", configs.profitRate);
           if (Array.isArray(configs.units)) setUnits(configs.units);
           if (Array.isArray(configs.brokers)) setBrokers(configs.brokers);
           // 1.1. 当前供应商的只写密钥状态
@@ -262,12 +239,10 @@ export function SystemConfigTab({
     >);
   };
 
-  const onSubmit = async (data: ConfigFormValues) => {
+  const onSubmit = async (_data: ConfigFormValues) => {
     setSaving(true);
     try {
       const tasks: Promise<unknown>[] = [
-        saveConfig("exchangeRate", data.exchangeRate),
-        saveConfig("profitRate", data.profitRate),
         saveConfig("units", units),
         saveConfig("brokers", brokers),
       ];
@@ -333,30 +308,6 @@ export function SystemConfigTab({
       toast.error("切换 HSCIQ 开关失败");
     } finally {
       setHsciqToggling(false);
-    }
-  };
-
-  /**
-   * 职责：从公开汇率 API 自动同步 USD/CNY 汇率，并填入表单
-   */
-  const handleSyncRate = async () => {
-    setSyncing(true);
-    try {
-      const res = await api.post<
-        ApiResponse<{ rate: number }>,
-        ApiResponse<{ rate: number }>
-      >("/system/exchange-rate/sync");
-      const rate = res.data?.rate;
-      if (rate && typeof rate === "number") {
-        form.setValue("exchangeRate", rate);
-        toast.success(
-          `已获取实时汇率：1 USD = ${rate} CNY，请点击「保存配置」以生效`,
-        );
-      }
-    } catch {
-      toast.error("汇率同步失败，请稍后重试");
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -512,83 +463,6 @@ export function SystemConfigTab({
     <div className="space-y-4">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {/* 基础参数 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>基础参数</CardTitle>
-              <CardDescription>
-                影响智能定价与汇率计算的全局参数，修改后需点击「保存配置」生效。
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="exchangeRate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>默认汇率 (USD/CNY)</FormLabel>
-                      <div className="flex gap-2">
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            {...field}
-                            onChange={(e) =>
-                              field.onChange(e.target.valueAsNumber || 0)
-                            }
-                          />
-                        </FormControl>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0"
-                          disabled={syncing}
-                          onClick={handleSyncRate}
-                          title="从公开 API 自动获取实时汇率"
-                        >
-                          {syncing ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            "同步"
-                          )}
-                        </Button>
-                      </div>
-                      <FormDescription>
-                        用于出口合同的初始汇率填充。
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="profitRate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>默认利润率</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(e.target.valueAsNumber || 0)
-                          }
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        例如 1.3 表示 30% 利润。
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
           {/* 业务流程参数：盖章平台 + 开票抬头 */}
           <Card>
             <CardHeader>

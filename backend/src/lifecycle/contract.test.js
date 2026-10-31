@@ -293,14 +293,14 @@ for (const [name, change, message] of [
   [
     'initial',
     (r) => {
-      r.matrix.initial = { mode: 'tiered' };
+      r.matrix.initial = { exchangeRate: 6.72 };
     },
     /singleton matrix cases/,
   ],
   [
     'replacement',
     (r) => {
-      r.matrix.replace.multiplier = 0;
+      r.matrix.replace.roundUpTo = 0;
     },
     /singleton matrix cases/,
   ],

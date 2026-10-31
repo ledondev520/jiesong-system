@@ -1,7 +1,17 @@
 /** 创建请求规范化边界；原子落库和认证请求隔离由 HTTP/SQLite 集成覆盖。 */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeCreation } = require('./salesCreationService');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const pricingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sales-creation-pricing-'));
+process.env.JIESONG_PRICING_CONFIG = path.join(pricingDir, 'pricing.json');
+fs.writeFileSync(process.env.JIESONG_PRICING_CONFIG, JSON.stringify({
+  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, roundUpTo: 5,
+  categoryMarkups: [{ categoryId: 'cat-tile', categoryName: '瓷砖', markup: 0.1 }],
+}), { mode: 0o600 });
+test.after(() => fs.rmSync(pricingDir, { recursive: true, force: true }));
+const { normalizeCreation, withRulePrices } = require('./salesCreationService');
 const item = { productId: 'synthetic-product', storeId: 'synthetic-store', quantity: 2, costPrice: 10, sellingPrice: 3 };
 
 test('规范化完整创建，不改写调用者输入，金额和编号保持明确含义', () => {
@@ -26,4 +36,17 @@ test('非法表头或任一明细必须在提交前拒绝', () => {
   for (const patch of [{ productId: '' }, { storeId: '' }, { quantity: '2' }, { quantity: -1 }, { costPrice: NaN }, { sellingPrice: 0 }, { note: {} }]) {
     assert.throws(() => normalizeCreation({ exchangeRate: 7.2, items: [item, { ...item, ...patch }] }), error => error.statusCode === 400);
   }
+});
+
+test('未给售价的明细按唯一报价规则补齐（瓷砖按分类 ×1.1），不再用 成本 ÷ 汇率 × 1.3', async () => {
+  const db = {
+    product: { findMany: async () => [{ id: 'p-tile', categoryId: 'cat-tile' }, { id: 'p-cup', categoryId: null }] },
+    productCategory: { findMany: async () => [{ id: 'cat-tile', parentId: null }] },
+  };
+  const input = normalizeCreation({
+    exchangeRate: 6.72,
+    items: [{ ...item, productId: 'p-cup', costPrice: 10000, sellingPrice: undefined }, { ...item, productId: 'p-tile', costPrice: 10000, sellingPrice: undefined }, item],
+  });
+  assert.equal(input.items[0].sellingPrice, undefined);
+  assert.deepEqual((await withRulePrices(input, db)).map(line => line.sellingPrice), [1995, 1690, 3]);
 });

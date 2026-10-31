@@ -418,7 +418,7 @@ const cases = [
     category: 'write_success',
     method: 'POST',
     path: '/api/v1/sales/calculate-price',
-    body: () => ({ costPrice: 100, exchangeRate: 7, profitRate: 1.3 }),
+    body: () => ({ costPrice: 100, exchangeRate: 7 }),
   },
   {
     id: 'ai_config_update_success',

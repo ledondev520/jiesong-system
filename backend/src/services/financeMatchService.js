@@ -181,6 +181,8 @@ async function loadPurchaseContracts() {
       c.supplier?.name,
       c.supplier?.shortName,
     ].filter(Boolean),
+    // 有意不用 payablesService.outstandingOf：这里是发票/付款匹配候选，草稿合同也可能已被预付或开票，必须能匹配；
+    // 它不是应付口径，不要把这个数当 应付 展示。
     unpaidAmount: Math.max(c.totalAmount - c.paidAmount, 0),
   }));
 }

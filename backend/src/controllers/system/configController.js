@@ -10,6 +10,8 @@ const https = require('https');
 const prisma = require('../../utils/prisma');
 const { success } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
+const { loadPricingSnapshot, updatePricingConfig } = require('../../services/pricingConfigService');
+const { currentRates } = require('../../services/exportPricing');
 const {
   normalizeConfigValueForResponse,
   normalizeConfigValueForStorage,
@@ -23,6 +25,9 @@ const EXCHANGE_RATE_SYNC_TIMEOUT_MS = parsePositiveIntEnv(
   process.env.EXCHANGE_RATE_SYNC_TIMEOUT_MS,
   1800,
 );
+const EXCHANGE_RATE_MAX_BODY_CHARS = 64 * 1024; // 公共汇率 API 的正常响应约 4KB
+// 同步值的合理区间与单次最大偏移；超出则拒绝自动写入（负责人决定无确认步骤，但异常值不能直接重定价）。
+const FX_SYNC_BAND = { min: 5, max: 10, maxJump: 0.05 };
 
 /**
  * 配置键到域的映射表（不改 schema，仅在应用层做域划分）
@@ -30,8 +35,6 @@ const EXCHANGE_RATE_SYNC_TIMEOUT_MS = parsePositiveIntEnv(
  */
 const CONFIG_DOMAIN_MAP = {
   // 基础参数域：影响定价与汇率计算的全局数值
-  exchangeRate: { domain: 'params', label: '基础参数', note: '用于销售合同初始汇率填充' },
-  profitRate:   { domain: 'params', label: '基础参数', note: '例如 1.3 表示 30% 利润率' },
   stampPlatformUrl: { domain: 'params', label: '基础参数', note: '线上盖章平台链接（购销合同生成后跳转盖章）' },
   invoiceTitleInfo: { domain: 'params', label: '基础参数', note: '我方开票抬头信息（催票文本附带，多行）' },
 
@@ -54,6 +57,9 @@ const CONFIG_DOMAIN_MAP = {
   hsciqEnabled:   { domain: 'ai', label: 'AI集成', note: '是否启用 HSCIQ 海关归类 API（开启后 HS 编码推荐与申报要素将优先调用官方 API）' },
 };
 
+// 汇率/加价只来自报价配置（config/pricing.json，经 /system/pricing-config）；普通 SystemConfig 不能再保存这两项。
+const PRICING_CONFIG_KEYS = ['exchangeRate', 'profitRate'];
+
 const getDomainMeta = (key) => CONFIG_DOMAIN_MAP[key] || { domain: 'other', label: '其他', note: '' };
 
 const buildConfigValue = (key, value) => {
@@ -71,26 +77,10 @@ const formatConfigResponse = (configRecord) => {
   };
 };
 
+// 兼容旧响应形状 { rate, buffer, effectiveRate }，数值全部来自唯一报价配置。
 const resolveExchangeRateConfig = async () => {
-  const config = await prisma.systemConfig.findUnique({
-    where: { key: 'exchangeRate' },
-  });
-
-  let rate = { rate: 6.8, buffer: 0.2, effectiveRate: 6.6 };
-  if (config) {
-    try {
-      const parsed = JSON.parse(config.value);
-      rate = {
-        ...parsed,
-        effectiveRate: parsed.rate - (parsed.buffer || 0.2),
-      };
-    } catch (parseError) {
-      // exchangeRate 配置值不是合法 JSON，降级为默认值并记录以便排查。
-      console.warn('[configController] exchangeRate 解析失败，使用默认值:', parseError?.message);
-    }
-  }
-
-  return rate;
+  const rates = currentRates();
+  return { rate: rates.spotRate, buffer: -rates.adjustment, effectiveRate: rates.effectiveRate };
 };
 
 const fetchUsdCnyRate = async ({ timeoutMs = EXCHANGE_RATE_SYNC_TIMEOUT_MS } = {}) => new Promise((resolve, reject) => {
@@ -105,7 +95,13 @@ const fetchUsdCnyRate = async ({ timeoutMs = EXCHANGE_RATE_SYNC_TIMEOUT_MS } = {
   };
   const request = https.get(url, (response) => {
     let data = '';
-    response.on('data', (chunk) => { data += chunk; });
+    response.on('data', (chunk) => {
+      data += chunk;
+      if (data.length > EXCHANGE_RATE_MAX_BODY_CHARS) {
+        request.destroy();
+        finish(reject, new Error('汇率响应过大'));
+      }
+    });
     response.on('end', () => {
       try {
         const parsed = JSON.parse(data);
@@ -142,6 +138,7 @@ const getConfigs = async (req, res, next) => {
     const configs = await prisma.systemConfig.findMany();
 
     const formatted = configs.reduce((acc, config) => {
+      if (PRICING_CONFIG_KEYS.includes(config.key)) return acc;
       acc[config.key] = buildConfigValue(config.key, config.value);
       return acc;
     }, {});
@@ -221,6 +218,9 @@ const updateConfig = async (req, res, next) => {
   try {
     const { key } = req.params;
     const { value, note } = req.body;
+    if (PRICING_CONFIG_KEYS.includes(key)) {
+      throw createError('汇率和加价由报价配置统一维护，请在「系统配置 > 报价配置」中修改', 400);
+    }
 
     // OpenAI 密钥/模型只来自服务器进程环境，任何 openai* 键都不允许写入数据库。
     if (/^openai/i.test(String(key))) {
@@ -253,50 +253,39 @@ const getExchangeRate = async (req, res, next) => {
 };
 
 /**
- * 职责：从公共汇率 API 自动同步 USD/CNY 汇率，并写入 systemConfig
- * 思路：
- * 1. 请求 open.er-api.com 获取实时汇率
- * 2. 保留现有 buffer 配置，只更新 rate 字段
- * 3. 写入 exchangeRate systemConfig
+ * 职责：从公共汇率 API 取现汇，并作为唯一报价配置的 exchangeRate 保存（带版本校验，ADMIN）
+ * 思路：读取当前配置与版本 → 只替换 exchangeRate → 原子整份替换；不再写 SystemConfig。
  */
 const syncExchangeRate = async (req, res, next) => {
+  // 1. 上游取数失败（网络/超时/解析/过大）才降级为“返回当前汇率”；写入阶段的错误不能伪装成成功。
+  let rate;
   try {
-    // 1. 从免费开放 API 获取汇率；外部慢或失败时必须快速降级，不能拖慢系统设置界面。
-    const rate = await fetchUsdCnyRate();
-
-    // 2. 读取现有配置（保留 buffer）
-    const existing = await prisma.systemConfig.findUnique({
-      where: { key: 'exchangeRate' },
-    });
-    let buffer = 0.2;
-    if (existing) {
-      try {
-        const parsed = JSON.parse(existing.value);
-        if (typeof parsed.buffer === 'number') buffer = parsed.buffer;
-      } catch { /* 使用默认 buffer */ }
-    }
-
-    // 3. 写入新汇率
-    const newValue = JSON.stringify({ rate, buffer, effectiveRate: rate - buffer });
-    await prisma.systemConfig.upsert({
-      where: { key: 'exchangeRate' },
-      update: { value: newValue, note: `汇率自动同步 - ${new Date().toISOString()}` },
-      create: { key: 'exchangeRate', value: newValue, note: '汇率自动同步' },
-    });
-
-    success(res, { rate, buffer, effectiveRate: rate - buffer }, `汇率已同步：1 USD = ${rate} CNY`);
+    rate = await fetchUsdCnyRate();
   } catch (error) {
     try {
       const currentRate = await resolveExchangeRateConfig();
-      success(res, {
+      return success(res, {
         ...currentRate,
         source: 'cached',
         syncStatus: 'degraded',
         error: error.message,
       }, `汇率同步暂不可用，已返回当前系统汇率：${currentRate.rate}`);
     } catch (fallbackError) {
-      next(createError(`汇率同步失败: ${fallbackError.message}`, 503));
+      return next(createError(`汇率同步失败: ${fallbackError.message}`, 503));
     }
+  }
+  try {
+    const { config, revision } = loadPricingSnapshot();
+    const jump = Math.abs(rate - config.exchangeRate) / config.exchangeRate;
+    if (rate < FX_SYNC_BAND.min || rate > FX_SYNC_BAND.max || jump > FX_SYNC_BAND.maxJump) {
+      throw createError(`同步到的汇率 ${rate} 超出安全范围（区间 ${FX_SYNC_BAND.min}–${FX_SYNC_BAND.max}，与当前 ${config.exchangeRate} 偏差不得超过 ${FX_SYNC_BAND.maxJump * 100}%），未写入。请在 设置 > 报价配置 手动设置现汇`, 409);
+    }
+    updatePricingConfig({ ...config, exchangeRate: rate }, revision, req.user?.id);
+    const buffer = -config.exchangeAdjustment;
+    return success(res, { rate, buffer, effectiveRate: Math.round((rate - buffer) * 1e6) / 1e6 }, `汇率已同步：1 USD = ${rate} CNY`);
+  } catch (error) {
+    // 冲突/锁/校验/文件写入错误一律如实返回，不走“同步降级”成功路径。
+    return next(error);
   }
 };
 

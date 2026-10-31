@@ -46,12 +46,13 @@ import {
   Container,
   Check,
   Calculator,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { salesService } from "@/services/sales.service";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { salesService, type OrderMargin } from "@/services/sales.service";
 import { productService } from "@/services/product.service";
 import { storeService } from "@/services/store.service";
-import { DEFAULT_EXCHANGE_RATE, DEFAULT_PROFIT_RATE } from "@/lib/constants";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { StoreSelect } from "./components/StoreSelect";
 const salesSchema = z.object({
@@ -88,6 +89,13 @@ export default function CreateSalesPage() {
   } | null>(null);
   const submitting = useRef(false);
   const mounted = useRef(true);
+  const rateEdited = useRef(false);
+  const priceTicket = useRef<Record<number, number>>({});
+  // 结果连同请求键保存：明细或汇率变了，旧结果自动不再显示
+  const [marginResult, setMarginResult] = useState<{
+    key: string;
+    margin: OrderMargin | null;
+  } | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -101,7 +109,8 @@ export default function CreateSalesPage() {
     defaultValues: {
       contractNo: "",
       signedAt: undefined,
-      exchangeRate: DEFAULT_EXCHANGE_RATE,
+      // 0 = 尚未取得现汇；由报价配置的现汇预填（见下方 effect），取不到时用户必须手填。
+      exchangeRate: 0,
       note: "",
       items: [
         {
@@ -145,14 +154,45 @@ export default function CreateSalesPage() {
     return sum + (Number(item.quantity) || 0) * (Number(item.costPrice) || 0);
   }, 0);
 
-  const totalProfit =
-    totalAmount * (exchangeRate || DEFAULT_EXCHANGE_RATE) - totalCost;
-  const profitMargin =
-    totalAmount > 0
-      ? (totalProfit /
-          (totalAmount * (exchangeRate || DEFAULT_EXCHANGE_RATE))) *
-        100
-      : 0;
+  const revenueCny = totalAmount * (exchangeRate || 0);
+  const totalProfit = revenueCny - totalCost;
+
+  // 订单整体利润率由后端按报价规则计算（报价汇率、瓷砖行不参与区间检查）；只提示，不阻止提交
+  const marginItems = JSON.stringify(
+    watchItems
+      .filter(
+        (item) =>
+          item.productId &&
+          Number(item.quantity) > 0 &&
+          Number(item.costPrice) > 0 &&
+          Number(item.sellingPrice) > 0,
+      )
+      .map(({ productId, quantity, costPrice, sellingPrice }) => ({
+        productId,
+        quantity: Number(quantity),
+        costPrice: Number(costPrice),
+        sellingPrice: Number(sellingPrice),
+      })),
+  );
+  const marginKey = `${exchangeRate}|${marginItems}`;
+  const orderMargin =
+    marginResult?.key === marginKey ? marginResult.margin : null;
+  useEffect(() => {
+    const items = JSON.parse(marginItems);
+    if (!(exchangeRate > 0) || !items.length) return;
+    let current = true;
+    const key = `${exchangeRate}|${marginItems}`;
+    const timer = setTimeout(() => {
+      salesService
+        .previewOrderMargin(exchangeRate, items)
+        .then((margin) => current && setMarginResult({ key, margin }))
+        .catch(() => current && setMarginResult({ key, margin: null }));
+    }, 300);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [marginItems, exchangeRate]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -185,21 +225,44 @@ export default function CreateSalesPage() {
     loadData();
   }, [form]);
 
-  // Auto-calculate selling price when cost price changes
-  const handleCostChange = (index: number, cost: number) => {
-    const price = salesService.calculatePrice(
-      cost,
-      exchangeRate,
-      DEFAULT_PROFIT_RATE,
-    );
+  // 预填汇率 = 报价配置的现汇；用户改过就不再覆盖
+  useEffect(() => {
+    salesService
+      .getExchangeRate()
+      .then((response) => {
+        const rate = response.data?.rate;
+        if (rate && !rateEdited.current) {
+          form.setValue("exchangeRate", rate, { shouldValidate: true });
+        }
+      })
+      .catch(() => toast.error("获取默认汇率失败，请手动填写汇率"));
+  }, [form]);
+
+  // 成本变化时按后端报价规则推荐售价；只采用最后一次请求的结果
+  const handleCostChange = async (index: number, cost: number) => {
     form.setValue(`items.${index}.costPrice`, cost, {
       shouldDirty: true,
       shouldValidate: true,
     });
-    form.setValue(`items.${index}.sellingPrice`, price, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
+    if (!(cost > 0) || !(exchangeRate > 0)) return;
+    const ticket = (priceTicket.current[index] =
+      (priceTicket.current[index] || 0) + 1);
+    try {
+      const price = await salesService.calculatePrice(
+        cost,
+        exchangeRate,
+        form.getValues(`items.${index}.productId`) || undefined,
+      );
+      if (!mounted.current || priceTicket.current[index] !== ticket) return;
+      form.setValue(`items.${index}.sellingPrice`, price, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    } catch {
+      if (mounted.current && priceTicket.current[index] === ticket) {
+        toast.error("无法按报价规则计算推荐售价，请手动填写");
+      }
+    }
   };
 
   const onSubmit = async (data: SalesFormValues) => {
@@ -394,13 +457,15 @@ export default function CreateSalesPage() {
                             type="number"
                             step="0.01"
                             {...field}
-                            onChange={(event) =>
-                              field.onChange(Number(event.target.value))
-                            }
+                            onChange={(event) => {
+                              rateEdited.current = true;
+                              field.onChange(Number(event.target.value));
+                            }}
                           />
                         </FormControl>
                         <FormDescription>
-                          默认: {DEFAULT_EXCHANGE_RATE}
+                          默认取报价配置的现汇，可修改；推荐售价按“现汇 −
+                          0.2”计算
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -477,15 +542,34 @@ export default function CreateSalesPage() {
                       </div>
                       <div>
                         <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                          利润率
+                          利润率（按报价汇率）
                         </p>
                         <p
-                          className={`text-lg font-bold tabular-nums ${profitMargin >= 0 ? "text-emerald-600" : "text-destructive"}`}
+                          className={`text-lg font-bold tabular-nums ${orderMargin?.warning ? "text-amber-600" : "text-emerald-600"}`}
                         >
-                          {profitMargin.toFixed(1)}%
+                          {orderMargin?.marginPct == null
+                            ? "—"
+                            : `${orderMargin.marginPct}%`}
                         </p>
                       </div>
                     </div>
+                    {orderMargin?.warning && (
+                      <Alert
+                        className="mt-4"
+                        data-testid="order-margin-warning"
+                      >
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>
+                          {orderMargin.warning}（仅提示，仍可创建合同）
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    {orderMargin && orderMargin.excludedLines > 0 && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        瓷砖等分类加价商品（{orderMargin.excludedLines}{" "}
+                        行）不计入利润率区间检查
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 

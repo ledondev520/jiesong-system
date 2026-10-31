@@ -8,6 +8,7 @@
 
 const config = require('../config');
 const prisma = require('../utils/prisma');
+const { currentRates, priceFor } = require('./exportPricing');
 const { buildChatSession } = require('./ai/chatOrchestrator');
 const { collectStreamedChat } = require('./ai/streamHelpers');
 
@@ -717,26 +718,20 @@ const generateLocalResponse = async (message) => {
     return '未找到相关商品信息。请确认商品名称后重试。';
   }
   
-  // 汇率查询
+  // 汇率查询：只读唯一报价配置
   if (lowerMessage.includes('汇率')) {
-    const exchangeConfig = await prisma.systemConfig.findUnique({
-      where: { key: 'exchangeRate' },
-    });
-    if (exchangeConfig) {
-      const rate = JSON.parse(exchangeConfig.value);
-      return `当前系统汇率为${rate.rate}，缓冲值${rate.buffer || 0.2}，实际计算汇率为${rate.rate - (rate.buffer || 0.2)}。`;
-    }
-    return '当前系统汇率为6.8，缓冲值0.2，实际计算汇率为6.6。';
+    const rates = currentRates();
+    return `当前现汇为${rates.spotRate}，调整${rates.adjustment}，实际报价汇率为${rates.effectiveRate}。`;
   }
   
-  // 价格计算
+  // 价格计算：唯一报价规则（加价、现汇调整、单价取整规则见 exportPricing.roundUnitPrice）
   if (lowerMessage.includes('价格') || lowerMessage.includes('售价')) {
     const numbers = message.match(/\d+(\.\d+)?/g);
     if (numbers && numbers.length > 0) {
       const cost = parseFloat(numbers[0]);
-      const rate = 6.6;
-      const sellingPrice = (cost / rate * 1.3).toFixed(2);
-      return `成本${cost}元，按汇率6.6、利润率30%计算，推荐售价为 $${sellingPrice} (约$${Math.round(parseFloat(sellingPrice))})`;
+      const priced = priceFor({ costCny: cost });
+      if (priced.status !== 'OK') return '请提供大于0的单位采购成本（人民币），我来帮您按报价规则计算售价。';
+      return `成本${cost}元，按报价规则（加价${Math.round(priced.markup * 100)}%、报价汇率${priced.effectiveRate}，单价向上取整）计算，推荐售价为 $${priced.unitPriceUsd}`;
     }
     return '请告诉我成本价，我来帮您计算推荐售价。';
   }
