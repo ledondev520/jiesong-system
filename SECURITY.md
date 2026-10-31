@@ -232,3 +232,8 @@ Migration B1 (`purchase_items.storeId`, `purchase_contracts.salesContractId`) is
 
 ## Company info settings (J34)
 `companyName`/`companyAddress`/`companyBankInfo` (SystemConfig) feed the quote/PI seller block. Writes: ADMIN only via `PUT /system/configs/:key` with text validation (`utils/companyConfig.js`). `companyBankInfo` is Restricted: flat `GET /system/configs` hides it from every role except ADMIN and FINANCE, and operation-log entries for that key keep who/when but never the value. No real company or bank data is stored in the repository, fixtures or examples; defaults are empty.
+
+## MCP writes and purchase/supplier deletes (AUDIT-JS-2)
+- `backend/src/routes/mcp.js` `TOOL_POLICIES` roles equal the REST create/update routes (`purchases.js`, `suppliers.js`: ADMIN/PURCHASE/SALES/FINANCE/WAREHOUSE; BOSS is read-only and denied). Agent callers still need the tool capability. Every successful MCP write is attributed in `operation_logs` to the authenticated user or agent credential; commands themselves take no actor.
+- `DELETE /purchases/:id` and `DELETE /suppliers/:id` are ADMIN/PURCHASE only. Purchase delete returns 409 once receipts, payments (incl. allocations), `invoiceNo`, SUPPLIER_INVOICE files or matched invoice records exist (`purchaseController.remove`); supplier delete (soft deactivate) returns 409 while purchase contracts reference it. `Payment.purchaseContract` still has no `onDelete` rule: the guard is code-level only.
+- `middleware/rateLimit.js` and `apiRateLimit.js` counters are per process: with N PM2 workers the effective limit is N x configured. Regression: `backend/src/integration/mcp-rbac-deletes.integration.js`.
