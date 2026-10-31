@@ -88,6 +88,13 @@ test('quote service over HTTP', async (t) => {
     assert.equal((await ok('SALES', 'POST', '/quotes', {})).quoteNo.endsWith('-002'), true);
   });
 
+  await t.test('manual unit price is never compared with the rule price (owner decision): any value >= 0 is kept', async () => {
+    const quote = await ok('SALES', 'POST', '/quotes', { items: [
+      line({ isManualPrice: true, unitPrice: 0 }), line({ isManualPrice: true, unitPrice: 1 }), line({ isManualPrice: true, unitPrice: 999999 }),
+    ] });
+    assert.deepEqual(quote.items.map((i) => [i.unitPrice, i.isManualPrice, i.formulaPrice]), [[0, true, 1995], [1, true, 1995], [999999, true, 1995]]);
+  });
+
   await t.test('changing the spot rate reprices; invalid input is atomic', async () => {
     const quote = await ok('SALES', 'POST', '/quotes', { items: [line()] });
     const repriced = await ok('SALES', 'PUT', `/quotes/${quote.id}`, { spotRate: 7.2 }); // 13000 / 7.0 = 1857.14 → 1858 → 1860
@@ -142,7 +149,7 @@ test('quote service over HTTP', async (t) => {
     assert.equal(order.status, 'DRAFT');
     assert.equal(order.customerId, customer.id);
     assert.equal([order.currency, order.incoterm, order.paymentTerms, order.portOfLoading].join('|'), 'USD|FOB|T/T 30%|Shanghai');
-    assert.equal(order.exchangeRate, 6.72);       // the order keeps the spot rate, not spot − 0.2
+    assert.equal(order.exchangeRate, 6.52);       // owner decision: order FX = spot − 0.2 (the quote's pricingRate)
     assert.equal(order.portId, port.id);          // both stores share one destination port
     assert.equal(order.totalAmount, 19950 + 3380);
     assert.equal(order.items.length, 2);
@@ -212,6 +219,26 @@ test('quote service over HTTP', async (t) => {
     }
     assert.equal((await raw('SALES', '/quotes/missing/export.xlsx')).status, 404);
     assert.deepEqual(fs.existsSync(process.env.UPLOAD_DIR) ? fs.readdirSync(process.env.UPLOAD_DIR) : [], []);
+  });
+
+  await t.test('seller block comes from company settings; bank details stay Restricted', async () => {
+    const quote = await ok('SALES', 'POST', '/quotes', { items: [line()] });
+    const printOf = async () => (await fetch(`${base}/quotes/${quote.id}/print`, { headers: { authorization: `Bearer ${roles.SALES.token}` } })).text();
+    const unset = await printOf();
+    assert.ok(!unset.includes('Bank Details')); // nothing configured → blank, nothing invented
+    for (const [key, value] of [['companyName', 'Synthetic Seller Co'], ['companyAddress', '1 Synthetic Road'], ['companyBankInfo', 'Bank: SYNTHETIC\nAccount: 000-SYNTH']]) {
+      await db.systemConfig.create({ data: { key, value: JSON.stringify(value) } });
+    }
+    const html = await printOf();
+    for (const text of ['Synthetic Seller Co', '1 Synthetic Road', 'Bank Details', 'Account: 000-SYNTH']) assert.ok(html.includes(text), text);
+    const configsFor = async (role) => (await ok(role, 'GET', '/system/configs'));
+    for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE']) {
+      const configs = await configsFor(role);
+      assert.equal(configs.companyName, 'Synthetic Seller Co', role);
+      assert.ok(!Object.hasOwn(configs, 'companyBankInfo'), role);
+    }
+    for (const role of ['ADMIN', 'FINANCE']) assert.equal((await configsFor(role)).companyBankInfo, 'Bank: SYNTHETIC\nAccount: 000-SYNTH');
+    await db.systemConfig.deleteMany({ where: { key: { in: ['companyName', 'companyAddress', 'companyBankInfo'] } } });
   });
 
   await t.test('roles: WAREHOUSE denied, PURCHASE/FINANCE read-only, BOSS read-only, anonymous 401', async () => {

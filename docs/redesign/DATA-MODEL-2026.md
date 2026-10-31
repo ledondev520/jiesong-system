@@ -384,7 +384,7 @@ No `DELETE` route (archive rule). WAREHOUSE has no quote access. Quote writes ar
 
 ### 4.5 Convert transaction (ACCEPTED → CONVERTED, one `prisma.$transaction`)
 1. Re-read the quote with items inside the transaction; re-check the guards.
-2. Create `SalesContract`: `status` DRAFT, `contractNo` from `generateNextContractNo` (`services/shared/contractUtils.js`), `customerId`, `currency`, `incoterm`, `paymentTerms`, `portOfLoading`, `quoteId`, `exchangeRate = quote.spotRate`, `portId` = the stores' common destination port when all lines share one, else null, `amountSource` default (DERIVED).
+2. Create `SalesContract`: `status` DRAFT, `contractNo` from `generateNextContractNo` (`services/shared/contractUtils.js`), `customerId`, `currency`, `incoterm`, `paymentTerms`, `portOfLoading`, `quoteId`, `exchangeRate = quote.pricingRate` (spot − 0.2, owner decision 2026-10-31), `portId` = the stores' common destination port when all lines share one, else null, `amountSource` default (DERIVED).
 3. One `SalesItem` per quote item: `productId`, `storeId`, `quantity`, `unit`, `specification`, `note`, `costPrice = costCny ?? 0`, `sellingPrice = unitPrice`.
 4. Recompute the order total the way `salesService` does today.
 5. `updateMany` the quote from ACCEPTED to CONVERTED (count must be 1).
@@ -488,7 +488,7 @@ The migrations are one-way doors: SQL is never "down-migrated".
 
 ## 9. Open questions
 1. **All existing 门店 and orders belong to Seapot?** The backfill links every store and order with no customer to the one named customer. If some stores/orders belong to someone else, they must be listed before the production run.
-2. **`SalesContract.exchangeRate` = spot rate?** Conversion copies `quote.spotRate` (not the pricing rate spot − 0.2) because customs/forex code uses the order rate for CNY conversion. Confirm.
+2. **`SalesContract.exchangeRate`** — decided 2026-10-31: conversion copies `quote.pricingRate` (spot − 0.2), same as the pricing rule.
 3. **Rounding unit price vs line total; step 1 vs 5.** The owner's locked example (cost 10000 ¥ → 13000 ¥ → ÷ 6.52 = 1993.865 → **1995** USD) gives 1995, while "ceil to whole USD" gives 1994. Either the example rounds to a multiple of 5, or it is a line total. `roundUpTo` (default 1) is config; whether the rule applies to unit price or to line total is code. Needs the owner's answer before J6 merges.
 4. **Port of loading** text (spec Q7), **store codes** (Q17) and **buyer/ship-to entities** (Q16) — owner data, entered after migration A; the model only provides the fields.
 5. **`deploy.sh` still falls back to `npx prisma db push`** (`deploy.sh:215`), which `AGENTS.md` forbids and which can drop SQLite data on a failed migration. Production deploys use `deploy.yml`, but the fallback should be removed in a separate full-process PR before any of these migrations ship. Not changed here.

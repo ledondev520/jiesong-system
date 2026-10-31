@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const ExcelJS = require('exceljs');
 const { buildQuoteDocument, buildQuoteWorkbook, buildQuoteHtml } = require('./quoteExportService');
 
+const SELLER = { name: 'Synthetic Seller Co', address: '1 Synthetic Road', bank: 'Bank: SYNTHETIC BANK\nAccount: 000-SYNTH' };
 const item = (n, store, qty, price, extra = {}) => ({
   sortOrder: n, quantity: qty, unitPrice: price, unit: 'PCS', specification: `spec-${n}`, note: null,
   product: { customsName: `Product ${n}`, hsCode: '6907210000' },
@@ -20,7 +21,7 @@ const quote = (status = 'DRAFT') => ({
 const cells = (sheet) => { const out = []; sheet.eachRow((row) => row.eachCell((c) => out.push(c.value))); return out; };
 
 test('workbook structure: sheet, title, header block, columns, per-store subtotals and total', async () => {
-  const doc = buildQuoteDocument(quote());
+  const doc = buildQuoteDocument(quote(), SELLER);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await buildQuoteWorkbook(doc));
   assert.deepEqual(workbook.worksheets.map((s) => s.name), ['外销合同']);
@@ -28,7 +29,7 @@ test('workbook structure: sheet, title, header block, columns, per-store subtota
   assert.equal(s.getCell('A1').value, 'QUOTATION / 报价单');
   assert.equal(s.getCell('A2').value, 'QT2610-007');
   const header = (row) => [1, 2, 6, 7].map((c) => s.getCell(row, c).value);
-  assert.deepEqual(header(4), ['Seller', '上海捷淞国际物流有限公司', 'Quote No.', 'QT2610-007']);
+  assert.deepEqual(header(4), ['Seller', 'Synthetic Seller Co\n1 Synthetic Road', 'Quote No.', 'QT2610-007']);
   assert.deepEqual(header(5), ['Buyer', 'Seapot Holdings LLC', 'Date', '2026-10-31']);
   assert.deepEqual(header(6), ['Destination', 'Los Angeles', 'Trade Term', 'FOB Shanghai']);
   assert.deepEqual(header(7), ['Currency', 'USD', 'Valid Until', '2026-11-30']);
@@ -46,6 +47,21 @@ test('workbook structure: sheet, title, header block, columns, per-store subtota
   assert.equal(rows[5][0], 'TOTAL / 合计');
   assert.deepEqual([rows[5][4], rows[5][7]], [15, 25221.5]);
   assert.equal(s.getColumn(7).numFmt, '#,##0.00');
+  // footer: bank details two rows below TOTAL (row 15)
+  assert.deepEqual([s.getCell('A17').value, s.getCell('B17').value], ['Bank Details', 'Bank: SYNTHETIC BANK\nAccount: 000-SYNTH']);
+});
+
+test('unset company settings print blank — nothing is invented or hardcoded', async () => {
+  const doc = buildQuoteDocument(quote(), {});
+  assert.equal(doc.header[0][1], '');
+  assert.equal(doc.bankDetails, '');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await buildQuoteWorkbook(doc));
+  const s = workbook.getWorksheet('外销合同');
+  assert.ok(!cells(s).includes('Bank Details'));
+  assert.ok(!JSON.stringify(cells(s)).includes('捷淞'));
+  const html = buildQuoteHtml(doc);
+  assert.ok(!html.includes('Bank Details'));
 });
 
 test('accepted quotes print as a proforma invoice', () => {
@@ -55,11 +71,12 @@ test('accepted quotes print as a proforma invoice', () => {
 });
 
 test('costs, markups and suppliers appear in no workbook cell and no HTML', async () => {
-  const doc = buildQuoteDocument(quote('ACCEPTED'));
+  const doc = buildQuoteDocument(quote('ACCEPTED'), SELLER);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await buildQuoteWorkbook(doc));
   const text = JSON.stringify(cells(workbook.getWorksheet('外销合同')));
   const html = buildQuoteHtml(doc);
+  assert.ok(html.includes('Bank Details'));
   for (const forbidden of ['SECRET-SUPPLIER', 'SECRET-PC-0001', '7777.77', '4242']) {
     assert.ok(!text.includes(forbidden), `xlsx leaks ${forbidden}`);
     assert.ok(!html.includes(forbidden), `html leaks ${forbidden}`);

@@ -203,3 +203,7 @@ Migration A (customers, stores.customerId/code/legalName, sales_contracts custom
 ## Quotation / PI export
 
 `GET /api/v1/quotes/:id/export.xlsx` and `/print` (`quoteExportService.js`, `quoteExportController.js`) stream the 外销合同-layout workbook / script-free HTML straight to the response (`Cache-Control: no-store`); nothing is written to disk or `UPLOAD_DIR`. Roles ADMIN/SALES/PURCHASE/FINANCE; BOSS and WAREHOUSE are denied (generated documents; the BOSS whitelist matches only `/quotes` and `/quotes/:id`). Both outputs are built from one document model that never contains cost, markup, cost supplier/contract or manual-price flags; the seller prints the company name only, no bank identifiers.
+
+## Company settings for quotation/PI (owner decision 2026-10-31)
+
+The Seller block of quotation/PI exports prints company name, address and bank details read from SystemConfig keys `companyName`, `companyAddress`, `companyBankInfo` (domain 公司信息, edited by ADMIN through the existing `PUT /system/configs/:key`). Unset keys print blank; nothing is hardcoded or invented. `companyBankInfo` is Restricted: `GET /system/configs` omits it for every role except ADMIN/FINANCE, and the AI config-read tool refuses it. It appears only on quotation/PI exports (xlsx and print view), which are streamed and never stored.
