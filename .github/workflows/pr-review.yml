@@ -74,7 +74,7 @@ jobs:
 
       - name: Test PR tooling
         working-directory: ./frontend
-        run: node --test ../scripts/check-pr-format.test.cjs ../scripts/check-review-freshness.test.cjs
+        run: node --test ../scripts/check-pr-format.test.cjs ../scripts/check-review-freshness.test.cjs ../scripts/check-ui-only.test.cjs
 
       - name: Check changed source formatting
         working-directory: ./frontend
