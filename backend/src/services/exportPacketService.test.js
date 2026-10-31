@@ -129,3 +129,39 @@ test('分类加价沿祖先链取最近一项：瓷砖 10%，单价向上取整�
   assert.equal(packet.lines[0].unitPriceUsd, 110);
   assert.equal(packet.lines[0].roundingMethod, 'round_up_unit');
 });
+
+
+test('订单已确认单价（商品 × 门店唯一价）优先于公式价与历史价；人工覆盖仍可改写；同对多价不猜测', () => {
+  const storeKey = { productId: 'product-1', storeId: 'store-1' };
+  const withStore = (extra = {}) => contract({
+    packingItems: [{ ...contract().packingItems[0], storeId: 'store-1' }],
+    ...extra,
+  });
+  const rule = evaluateExportPacket(withStore(), readiness(), [], options());
+  const ruleLine = rule.lines[0];
+  assert.equal(ruleLine.pricingSource, 'formula');
+
+  const confirmed = evaluateExportPacket(withStore({ items: [{ ...storeKey, sellingPrice: 777 }] }), readiness(), [], options());
+  assert.equal(confirmed.lines[0].pricingSource, 'order');
+  assert.equal(confirmed.lines[0].unitPriceUsd, 777);
+  assert.equal(confirmed.lines[0].totalUsd, 7770);
+  assert.notEqual(confirmed.lines[0].unitPriceUsd, ruleLine.unitPriceUsd);
+
+  // 本票人工确认仍是最后一道覆盖
+  const manual = evaluateExportPacket(withStore({ items: [{ ...storeKey, sellingPrice: 777 }] }), readiness(), [],
+    options({ priceOverrides: [{ packingItemId: 'packing-1', unitPriceUsd: ruleLine.unitPriceUsd }] }));
+  assert.equal(manual.lines[0].pricingSource, 'manual');
+
+  // 同一商品 × 门店出现两个不同价格：不采用订单价，回退公式并给出警告（不阻断）
+  const ambiguous = evaluateExportPacket(
+    withStore({ items: [{ ...storeKey, sellingPrice: 700 }, { ...storeKey, sellingPrice: 800 }] }), readiness(), [], options());
+  assert.equal(ambiguous.lines[0].pricingSource, 'formula');
+  assert.ok(ambiguous.lines[0].issues.some((issue) => issue.code === 'AMBIGUOUS_ORDER_PRICE' && issue.severity === 'warning'));
+  assert.equal(ambiguous.lines[0].issues.some((issue) => issue.severity === 'error' && issue.code === 'AMBIGUOUS_ORDER_PRICE'), false);
+
+  // 同价重复行（拆行）视为同一个确认价；其它商品/门店不受影响
+  const sameTwice = evaluateExportPacket(
+    withStore({ items: [{ ...storeKey, sellingPrice: 777 }, { ...storeKey, sellingPrice: 777 }, { productId: 'other', storeId: 'store-1', sellingPrice: 5 }] }),
+    readiness(), [], options());
+  assert.equal(sameTwice.lines[0].unitPriceUsd, 777);
+});
