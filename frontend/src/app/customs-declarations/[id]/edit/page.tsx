@@ -1,18 +1,10 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import { useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
 
-export default function EditCustomsDeclarationRedirectPage() {
-  const router = useRouter();
-  const params = useParams();
-  const id = params?.id as string;
-
-  useEffect(() => {
-    if (id) {
-      router.replace(`/dashboard/customs-declarations/${id}/edit`);
-    }
-  }, [id, router]);
-
-  return null;
+export default async function EditCustomsDeclarationRedirectPage({ params }: PageProps) {
+  const { id } = await params;
+  redirect(`/dashboard/customs/${encodeURIComponent(id)}/edit`);
 }

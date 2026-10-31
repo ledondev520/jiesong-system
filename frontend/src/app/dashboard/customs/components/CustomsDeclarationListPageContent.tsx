@@ -186,7 +186,7 @@ export function CustomsDeclarationListPageContent({
     );
     const detailQuery = new URLSearchParams({ returnTo });
     startTransition(() => {
-      router.push(`/dashboard/customs-declarations/${id}?${detailQuery}`);
+      router.push(`/dashboard/customs/${id}?${detailQuery}`);
     });
   };
 
@@ -271,7 +271,7 @@ export function CustomsDeclarationListPageContent({
               <Button
                 className="h-11 rounded-xl"
                 onClick={() =>
-                  router.push("/dashboard/customs-declarations/create")
+                  router.push("/dashboard/customs/new")
                 }
               >
                 <Plus className="mr-2 h-4 w-4" />

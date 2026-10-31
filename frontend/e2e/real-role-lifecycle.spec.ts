@@ -466,8 +466,8 @@ for (const kind of ["customs", "refunds"] as const) {
   const editLabel = kind === "customs" ? "编辑报关单" : "编辑退税单";
   const listURL =
     kind === "customs"
-      ? /\/dashboard\/tax-refunds\?view=customs$/
-      : /\/dashboard\/tax-refunds$/;
+      ? /\/dashboard\/customs\?view=customs$/
+      : /\/dashboard\/customs$/;
 
   test(`FINANCE ${kind} unsaved create return cancels with zero record or audit writes`, async ({
     page,

@@ -132,7 +132,7 @@ export function TaxRefundDetailPageContent({
       <PageHeader
         title={taxRefund.refundNo}
         description="查看当前退税批次的金额与关联单据。"
-        backHref="/dashboard/tax-refunds"
+        backHref="/dashboard/customs"
         actions={
           <>
             <TaxRefundStatusBadge status={taxRefund.status} />

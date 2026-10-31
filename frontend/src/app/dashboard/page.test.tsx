@@ -296,7 +296,7 @@ describe("DashboardPage 交互逻辑", () => {
 
     await user.click(screen.getByRole("button", { name: /查看报关单/ }));
     expect(mockPush).toHaveBeenCalledWith(
-      "/dashboard/tax-refunds?view=customs",
+      "/dashboard/customs?view=customs",
     );
   });
 });

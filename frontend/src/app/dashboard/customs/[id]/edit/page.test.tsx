@@ -32,7 +32,7 @@ vi.mock("react", async () => {
 });
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/dashboard/customs-declarations/cd-2/edit",
+  usePathname: () => "/dashboard/customs/cd-2/edit",
   useRouter: () => ({
     push: mockRouterPush,
     back: vi.fn(),
@@ -175,7 +175,7 @@ describe("EditCustomsDeclarationPage 交互逻辑", () => {
 
     expect(mockToastSuccess).toHaveBeenCalledWith("报关单更新成功");
     expect(mockRouterPush).toHaveBeenCalledWith(
-      "/dashboard/customs-declarations/cd-2",
+      "/dashboard/customs/cd-2",
     );
   });
 

@@ -141,15 +141,13 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
   },
   {
     key: "documents",
-    href: "/dashboard/customs-declarations",
-    defaultHref: "/dashboard/customs-declarations",
+    href: "/dashboard/customs",
+    defaultHref: "/dashboard/customs",
     label: "单证与退税",
     icon: FileCheck2,
+    // 报关单 / 出口退税 / 退税工作台是页面内页签；退税详情路由仍在 /dashboard/tax-refunds/[id]
     childPrefixes: ["/dashboard/tax-refunds"],
-    children: [
-      { href: "/dashboard/customs-declarations", label: "报关单" },
-      { href: "/dashboard/tax-refunds", label: "出口退税" },
-    ],
+    children: [],
     group: "business",
   },
   {

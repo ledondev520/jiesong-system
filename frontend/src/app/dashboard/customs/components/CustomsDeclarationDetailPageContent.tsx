@@ -141,7 +141,7 @@ export function CustomsDeclarationDetailPageContent({
                 className="rounded-xl"
                 onClick={() =>
                   router.push(
-                    `/dashboard/customs-declarations/${declaration.id}/edit`,
+                    `/dashboard/customs/${declaration.id}/edit`,
                   )
                 }
               >

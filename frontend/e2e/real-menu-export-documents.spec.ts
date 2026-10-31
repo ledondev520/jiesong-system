@@ -309,7 +309,6 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   await page.getByRole("button", { name: "返回", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/sales$/);
   await page.getByRole("link", { name: "单证与退税", exact: true }).click();
-  await page.getByRole("link", { name: "出口退税", exact: true }).click();
   await page.getByRole("tab", { name: "报关单", exact: true }).click();
   await page
     .getByRole("button", {
@@ -321,7 +320,7 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   await expect(page).toHaveURL(
     (url) =>
       url.pathname ===
-      `/dashboard/customs-declarations/${saved.customs_declarations[0].id}`,
+      `/dashboard/customs/${saved.customs_declarations[0].id}`,
   );
   await expect(
     page.getByRole("heading", {
@@ -343,7 +342,6 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   await expect(customsAmount).toBeVisible();
   await expect(customsAmount).toHaveText("USD 20");
   await page.getByRole("link", { name: "单证与退税", exact: true }).click();
-  await page.getByRole("link", { name: "出口退税", exact: true }).click();
   await page.getByRole("tab", { name: "退税记录", exact: true }).click();
   await page
     .getByRole("button", {

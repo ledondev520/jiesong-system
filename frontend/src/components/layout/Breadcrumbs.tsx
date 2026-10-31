@@ -48,6 +48,7 @@ const routeLabelMap: Record<string, string> = {
   "hs-codes": "HS 编码",
   "tax-refunds": "出口退税",
   "customs-declarations": "报关单",
+  customs: "单证与退税",
   settings: "设置",
   users: "用户管理",
   import: "导入记录",

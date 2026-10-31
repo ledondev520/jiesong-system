@@ -20,11 +20,11 @@ const routes = [
   "/dashboard/sales",
   "/dashboard/sales/create",
   "/dashboard/sales/sc-001",
-  "/dashboard/tax-refunds",
-  "/dashboard/tax-refunds?view=customs",
-  "/dashboard/tax-refunds?view=refunds",
+  "/dashboard/customs",
+  "/dashboard/customs?view=customs",
+  "/dashboard/customs?view=refunds",
   "/dashboard/tax-refunds/create",
-  "/dashboard/customs-declarations/create",
+  "/dashboard/customs/new",
   "/dashboard/hs-codes",
   "/dashboard/finance",
   "/dashboard/finance/statements",
@@ -337,8 +337,8 @@ test.describe("手机核心操作", () => {
   test("报关退税详情、编辑和手机卡片完整显示", async ({ page }) => {
     await signInAsAdmin(page);
     for (const route of [
-      "/dashboard/customs-declarations/cd-1",
-      "/dashboard/customs-declarations/cd-1/edit",
+      "/dashboard/customs/cd-1",
+      "/dashboard/customs/cd-1/edit",
       "/dashboard/tax-refunds/tr-1",
       "/dashboard/tax-refunds/tr-1/edit",
     ]) {

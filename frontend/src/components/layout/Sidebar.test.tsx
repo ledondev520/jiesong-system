@@ -146,17 +146,14 @@ describe("Sidebar", () => {
     );
   });
 
-  it("单证与退税下报关单与出口退税分别激活", () => {
-    mockPathname = "/dashboard/customs-declarations/create";
-    const { getByText } = render(<Sidebar />);
+  it("单证与退税是单一菜单项，报关单子页面时保持激活", () => {
+    mockPathname = "/dashboard/customs/new";
+    const { getByText, queryByText } = render(<Sidebar />);
 
-    expect(getByText("报关单").closest("a")).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(getByText("出口退税").closest("a")).not.toHaveAttribute(
-      "aria-current",
-    );
+    expect(
+      getByText("单证与退税").closest("a")?.className.includes("bg-sidebar-accent"),
+    ).toBe(true);
+    expect(queryByText("出口退税")).toBeNull();
   });
 
   it("非管理员角色不显示设置入口", () => {

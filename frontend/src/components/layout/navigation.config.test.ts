@@ -73,7 +73,7 @@ describe("navigation.config helpers", () => {
       orders: "/dashboard/sales",
       purchases: "/dashboard/purchases",
       inventory: "/dashboard/inventory",
-      documents: "/dashboard/customs-declarations",
+      documents: "/dashboard/customs",
       finance: "/dashboard/finance",
       suppliers: "/dashboard/suppliers",
       products: "/dashboard/products",
@@ -94,7 +94,7 @@ describe("navigation.config helpers", () => {
       "/dashboard/products": "products",
       "/dashboard/sales/create": "orders",
       "/dashboard/tax-refunds/abc": "documents",
-      "/dashboard/customs-declarations/create": "documents",
+      "/dashboard/customs/new": "documents",
       "/dashboard/hs-codes": "hs-codes",
       "/dashboard/finance/statements": "finance",
       "/dashboard/payments": "finance",
@@ -182,24 +182,16 @@ describe("navigation.config helpers", () => {
     ).toBe(true);
   });
 
-  it("报关单与出口退税互不串扰", () => {
-    expect(
-      isTabRouteActive(
-        "/dashboard/customs-declarations/create",
-        "/dashboard/customs-declarations",
-      ),
-    ).toBe(true);
-    expect(
-      isTabRouteActive(
-        "/dashboard/customs-declarations",
-        "/dashboard/tax-refunds",
-      ),
-    ).toBe(false);
-    expect(
-      isTabRouteActive(
-        "/dashboard/tax-refunds/abc/edit",
-        "/dashboard/tax-refunds",
-      ),
-    ).toBe(true);
+  it("单证与退税单一入口：报关单与退税详情都归属该菜单", () => {
+    const documents = MODULE_NAV_ITEMS.find((item) => item.key === "documents");
+    expect(documents?.children).toEqual([]);
+    for (const path of [
+      "/dashboard/customs",
+      "/dashboard/customs/new",
+      "/dashboard/customs/cd-1/edit",
+      "/dashboard/tax-refunds/abc/edit",
+    ]) {
+      expect(getModuleByPath(path)?.key).toBe("documents");
+    }
   });
 });

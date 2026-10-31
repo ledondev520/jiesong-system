@@ -14,17 +14,17 @@ import {
 describe("报关明确返回的原生新文档导航", () => {
   it.each([
     [
-      "/dashboard/tax-refunds?view=customs&keyword=QA%2BTEST&status=DRAFT#rows",
-      "/dashboard/tax-refunds?view=customs&keyword=QA%2BTEST&status=DRAFT#rows",
+      "/dashboard/customs?view=customs&keyword=QA%2BTEST&status=DRAFT#rows",
+      "/dashboard/customs?view=customs&keyword=QA%2BTEST&status=DRAFT#rows",
     ],
     [null, CUSTOMS_RETURN_FALLBACK],
     [
-      "https://example.invalid/dashboard/tax-refunds?view=customs",
+      "https://example.invalid/dashboard/customs?view=customs",
       CUSTOMS_RETURN_FALLBACK,
     ],
     [
       "/customs-declarations?keyword=QA&status=RELEASED",
-      "/dashboard/tax-refunds?keyword=QA&status=RELEASED&view=customs",
+      "/dashboard/customs?keyword=QA&status=RELEASED&view=customs",
     ],
   ])("只把已验证目标 %s 交给 location.assign", (target, expected) => {
     const assign = vi.fn();
@@ -50,10 +50,10 @@ describe("报关详情的有限返回上下文", () => {
     query.append("tag", "first");
     query.append("tag", "second");
     const result = resolveCustomsReturnTo(
-      `/dashboard/tax-refunds?${query}#rows`,
+      `/dashboard/customs?${query}#rows`,
     );
     const parsed = new URL(result, "https://synthetic.invalid");
-    expect(parsed.pathname).toBe("/dashboard/tax-refunds");
+    expect(parsed.pathname).toBe("/dashboard/customs");
     expect(parsed.searchParams.get("keyword")).toBe(keyword);
     expect(parsed.searchParams.get("status")).toBe("RELEASED");
     expect(parsed.searchParams.getAll("tag")).toEqual(["first", "second"]);
@@ -69,7 +69,7 @@ describe("报关详情的有限返回上下文", () => {
           pathname + "?keyword=QA%2BTEST&status=DRAFT&source=qa#rows",
         ),
       ).toBe(
-        "/dashboard/tax-refunds?keyword=QA%2BTEST&status=DRAFT&source=qa&view=customs#rows",
+        "/dashboard/customs?keyword=QA%2BTEST&status=DRAFT&source=qa&view=customs#rows",
       );
     },
   );
@@ -77,35 +77,49 @@ describe("报关详情的有限返回上下文", () => {
   it("去除全部嵌套 returnTo，保留普通来源参数", () => {
     expect(
       resolveCustomsReturnTo(
-        "/dashboard/tax-refunds?view=customs&keyword=QA&returnTo=%2Fdashboard&source=qa&returnTo=https%3A%2F%2Fexample.invalid",
+        "/dashboard/customs?view=customs&keyword=QA&returnTo=%2Fdashboard&source=qa&returnTo=https%3A%2F%2Fexample.invalid",
       ),
-    ).toBe("/dashboard/tax-refunds?view=customs&keyword=QA&source=qa");
+    ).toBe("/dashboard/customs?view=customs&keyword=QA&source=qa");
   });
 
   it.each([
     null,
     "",
-    "https://example.invalid/dashboard/tax-refunds?view=customs",
-    "http://localhost/dashboard/tax-refunds?view=customs",
-    "//example.invalid/dashboard/tax-refunds?view=customs",
+    "https://example.invalid/dashboard/customs?view=customs",
+    "http://localhost/dashboard/customs?view=customs",
+    "//example.invalid/dashboard/customs?view=customs",
     "javascript:alert(1)",
-    "\\example.invalid/dashboard/tax-refunds?view=customs",
-    "/\\example.invalid/dashboard/tax-refunds?view=customs",
-    " /dashboard/tax-refunds?view=customs",
+    "\\example.invalid/dashboard/customs?view=customs",
+    "/\\example.invalid/dashboard/customs?view=customs",
+    " /dashboard/customs?view=customs",
     "/dashboard/tax-refunds/../sales?view=customs",
-    "/dashboard/../dashboard/tax-refunds?view=customs",
+    "/dashboard/../dashboard/customs?view=customs",
     "/dashboard/%74ax-refunds?view=customs",
     "%2Fdashboard%2Ftax-refunds%3Fview%3Dcustoms",
     "%252Fdashboard%252Ftax-refunds%253Fview%253Dcustoms",
-    "/%2Fexample.invalid/dashboard/tax-refunds?view=customs",
+    "/%2Fexample.invalid/dashboard/customs?view=customs",
     "/dashboard/sales?view=customs",
     "/dashboard/tax-refunds/qa?view=customs",
-    "/dashboard/tax-refunds?keyword=QA",
-    "/dashboard/tax-refunds?view=refunds&keyword=QA",
-    "/dashboard/tax-refunds?view=customs&view=refunds",
-    "/dashboard/tax-refunds?view=customs&view=customs",
+    "/dashboard/customs?keyword=QA",
+    "/dashboard/customs?view=refunds&keyword=QA",
+    "/dashboard/customs?view=customs&view=refunds",
+    "/dashboard/customs?view=customs&view=customs",
     "/customs-declarations?view=refunds",
   ])("不受支持的目标 %s 一律回退到报关页签", (target) => {
     expect(resolveCustomsReturnTo(target)).toBe(CUSTOMS_RETURN_FALLBACK);
+  });
+});
+
+describe("迁移前的退税页签地址", () => {
+  it("带 view=customs 的旧 returnTo 规范到新地址，缺少 view 的回退", () => {
+    expect(
+      resolveCustomsReturnTo("/dashboard/tax-refunds?view=customs&keyword=QA"),
+    ).toBe("/dashboard/customs?view=customs&keyword=QA");
+    expect(resolveCustomsReturnTo("/dashboard/tax-refunds?keyword=QA")).toBe(
+      CUSTOMS_RETURN_FALLBACK,
+    );
+    expect(
+      resolveCustomsReturnTo("/dashboard/tax-refunds?view=refunds"),
+    ).toBe(CUSTOMS_RETURN_FALLBACK);
   });
 });

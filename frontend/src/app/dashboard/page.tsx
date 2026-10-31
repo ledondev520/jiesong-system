@@ -337,7 +337,7 @@ function DashboardContent() {
             <Button
               className="justify-start rounded-md"
               variant="outline"
-              onClick={() => router.push("/dashboard/tax-refunds?view=customs")}
+              onClick={() => router.push("/dashboard/customs?view=customs")}
             >
               <FileText className="mr-2 h-4 w-4" />
               查看报关单

@@ -15,6 +15,6 @@ describe('TaxRefundsPage', () => {
       // next redirect throws by design
     }
 
-    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/tax-refunds');
+    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/customs');
   });
 });

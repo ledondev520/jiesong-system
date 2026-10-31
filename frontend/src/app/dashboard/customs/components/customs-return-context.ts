@@ -5,8 +5,10 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-const CUSTOMS_LIST_PATH = "/dashboard/tax-refunds";
+const CUSTOMS_LIST_PATH = "/dashboard/customs";
 export const CUSTOMS_RETURN_FALLBACK = `${CUSTOMS_LIST_PATH}?view=customs`;
+// 旧页签地址（迁移前的 returnTo/书签）；与规范地址一样必须明确带 view=customs。
+const LEGACY_TAB_PATH = "/dashboard/tax-refunds";
 const LEGACY_LIST_PATHS = [
   "/customs-declarations",
   "/dashboard/customs-declarations",
@@ -21,7 +23,9 @@ export function resolveCustomsReturnTo(returnTo: string | null) {
   const pathname =
     queryIndex < 0 ? pathAndQuery : pathAndQuery.slice(0, queryIndex);
   // 精确比较未经再次解码的路径，拒绝外部/协议相对地址、编码路径、反斜线与路径别名。
-  if (pathname !== CUSTOMS_LIST_PATH && !LEGACY_LIST_PATHS.includes(pathname)) {
+  const isTabPath =
+    pathname === CUSTOMS_LIST_PATH || pathname === LEGACY_TAB_PATH;
+  if (!isTabPath && !LEGACY_LIST_PATHS.includes(pathname)) {
     return CUSTOMS_RETURN_FALLBACK;
   }
   const params = new URLSearchParams(
@@ -29,7 +33,7 @@ export function resolveCustomsReturnTo(returnTo: string | null) {
   );
   const views = params.getAll("view");
   if (
-    (pathname === CUSTOMS_LIST_PATH && views.length !== 1) ||
+    (isTabPath && views.length !== 1) ||
     views.length > 1 ||
     (views.length === 1 && views[0] !== "customs")
   ) {

@@ -73,9 +73,9 @@ for (const width of [390, 1440]) {
       await route.fallback();
     });
     const oldUrl =
-      "/dashboard/tax-refunds?view=customs&source=qa&keyword=OLD&status=RELEASED";
+      "/dashboard/customs?view=customs&source=qa&keyword=OLD&status=RELEASED";
     const newUrl =
-      "/dashboard/tax-refunds?view=customs&source=qa&keyword=NEW&status=DRAFT";
+      "/dashboard/customs?view=customs&source=qa&keyword=NEW&status=DRAFT";
     await signInAsAdmin(page, oldUrl);
     const search = page.getByPlaceholder("搜索报关单号或报关行...");
     const customsTab = page.getByRole("tab", { name: "报关单", exact: true });
@@ -128,7 +128,7 @@ for (const width of [390, 1440]) {
     expect(new URL(page.url()).searchParams.get("source")).toBe("qa");
     await page.getByTestId("reset-filters").click();
     await expect(page).toHaveURL(
-      /\/dashboard\/tax-refunds\?view=customs&source=qa$/,
+      /\/dashboard\/customs\?view=customs&source=qa$/,
     );
     await expect(search).toHaveValue("");
     await expect(page.getByRole("combobox").first()).toHaveText("全部状态");
@@ -139,7 +139,7 @@ for (const width of [390, 1440]) {
     await page.getByRole("option", { name: "草稿", exact: true }).click();
     await expect(search).toHaveValue(declaration.declarationNo);
     const filteredReturn =
-      "/dashboard/tax-refunds?view=customs&source=qa&keyword=" +
+      "/dashboard/customs?view=customs&source=qa&keyword=" +
       declaration.declarationNo +
       "&status=DRAFT";
     await expect(page).toHaveURL(new URL(filteredReturn, page.url()).href);
@@ -147,7 +147,7 @@ for (const width of [390, 1440]) {
       width < 768 ? "查看详情" : `查看详情 ${declaration.declarationNo}`;
     await page.getByRole("button", { name: detailName, exact: true }).click();
     const expectedDetail = new URL(
-      "/dashboard/customs-declarations/qa-customs-navigation?" +
+      "/dashboard/customs/qa-customs-navigation?" +
         new URLSearchParams({ returnTo: filteredReturn }),
       page.url(),
     ).href;
@@ -169,20 +169,20 @@ for (const width of [390, 1440]) {
     // 不等待最后一次搜索 URL 提交，紧接着切换页签以覆盖中断中的筛选工作。
     await search.fill("LATE");
     await refundsTab.click();
-    await expect(page).toHaveURL(/\/dashboard\/tax-refunds\?view=refunds$/);
+    await expect(page).toHaveURL(/\/dashboard\/customs\?view=refunds$/);
     await expect(refundsTab).toHaveAttribute("aria-selected", "true");
     await expect(
       page.getByRole("heading", { name: "报关单管理", exact: true }),
     ).not.toBeVisible();
     await refundsTab.click();
-    await expect(page).toHaveURL(/\/dashboard\/tax-refunds\?view=refunds$/);
+    await expect(page).toHaveURL(/\/dashboard\/customs\?view=refunds$/);
     await page.getByRole("tab", { name: "退税工作台", exact: true }).click();
-    await expect(page).toHaveURL(/\/dashboard\/tax-refunds$/);
+    await expect(page).toHaveURL(/\/dashboard\/customs$/);
     await page.keyboard.press("ArrowRight");
     await expect(customsTab).toHaveAttribute("aria-selected", "true");
     await page.keyboard.press("ArrowRight");
     await expect(refundsTab).toHaveAttribute("aria-selected", "true");
-    await expect(page).toHaveURL(/\/dashboard\/tax-refunds\?view=refunds$/);
+    await expect(page).toHaveURL(/\/dashboard\/customs\?view=refunds$/);
     expect(businessWrites).toEqual([]);
   });
 }

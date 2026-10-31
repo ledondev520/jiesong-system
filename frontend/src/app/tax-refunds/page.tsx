@@ -8,5 +8,5 @@ import { redirect } from 'next/navigation';
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 export default function TaxRefundsPage() {
-  redirect('/dashboard/tax-refunds');
+  redirect('/dashboard/customs');
 }

@@ -66,7 +66,7 @@ import { TaxRefundWorkbench } from "./TaxRefundWorkbench";
 const DEFAULT_PAGE_SIZE = 20;
 
 const CustomsDeclarationListPageContent = lazy(() =>
-  import("@/app/customs-declarations/components/CustomsDeclarationListPageContent").then(
+  import("@/app/dashboard/customs/components/CustomsDeclarationListPageContent").then(
     (module) => ({
       default: module.CustomsDeclarationListPageContent,
     }),
@@ -224,10 +224,10 @@ export function TaxRefundListPageContent() {
   const handleViewChange = (view: string) => {
     const href =
       view === "customs"
-        ? "/dashboard/tax-refunds?view=customs"
+        ? "/dashboard/customs?view=customs"
         : view === "refunds"
-          ? "/dashboard/tax-refunds?view=refunds"
-          : "/dashboard/tax-refunds";
+          ? "/dashboard/customs?view=refunds"
+          : "/dashboard/customs";
     setKeyword("");
     setStatus("ALL");
     setPage(1);

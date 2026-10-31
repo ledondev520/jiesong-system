@@ -35,7 +35,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     window.history.replaceState(
       {},
       "",
-      "/dashboard/tax-refunds?view=customs&source=qa",
+      "/dashboard/customs?view=customs&source=qa",
     );
     mocks.getAll.mockResolvedValue({
       data: { items: [], pagination: { total: 0 } },
@@ -51,7 +51,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
   it("浏览器已离开报关页签时旧嵌入列表事件不能再发布筛选", async () => {
     render(<CustomsDeclarationListPageContent embedded />);
     const input = screen.getByPlaceholderText("搜索报关单号或报关行...");
-    window.history.replaceState({}, "", "/dashboard/tax-refunds?view=refunds");
+    window.history.replaceState({}, "", "/dashboard/customs?view=refunds");
     fireEvent.change(input, { target: { value: "LATE" } });
     expect(window.location.search).toBe("?view=refunds");
   });
@@ -61,7 +61,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     window.history.replaceState(
       {},
       "",
-      "/dashboard/tax-refunds?" + mocks.params.toString(),
+      "/dashboard/customs?" + mocks.params.toString(),
     );
     const user = userEvent.setup();
     render(<CustomsDeclarationListPageContent embedded />);
@@ -78,7 +78,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     expect(input).toHaveValue("");
     expect(mocks.router.replace).not.toHaveBeenCalled();
   });
-  it.each(["/customs-declarations", "/dashboard/customs-declarations"])(
+  it.each(["/customs-declarations", "/dashboard/customs"])(
     "旧独立列表 %s 进入详情只传递内部的规范报关返回上下文",
     async (pathname) => {
       const user = userEvent.setup();
@@ -110,10 +110,10 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
       const href = mocks.router.push.mock.calls.at(-1)?.[0];
       expect(href).toBeTypeOf("string");
       const detailUrl = new URL(href, window.location.origin);
-      expect(detailUrl.pathname).toBe("/dashboard/customs-declarations/qa");
+      expect(detailUrl.pathname).toBe("/dashboard/customs/qa");
       const returnTo = detailUrl.searchParams.get("returnTo");
       expect(returnTo).toBe(
-        "/dashboard/tax-refunds?source=qa&keyword=QA&status=DRAFT&view=customs#rows",
+        "/dashboard/customs?source=qa&keyword=QA&status=DRAFT&view=customs#rows",
       );
       expect(returnTo).not.toContain(window.location.origin);
       expect(returnTo).not.toContain("returnTo=");
@@ -181,7 +181,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     window.history.replaceState(
       {},
       "",
-      "/dashboard/customs-declarations?" + mocks.params.toString(),
+      "/dashboard/customs?" + mocks.params.toString(),
     );
     const { rerender } = render(<CustomsDeclarationListPageContent />);
     await screen.findByDisplayValue("OLD");
@@ -192,7 +192,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     window.history.replaceState(
       {},
       "",
-      "/dashboard/customs-declarations?" + mocks.params.toString(),
+      "/dashboard/customs?" + mocks.params.toString(),
     );
     rerender(<CustomsDeclarationListPageContent />);
     const input = await screen.findByDisplayValue("NEW");
@@ -205,7 +205,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
 
     await user.clear(input);
     await user.type(input, "TEST");
-    expect(window.location.pathname).toBe("/dashboard/customs-declarations");
+    expect(window.location.pathname).toBe("/dashboard/customs");
     expect(
       Object.fromEntries(new URLSearchParams(window.location.search)),
     ).toEqual({
@@ -215,7 +215,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     });
     expect(mocks.router.replace).not.toHaveBeenCalled();
     await user.click(screen.getByTestId("reset-filters"));
-    expect(window.location.pathname).toBe("/dashboard/customs-declarations");
+    expect(window.location.pathname).toBe("/dashboard/customs");
     expect(
       Object.fromEntries(new URLSearchParams(window.location.search)),
     ).toEqual({
@@ -228,7 +228,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
 
 it("报关详情返回与刷新恢复URL页签、筛选及分页", async () => {
   const saved =
-    "/dashboard/tax-refunds?view=customs&keyword=SYN&status=RELEASED&page=2&pageSize=50&source=qa#rows";
+    "/dashboard/customs?view=customs&keyword=SYN&status=RELEASED&page=2&pageSize=50&source=qa#rows";
   window.history.replaceState({}, "", saved);
   mocks.getAll.mockResolvedValue({
     data: {

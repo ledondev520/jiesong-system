@@ -23,7 +23,7 @@ const setFieldValue = (label: string, value: string) => {
 };
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/dashboard/customs-declarations/create",
+  usePathname: () => "/dashboard/customs/new",
   useRouter: () => ({
     push: mockPush,
     back: vi.fn(),
@@ -140,7 +140,7 @@ describe("CreateCustomsDeclarationPage 交互逻辑", () => {
 
     expect(mockToastSuccess).toHaveBeenCalledWith("报关单创建成功");
     expect(mockPush).toHaveBeenCalledWith(
-      "/dashboard/customs-declarations/cd-new",
+      "/dashboard/customs/cd-new",
     );
   });
 

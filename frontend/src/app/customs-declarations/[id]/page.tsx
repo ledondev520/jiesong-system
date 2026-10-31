@@ -6,5 +6,5 @@ interface PageProps {
 
 export default async function CustomsDeclarationDetailRedirectPage({ params }: PageProps) {
   const { id } = await params;
-  redirect(`/dashboard/customs-declarations/${id}`);
+  redirect(`/dashboard/customs/${encodeURIComponent(id)}`);
 }
