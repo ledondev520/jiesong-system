@@ -140,7 +140,9 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     const inspection = await db.purchaseReceiptInspection.create({ data: { receiptId: receipt.id, receiptItemId: receiptItem.id, requestId: 'hd-i', requestHash: 'hd-ih', acceptedQuantity: 2, acceptedIncrement: 2, reinspectionQuantity: 0, pendingQuantity: 0, note: 'synthetic', inspectedById: users.PURCHASE.id } });
     await db.inventory.create({ data: { productId: product.id, purchaseItemId: contract.items[0].id, receiptInspectionId: inspection.id, quantity: 2 } });
     const sale = await db.salesContract.create({ data: { contractNo: 'EXP-HD-1', exchangeRate: 7 } });
-    await db.packingItem.create({ data: { salesContractId: sale.id, purchaseItemId: contract.items[0].id, productId: product.id, quantity: 1 } });
+    await db.packingItem.create({ data: { salesContractId: sale.id, purchaseItemId: contract.items[0].id, productId: product.id, quantity: 1, boxes: 5, grossWeight: 50 } });
+    await db.packingItem.create({ data: { salesContractId: sale.id, productId: product.id, quantity: 1, boxes: 2, grossWeight: 20 } }); // unrelated row survives
+    await db.salesContract.update({ where: { id: sale.id }, data: { totalBoxes: 7, grossWeight: 70 } });
     const other = await db.supplier.create({ data: { name: 'Synthetic bystander supplier' } });
     const otherContract = await db.purchaseContract.create({ data: { contractNo: 'HD-OTHER', supplierId: other.id } });
 
@@ -196,8 +198,11 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     assert.equal(await db.purchaseReceipt.count({ where }), 0);
     assert.equal(await db.purchaseReceiptInspection.count({ where: { receiptId: receipt.id } }), 0);
     assert.equal(await db.inventory.count({ where: { receiptInspectionId: inspection.id } }), 0);
-    assert.equal(await db.packingItem.count({ where: { salesContractId: sale.id } }), 0);
-    assert.ok(await db.salesContract.findUnique({ where: { id: sale.id } }), 'sales contract itself is kept');
+    assert.equal(await db.packingItem.count({ where: { salesContractId: sale.id } }), 1);
+    const keptSale = await db.salesContract.findUnique({ where: { id: sale.id } });
+    assert.ok(keptSale, 'sales contract itself is kept');
+    assert.equal(keptSale.totalBoxes, 2, 'sales totals recomputed from remaining packing rows');
+    assert.equal(keptSale.grossWeight, 20);
     // Other suppliers and the product catalogue are untouched.
     assert.ok(await db.supplier.findUnique({ where: { id: other.id } }));
     assert.ok(await db.purchaseContract.findUnique({ where: { id: otherContract.id } }));

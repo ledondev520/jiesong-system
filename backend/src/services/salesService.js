@@ -770,6 +770,7 @@ module.exports = {
   addPackingItem,
   updatePackingItem,
   removePackingItem,
+  recalculateContractStats,
   getAvailablePurchaseItems,
   importPurchasePackingItems,
 };

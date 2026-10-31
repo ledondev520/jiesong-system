@@ -8,6 +8,7 @@
 const crypto = require('crypto');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
+const { recalculateContractStats } = require('./salesService');
 
 // shortcut: attachment files on disk are kept (same as purchase delete); only ContractFile rows go. Upgrade if disk cleanup is wanted.
 // PriceHistory.supplierId has no FK and is a product price snapshot, so it is left untouched.
@@ -102,7 +103,10 @@ const hardDelete = async (prisma, { supplierId, confirmToken, actorId, req }) =>
   await tx.purchaseReceiptInspection.deleteMany({ where: f.inspection });
   await tx.purchaseReceiptItem.deleteMany({ where: f.receiptItem });
   await tx.purchaseReceipt.deleteMany({ where: f.receipt });
+  // Sales contracts lose cargo rows here, so their box/weight/volume totals are recomputed by the existing sales logic.
+  const salesIds = (await tx.packingItem.findMany({ where: f.packing, select: { salesContractId: true }, distinct: ['salesContractId'] })).map((r) => r.salesContractId);
   await tx.packingItem.deleteMany({ where: f.packing });
+  for (const id of salesIds) await recalculateContractStats(id, tx);
   await tx.purchaseContract.deleteMany({ where: f.contract }); // cascades items + ContractFile rows
   await tx.contractTemplate.deleteMany({ where: { type: 'PURCHASE', supplierId } });
   await tx.productSupplier.deleteMany({ where: { supplierId } });
