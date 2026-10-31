@@ -22,10 +22,6 @@ import {
   ShoppingCart,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  OPERATIONS_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { TradeWorkflowBoard } from "@/components/dashboard/TradeWorkflowBoard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +33,7 @@ import {
   type WpsSyncStatus,
 } from "@/services/tradeWorkflow.service";
 import { useAuthStore } from "@/store/auth.store";
+import { Role } from "@/types";
 
 type DashboardMetrics = {
   draftPurchases: number | null;
@@ -74,6 +71,8 @@ function DashboardContent() {
       : "recent";
   const router = useRouter();
   const { user } = useAuthStore();
+  // WPS 同步状态是运维信息，仅管理员可见且仅管理员才请求
+  const isAdmin = user?.role === Role.ADMIN;
   const [metricsLoading, setMetricsLoading] = useState(true);
   const [fundsUnavailable, setFundsUnavailable] = useState(false);
   const [periodUnavailable, setPeriodUnavailable] = useState(false);
@@ -86,6 +85,7 @@ function DashboardContent() {
   const [syncUnavailable, setSyncUnavailable] = useState(false);
 
   useEffect(() => {
+    if (!isAdmin) return;
     let active = true;
     const refresh = async () => {
       try {
@@ -106,7 +106,7 @@ function DashboardContent() {
       active = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     let active = true;
@@ -208,50 +208,51 @@ function DashboardContent() {
 
   return (
     <div className="space-y-5 pb-4 md:space-y-8 md:pb-16">
-      <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
       <PageHeader
         title="工作台"
         description="按专项单执行采购、出口、退税与财务结清的唯一下一步。"
         showBack={false}
       />
 
-      <div
-        className="rounded-lg border bg-card p-4 text-sm"
-        role="status"
-        aria-live="polite"
-      >
-        <p className="font-medium">
-          WPS 出货同步 ·{" "}
-          {syncUnavailable
-            ? "状态读取失败"
-            : !syncStatus
-              ? "正在查询"
-              : {
-                  never: "尚未完成同步",
-                  current: "已核对",
-                  needs_review: "已核对，仍有历史差异",
-                  running: "同步中",
-                  failed: "本轮失败",
-                  stale: "超过90分钟未成功核对",
-                }[syncStatus.state]}
-        </p>
-        {syncStatus?.message && (
-          <p className="mt-1 text-muted-foreground">{syncStatus.message}</p>
-        )}
-        <p className="mt-1 text-muted-foreground">
-          最近成功核对：
-          {syncStatus?.lastSuccessAt
-            ? new Date(syncStatus.lastSuccessAt).toLocaleString("zh-CN", {
-                timeZone: "Asia/Shanghai",
-              })
-            : "暂无"}
-          {syncStatus && syncStatus.conflicts > 0
-            ? `；${syncStatus.conflicts} 项待核对，未强行覆盖。`
-            : ""}{" "}
-          以 WPS 已上传内容为准；电脑及 Codex
-          在线时每小时检查，失败在当前任务提醒。
-        </p>
-      </div>
+      {isAdmin && (
+        <div
+          className="rounded-lg border bg-card p-4 text-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="font-medium">
+            WPS 出货同步 ·{" "}
+            {syncUnavailable
+              ? "状态读取失败"
+              : !syncStatus
+                ? "正在查询"
+                : {
+                    never: "尚未完成同步",
+                    current: "已核对",
+                    needs_review: "已核对，仍有历史差异",
+                    running: "同步中",
+                    failed: "本轮失败",
+                    stale: "超过90分钟未成功核对",
+                  }[syncStatus.state]}
+          </p>
+          {syncStatus?.message && (
+            <p className="mt-1 text-muted-foreground">{syncStatus.message}</p>
+          )}
+          <p className="mt-1 text-muted-foreground">
+            最近成功核对：
+            {syncStatus?.lastSuccessAt
+              ? new Date(syncStatus.lastSuccessAt).toLocaleString("zh-CN", {
+                  timeZone: "Asia/Shanghai",
+                })
+              : "暂无"}
+            {syncStatus && syncStatus.conflicts > 0
+              ? `；${syncStatus.conflicts} 项待核对，未强行覆盖。`
+              : ""}{" "}
+            以 WPS 已上传内容为准；电脑及 Codex
+            在线时每小时检查，失败在当前任务提醒。
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2" aria-label="专项单范围">
         {(

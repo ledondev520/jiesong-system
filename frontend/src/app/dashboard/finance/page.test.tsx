@@ -6,12 +6,12 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { readFileSync } from 'node:fs';
-import { clearAllCache } from '@/lib/api-cache';
-import FinancePage from './page';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import { clearAllCache } from "@/lib/api-cache";
+import FinancePage from "./page";
 
 const mockGetStats = vi.fn();
 const mockApiGet = vi.fn();
@@ -19,38 +19,33 @@ const mockGetTransactionStats = vi.fn();
 const mockGetInvoiceStats = vi.fn();
 const mockClearApiGetCache = vi.fn();
 
-vi.mock('@/services/finance.service', () => ({
+vi.mock("@/services/finance.service", () => ({
   financeService: {
     getStats: (...args: unknown[]) => mockGetStats(...args),
   },
 }));
 
-vi.mock('@/lib/axios', () => ({
+vi.mock("@/lib/axios", () => ({
   clearApiGetCache: () => mockClearApiGetCache(),
   default: {
     get: (...args: unknown[]) => mockApiGet(...args),
   },
 }));
 
-vi.mock('@/services/bankFlow.service', () => ({
+vi.mock("@/services/bankFlow.service", () => ({
   getTransactionStats: (...args: unknown[]) => mockGetTransactionStats(...args),
   getInvoiceStats: (...args: unknown[]) => mockGetInvoiceStats(...args),
 }));
 
-vi.mock('next/navigation', () => ({
+vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: vi.fn(),
     back: vi.fn(),
   }),
-  usePathname: () => '/dashboard/finance',
+  usePathname: () => "/dashboard/finance",
 }));
 
-vi.mock('@/lib/tab-memory', () => ({
-  saveModuleTab: vi.fn(),
-  getModuleTab: vi.fn((href: string) => href),
-}));
-
-vi.mock('./components/FinanceOverviewCharts', () => ({
+vi.mock("./components/FinanceOverviewCharts", () => ({
   default: () => (
     <div data-testid="finance-overview-charts">
       <span>收支对比</span>
@@ -59,7 +54,7 @@ vi.mock('./components/FinanceOverviewCharts', () => ({
   ),
 }));
 
-describe('FinancePage 交互逻辑', () => {
+describe("FinancePage 交互逻辑", () => {
   beforeEach(() => {
     clearAllCache();
     mockClearApiGetCache.mockReset();
@@ -67,7 +62,12 @@ describe('FinancePage 交互逻辑', () => {
     mockApiGet.mockReset();
     mockGetTransactionStats.mockReset();
     mockGetInvoiceStats.mockReset();
-    mockGetTransactionStats.mockResolvedValue({ totalIn: 0, totalOut: 0, netFlow: 0, txnCount: 0 });
+    mockGetTransactionStats.mockResolvedValue({
+      totalIn: 0,
+      totalOut: 0,
+      netFlow: 0,
+      txnCount: 0,
+    });
     mockGetInvoiceStats.mockResolvedValue({
       validTotal: 0,
       validTax: 0,
@@ -77,34 +77,40 @@ describe('FinancePage 交互逻辑', () => {
       totalCount: 0,
     });
     mockApiGet.mockImplementation((url: string) => {
-      if (url.includes('/system/exchange-rate')) {
+      if (url.includes("/system/exchange-rate")) {
         return Promise.resolve({
           data: { rate: 6.8, buffer: 0.2, effectiveRate: 6.6 },
         });
       }
-      if (url.includes('/finance/payment-trends')) {
+      if (url.includes("/finance/payment-trends")) {
         return Promise.resolve({
           data: [
-            { label: '上期', receivables: 800, payables: 300 },
-            { label: '本期', receivables: 1000, payables: 400 },
+            { label: "上期", receivables: 800, payables: 300 },
+            { label: "本期", receivables: 1000, payables: 400 },
           ],
         });
       }
-      if (url.includes('/finance/overdue-receivables')) {
+      if (url.includes("/finance/overdue-receivables")) {
         return Promise.resolve({ data: [] });
       }
       return Promise.resolve({ data: null });
     });
   });
 
-  it('图表库通过延迟加载的内部 Module 隔离', () => {
-    const pageSource = readFileSync('src/app/dashboard/finance/page.tsx', 'utf8');
+  it("图表库通过延迟加载的内部 Module 隔离", () => {
+    const pageSource = readFileSync(
+      "src/app/dashboard/finance/page.tsx",
+      "utf8",
+    );
 
-    expect(pageSource).not.toContain("from 'recharts'");
-    expect(pageSource).toContain("import('./components/FinanceOverviewCharts')");
+    // Quote-agnostic: Prettier owns the quote style of page.tsx.
+    expect(pageSource).not.toMatch(/from ["']recharts["']/);
+    expect(pageSource).toMatch(
+      /import\(["']\.\/components\/FinanceOverviewCharts["']\)/,
+    );
   });
 
-  it('加载完成后展示统计信息', async () => {
+  it("加载完成后展示统计信息", async () => {
     mockGetStats.mockResolvedValue({
       payable: { total: 1200, paid: 400, unpaid: 800 },
       receivable: { total: 3200, received: 1000, unreceived: 2200 },
@@ -112,37 +118,52 @@ describe('FinancePage 交互逻辑', () => {
 
     render(<FinancePage />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '财务概览' })).toBeInTheDocument();
-      expect(screen.getByText('先看收付压力，再下钻经营执行')).toBeInTheDocument();
-      expect(screen.getByText('应付账款总额')).toBeInTheDocument();
-      expect(screen.getByText('待收账款')).toBeInTheDocument();
-      expect(screen.getByText(/当前客户剩余欠款/)).toBeInTheDocument();
-      expect(screen.getByText('财务报表分析')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /查看报表分析/ })).toHaveAttribute('href', '/dashboard/finance/statements');
-      expect(screen.queryByTestId('financial-statements-section')).not.toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByRole("heading", { name: "财务概览" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("先看收付压力，再下钻经营执行"),
+        ).toBeInTheDocument();
+        expect(screen.getByText("应付账款总额")).toBeInTheDocument();
+        expect(screen.getByText("待收账款")).toBeInTheDocument();
+        expect(screen.getByText(/当前客户剩余欠款/)).toBeInTheDocument();
+        expect(screen.getByText("财务报表分析")).toBeInTheDocument();
+        expect(
+          screen.getByRole("link", { name: /查看报表分析/ }),
+        ).toHaveAttribute("href", "/dashboard/finance/statements");
+        expect(
+          screen.queryByTestId("financial-statements-section"),
+        ).not.toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
-    expect(await screen.findByTestId('finance-overview-charts', undefined, { timeout: 15000 })).toBeInTheDocument();
-    expect(screen.getByText('收支对比')).toBeInTheDocument();
-    expect(screen.getByText('现金流预测')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId("finance-overview-charts", undefined, {
+        timeout: 15000,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("收支对比")).toBeInTheDocument();
+    expect(screen.getByText("现金流预测")).toBeInTheDocument();
   });
 
-  it('初始加载中会显示加载文案', () => {
+  it("初始加载中会显示加载文案", () => {
     mockGetStats.mockReturnValue(new Promise(() => {}));
     mockApiGet.mockReturnValue(new Promise(() => {}));
     render(<FinancePage />);
-    expect(screen.getByText('加载中...')).toBeInTheDocument();
+    expect(screen.getByText("加载中...")).toBeInTheDocument();
   });
 
-  it('手动刷新失效两层缓存并重新读取财务统计', async () => {
+  it("手动刷新失效两层缓存并重新读取财务统计", async () => {
     mockGetStats.mockResolvedValue({
       payable: { total: 0, paid: 0, unpaid: 0 },
       receivable: { total: 0, received: 0, unreceived: 0 },
     });
     const user = userEvent.setup();
     render(<FinancePage />);
-    await user.click(await screen.findByRole('button', { name: '刷新' }));
+    await user.click(await screen.findByRole("button", { name: "刷新" }));
 
     await waitFor(() => expect(mockGetStats).toHaveBeenCalledTimes(2));
     expect(mockClearApiGetCache).toHaveBeenCalledTimes(1);

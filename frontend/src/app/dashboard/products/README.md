@@ -7,3 +7,4 @@
 - `components/`：商品编辑和库存状态组件，生命周期边界与回归见该目录 README
 
 商品/库存页签由 `useListUrlState(listUrlFields.productTabs)` 写入URL的tab字段，库存查询参数独立保留。
+- `[id]/page.tsx`：商品详情（概览 + 只读「采购价格」页签，各供应商比价）；`[id]/page.test.tsx` 覆盖页签与加载失败重试

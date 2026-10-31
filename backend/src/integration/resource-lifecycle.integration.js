@@ -112,6 +112,12 @@ test('registered resource lifecycle matrix over HTTP, private SQLite and singlet
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const payload = await response.json();
+    // The real global limiter (100/min) stays mounted; with many registered resources the matrix must pace itself.
+    const remaining = Number(response.headers.get('x-ratelimit-remaining'));
+    if (remaining <= 5) {
+      const wait = Number(response.headers.get('x-ratelimit-reset')) - Date.now() + 100;
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    }
     if (
       method !== 'GET' &&
       response.status >= 200 &&

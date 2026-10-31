@@ -74,10 +74,6 @@ vi.mock("@/services/agent.service", () => ({
 vi.mock("@/components/dialog/AgentAccountDialog", () => ({
   AgentAccountDialog: () => null,
 }));
-vi.mock("@/components/layout/ModuleTabHeader", () => ({
-  ModuleTabHeader: () => null,
-  ADMIN_TABS: [],
-}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("sonner", () => ({
   toast: { error: transport.error, success: transport.success },

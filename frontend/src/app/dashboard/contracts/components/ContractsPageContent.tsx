@@ -13,10 +13,6 @@ import {
   useBusinessReadOnly,
 } from "@/lib/hooks/useBusinessReadOnly";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import {
-  ModuleTabHeader,
-  PROCUREMENT_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PurchaseContract, PurchaseStatus, PurchaseItem } from "@/types";
 import { purchaseService } from "@/services/purchase.service";
@@ -735,7 +731,6 @@ export default function ContractsPageContent() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader title="采购合同" />
 
       <div className="grid grid-cols-2 gap-3 md:hidden">

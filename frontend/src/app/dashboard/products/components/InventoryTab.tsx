@@ -57,6 +57,10 @@ import {
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 
+/** 单位字段可能是脏数据（如 "41.0"）；纯数字不当作单位展示，避免出现两个无标签数字。 */
+const formatQuantity = (quantity: number, unit?: string | null) =>
+  unit && !/^[\d.\s]+$/.test(unit) ? `${quantity} ${unit}` : `${quantity}`;
+
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
   [InventoryStatus.PRODUCING]: "生产中",
   [InventoryStatus.PACKING]: "包装中",
@@ -190,7 +194,7 @@ export function InventoryTab() {
   const getStatusBadge = (status: InventoryStatus) => {
     const statusMap: Record<InventoryStatus, StatusBadgeConfig> = {
       [InventoryStatus.PRODUCING]: { label: "生产中", tone: "warning" },
-      [InventoryStatus.PACKING]: { label: "包装中", tone: "danger" },
+      [InventoryStatus.PACKING]: { label: "包装中", tone: "warning" },
       [InventoryStatus.SHIPPING]: { label: "运输中", tone: "progress" },
       [InventoryStatus.INBOUND]: { label: "已入库", tone: "secondary" },
       [InventoryStatus.OUTBOUND]: { label: "已出库", tone: "success" },
@@ -570,7 +574,7 @@ export function InventoryTab() {
                         数量
                       </p>
                       <p className="text-sm font-medium">
-                        {item.quantity} {item.product?.unit}
+                        {formatQuantity(item.quantity, item.product?.unit)}
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -708,7 +712,7 @@ export function InventoryTab() {
                     {item.purchaseItem?.purchaseContract?.contractNo || "-"}
                   </TableCell>
                   <TableCell>
-                    {item.quantity} {item.product?.unit}
+                    {formatQuantity(item.quantity, item.product?.unit)}
                   </TableCell>
                   <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell>

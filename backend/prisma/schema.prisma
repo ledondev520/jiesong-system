@@ -99,6 +99,7 @@ model User {
   purchaseReceiptsCreated    PurchaseReceipt[] @relation("ReceiptCreatedBy")
   purchaseReceiptInspections PurchaseReceiptInspection[] @relation("ReceiptInspectedBy")
   browserSessions           BrowserSession[]
+  quotesCreated             Quote[]           @relation("QuoteCreatedBy")
   operationLogs             OperationLog[]
   chatHistories             ChatHistory[]
   agentReplaySummaries      AgentReplaySummary[]
@@ -243,6 +244,7 @@ model Customer {
 
   stores         Store[]
   salesContracts SalesContract[]
+  quotes         Quote[]
 
   @@map("customers")
 }
@@ -267,6 +269,7 @@ model Store {
   salesItems    SalesItem[]
   packingItems  PackingItem[]
   purchaseItems PurchaseItem[]
+  quoteItems    QuoteItem[]
 
   @@index([customerId])
   @@map("stores")
@@ -305,6 +308,7 @@ model Product {
   customsDeclarationItems CustomsDeclarationItem[]
   priceHistories          PriceHistory[]
   taxRates                TaxRate[]
+  quoteItems              QuoteItem[]
 
   @@map("products")
 }
@@ -527,12 +531,14 @@ model SalesContract {
   incoterm         String? // 新订单复制 Customer.defaultIncoterm；旧订单为空 = 显示客户默认
   paymentTerms     String?
   portOfLoading    String? // 自由文本，复制自 Customer.defaultPortOfLoading
+  quoteId          String?   @unique // 本订单由哪张报价转换而来
   // 时间戳
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   port                Port?                @relation(fields: [portId], references: [id])
   customer            Customer?            @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  quote               Quote?               @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   customsDeclarations CustomsDeclaration[]
   forexVerifications  ForexVerification[]
   items               SalesItem[]
@@ -550,6 +556,66 @@ model SalesContract {
   @@index([customerId])
   @@index([createdAt])
   @@map("sales_contracts")
+}
+
+// Confidential: quote prices and reference costs. Generated PI files are streamed, never stored.
+model Quote {
+  id              String    @id @default(cuid())
+  quoteNo         String    @unique              // "QT" + yyMM + "-" + 3-digit monthly sequence (Asia/Shanghai), e.g. QT2611-003
+  customerId      String?                        // defaults to the only active customer; required before SENT
+  currency        String    @default("USD")      // v1: "USD" only
+  incoterm        String    @default("FOB")
+  paymentTerms    String?
+  portOfLoading   String?
+  validUntil      DateTime?
+  spotRate        Float?                         // spot CNY/USD used at the last pricing; required before SENT
+  pricingRate     Float?                         // FX actually used = spotRate − adjustment (locked rule: spot − 0.2)
+  pricingRevision String?                        // pricing.json revision (sha256) used at the last pricing
+  status          String    @default("DRAFT")    // DRAFT / SENT / ACCEPTED / REJECTED / CONVERTED / CANCELLED
+  totalAmount     Float     @default(0)
+  note            String?
+  createdById     String
+  sentAt          DateTime?
+  acceptedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  customer      Customer?      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdBy     User           @relation("QuoteCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  items         QuoteItem[]
+  salesContract SalesContract?
+
+  @@index([status])
+  @@index([customerId])
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id             String  @id @default(cuid())
+  quoteId        String
+  productId      String
+  storeId        String?                         // required before SENT
+  quantity       Float
+  unit           String?
+  specification  String?
+  costCny        Float?                          // reference unit cost ¥ chosen in the comparison (null = 缺成本)
+  costSupplierId String?                         // snapshot of the supplier id the cost came from (no FK)
+  costContractNo String?                         // snapshot of the purchase contract number the cost came from
+  markup         Float?                          // markup applied (0.3 / 0.1); null when costCny is null
+  formulaPrice   Float?                          // server-computed rule price in USD (whole number); null when costCny is null
+  unitPrice      Float                           // final USD unit price; 0 allowed only in DRAFT
+  isManualPrice  Boolean @default(false)         // true = user override, shows 手动价
+  totalPrice     Float                           // round2(unitPrice × quantity)
+  note           String?
+  sortOrder      Int     @default(0)
+
+  quote   Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  store   Store?  @relation(fields: [storeId], references: [id], onDelete: Restrict)
+
+  @@index([quoteId])
+  @@index([productId])
+  @@map("quote_items")
 }
 
 model SalesItem {

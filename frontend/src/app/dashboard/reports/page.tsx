@@ -51,10 +51,6 @@ import {
 } from "recharts";
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
-  ModuleTabHeader,
-  OPERATIONS_TABS,
-} from "@/components/layout/ModuleTabHeader";
-import {
   reportsService,
   type BusinessOverview,
 } from "@/services/reports.service";
@@ -234,7 +230,6 @@ function BusinessReportsContent() {
     return (
       <div className="space-y-6">
         <PageHeader title="经营执行" showBack={false} />
-        <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/60" />
         </div>
@@ -246,7 +241,6 @@ function BusinessReportsContent() {
     return (
       <div className="space-y-6">
         <PageHeader title="经营执行" showBack={false} />
-        <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
         <Card className="border-border/40">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
             <span className="rounded-full bg-muted/60 p-4">
@@ -279,7 +273,6 @@ function BusinessReportsContent() {
   return (
     <div className="space-y-6">
       <PageHeader title="经营执行" showBack={false} />
-      <ModuleTabHeader tabs={OPERATIONS_TABS} moduleName="经营中台" />
 
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 pt-4">
@@ -344,16 +337,25 @@ function BusinessReportsContent() {
           role="alert"
           className="rounded-md border border-destructive/30 p-3 text-sm text-destructive"
         >
-          毛利待核验，缺少汇率或已售成本。
-          {overview.unavailableContracts.map((contract, index) => (
-            <Link
-              key={contract.id}
-              className="ml-2 underline"
-              href={`/dashboard/sales/${contract.id}?tab=finance`}
-            >
-              核验第{index + 1}笔：{contract.reasons.join("；")}
-            </Link>
-          ))}
+          毛利待核验，缺少汇率或已售成本，共{" "}
+          {overview.unavailableContracts.length} 笔需要处理。
+          <details className="mt-2">
+            <summary className="cursor-pointer underline">
+              查看清单（{overview.unavailableContracts.length} 笔）
+            </summary>
+            <ul className="mt-2 space-y-1">
+              {overview.unavailableContracts.map((contract, index) => (
+                <li key={contract.id}>
+                  <Link
+                    className="underline"
+                    href={`/dashboard/sales/${contract.id}?tab=finance`}
+                  >
+                    核验第{index + 1}笔：{contract.reasons.join("；")}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </details>
         </div>
       )}
       {/* 经营概览 */}

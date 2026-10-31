@@ -43,7 +43,7 @@ const getThirdPartySources = (packingItems = []) => Array.from(new Set(
     .filter(Boolean),
 ));
 
-const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, shipped = false, shippedFrom, shippedTo, lite = false }) => {
+const getSalesContracts = async ({ page, pageSize, status, storeId, customerId, keyword, shipped = false, shippedFrom, shippedTo, lite = false }) => {
   const where = {};
   if (shipped !== false && shipped !== true && shipped !== 'false' && shipped !== 'true') throw createError('shipped 必须为true或false', 400);
   const shippedOnly = shipped === true || shipped === 'true';
@@ -57,6 +57,10 @@ const getSalesContracts = async ({ page, pageSize, status, storeId, keyword, shi
   if (Object.keys(dateRange).length > 0) where.shippedAt = dateRange;
   if (storeId) {
     where.items = { some: { storeId } };
+  }
+  if (customerId !== undefined) {
+    if (typeof customerId !== 'string' || !customerId.trim()) throw createError('customerId 必须为非空文本', 400);
+    where.customerId = customerId.trim();
   }
   if (keyword) {
     if (typeof keyword !== 'string') throw createError('keyword 必须为文本', 400);
