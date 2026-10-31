@@ -19,7 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { storeService } from "@/services/store.service";
 import { describeFailure } from "@/lib/error-reason";
-import type { Port, Store } from "@/types";
+import type { Store } from "@/types";
+
+type Port = NonNullable<Store["port"]>;
 
 const CODE_PATTERN = /^[A-Z0-9-]{2,12}$/;
 
