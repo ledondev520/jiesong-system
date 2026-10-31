@@ -24,6 +24,7 @@ const updateSupplier = async ({ id, input, prismaClient = prisma } = {}) => {
         bankAccount: input?.bankAccount,
         hasQualityIssue: input?.hasQualityIssue,
         qualityNote: input?.qualityNote,
+        isActive: typeof input?.isActive === "boolean" ? input.isActive : undefined,
         // One nested write preserves the supplier and old aliases if replacement fails.
         aliases:
           aliases === undefined

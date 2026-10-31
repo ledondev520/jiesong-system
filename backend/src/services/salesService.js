@@ -2,6 +2,7 @@
 const prisma = require('../utils/prisma');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { createError } = require('../middleware/errorHandler');
+const { resolveOrderCustomerFields, resolveCustomerIdForNewStore } = require('./customerService');
 const {
   generateNextContractNo,
   normalizeFilterStatus,
@@ -153,11 +154,13 @@ const createSalesContract = async (data = {}, context = {}) => {
   const year = getCurrentYear();
   const contractNo = data.contractNo || (await generateNextContractNo({ prisma, year }));
   const exchangeRate = parseNullableNumber(data.exchangeRate, defaultSpotRate());
+  const customerFields = await resolveOrderCustomerFields(data);
 
   const contract = await prisma.salesContract.create({
     data: {
       contractNo,
       exchangeRate,
+      ...customerFields,
       signedAt: data.signedAt ? new Date(data.signedAt) : null,
       note: data.note,
     },
@@ -176,15 +179,29 @@ const updateSalesContract = async (id, data = {}) => {
       throw createError('汇率必须为正数', 400);
     }
   }
-  return prisma.salesContract.update({
+  const update = (db, customerId) => db.salesContract.update({
     where: { id },
     data: {
       exchangeRate,
+      customerId,
       signedAt: data.signedAt ? new Date(data.signedAt) : undefined,
       estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
       portId: data.portId || undefined,
       note: data.note,
     },
+  });
+  if (data.customerId === undefined) return update(prisma);
+  // customerId 只能在草稿阶段更换（DATA-MODEL §2.4）；设为当前值是无操作，清空不允许。
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.salesContract.findUnique({ where: { id }, select: { status: true, customerId: true } });
+    if (!current) throw createError('出口合同不存在', 404);
+    if (data.customerId === null || data.customerId === '') throw createError('请选择客户', 400);
+    let customerId;
+    if (String(data.customerId) !== current.customerId) {
+      if (current.status !== SALES_STATUS.DRAFT) throw createError('仅草稿订单可更换客户', 400);
+      customerId = await resolveCustomerIdForNewStore(data.customerId, tx, '订单');
+    }
+    return update(tx, customerId);
   });
 };
 
