@@ -352,7 +352,9 @@ export function FinancialStatementsPageContent() {
   }, [analytics, drilldownsBlocked]);
 
   // 只读角色（老板）看不到原始资料库页签；URL 里的 library 对其回落到总览
-  const tabs = readOnly ? STATEMENT_TABS.filter((tab) => tab.value !== "library") : STATEMENT_TABS;
+  const tabs = readOnly
+    ? STATEMENT_TABS.filter((tab) => tab.value !== "library")
+    : STATEMENT_TABS;
   const activeView = tabs.some((tab) => tab.value === view) ? view : "overview";
 
   return (
@@ -380,7 +382,10 @@ export function FinancialStatementsPageContent() {
         <FinancialStatementsLoadingState />
       ) : (
         <>
-          <Tabs value={activeView} onValueChange={(value) => setView({ view: value })}>
+          <Tabs
+            value={activeView}
+            onValueChange={(value) => setView({ view: value })}
+          >
             <TabsList className="h-auto flex-wrap justify-start">
               {tabs.map((tab) => (
                 <TabsTrigger key={tab.value} value={tab.value}>
@@ -409,23 +414,31 @@ export function FinancialStatementsPageContent() {
             />
           )}
 
-          {activeView !== "overview" && activeView !== "library" && periods.length > 0 && (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">账期</span>
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-40" aria-label="选择账期">
-                  <SelectValue placeholder="选择账期" />
-                </SelectTrigger>
-                <SelectContent>
-                  {periods.map((period) => (
-                    <SelectItem key={`${period.year}-${period.month}`} value={`${period.year}-${period.month}`}>
-                      {period.year}年{period.month}月
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {activeView !== "overview" &&
+            activeView !== "library" &&
+            periods.length > 0 && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">账期</span>
+                <Select
+                  value={selectedPeriod}
+                  onValueChange={setSelectedPeriod}
+                >
+                  <SelectTrigger className="w-40" aria-label="选择账期">
+                    <SelectValue placeholder="选择账期" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {periods.map((period) => (
+                      <SelectItem
+                        key={`${period.year}-${period.month}`}
+                        value={`${period.year}-${period.month}`}
+                      >
+                        {period.year}年{period.month}月
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
           {activeView === "overview" && currentPeriod && (
             <ReceivableReconciliationCard
@@ -434,17 +447,22 @@ export function FinancialStatementsPageContent() {
             />
           )}
 
-          {activeView !== "library" && hasData && analytics && showDrilldowns && (
-            <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>
-              <FinancialStatementsTabsSection
-                view={activeView as FinancialStatementsView}
-                analytics={analytics}
-                periods={periods}
-                currentDetail={currentDetail}
-                detailLoading={detailLoading}
-              />
-            </Suspense>
-          )}
+          {activeView !== "library" &&
+            hasData &&
+            analytics &&
+            showDrilldowns && (
+              <Suspense
+                fallback={<FinancialStatementsLoadingState count={2} />}
+              >
+                <FinancialStatementsTabsSection
+                  view={activeView as FinancialStatementsView}
+                  analytics={analytics}
+                  periods={periods}
+                  currentDetail={currentDetail}
+                  detailLoading={detailLoading}
+                />
+              </Suspense>
+            )}
 
           {activeView === "library" && (
             <Suspense fallback={<FinancialStatementsLoadingState count={2} />}>

@@ -53,7 +53,8 @@ const KIND = {
     description: "出口订单的未收余额",
     currency: "USD" as const,
     detailHref: (id: string) => `/dashboard/sales/${id}`,
-    party: (row: BalanceRow) => (row.stores?.length ? row.stores.join("、") : "—"),
+    party: (row: BalanceRow) =>
+      row.stores?.length ? row.stores.join("、") : "—",
     partyLabel: "门店",
     paid: (row: BalanceRow) => row.receivedAmount ?? 0,
     open: (row: BalanceRow) => row.unreceiveAmount ?? 0,
@@ -64,13 +65,21 @@ const KIND = {
   },
 };
 
-export function ContractBalanceList({ kind, refreshKey = 0 }: { kind: keyof typeof KIND; refreshKey?: number }) {
+export function ContractBalanceList({
+  kind,
+  refreshKey = 0,
+}: {
+  kind: keyof typeof KIND;
+  refreshKey?: number;
+}) {
   const config = KIND[kind];
   // 旧 /dashboard/payments 链接带 overdue / pastDelivery：重定向后仍落在对应筛选上
   const params = useSearchParams();
   const [search, setSearch] = useState("");
   const [outstandingOnly, setOutstandingOnly] = useState(true);
-  const [flagged, setFlagged] = useState(params?.get(kind === "payable" ? "pastDelivery" : "overdue") === "true");
+  const [flagged, setFlagged] = useState(
+    params?.get(kind === "payable" ? "pastDelivery" : "overdue") === "true",
+  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [rows, setRows] = useState<BalanceRow[]>([]);
@@ -84,17 +93,26 @@ export function ContractBalanceList({ kind, refreshKey = 0 }: { kind: keyof type
     setLoading(true);
     try {
       const query = {
-        page, pageSize, search: search.trim() || undefined, outstandingOnly: outstandingOnly || undefined,
-        ...(kind === "payable" ? { pastDelivery: flagged || undefined } : { overdue: flagged || undefined }),
+        page,
+        pageSize,
+        search: search.trim() || undefined,
+        outstandingOnly: outstandingOnly || undefined,
+        ...(kind === "payable"
+          ? { pastDelivery: flagged || undefined }
+          : { overdue: flagged || undefined }),
       };
       const [list, stats] = await Promise.all([
-        kind === "payable" ? financeService.getPayables(query) : financeService.getReceivables(query),
+        kind === "payable"
+          ? financeService.getPayables(query)
+          : financeService.getReceivables(query),
         financeService.getStats(),
       ]);
       setRows(list.data.items as BalanceRow[]);
       setTotal(list.data.pagination.total);
       // 顶部合计直接取后端统计（与财务概览同源），不在前端求和
-      setOpenTotal(kind === "payable" ? stats.payable.unpaid : stats.receivable.unreceived);
+      setOpenTotal(
+        kind === "payable" ? stats.payable.unpaid : stats.receivable.unreceived,
+      );
       setLoadError(null);
     } catch (error) {
       setLoadError(error ?? new Error("加载失败"));
@@ -111,7 +129,9 @@ export function ContractBalanceList({ kind, refreshKey = 0 }: { kind: keyof type
     if (!selected) throw new Error("请选择合同后重试");
     await financeService.createPayment({
       type: kind === "payable" ? PaymentType.PAYABLE : PaymentType.RECEIVABLE,
-      ...(kind === "payable" ? { purchaseContractId: selected.id } : { salesContractId: selected.id }),
+      ...(kind === "payable"
+        ? { purchaseContractId: selected.id }
+        : { salesContractId: selected.id }),
       amount: Number(data.amount),
       currency: config.currency,
       paymentMethod: data.paymentMethod,
@@ -120,30 +140,73 @@ export function ContractBalanceList({ kind, refreshKey = 0 }: { kind: keyof type
     });
     toast.success(kind === "payable" ? "付款记录已保存" : "收款记录已保存");
     setSelected(null);
-    await load().catch((error) => toast.error(describeFailure("刷新失败", error)));
+    await load().catch((error) =>
+      toast.error(describeFailure("刷新失败", error)),
+    );
   };
 
   const columns: DataTableColumn<BalanceRow>[] = [
     {
       key: "contractNo",
       header: "合同号",
-      cell: (row) => <Link href={config.detailHref(row.id)} className="font-medium hover:underline">{row.contractNo}</Link>,
+      cell: (row) => (
+        <Link
+          href={config.detailHref(row.id)}
+          className="font-medium hover:underline"
+        >
+          {row.contractNo}
+        </Link>
+      ),
       hideable: false,
     },
-    { key: "party", header: config.partyLabel, cell: (row) => config.party(row) },
-    { key: "status", header: "状态", cell: (row) => <StatusBadge status={row.status} /> },
-    { key: "total", header: "合同金额", cell: (row) => formatMoney(row.totalAmount, config.currency), className: "text-right" },
-    { key: "paid", header: config.paidLabel, cell: (row) => formatMoney(config.paid(row), config.currency), className: "text-right" },
-    { key: "open", header: config.openLabel, cell: (row) => <strong>{formatMoney(config.open(row), config.currency)}</strong>, className: "text-right" },
+    {
+      key: "party",
+      header: config.partyLabel,
+      cell: (row) => config.party(row),
+    },
+    {
+      key: "status",
+      header: "状态",
+      cell: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: "total",
+      header: "合同金额",
+      cell: (row) => formatMoney(row.totalAmount, config.currency),
+      className: "text-right",
+    },
+    {
+      key: "paid",
+      header: config.paidLabel,
+      cell: (row) => formatMoney(config.paid(row), config.currency),
+      className: "text-right",
+    },
+    {
+      key: "open",
+      header: config.openLabel,
+      cell: (row) => (
+        <strong>{formatMoney(config.open(row), config.currency)}</strong>
+      ),
+      className: "text-right",
+    },
   ];
 
   return (
     <div className="space-y-5">
-      <PageHeader title={config.title} description={config.description} showBack={false} />
+      <PageHeader
+        title={config.title}
+        description={config.description}
+        showBack={false}
+      />
       <Card>
         <CardContent className="flex items-baseline justify-between p-4">
-          <span className="text-sm text-muted-foreground">{config.openLabel}合计（全部合同，与财务概览同一口径）</span>
-          <span className="text-2xl font-semibold tabular-nums" data-testid="open-total">
+          <span className="text-sm text-muted-foreground">
+            {config.openLabel}合计（全部合同，与财务概览同一口径）
+          </span>
+          <span
+            className="text-2xl font-semibold tabular-nums"
+            data-testid="open-total"
+          >
             {openTotal === null ? "—" : formatMoney(openTotal, config.currency)}
           </span>
         </CardContent>
@@ -156,22 +219,66 @@ export function ContractBalanceList({ kind, refreshKey = 0 }: { kind: keyof type
         error={loadError}
         errorWhat={`加载${config.title}失败`}
         onRetry={() => void load()}
-        emptyTitle={search ? `没有符合条件的${config.title}` : `暂无${config.title}`}
-        search={{ value: search, onChange: (value) => { setSearch(value); setPage(1); }, placeholder: "搜索合同号或对方名称..." }}
+        emptyTitle={
+          search ? `没有符合条件的${config.title}` : `暂无${config.title}`
+        }
+        search={{
+          value: search,
+          onChange: (value) => {
+            setSearch(value);
+            setPage(1);
+          },
+          placeholder: "搜索合同号或对方名称...",
+        }}
         filters={[
-          { key: "outstanding", label: `仅看${config.openLabel}`, active: outstandingOnly, onToggle: () => { setOutstandingOnly(!outstandingOnly); setPage(1); } },
-          { key: "flagged", label: config.pastLabel, active: flagged, onToggle: () => { setFlagged(!flagged); setPage(1); } },
+          {
+            key: "outstanding",
+            label: `仅看${config.openLabel}`,
+            active: outstandingOnly,
+            onToggle: () => {
+              setOutstandingOnly(!outstandingOnly);
+              setPage(1);
+            },
+          },
+          {
+            key: "flagged",
+            label: config.pastLabel,
+            active: flagged,
+            onToggle: () => {
+              setFlagged(!flagged);
+              setPage(1);
+            },
+          },
         ]}
-        pagination={{ page, pageSize, total, onPageChange: setPage, onPageSizeChange: (size) => { setPageSize(size); setPage(1); } }}
-        renderActions={(row) => (config.open(row) > 0 ? (
-          <Button size="sm" variant="outline" onClick={() => setSelected(row)}>{config.action}</Button>
-        ) : null)}
+        pagination={{
+          page,
+          pageSize,
+          total,
+          onPageChange: setPage,
+          onPageSizeChange: (size) => {
+            setPageSize(size);
+            setPage(1);
+          },
+        }}
+        renderActions={(row) =>
+          config.open(row) > 0 ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSelected(row)}
+            >
+              {config.action}
+            </Button>
+          ) : null
+        }
       />
       {selected ? (
         <PaymentDialog
           open
           onOpenChange={(open) => !open && setSelected(null)}
-          type={kind === "payable" ? PaymentType.PAYABLE : PaymentType.RECEIVABLE}
+          type={
+            kind === "payable" ? PaymentType.PAYABLE : PaymentType.RECEIVABLE
+          }
           contractNo={selected.contractNo}
           contractId={selected.id}
           remainingAmount={config.open(selected)}

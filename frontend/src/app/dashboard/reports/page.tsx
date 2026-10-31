@@ -337,7 +337,8 @@ function BusinessReportsContent() {
           role="alert"
           className="rounded-md border border-destructive/30 p-3 text-sm text-destructive"
         >
-          毛利待核验，缺少汇率或已售成本：共 {overview.unavailableContracts.length} 笔。
+          毛利待核验，缺少汇率或已售成本：共{" "}
+          {overview.unavailableContracts.length} 笔。
           {overview.unavailableContracts.length <= 3 ? (
             overview.unavailableContracts.map((contract, index) => (
               <Link
@@ -355,7 +356,10 @@ function BusinessReportsContent() {
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 {overview.unavailableContracts.map((contract, index) => (
                   <li key={contract.id}>
-                    <Link className="underline" href={`/dashboard/sales/${contract.id}?tab=finance`}>
+                    <Link
+                      className="underline"
+                      href={`/dashboard/sales/${contract.id}?tab=finance`}
+                    >
                       核验第{index + 1}笔：{contract.reasons.join("；")}
                     </Link>
                   </li>

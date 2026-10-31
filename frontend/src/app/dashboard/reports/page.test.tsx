@@ -54,10 +54,7 @@ describe("经营报表范围与追溯", () => {
     ).toHaveAttribute("href", "/dashboard/products?lowStock=true");
     expect(
       screen.getByRole("link", { name: "查看发运超过30天未收明细" }),
-    ).toHaveAttribute(
-      "href",
-      "/dashboard/finance/receivable?overdue=true",
-    );
+    ).toHaveAttribute("href", "/dashboard/finance/receivable?overdue=true");
     fireEvent.change(screen.getByLabelText("发运开始日期"), {
       target: { value: "2026-09-01" },
     });

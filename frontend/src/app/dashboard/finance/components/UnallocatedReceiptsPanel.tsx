@@ -19,7 +19,11 @@ import { PaymentType, type Payment } from "@/types";
 import { AllocateDialog } from "./AllocateDialog";
 import { ReceiptDialog, type ReceiptSubmitData } from "./ReceiptDialog";
 
-export function UnallocatedReceiptsPanel({ onChanged }: { onChanged: () => void }) {
+export function UnallocatedReceiptsPanel({
+  onChanged,
+}: {
+  onChanged: () => void;
+}) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -57,7 +61,11 @@ export function UnallocatedReceiptsPanel({ onChanged }: { onChanged: () => void 
         currency: data.currency,
         paymentMethod: data.paymentMethod,
         paymentDate: data.paymentDate.toISOString(),
-        note: buildReceiptNote({ contractRef: data.contractRef, note: data.note }) || undefined,
+        note:
+          buildReceiptNote({
+            contractRef: data.contractRef,
+            note: data.note,
+          }) || undefined,
       });
       toast.success("到账记录已保存，请前往分配");
       setReceiptOpen(false);
@@ -86,9 +94,13 @@ export function UnallocatedReceiptsPanel({ onChanged }: { onChanged: () => void 
     try {
       const result = (await financeService.autoMatchUnallocatedPayments()).data;
       if ((result?.matchedCount || 0) > 0) {
-        toast.success(`自动匹配 ${result?.matchedCount} 笔，剩余 ${result?.skippedCount || 0} 笔待人工处理`);
+        toast.success(
+          `自动匹配 ${result?.matchedCount} 笔，剩余 ${result?.skippedCount || 0} 笔待人工处理`,
+        );
       } else {
-        toast.message(`没有命中高置信度规则，${result?.skippedCount || 0} 笔继续留在收款池`);
+        toast.message(
+          `没有命中高置信度规则，${result?.skippedCount || 0} 笔继续留在收款池`,
+        );
       }
       refreshAll();
     } catch {
@@ -102,7 +114,11 @@ export function UnallocatedReceiptsPanel({ onChanged }: { onChanged: () => void 
     <>
       <div className="flex justify-end">
         <BusinessWrite>
-          <Button size="sm" className="h-10" onClick={() => setReceiptOpen(true)}>
+          <Button
+            size="sm"
+            className="h-10"
+            onClick={() => setReceiptOpen(true)}
+          >
             <Plus className="mr-2 h-4 w-4" /> 记录到账
           </Button>
         </BusinessWrite>
@@ -111,7 +127,9 @@ export function UnallocatedReceiptsPanel({ onChanged }: { onChanged: () => void 
       {loadFailed ? (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/30 p-3 text-sm text-destructive">
           收款池读取失败{" "}
-          <Button variant="outline" size="sm" onClick={() => void load()}>重试</Button>
+          <Button variant="outline" size="sm" onClick={() => void load()}>
+            重试
+          </Button>
         </div>
       ) : null}
 
@@ -130,19 +148,27 @@ export function UnallocatedReceiptsPanel({ onChanged }: { onChanged: () => void 
                 onClick={() => void handleAutoMatch()}
                 disabled={autoMatching}
               >
-                <RefreshCw className={`mr-1 h-3.5 w-3.5 ${autoMatching ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`mr-1 h-3.5 w-3.5 ${autoMatching ? "animate-spin" : ""}`}
+                />
                 {autoMatching ? "自动匹配中" : "自动匹配"}
               </Button>
             </BusinessWrite>
           </CardHeader>
           <CardContent className="space-y-2">
             {payments.map((p) => (
-              <div key={p.id} className="flex items-center justify-between rounded-lg border border-orange-200 bg-background px-3 py-2 dark:border-orange-900">
+              <div
+                key={p.id}
+                className="flex items-center justify-between rounded-lg border border-orange-200 bg-background px-3 py-2 dark:border-orange-900"
+              >
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-sm">{p.customerName || "未标注客户"}</span>
+                    <span className="font-semibold text-sm">
+                      {p.customerName || "未标注客户"}
+                    </span>
                     <Badge variant="outline" className="text-[10px]">
-                      剩余待分配 {p.currency} {(p.remainingAmount ?? p.amount).toLocaleString()}
+                      剩余待分配 {p.currency}{" "}
+                      {(p.remainingAmount ?? p.amount).toLocaleString()}
                     </Badge>
                   </div>
                   <span className="text-xs text-muted-foreground">
@@ -151,7 +177,12 @@ export function UnallocatedReceiptsPanel({ onChanged }: { onChanged: () => void 
                   </span>
                 </div>
                 <BusinessWrite>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAllocateTarget(p)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs"
+                    onClick={() => setAllocateTarget(p)}
+                  >
                     <Split className="mr-1 h-3 w-3" /> 分配
                   </Button>
                 </BusinessWrite>
@@ -161,7 +192,11 @@ export function UnallocatedReceiptsPanel({ onChanged }: { onChanged: () => void 
         </Card>
       )}
 
-      <ReceiptDialog open={receiptOpen} onOpenChange={setReceiptOpen} onSubmit={handleReceiptSubmit} />
+      <ReceiptDialog
+        open={receiptOpen}
+        onOpenChange={setReceiptOpen}
+        onSubmit={handleReceiptSubmit}
+      />
       <AllocateDialog
         open={!!allocateTarget}
         onOpenChange={(open) => !open && setAllocateTarget(null)}

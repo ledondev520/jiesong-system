@@ -13,12 +13,20 @@ export function financeRedirectTarget(params: SearchParams = {}): string {
     return Array.isArray(value) ? value[0] : value;
   };
   if (first("tab") === "receivable") {
-    return first("overdue") === "true" ? "/dashboard/finance/receivable?overdue=true" : "/dashboard/finance/receivable";
+    return first("overdue") === "true"
+      ? "/dashboard/finance/receivable?overdue=true"
+      : "/dashboard/finance/receivable";
   }
   // 默认视图一直是应付（旧页 tab 缺省 = payable）
-  return first("pastDelivery") === "true" ? "/dashboard/finance/payable?pastDelivery=true" : "/dashboard/finance/payable";
+  return first("pastDelivery") === "true"
+    ? "/dashboard/finance/payable?pastDelivery=true"
+    : "/dashboard/finance/payable";
 }
 
-export default async function PaymentsRedirect({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+export default async function PaymentsRedirect({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>;
+}) {
   redirect(financeRedirectTarget(await searchParams));
 }

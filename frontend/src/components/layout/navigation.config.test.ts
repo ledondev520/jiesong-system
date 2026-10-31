@@ -176,10 +176,15 @@ describe("navigation.config helpers", () => {
       expect(isTabRouteActive(tab, tab)).toBe(true);
       expect(isTabRouteActive(`${tab}/x`, tab)).toBe(true);
       expect(isTabRouteActive(tab, "/dashboard/finance")).toBe(false);
-      expect(isTabRouteActive(tab, "/dashboard/finance/statements")).toBe(false);
+      expect(isTabRouteActive(tab, "/dashboard/finance/statements")).toBe(
+        false,
+      );
     }
     expect(
-      isTabRouteActive("/dashboard/finance/payable", "/dashboard/finance/receivable"),
+      isTabRouteActive(
+        "/dashboard/finance/payable",
+        "/dashboard/finance/receivable",
+      ),
     ).toBe(false);
   });
 

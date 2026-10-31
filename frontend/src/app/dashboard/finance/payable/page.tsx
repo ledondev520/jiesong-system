@@ -8,7 +8,11 @@ import { ContractBalanceList } from "../components/ContractBalanceList";
 
 export default function PayablePage() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-muted-foreground">加载中...</div>
+      }
+    >
       <ContractBalanceList kind="payable" />
     </Suspense>
   );

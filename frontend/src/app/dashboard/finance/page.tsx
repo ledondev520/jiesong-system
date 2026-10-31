@@ -805,9 +805,7 @@ export default function FinancePage() {
               action={
                 <div className="flex flex-wrap justify-center gap-3">
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/dashboard/finance/payable">
-                      查看应付明细
-                    </Link>
+                    <Link href="/dashboard/finance/payable">查看应付明细</Link>
                   </Button>
                   <Button asChild size="sm">
                     <Link href="/dashboard/finance/receivable">

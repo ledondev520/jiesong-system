@@ -21,7 +21,14 @@ export const listUrlFields = {
   statements: {
     view: {
       default: "overview",
-      values: ["overview", "balance", "income", "cashflow", "ledger", "library"],
+      values: [
+        "overview",
+        "balance",
+        "income",
+        "cashflow",
+        "ledger",
+        "library",
+      ],
     },
   },
   customs: {

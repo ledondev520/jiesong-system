@@ -14,8 +14,16 @@ export default function ReceivablePage() {
   const [refreshKey, setRefreshKey] = useState(0);
   return (
     <div className="space-y-5">
-      <UnallocatedReceiptsPanel onChanged={() => setRefreshKey((key) => key + 1)} />
-      <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+      <UnallocatedReceiptsPanel
+        onChanged={() => setRefreshKey((key) => key + 1)}
+      />
+      <Suspense
+        fallback={
+          <div className="py-12 text-center text-muted-foreground">
+            加载中...
+          </div>
+        }
+      >
         <ContractBalanceList kind="receivable" refreshKey={refreshKey} />
       </Suspense>
     </div>
