@@ -295,6 +295,10 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   expect(inbound(fixture)).toBe(60);
   const shipped = mutation(page, `/sales/${fixture.salesId}/status`, "PUT");
   await ship.click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "确认", exact: true })
+    .click();
   expect((await shipped).status()).toBe(200);
   await expect(ship).toHaveCount(0);
   await page.reload();

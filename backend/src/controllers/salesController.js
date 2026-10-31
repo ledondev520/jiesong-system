@@ -252,6 +252,7 @@ const uploadFile = async (req, res, next) => {
       req.file,
       req.body?.description,
       req.body?.category,
+      req.user,
     );
 
     created(res, contractFile, '文件上传成功');

@@ -195,6 +195,16 @@ it("到货照片：手机可直接拍照（capture），到货保存成功后才
     uploadPhoto.mock.invocationCallOrder[0],
   );
 });
+it("到货照片：单张超过 10MB 在选择时即拒绝，不加入列表", async () => {
+  await openArrival();
+  const big = photo("big.jpg");
+  Object.defineProperty(big, "size", { value: 10 * 1024 * 1024 + 1 });
+  fireEvent.change(screen.getByLabelText(/到货照片/), {
+    target: { files: [big] },
+  });
+  expect(screen.getByText("单张照片不超过 10MB")).toBeInTheDocument();
+  expect(screen.queryByText("big.jpg")).not.toBeInTheDocument();
+});
 it("到货保存失败时不上传照片；照片上传失败不回滚到货，只提示补传", async () => {
   create.mockRejectedValueOnce(new Error("offline"));
   uploadPhoto.mockRejectedValue(new Error("上传失败"));

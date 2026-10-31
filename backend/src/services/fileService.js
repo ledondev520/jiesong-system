@@ -43,6 +43,15 @@ const assertFileAccess = (file, user) => {
   }
 };
 
+// 到货照片是 Confidential 到货证据：仅采购合同、且仅能登记到货的人类角色可写/删。
+const RECEIPT_PHOTO_ROLES = ['ADMIN', 'PURCHASE', 'WAREHOUSE'];
+const assertReceiptPhotoAccess = (contractType, category, user) => {
+  if (category === CONTRACT_FILE_CATEGORY.RECEIPT_PHOTO
+    && (contractType !== CONTRACT_TYPE.PURCHASE || !RECEIPT_PHOTO_ROLES.includes(user?.role))) {
+    throw createError('仅管理员、采购或仓库可在采购合同上登记或删除到货照片', 403);
+  }
+};
+
 const assertContractType = (contractType) => {
   if (!Object.values(CONTRACT_TYPE).includes(contractType)) {
     throw createError('合同类型仅支持 PURCHASE 或 SALES', 400);
@@ -106,8 +115,9 @@ const validateUploadedFileCategory = (file, category) => {
  * @param {string} contractType - PURCHASE | SALES
  * @param {Object} file - multer 文件对象
  * @param {string} [description] - 文件描述
+ * @param {Object} [user] - req.user，用于到货照片角色校验
  */
-const createFile = async (contractId, contractType, file, description, category) => {
+const createFile = async (contractId, contractType, file, description, category, user) => {
   const filePath = file?.path;
   const uploadRoot = config.upload.dir;
   let payload;
@@ -117,6 +127,7 @@ const createFile = async (contractId, contractType, file, description, category)
     secureStoredFile(payload.path);
     assertContractType(contractType);
     const normalizedCategory = normalizeCategory(category);
+    assertReceiptPhotoAccess(contractType, normalizedCategory, user);
     validateUploadedFileCategory(file, normalizedCategory);
     const isSales = contractType === CONTRACT_TYPE.SALES;
     const contract = await (isSales ? prisma.salesContract : prisma.purchaseContract).findUnique({
@@ -293,6 +304,7 @@ module.exports = {
   CONTRACT_TYPE,
   CONTRACT_FILE_CATEGORY,
   assertFileAccess,
+  assertReceiptPhotoAccess,
   archiveBufferFile,
   archiveGeneratedFile,
   createFile,

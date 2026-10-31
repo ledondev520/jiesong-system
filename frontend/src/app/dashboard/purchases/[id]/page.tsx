@@ -98,6 +98,7 @@ import { PurchaseFlowPanel } from "./components/PurchaseFlowPanel";
 import { PurchaseProductionPanel } from "./components/PurchaseProductionPanel";
 import { configService } from "@/services/config.service";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
 import {
   calculatePurchaseLineAmounts,
   summarizePurchaseAmounts,
@@ -322,6 +323,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const readOnly = useBusinessReadOnly();
   const isMobile = useMobile();
   const router = useRouter();
+  const userRole = useAuthStore((state) => state.user?.role);
   const [loadError, setLoadError] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const { id } = use(params);
@@ -1298,6 +1300,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           { value: "SIGNED_CONTRACT", label: "供应商盖章件" },
           { value: "SUPPLIER_INVOICE", label: "供应商发票" },
           { value: "OTHER", label: "其他附件" },
+          // 与后端 assertReceiptPhotoAccess 一致：仅到货角色可补传到货照片
+          ...(["ADMIN", "PURCHASE", "WAREHOUSE"].includes(userRole || "")
+            ? [{ value: "RECEIPT_PHOTO" as const, label: "到货照片" }]
+            : []),
         ]}
       />
 

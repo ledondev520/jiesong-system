@@ -82,6 +82,8 @@ function runAwait<T>(
 // 与后端数量上限容差一致，避免0.1+0.2误报超过0.3。
 const MAX_ARRIVAL_PHOTOS = 6;
 const PHOTO_TYPES = ["image/jpeg", "image/png"];
+// 与后端 contractUpload 的 10MB 上限一致，避免保存到货后才发现照片过大
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const EPSILON = 1e-9;
 
 interface Props {
@@ -702,6 +704,10 @@ export function PurchaseReceiptPanel({
                       picked.some((file) => !PHOTO_TYPES.includes(file.type))
                     ) {
                       setFormError("到货照片仅支持 JPG、PNG 格式");
+                      return;
+                    }
+                    if (picked.some((file) => file.size > MAX_PHOTO_BYTES)) {
+                      setFormError("单张照片不超过 10MB");
                       return;
                     }
                     if (
