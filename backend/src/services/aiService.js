@@ -108,6 +108,10 @@ const extractErrorMessage = (error) => {
   if (error.status === 401 || error.message?.includes('Unauthorized')) {
     return '错误：API Key无效或已过期，请联系管理员检查配置。';
   }
+  // OpenAI 额度（负责人在控制台设置的花费上限）用尽：不是限流，重试也无用。
+  if (error.code === 'insufficient_quota' || error.error?.code === 'insufficient_quota') {
+    return '错误：AI 用量额度已用完，请联系管理员处理。';
+  }
   if (error.status === 429 || error.message?.includes('rate limit')) {
     return '错误：请求过于频繁，请稍后再试。';
   }

@@ -222,6 +222,11 @@ const updateConfig = async (req, res, next) => {
     const { key } = req.params;
     const { value, note } = req.body;
 
+    // OpenAI 密钥/模型只来自服务器进程环境，任何 openai* 键都不允许写入数据库。
+    if (/^openai/i.test(String(key))) {
+      throw createError('OpenAI 配置只能通过服务器环境设置，不能保存到系统设置', 400);
+    }
+
     const storedValue = normalizeConfigValueForStorage(key, value);
 
     const config = await prisma.systemConfig.upsert({

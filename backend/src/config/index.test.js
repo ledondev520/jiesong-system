@@ -114,9 +114,13 @@ test('config: OpenAI 需要密钥，模型默认 gpt-6.1-terra，密钥只发往
   assert.throws(() => loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_BASE_URL: 'http://api.example.test/v1' }), /https/);
   assert.throws(() => loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_BASE_URL: 'not a url' }), /OPENAI_BASE_URL/);
   assert.equal(loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_BASE_URL: 'http://127.0.0.1:9/v1' }).ai.baseUrl, 'http://127.0.0.1:9/v1');
-  const bounded = loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_MAX_RETRIES: '9', OPENAI_MAX_OUTPUT_TOKENS: '10' }).ai;
-  assert.equal(bounded.maxRetries, 1, 'out-of-range retries fall back to the default');
-  assert.equal(bounded.maxOutputTokens, 16000);
+  // 显式非法/越界的有界参数在 openai 下启动失败，不再静默回退
+  for (const [name, value] of [['OPENAI_MAX_RETRIES', '3'], ['OPENAI_MAX_RETRIES', '-1'], ['OPENAI_MAX_RETRIES', 'abc'], ['OPENAI_MAX_OUTPUT_TOKENS', '100']]) {
+    assert.throws(() => loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', [name]: value }), new RegExp(name), `${name}=${value}`);
+  }
+  assert.equal(loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MAX_RETRIES: '', OPENAI_MAX_OUTPUT_TOKENS: '' }).ai.maxRetries, 1, 'unset keeps the default');
+  // 其他供应商不受遗留的 OPENAI_* 取值影响
+  assert.equal(loadConfigWithEnv({ AI_PROVIDER: 'kimi', JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx', OPENAI_MAX_RETRIES: '9' }).ai.provider, 'kimi');
   assert.equal(loadConfigWithEnv({ ...base, OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm', OPENAI_MAX_RETRIES: '0' }).ai.maxRetries, 0);
   // Other providers do not require any OpenAI variable.
   assert.equal(loadConfigWithEnv({ AI_PROVIDER: 'kimi', JWT_SECRET: 'test-secret-with-32-chars--xxxxxxxx', OPENAI_API_KEY: '', OPENAI_MODEL: '' }).ai.provider, 'kimi');

@@ -357,3 +357,23 @@ test('syncExchangeRate: 外部同步成功时写入当前 schema 支持的配置
     https.get = originalHttpsGet;
   }
 });
+
+test('updateConfig: openai* 键永不写入数据库（密钥/模型只来自服务器环境）', async () => {
+  const originalUpsert = prisma.systemConfig.upsert;
+  let upserts = 0;
+  prisma.systemConfig.upsert = async () => { upserts += 1; return {}; };
+  try {
+    for (const key of ['openaiApiKey', 'OPENAI_API_KEY', 'openaiModel']) {
+      const res = createMockRes();
+      let capturedError = null;
+      await configController.updateConfig({ params: { key }, body: { value: 'synthetic-non-key' } }, res, (error) => {
+        capturedError = error;
+      });
+      assert.equal(capturedError?.statusCode, 400, key);
+      assert.equal(res.payload, null);
+    }
+    assert.equal(upserts, 0);
+  } finally {
+    prisma.systemConfig.upsert = originalUpsert;
+  }
+});

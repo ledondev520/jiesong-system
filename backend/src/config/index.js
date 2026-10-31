@@ -101,10 +101,15 @@ const kimi = {
   baseUrl: process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1',
 };
 
-// OpenAI：密钥只来自进程环境（systemd/pm2 的 EnvironmentFile，如 /etc/openai/openai.env），不入库、不写仓库、不打印。
-const boundedInt = (value, fallback, min, max) => {
-  const parsed = Number.parseInt(String(value ?? ''), 10);
-  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : fallback;
+// OpenAI：密钥只来自进程环境（生产由 PM2 node_args --env-file=/etc/openai/openai.env 注入），不入库、不写仓库、不打印。
+// 显式设置但非法/越界的值：AI_PROVIDER=openai 时启动失败（与 base URL 校验一致），其他供应商忽略并用默认值。
+const openaiIntEnv = (name, fallback, min, max) => {
+  const raw = (process.env[name] || '').trim();
+  if (!raw) return fallback;
+  const parsed = /^\d+$/.test(raw) ? Number.parseInt(raw, 10) : NaN;
+  if (parsed >= min && parsed <= max) return parsed;
+  if (aiProvider === 'openai') throw new Error(`${name} 必须是 ${min}–${max} 之间的整数`);
+  return fallback;
 };
 const openai = {
   provider: 'openai',
@@ -113,8 +118,8 @@ const openai = {
   // 负责人决定（2026-10-31）：所有 OpenAI 调用（聊天、推荐、视觉、Agent）统一 gpt-6.1-terra，无廉价回退模型。
   model: (process.env.OPENAI_MODEL || '').trim() || 'gpt-6.1-terra',
   // 429/5xx 的有限重试次数（共用同一完整响应 deadline）；0 = 单次调用
-  maxRetries: boundedInt(process.env.OPENAI_MAX_RETRIES, 1, 0, 2),
-  maxOutputTokens: boundedInt(process.env.OPENAI_MAX_OUTPUT_TOKENS, 16000, 256, 128000),
+  maxRetries: openaiIntEnv('OPENAI_MAX_RETRIES', 1, 0, 2),
+  maxOutputTokens: openaiIntEnv('OPENAI_MAX_OUTPUT_TOKENS', 16000, 256, 128000),
 };
 if (aiProvider === 'openai') {
   if (!openai.apiKey) {

@@ -219,6 +219,7 @@ test('OpenAI service (mocked transport): env key only, OpenAI body shape, one bo
       const count = seen.filter(call => call.phase === phase).length;
       if (phase === 'retry-then-ok' && count === 1) return new Response(JSON.stringify({ error: { message: 'rate' } }), { status: 429, headers: { 'retry-after': '0', 'content-type': 'application/json' } });
       if (phase === 'always-503') return new Response(JSON.stringify({ error: { message: 'down' } }), { status: 503, headers: { 'content-type': 'application/json' } });
+      if (phase === 'quota') return new Response(JSON.stringify({ error: { message: 'cap', type: 'insufficient_quota', code: 'insufficient_quota' } }), { status: 429, headers: { 'content-type': 'application/json' } });
       if (phase === 'unauthorized') return new Response(JSON.stringify({ error: { message: 'bad key' } }), { status: 401, headers: { 'content-type': 'application/json' } });
       return sse([{ choices: [{ delta: { content: 'OK' } }] }, { choices: [], usage: { prompt_tokens: 3, completion_tokens: 5 } }]);
     };
@@ -255,6 +256,11 @@ test('OpenAI service (mocked transport): env key only, OpenAI body shape, one bo
       const denied = await ai.callAI([{ role: 'user', content: 'synthetic' }]);
       assert.equal(seen.filter(call => call.phase === 'unauthorized').length, 1, '401 is never retried');
       assert.match(denied.content, /API Key/);
+      phase = 'quota';
+      const capped = await ai.callAI([{ role: 'user', content: 'synthetic' }]);
+      assert.equal(seen.filter(call => call.phase === 'quota').length, 1, 'an exhausted spend cap is never retried');
+      assert.match(capped.content, /额度/);
+      assert.doesNotMatch(capped.content, /频繁/);
       console.log('openai synthetic checks completed');
     })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => prisma.$disconnect());
   `;
