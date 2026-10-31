@@ -165,51 +165,9 @@ function OrdersList() {
         }
       />
 
-      <div className="hidden md:block">
-        <DataTable
-          columns={columns}
-          data={items}
-          rowKey={(order) => order.id}
-          loading={loading}
-          error={loadError}
-          errorWhat="加载订单失败"
-          onRetry={() => void load()}
-          emptyTitle={
-            filters.keyword || filters.status
-              ? "没有符合条件的订单"
-              : "暂无订单"
-          }
-          emptyDescription={
-            filters.keyword || filters.status
-              ? undefined
-              : "点击右上角「新建订单」开始"
-          }
-          onRowClick={(order) => router.push(`/dashboard/sales/${order.id}`)}
-          search={{
-            value: filters.keyword,
-            onChange: (keyword) => setFilters({ keyword }),
-            placeholder: "搜索订单号、港口或门店...",
-          }}
-          filters={STATUS_FILTERS.map(({ status, label }) => ({
-            key: status,
-            label,
-            active: filters.status === status,
-            onToggle: () =>
-              setFilters({ status: filters.status === status ? "" : status }),
-          }))}
-          pagination={{
-            page: filters.page,
-            pageSize: filters.pageSize,
-            total,
-            onPageChange: (page) => setFilters({ page }),
-            onPageSizeChange: (pageSize) => setFilters({ pageSize }),
-          }}
-        />
-      </div>
-
-      <div className="grid gap-3 md:hidden">
-        {items.map((order) => (
-          <Link key={order.id} href={`/dashboard/sales/${order.id}`}>
+      <DataTable
+        renderCard={(order) => (
+          <Link href={`/dashboard/sales/${order.id}`}>
             <Card className="border-border/70">
               <CardContent className="space-y-1 p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -224,13 +182,43 @@ function OrdersList() {
               </CardContent>
             </Card>
           </Link>
-        ))}
-        {!loading && !loadError && items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            暂无订单
-          </p>
-        ) : null}
-      </div>
+        )}
+        columns={columns}
+        data={items}
+        rowKey={(order) => order.id}
+        loading={loading}
+        error={loadError}
+        errorWhat="加载订单失败"
+        onRetry={() => void load()}
+        emptyTitle={
+          filters.keyword || filters.status ? "没有符合条件的订单" : "暂无订单"
+        }
+        emptyDescription={
+          filters.keyword || filters.status
+            ? undefined
+            : "点击右上角「新建订单」开始"
+        }
+        onRowClick={(order) => router.push(`/dashboard/sales/${order.id}`)}
+        search={{
+          value: filters.keyword,
+          onChange: (keyword) => setFilters({ keyword }),
+          placeholder: "搜索订单号、港口或门店...",
+        }}
+        filters={STATUS_FILTERS.map(({ status, label }) => ({
+          key: status,
+          label,
+          active: filters.status === status,
+          onToggle: () =>
+            setFilters({ status: filters.status === status ? "" : status }),
+        }))}
+        pagination={{
+          page: filters.page,
+          pageSize: filters.pageSize,
+          total,
+          onPageChange: (page) => setFilters({ page }),
+          onPageSizeChange: (pageSize) => setFilters({ pageSize }),
+        }}
+      />
     </div>
   );
 }

@@ -4,7 +4,8 @@
  * Pos: 通用 UI 组件（UX 规范 §8.5），由 ui/table、useTableSort、page-size-select、data-state、empty-state 组成，不引入依赖
  *
  * 边界：排序只作用于传入的这一页数据（服务端分页时不是全量排序）；搜索/筛选由页面持有并请求数据，
- * 本组件只渲染搜索框、重置按钮和筛选 chip。移动端卡片由页面自己渲染（md:hidden），本表格放在 hidden md:block 中。
+ * 本组件只渲染搜索框、重置按钮和筛选 chip。提供 renderCard 时，表格只在 md 及以上显示，较窄屏幕改用卡片列表，
+ * 搜索/筛选/分页/加载/错误/空状态两种布局共用（评审 R1-5）。
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -15,7 +16,12 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Columns3, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { TableStateRow } from "@/components/ui/data-state";
+import {
+  ErrorState,
+  LoadingState,
+  TableStateRow,
+} from "@/components/ui/data-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -80,6 +86,8 @@ export interface DataTableProps<T> {
   emptyDescription?: string;
   emptyAction?: ReactNode;
   onRowClick?: (row: T) => void;
+  /** 窄屏卡片；提供后表格仅在 md 及以上显示，控件与状态在两种布局共用 */
+  renderCard?: (row: T) => ReactNode;
   /** 粘性右侧操作列内容，通常是 <RowActionsMenu /> */
   renderActions?: (row: T) => ReactNode;
   search?: {
@@ -112,6 +120,7 @@ export function DataTable<T>({
   emptyDescription,
   emptyAction,
   onRowClick,
+  renderCard,
   renderActions,
   search,
   filters,
@@ -217,7 +226,7 @@ export function DataTable<T>({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-9"
+                    className={cn("h-9", renderCard && "hidden md:inline-flex")}
                   >
                     <Columns3 className="mr-1.5 h-4 w-4" />列
                   </Button>
@@ -253,9 +262,31 @@ export function DataTable<T>({
         </div>
       ) : null}
 
+      {renderCard ? (
+        <div className="grid gap-3 md:hidden">
+          {loading ? (
+            <LoadingState />
+          ) : hasError ? (
+            <ErrorState what={errorWhat} error={error} onRetry={onRetry} />
+          ) : sortedData.length === 0 ? (
+            <EmptyState
+              title={emptyTitle}
+              description={emptyDescription}
+              action={emptyAction}
+              className="py-12"
+            />
+          ) : (
+            sortedData.map((row) => (
+              <div key={rowKey(row)}>{renderCard(row)}</div>
+            ))
+          )}
+        </div>
+      ) : null}
+
       <div
         className={cn(
           "overflow-auto rounded-xl border bg-card",
+          renderCard && "hidden md:block",
           maxHeightClassName,
         )}
       >

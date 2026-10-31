@@ -143,66 +143,9 @@ export default function CustomersPage() {
         }
       />
 
-      <div className="hidden md:block">
-        <DataTable
-          columns={columns}
-          data={items}
-          rowKey={(customer) => customer.id}
-          loading={loading}
-          error={loadError}
-          errorWhat="加载客户失败"
-          onRetry={() => void load()}
-          emptyTitle={filters.keyword ? "没有符合条件的客户" : "暂无客户"}
-          emptyDescription={
-            filters.keyword ? undefined : "先新增客户，再在客户下添加门店"
-          }
-          onRowClick={(customer) =>
-            router.push(`/dashboard/customers/${customer.id}`)
-          }
-          search={{
-            value: filters.keyword,
-            onChange: (keyword) => setFilters({ keyword }),
-            placeholder: "搜索客户名称或公司全称...",
-          }}
-          filters={[
-            {
-              key: "archived",
-              label: "含已归档",
-              active: includeArchived,
-              onToggle: () =>
-                setFilters({ archived: includeArchived ? "no" : "yes" }),
-            },
-          ]}
-          pagination={{
-            page: filters.page,
-            pageSize: filters.pageSize,
-            total,
-            onPageChange: (page) => setFilters({ page }),
-            onPageSizeChange: (pageSize) => setFilters({ pageSize }),
-          }}
-          renderActions={
-            canWrite
-              ? (customer) => (
-                  <RowActionsMenu
-                    onEdit={() => setEditing(customer)}
-                    onDelete={() => setArchived(customer, !customer.isActive)}
-                    deleteLabel={customer.isActive ? "归档" : "恢复"}
-                    confirmTitle={`${customer.isActive ? "归档" : "恢复"}客户「${customer.name}」？`}
-                    confirmDescription={
-                      customer.isActive
-                        ? "归档后不能再为其新增门店，已有订单和门店保留。"
-                        : "恢复后可继续新增门店和订单。"
-                    }
-                  />
-                )
-              : undefined
-          }
-        />
-      </div>
-
-      <div className="grid gap-3 md:hidden">
-        {items.map((customer) => (
-          <Link key={customer.id} href={`/dashboard/customers/${customer.id}`}>
+      <DataTable
+        renderCard={(customer) => (
+          <Link href={`/dashboard/customers/${customer.id}`}>
             <Card className="border-border/70">
               <CardContent className="space-y-1 p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -219,13 +162,60 @@ export default function CustomersPage() {
               </CardContent>
             </Card>
           </Link>
-        ))}
-        {!loading && !loadError && items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            暂无客户
-          </p>
-        ) : null}
-      </div>
+        )}
+        columns={columns}
+        data={items}
+        rowKey={(customer) => customer.id}
+        loading={loading}
+        error={loadError}
+        errorWhat="加载客户失败"
+        onRetry={() => void load()}
+        emptyTitle={filters.keyword ? "没有符合条件的客户" : "暂无客户"}
+        emptyDescription={
+          filters.keyword ? undefined : "先新增客户，再在客户下添加门店"
+        }
+        onRowClick={(customer) =>
+          router.push(`/dashboard/customers/${customer.id}`)
+        }
+        search={{
+          value: filters.keyword,
+          onChange: (keyword) => setFilters({ keyword }),
+          placeholder: "搜索客户名称或公司全称...",
+        }}
+        filters={[
+          {
+            key: "archived",
+            label: "含已归档",
+            active: includeArchived,
+            onToggle: () =>
+              setFilters({ archived: includeArchived ? "no" : "yes" }),
+          },
+        ]}
+        pagination={{
+          page: filters.page,
+          pageSize: filters.pageSize,
+          total,
+          onPageChange: (page) => setFilters({ page }),
+          onPageSizeChange: (pageSize) => setFilters({ pageSize }),
+        }}
+        renderActions={
+          canWrite
+            ? (customer) => (
+                <RowActionsMenu
+                  onEdit={() => setEditing(customer)}
+                  onDelete={() => setArchived(customer, !customer.isActive)}
+                  deleteLabel={customer.isActive ? "归档" : "恢复"}
+                  confirmTitle={`${customer.isActive ? "归档" : "恢复"}客户「${customer.name}」？`}
+                  confirmDescription={
+                    customer.isActive
+                      ? "归档后不能再为其新增门店，已有订单和门店保留。"
+                      : "恢复后可继续新增门店和订单。"
+                  }
+                />
+              )
+            : undefined
+        }
+      />
 
       {editing !== undefined ? (
         <CustomerDialog
