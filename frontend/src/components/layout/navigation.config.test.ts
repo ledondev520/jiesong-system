@@ -133,6 +133,7 @@ describe("navigation.config helpers", () => {
     expect(keys(getSecondaryMobileModuleNavItems(Role.ADMIN))).toEqual([
       "documents",
       "finance",
+      "customers",
       "suppliers",
       "products",
       "hs-codes",
