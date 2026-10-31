@@ -43,7 +43,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { SemanticBadge } from "@/components/ui/semantic-badge";
+import { SemanticBadge } from "@/components/ui/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,

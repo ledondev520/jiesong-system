@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SemanticBadge } from '@/components/ui/semantic-badge';
+import { SemanticBadge } from '@/components/ui/status-badge';
 
 export type FinancialUploadFileType = 'statement' | 'trialBalance' | 'generalLedger';
 export type FinancialUploadFiles = Record<FinancialUploadFileType, File | null>;
