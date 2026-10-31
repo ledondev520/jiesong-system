@@ -198,7 +198,7 @@ const createMessageWithClient = async ({
         ...modelOptions,
       }, requestOptions);
 
-      return mapKimiResponseToAnthropic({ response, model });
+      return mapKimiResponseToAnthropic({ response, model: response.servedBy?.model || model });
     } catch (error) {
       lastError = error;
       const canTryFallback = index < candidates.length - 1 && isModelUnavailableError(error);

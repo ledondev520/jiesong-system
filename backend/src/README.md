@@ -34,7 +34,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | 文件/目录 | 地位 | 功能 |
 |-----------|------|------|
 | app.js | 入口 | Express 应用初始化和启动（含定时任务启动） |
-| config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与常量（含单元测试） |
+| config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与可选 DeepSeek 回退/熔断参数、常量（含单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
 | integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等、真实 HTTP 进销存闭环、首个门店创建/RBAC、仓储异常出库/FIFO/来源守恒、收验货后采购更正/补录边界与合同附件 multipart/权限/失败留存矩阵，以及银行流水/发票查询筛选、币种、分类与既有角色边界）；generic-export-content.integration.js 解析七个设置模块的 CSV 下载，覆盖空表头、文本/日期/金额和重复导出的业务只读性 |
 | integration/ordinary-setting-text.integration.js | 普通文本验收 | 私有迁移库中仅写既有开票固定文本，验证单键保存/错误留存/明确重试/清空与独立回读，不提交含 AI/汇率参数的整表 |
@@ -91,7 +91,8 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | financialEvidenceService.js | 财务资料分类、脱敏与受限查询；普通幂等导入与单月/累计报表快照仅新增留存分离，快照不替换已有账期 |
 | financialEvidenceTransferService.js | 指定资料的版本化跨机迁移包、完整性及目标预检、冲突拒绝与事务内仅新增回读；由 financial-evidence-transfer.js 强制私有文件及实际SQLite在线备份 |
 | ai/contextService.js | 按当前销售合同港口关联构造美元上下文；局部查询失败保留其他资料并提示不可用，解析汇率后继续拼接财务概况 |
-| aiService.js | DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量 |
+| aiService.js | OpenAI/DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量；可选 `AI_FALLBACK_PROVIDER=deepseek` 经唯一的 `getOpenAIClient` 接入，用量记录实际作答模型 |
+| ai/fallbackClient.js | 主 AI 调用失败（网络/超时/429/5xx/提供方 4xx）时同一请求透明改发 DeepSeek 一次：流已输出正文/推理/工具调用则不拼接、总预算 50s、取消与本地错误不回退、双失败抛主错误；进程内熔断（连续失败直连、冷却后半开探测）；聊天/SSE/解析/HS/Agent 共用 |
 | anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |
 | openAgentService.js | 出口详情复用销售服务从装箱行计算拼柜来源；内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放；SDK 错误终止传播为 503/SSE error，不写成功记录 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
