@@ -108,7 +108,7 @@ function OrdersList() {
         description="一张订单 = 客户 + 多个门店；点击订单号进入详情"
         actions={
           <BusinessWrite>
-            <Button className="h-10 rounded-xl" onClick={() => router.push("/dashboard/sales/create")}>
+            <Button className="h-10 rounded-xl" onClick={() => router.push("/dashboard/orders/new")}>
               <Plus className="mr-2 h-4 w-4" /> 新建订单
             </Button>
           </BusinessWrite>

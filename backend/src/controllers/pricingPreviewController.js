@@ -36,7 +36,8 @@ const previewLines = async (req, res, next) => {
       return { index, status: priced.status, unitPriceUsd: priced.unitPriceUsd, markup: priced.markup ?? null, effectiveRate: priced.effectiveRate ?? null };
     });
     res.set('Cache-Control', 'no-store');
-    return success(res, { results });
+    // spotRate = 实际使用的现汇（未指定时为规则文件里的现汇），订单编辑器据此预填订单现汇
+    return success(res, { results, spotRate: spotRate ?? config.exchangeRate });
   } catch (error) {
     return next(error);
   }

@@ -68,6 +68,8 @@ test('HTTP/SQLite: pricing preview applies the locked rule (×1.3 / tiles ×1.1,
   assert.equal(owner.data.results[0].status, 'OK');
   assert.equal(owner.data.results[0].unitPriceUsd, 1995);
   assert.equal(owner.data.results[0].effectiveRate, 6.52);
+  assert.equal(owner.data.spotRate, 6.72, 'the configured spot rate is returned when none is sent');
+  assert.equal((await post({ spotRate: 7.2, lines: [{ costCny: 1 }] })).data.spotRate, 7.2);
 
   // Category markup is found through the product; a stated spot rate overrides the configured one.
   const mixed = await post({ lines: [{ productId: plainProduct.id, costCny: 1000 }, { productId: tileProduct.id, costCny: 1000 }, { categoryId: tiles.id, costCny: 1000 }] }, 'ADMIN');

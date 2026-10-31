@@ -440,6 +440,12 @@ export interface SalesContract {
   customsBroker?: string;
   isFumigated?: boolean;
   hasTaxRefund?: boolean;
+  // 订单级条款（迁移 A）
+  customerId?: string | null;
+  currency?: string;
+  incoterm?: string | null;
+  paymentTerms?: string | null;
+  portOfLoading?: string | null;
   // 时间戳
   createdAt: string;
   updatedAt: string;
