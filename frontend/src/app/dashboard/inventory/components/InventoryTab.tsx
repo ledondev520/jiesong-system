@@ -1,7 +1,7 @@
 /**
- * Input: 实时库存服务、共享列表URL状态、SortableTableHead、useTableSort
- * Output: 支持当前筛选刷新、窄屏操作与长名称显示的库存状态管理 Tab 组件（单条/批量状态流转、桌面表列排序；采购/验货来源库存自动流转）
- * Pos: 商品档案页面的子 Tab
+ * Input: 实时库存服务、采购合同店铺汇总、共享列表URL状态、SortableTableHead、useTableSort
+ * Output: 支持当前筛选刷新、窄屏操作与长名称显示的库存状态管理 Tab 组件（店铺筛选、单条/批量状态流转（需确认）、桌面表列排序；采购/验货来源库存自动流转）
+ * Pos: 库存页（/dashboard/inventory）主体
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -19,6 +19,7 @@ import {
 } from "react";
 import { Inventory, InventoryStatus } from "@/types";
 import { inventoryService } from "@/services/inventory.service";
+import { purchaseService } from "@/services/purchase.service";
 import {
   Table,
   TableBody,
@@ -32,6 +33,23 @@ import {
   type StatusBadgeConfig,
 } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +75,13 @@ import {
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 
+const ALL_STORES = "ALL";
+
+/** 待确认的状态变更：单条或批量，确认后才调用接口 */
+type PendingChange =
+  | { kind: "single"; id: string; label: string; status: InventoryStatus }
+  | { kind: "batch"; count: number; status: InventoryStatus };
+
 const STATUS_LABEL_MAP: Record<InventoryStatus, string> = {
   [InventoryStatus.PRODUCING]: "生产中",
   [InventoryStatus.PACKING]: "包装中",
@@ -79,8 +104,12 @@ export function InventoryTab() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [{ keyword, page: currentPage, pageSize }, setListState] =
+  const [{ keyword, store, page: currentPage, pageSize }, setListState] =
     useListUrlState(listUrlFields.inventory);
+  const [storeOptions, setStoreOptions] = useState<string[]>([]);
+  const [pendingChange, setPendingChange] = useState<PendingChange | null>(
+    null,
+  );
   const [debouncedKeyword, setDebouncedKeyword] = useState(keyword.trim());
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [batchUpdating, setBatchUpdating] = useState(false);
@@ -119,6 +148,7 @@ export function InventoryTab() {
             page: currentPage,
             pageSize,
             keyword: searchKeyword || undefined,
+            storeName: store || undefined,
           }),
         (response) => {
           if (request !== inventoryRequest.current) return;
@@ -141,7 +171,7 @@ export function InventoryTab() {
         },
       );
     },
-    [currentPage, pageSize],
+    [currentPage, pageSize, store],
   );
 
   /** 手动重试：先进入加载态再拉取 */
@@ -157,6 +187,7 @@ export function InventoryTab() {
   // 查询条件或刷新信号变化时在渲染期同步进入加载态（替代 effect 内同步 setState），请求仍在下方 effect 中发起
   const inventoryQueryKey = JSON.stringify([
     debouncedKeyword,
+    store,
     currentPage,
     pageSize,
     refreshVersion,
@@ -183,6 +214,20 @@ export function InventoryTab() {
       inventoryRequest.current += 1;
     };
   }, [debouncedKeyword, fetchInventory, refreshVersion]);
+
+  // 店铺选项取自采购合同列表的店铺汇总；加载失败时只是没有可选项，不影响库存列表
+  useEffect(() => {
+    let active = true;
+    purchaseService
+      .getAll({ page: 1, pageSize: 1, lite: true })
+      .then((response) => {
+        if (active) setStoreOptions(response.data?.summary?.stores ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   /**
    * 获取库存状态徽章
@@ -253,6 +298,39 @@ export function InventoryTab() {
       toast.success(`状态已更新`);
     } catch (error) {
       toast.error(resolveErrorMessage(error));
+    }
+  };
+
+  /**
+   * 职责：状态变更先进入确认弹窗，确认后才真正调用接口。
+   */
+  const requestSingleChange = (item: Inventory, status: InventoryStatus) => {
+    setMobileActionsOpen(false);
+    setPendingChange({
+      kind: "single",
+      id: item.id,
+      label: item.product?.customsName || item.id,
+      status,
+    });
+  };
+
+  const requestBatchChange = (status: InventoryStatus) => {
+    setMobileActionsOpen(false);
+    if (selectedIds.length === 0) {
+      toast.error("请先选择要更新的库存记录");
+      return;
+    }
+    setPendingChange({ kind: "batch", count: selectedIds.length, status });
+  };
+
+  const confirmPendingChange = () => {
+    const change = pendingChange;
+    setPendingChange(null);
+    if (!change) return;
+    if (change.kind === "single") {
+      void handleStatusChange(change.id, change.status);
+    } else {
+      void handleBatchStatusChange(change.status);
     }
   };
 
@@ -345,6 +423,30 @@ export function InventoryTab() {
   const hasManualInventory = inventory.some(
     (item) => !item.purchaseItemId && !item.receiptInspectionId,
   );
+  const renderStoreSelect = (triggerClassName: string) => (
+    <Select
+      value={store || ALL_STORES}
+      onValueChange={(value) =>
+        setListState({ store: value === ALL_STORES ? "" : value })
+      }
+    >
+      <SelectTrigger className={triggerClassName} aria-label="按店铺筛选">
+        <SelectValue placeholder="全部店铺" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ALL_STORES}>全部店铺</SelectItem>
+        {/* 当前筛选的店铺即使不在汇总里也保留，避免选中值显示为空 */}
+        {[...new Set([...(store ? [store] : []), ...storeOptions])].map(
+          (name) => (
+            <SelectItem key={name} value={name}>
+              {name}
+            </SelectItem>
+          ),
+        )}
+      </SelectContent>
+    </Select>
+  );
+
   return (
     <div className="space-y-6">
       <div className="hidden flex-wrap items-center gap-2 md:flex">
@@ -359,13 +461,14 @@ export function InventoryTab() {
             className="h-10 rounded-xl border-border/70 bg-background/70 pl-9"
           />
         </div>
-        {keyword && (
+        {renderStoreSelect("h-10 w-44 rounded-xl")}
+        {(keyword || store) && (
           <Button
             variant="ghost"
             size="sm"
             className="h-10 rounded-xl"
             onClick={() => {
-              setListState({ keyword: "" });
+              setListState({ keyword: "", store: "" });
               setDebouncedKeyword("");
             }}
           >
@@ -378,7 +481,7 @@ export function InventoryTab() {
             <Button
               variant="outline"
               disabled={batchUpdating || selectedIds.length === 0}
-              onClick={() => handleBatchStatusChange(InventoryStatus.INBOUND)}
+              onClick={() => requestBatchChange(InventoryStatus.INBOUND)}
             >
               批量设为已入库
             </Button>
@@ -389,7 +492,7 @@ export function InventoryTab() {
             <Button
               variant="outline"
               disabled={batchUpdating || selectedIds.length === 0}
-              onClick={() => handleBatchStatusChange(InventoryStatus.OUTBOUND)}
+              onClick={() => requestBatchChange(InventoryStatus.OUTBOUND)}
             >
               批量设为已出库
             </Button>
@@ -427,12 +530,13 @@ export function InventoryTab() {
                   className="h-11 rounded-2xl border-border/70 bg-background/80 pl-9"
                 />
               </div>
-              {keyword && (
+              {renderStoreSelect("h-11 w-full rounded-2xl")}
+              {(keyword || store) && (
                 <Button
                   variant="outline"
                   className="h-11 w-full rounded-2xl"
                   onClick={() => {
-                    setListState({ keyword: "" });
+                    setListState({ keyword: "", store: "" });
                     setDebouncedKeyword("");
                   }}
                 >
@@ -451,7 +555,7 @@ export function InventoryTab() {
                       className="h-11 rounded-2xl"
                       disabled={batchUpdating || selectedIds.length === 0}
                       onClick={() =>
-                        void handleBatchStatusChange(InventoryStatus.INBOUND)
+                        requestBatchChange(InventoryStatus.INBOUND)
                       }
                     >
                       批量设为已入库
@@ -465,7 +569,7 @@ export function InventoryTab() {
                       className="h-11 rounded-2xl"
                       disabled={batchUpdating || selectedIds.length === 0}
                       onClick={() =>
-                        void handleBatchStatusChange(InventoryStatus.OUTBOUND)
+                        requestBatchChange(InventoryStatus.OUTBOUND)
                       }
                     >
                       批量设为已出库
@@ -597,7 +701,7 @@ export function InventoryTab() {
                             variant="outline"
                             className="h-11 rounded-2xl"
                             onClick={() =>
-                              void handleStatusChange(item.id, nextStatus)
+                              requestSingleChange(item, nextStatus)
                             }
                             aria-label={`将 ${itemLabel} 状态更新为 ${STATUS_LABEL_MAP[nextStatus]}`}
                           >
@@ -739,7 +843,7 @@ export function InventoryTab() {
                                   <DropdownMenuItem
                                     key={`${item.id}-${nextStatus}`}
                                     onClick={() =>
-                                      handleStatusChange(item.id, nextStatus)
+                                      requestSingleChange(item, nextStatus)
                                     }
                                   >
                                     设为: {STATUS_LABEL_MAP[nextStatus]}
@@ -758,6 +862,33 @@ export function InventoryTab() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog
+        open={pendingChange !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingChange(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认变更库存状态</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingChange?.kind === "single"
+                ? `将「${pendingChange.label}」设为${STATUS_LABEL_MAP[pendingChange.status]}。`
+                : pendingChange
+                  ? `将选中的 ${pendingChange.count} 条库存设为${STATUS_LABEL_MAP[pendingChange.status]}。`
+                  : null}
+              状态变更会改变可出库数量，请确认无误。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPendingChange}>
+              确认
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* 分页控制 */}
       <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">

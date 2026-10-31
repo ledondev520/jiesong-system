@@ -7,6 +7,7 @@ type ProductListQuery = {
   keyword?: string;
   lite?: boolean;
   lowStock?: boolean;
+  incomplete?: boolean;
 };
 
 const crud = createCrudService<Product, Partial<Product>, Partial<Product>, ProductListQuery>('/products');

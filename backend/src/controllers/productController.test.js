@@ -112,3 +112,27 @@ test('list: 低库存按已入库商品汇总筛选再分页，包含零库存�
     assert.equal(res.payload.data.items[0].availableStock,0);
   } finally { prisma.inventory=originalInventory; }
 });
+
+test('list: 资料不全筛选毛重/体积/HS 缺失，并保留关键词的 OR 条件', async () => {
+  let listWhere;
+  let nextError;
+  const res = createMockRes();
+  await withMockProductDelegate({
+    findMany: async (args) => { listWhere = args.where; return []; },
+    count: async () => 0,
+  }, async () => productController.list({ query: { incomplete: 'true', keyword: '砖', page: '1', pageSize: '20' } }, res, error => { nextError = error; }));
+  assert.ifError(nextError);
+  assert.equal(listWhere.OR.length, 2);
+  const fields = listWhere.AND[0].OR.map(clause => Object.keys(clause)[0]);
+  assert.deepEqual([...new Set(fields)], ['grossWeight', 'volume', 'hsCode']);
+});
+
+test('list: 未传 incomplete 时不加资料不全条件', async () => {
+  let listWhere;
+  const res = createMockRes();
+  await withMockProductDelegate({
+    findMany: async (args) => { listWhere = args.where; return []; },
+    count: async () => 0,
+  }, async () => productController.list({ query: { page: '1', pageSize: '20' } }, res, () => {}));
+  assert.equal(listWhere.AND, undefined);
+});

@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import { CustomsDeclarationDetailPageContent } from "@/app/customs-declarations/components/CustomsDeclarationDetailPageContent";
 import registry from "../../../../lifecycle/resources.json";
-import { InventoryTab } from "@/app/dashboard/products/components/InventoryTab";
+import { InventoryTab } from "@/app/dashboard/inventory/components/InventoryTab";
 import { CustomsDeclarationListPageContent } from "@/app/customs-declarations/components/CustomsDeclarationListPageContent";
 
 const mocks = vi.hoisted(() => ({
@@ -36,6 +36,11 @@ vi.mock(
 );
 vi.mock("@/services/inventory.service", () => ({
   inventoryService: { getAll: mocks.getAll },
+}));
+vi.mock("@/services/purchase.service", () => ({
+  purchaseService: {
+    getAll: vi.fn(async () => ({ data: { summary: { stores: [] } } })),
+  },
 }));
 vi.mock("@/services/customsDeclaration.service", () => ({
   customsDeclarationService: { getAll: mocks.getAll, getById: mocks.getById },

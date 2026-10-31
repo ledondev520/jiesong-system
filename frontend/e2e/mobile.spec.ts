@@ -16,7 +16,7 @@ const routes = [
   "/dashboard/purchases/pc-001",
   "/dashboard/suppliers",
   "/dashboard/products",
-  "/dashboard/inventory-status",
+  "/dashboard/inventory",
   "/dashboard/sales",
   "/dashboard/sales/create",
   "/dashboard/sales/sc-001",

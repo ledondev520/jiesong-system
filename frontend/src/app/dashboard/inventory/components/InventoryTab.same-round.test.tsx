@@ -28,6 +28,11 @@ vi.mock("@/services/inventory.service", () => ({
     batchUpdateStatus: vi.fn(),
   },
 }));
+vi.mock("@/services/purchase.service", () => ({
+  purchaseService: {
+    getAll: vi.fn(async () => ({ data: { summary: { stores: ["第二店"] } } })),
+  },
+}));
 vi.mock("@/lib/api-cache", () => ({
   cachedFetch: (_key: string, fetcher: () => unknown) => fetcher(),
   invalidateCache: vi.fn(),
@@ -67,7 +72,7 @@ async function runListThenUpdate(list: "ok" | "fail", update: "ok" | "fail") {
   toastCalls.length = 0;
   mockGetAll.mockReset();
   mockUpdateStatus.mockReset();
-  window.history.replaceState({}, "", "/dashboard/products?tab=inventory");
+  window.history.replaceState({}, "", "/dashboard/inventory");
   mockGetAll.mockResolvedValueOnce(
     listResponse([inventoryItem(InventoryStatus.SHIPPING)]),
   );
@@ -84,6 +89,7 @@ async function runListThenUpdate(list: "ok" | "fail", update: "ok" | "fail") {
     target: { value: "合成" },
   });
   fireEvent.click(stockInButtons[0]);
+  fireEvent.click(await screen.findByRole("button", { name: "确认" }));
   await waitFor(() => expect(mockUpdateStatus).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(mockGetAll).toHaveBeenCalledTimes(2), {
     timeout: 3000,

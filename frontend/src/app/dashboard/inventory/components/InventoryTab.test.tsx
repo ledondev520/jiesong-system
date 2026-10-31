@@ -13,13 +13,18 @@ const getAll = vi.fn(async (_params: unknown) => ({
 vi.mock("@/services/inventory.service", () => ({
   inventoryService: { getAll: (...args: unknown[]) => getAll(args[0]) },
 }));
+vi.mock("@/services/purchase.service", () => ({
+  purchaseService: {
+    getAll: vi.fn(async () => ({ data: { summary: { stores: ["第二店"] } } })),
+  },
+}));
 vi.mock("@/lib/api-cache", () => ({
   cachedFetch: (_key: string, fetcher: () => unknown) => fetcher(),
   invalidateCache: vi.fn(),
 }));
 
 beforeEach(() =>
-  window.history.replaceState({}, "", "/dashboard/products?tab=inventory"),
+  window.history.replaceState({}, "", "/dashboard/inventory"),
 );
 
 it("库存后端总数与实际页码一致，第二页继续请求服务端", async () => {
@@ -63,4 +68,20 @@ it("采购来源库存不再要求手工设置入库/出库", async () => {
       .getAllByRole("checkbox", { name: /选择库存/ })
       .every((e) => e.getAttribute("data-disabled") !== null),
   ).toBe(true);
+});
+
+it("URL 中的店铺筛选发送到后端并可见", async () => {
+  window.history.replaceState(
+    {},
+    "",
+    "/dashboard/inventory?inventoryStore=%E7%AC%AC%E4%BA%8C%E5%BA%97",
+  );
+  getAll.mockClear();
+  render(<InventoryTab />);
+  await waitFor(() =>
+    expect(getAll).toHaveBeenCalledWith(
+      expect.objectContaining({ storeName: "第二店" }),
+    ),
+  );
+  expect((await screen.findAllByText("第二店")).length).toBeGreaterThan(0);
 });

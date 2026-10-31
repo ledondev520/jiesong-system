@@ -222,7 +222,7 @@ test("WAREHOUSE inspection persists its actor and only accepted stock reaches in
     history.getByText("合成检验：30件合格，10件待复验"),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.goto("/dashboard/inventory-status");
+  await page.goto("/dashboard/inventory");
   const row = page.getByRole("row").filter({ hasText: productName });
   await expect(row).toContainText("CG-SYNTHETIC-ROLE");
   await expect(row).toContainText("30 件");
@@ -325,7 +325,7 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   );
   expect(repeat.status()).toBe(200);
   expect(readDomain(fixture)).toEqual(domain);
-  await page.goto("/dashboard/inventory-status");
+  await page.goto("/dashboard/inventory");
   const rows = page.getByRole("row").filter({ hasText: productName });
   await expect(rows.filter({ hasText: "已出库" })).toHaveCount(outbound.length);
   await expect(rows.filter({ hasText: "已入库" })).toContainText("10 件");

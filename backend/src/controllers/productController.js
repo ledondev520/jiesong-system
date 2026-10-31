@@ -49,6 +49,16 @@ const list = async (req, res, next) => {
       where.categoryId = categoryId;
     }
     
+    // 资料不全：毛重、体积或 HS 编码缺失/为 0（只读筛选，用 AND 避免覆盖关键词的 OR）
+    const incomplete = req.query.incomplete === 'true' || req.query.incomplete === true;
+    if (incomplete) {
+      where.AND = [{ OR: [
+        { grossWeight: null }, { grossWeight: 0 },
+        { volume: null }, { volume: 0 },
+        { hsCode: null }, { hsCode: '' },
+      ] }];
+    }
+
     const lowStock = req.query.lowStock === 'true' || req.query.lowStock === true;
     const alerts = lowStock ? (await listLowStockAlerts(prisma, { keyword })).alerts : [];
     if (lowStock) where.id = { in: alerts.map(alert => alert.productId) };

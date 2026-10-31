@@ -18,6 +18,11 @@ vi.mock("@/services/inventory.service", () => ({
     batchUpdateStatus: (...args: unknown[]) => batchUpdateStatus(...args),
   },
 }));
+vi.mock("@/services/purchase.service", () => ({
+  purchaseService: {
+    getAll: vi.fn(async () => ({ data: { summary: { stores: ["第二店"] } } })),
+  },
+}));
 vi.mock("@/lib/hooks/useBusinessReadOnly", () => ({
   BusinessWrite: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -35,7 +40,7 @@ const response = (items: Inventory[]) => ({
   data: { items, pagination: { total: items.length, totalPages: 1 } },
 });
 beforeEach(() => {
-  window.history.replaceState({}, "", "/dashboard/products?tab=inventory");
+  window.history.replaceState({}, "", "/dashboard/inventory");
   clearAllCache();
   getAll.mockReset();
   batchUpdateStatus.mockReset();
@@ -55,6 +60,7 @@ it("成功批量入库后立即读取新库存，不从页面缓存恢复旧状�
     response([{ ...stock, status: InventoryStatus.INBOUND }]),
   );
   fireEvent.click(screen.getByRole("button", { name: "批量设为已入库" }));
+  fireEvent.click(await screen.findByRole("button", { name: "确认" }));
   await waitFor(() =>
     expect(batchUpdateStatus).toHaveBeenCalledWith(
       ["synthetic-stock"],
@@ -107,6 +113,7 @@ it("批量更新等待期间切换搜索，完成后只刷新当前搜索结果"
     )[0],
   );
   fireEvent.click(screen.getByRole("button", { name: "批量设为已入库" }));
+  fireEvent.click(await screen.findByRole("button", { name: "确认" }));
   await waitFor(() => expect(batchUpdateStatus).toHaveBeenCalledTimes(1));
   fireEvent.change(screen.getByPlaceholderText("搜索商品/采购合同..."), {
     target: { value: "新搜索" },
@@ -157,6 +164,7 @@ it("批量更新等待期间翻页，完成后继续显示当前页", async () =
     )[0],
   );
   fireEvent.click(screen.getByRole("button", { name: "批量设为已入库" }));
+  fireEvent.click(await screen.findByRole("button", { name: "确认" }));
   await waitFor(() => expect(batchUpdateStatus).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByRole("button", { name: "下一页" }));
   await screen.findAllByRole("checkbox", { name: "选择库存 synthetic-page-2" });
@@ -184,7 +192,7 @@ it("库存URL在返回与重新挂载后恢复筛选和分页", async () => {
   window.history.replaceState(
     {},
     "",
-    "/dashboard/products?tab=inventory&inventoryKeyword=SYN&inventoryPage=2&inventoryPageSize=50&source=qa#rows",
+    "/dashboard/inventory&inventoryKeyword=SYN&inventoryPage=2&inventoryPageSize=50&source=qa#rows",
   );
   getAll.mockResolvedValue({
     data: { items: [stock], pagination: { total: 200 } },
@@ -224,7 +232,7 @@ it("库存URL在返回与重新挂载后恢复筛选和分页", async () => {
     window.history.replaceState(
       {},
       "",
-      "/dashboard/products?tab=inventory&inventoryKeyword=BACK&inventoryPage=2&inventoryPageSize=50",
+      "/dashboard/inventory&inventoryKeyword=BACK&inventoryPage=2&inventoryPageSize=50",
     );
     window.dispatchEvent(new PopStateEvent("popstate"));
   });

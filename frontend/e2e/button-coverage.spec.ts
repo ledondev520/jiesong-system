@@ -23,7 +23,7 @@ const pageCases: PageCase[] = [
   { name: '出口合同', path: '/dashboard/sales' },
   { name: '出口创建', path: '/dashboard/sales/create', minClicks: 0 },
   { name: '商品档案', path: '/dashboard/products' },
-  { name: '库存状态', path: '/dashboard/inventory-status', minClicks: 0 },
+  { name: '库存', path: '/dashboard/inventory', minClicks: 0 },
   { name: '设置', path: '/dashboard/settings', minClicks: 0 },
   { name: '商品管理', path: '/dashboard/products' },
   { name: '供应商管理', path: '/dashboard/suppliers' },

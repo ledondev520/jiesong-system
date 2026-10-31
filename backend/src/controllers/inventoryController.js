@@ -36,6 +36,9 @@ const list = async (req, res, next) => {
     const where = {};
     if (status) where.status = status;
     if (productId) where.productId = productId;
+    // 按采购合同的发货店铺筛选（只读）；手工库存没有店铺，不会匹配
+    const storeName = typeof req.query.storeName === 'string' ? req.query.storeName.trim() : '';
+    if (storeName) where.purchaseItem = { purchaseContract: { storeName } };
     if (keyword && keyword.trim()) {
       where.OR = [
         {
@@ -89,6 +92,7 @@ const list = async (req, res, next) => {
                     select: {
                       id: true,
                       contractNo: true,
+                      storeName: true,
                     },
                   },
                 },

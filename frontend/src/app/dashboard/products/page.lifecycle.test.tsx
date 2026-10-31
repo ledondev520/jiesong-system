@@ -27,7 +27,6 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => ({ get: () => null }),
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
 }));
-vi.mock("./components/InventoryTab", () => ({ InventoryTab: () => null }));
 vi.mock("@/services/product.service", () => ({
   productService: {
     getAll: (...args: unknown[]) => mockGetAll(...args),

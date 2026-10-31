@@ -31,7 +31,7 @@ const allRoutes = [
   { id: 'reports', path: '/dashboard/reports' },
   { id: 'purchases', path: '/dashboard/purchases' },
   { id: 'suppliers', path: '/dashboard/suppliers' },
-  { id: 'inventory_status', path: '/dashboard/inventory-status' },
+  { id: 'inventory_status', path: '/dashboard/inventory' },
   { id: 'sales_list', path: '/dashboard/sales' },
   { id: 'tax_refunds', path: '/dashboard/tax-refunds' },
   { id: 'tax_refunds_customs', path: '/dashboard/tax-refunds?view=customs' },

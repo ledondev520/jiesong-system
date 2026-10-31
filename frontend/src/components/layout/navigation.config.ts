@@ -130,8 +130,8 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
   },
   {
     key: "inventory",
-    href: "/dashboard/inventory-status",
-    defaultHref: "/dashboard/inventory-status",
+    href: "/dashboard/inventory",
+    defaultHref: "/dashboard/inventory",
     label: "库存",
     icon: Boxes,
     childPrefixes: ["/dashboard/logistics"],

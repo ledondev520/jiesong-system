@@ -127,8 +127,7 @@ test.describe('关键按钮交互', () => {
   });
 
   test('库存状态页：批量状态更新可触发', async ({ page }) => {
-    await signInAsAdmin(page, '/dashboard/products');
-    await safeClick(page.getByRole('tab', { name: '库存状态' }));
+    await signInAsAdmin(page, '/dashboard/inventory');
 
     await safeClick(page.getByRole('checkbox', { name: /选择库存/ }));
 
@@ -136,6 +135,7 @@ test.describe('关键按钮交互', () => {
     await expect(batchOutboundButton).toBeEnabled();
 
     await safeClick(batchOutboundButton);
+    await safeClick(page.getByRole('button', { name: '确认', exact: true }));
     await expect(page.getByText('批量更新完成：成功 1 条')).toBeVisible();
   });
 
@@ -143,8 +143,8 @@ test.describe('关键按钮交互', () => {
     await signInAsAdmin(page, '/dashboard/purchases');
     await page.getByRole('link', { name: '供应商管理', exact: true }).click();
     await expect(page.getByRole('heading', { name: '供应商管理', exact: true })).toBeVisible();
-    await page.getByRole('link', { name: '库存状态', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '库存状态', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: '库存', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '库存', exact: true })).toBeVisible();
   });
 
   test('通知中心：未读筛选入口可见', async ({ page }) => {
