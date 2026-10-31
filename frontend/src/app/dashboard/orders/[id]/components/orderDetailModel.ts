@@ -221,9 +221,10 @@ export const evaluateOrderReadiness = (
   status: SalesStatus,
   packingRows: PackingItem[],
   plan: LoadingPlan | null,
+  planFailed = false,
 ) => {
   const totals = sumPackingTotals(packingRows);
-  const summary = summarizeLoadingPlan(plan);
+  const summary = summarizeLoadingPlan(plan, planFailed);
   const hasShipped = hasOrderShipped(status);
   const isBlocking = summary.blocking;
   const headline = hasShipped

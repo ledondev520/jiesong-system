@@ -162,7 +162,7 @@ export function OrderOverviewTab({
         </Metric>
         <Metric label="未收款" value={usd(Math.max(total - received, 0))} />
         <Metric
-          label={`${readiness.totals.cartons} 箱 · 毛重 ${readiness.totals.grossKg.toLocaleString()} kg（${readiness.plan?.containerType ?? "40HQ"}）`}
+          label={`${readiness.totals.cartons} 箱 · 毛重 ${readiness.totals.grossKg.toLocaleString()} kg（${readiness.plan?.containerType ?? "—"}）`}
           value={`${readiness.totals.cargoCbm.toFixed(2)} CBM`}
         >
           <p

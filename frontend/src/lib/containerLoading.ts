@@ -104,14 +104,15 @@ export interface LoadingPlan {
 
 const PHYSICAL_BLOCKERS = ["missing-dimensions", "oversize", "unplaced"];
 
-/** 职责：把装柜计划压成页面横幅所需的摘要；计划未加载时 ready=false（fail closed）。 */
-export function summarizeLoadingPlan(plan: LoadingPlan | null) {
+/** 职责：把装柜计划压成页面横幅所需的摘要；计划未加载/加载失败时 ready=false（fail closed）。 */
+export function summarizeLoadingPlan(plan: LoadingPlan | null, failed = false) {
   if (!plan) {
     return {
       loaded: false,
+      failed,
       ready: false,
       blocking: false,
-      headline: "正在核对装柜…",
+      headline: failed ? "装柜计划加载失败，暂不可登记发运" : "正在核对装柜…",
       weightPct: 0,
       volumePct: 0,
       thresholdPct: null as number | null,
@@ -127,6 +128,7 @@ export function summarizeLoadingPlan(plan: LoadingPlan | null) {
   const unplaced = plan.unplaced.reduce((sum, entry) => sum + entry.cartons, 0);
   return {
     loaded: true,
+    failed: false,
     ready: check.ready,
     blocking: check.status === "blocked",
     headline: check.headline,

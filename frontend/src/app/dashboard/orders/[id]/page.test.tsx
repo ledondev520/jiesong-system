@@ -179,6 +179,26 @@ vi.mock("@/components/finance/ForexVerificationPanel", () => ({
   },
 }));
 
+const PACKING_CONTRACT = {
+  id: "s-1",
+  contractNo: "EXP260008",
+  status: "PACKING",
+  totalBoxes: 1,
+  totalAmount: 100,
+  packingItems: [
+    {
+      id: "pk-1",
+      productId: "p-1",
+      boxes: 1,
+      quantity: 1,
+      volume: 60,
+      grossWeight: 18000,
+      product: { id: "p-1", customsName: "大宗货物" },
+    },
+  ],
+  port: { name: "Oakland" },
+};
+
 describe("OrderDetailPage 交互逻辑", () => {
   beforeEach(() => {
     mockIsMobile.mockReturnValue(false);
@@ -726,8 +746,67 @@ describe("OrderDetailPage 交互逻辑", () => {
     });
     renderPage("s-1");
 
-    expect(await screen.findByText("正在核对装柜…")).toBeInTheDocument();
+    expect(
+      await screen.findByText("装柜计划加载失败，暂不可登记发运"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("正在核对装柜…")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled();
+    // 没有计划时不显示 0t / 0 CBM 之类的假柜型上限 (INT5-02)
+    expect(screen.queryByText(/\/ 0 ?t|\/ 0 CBM/)).not.toBeInTheDocument();
+  });
+
+  it("装柜计划加载失败后可重试，成功后恢复判定 (INT5-02)", async () => {
+    mockGetLoadingPlan
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValue({ data: READY_PLAN });
+    mockGetById.mockImplementation(async () => ({
+      data: { ...PACKING_CONTRACT },
+    })); // 新对象：模拟真实刷新
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    await screen.findByText("装柜计划加载失败，暂不可登记发运");
+    expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "重试" }));
+
+    expect(
+      (await screen.findAllByText("满足出柜条件且全部箱件可装下")).length,
+    ).toBeGreaterThan(0);
+    expect(mockGetLoadingPlan).toHaveBeenCalledTimes(2);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "登记发运" })).toBeEnabled(),
+    );
+  });
+
+  it("合同刷新后旧合同的装柜计划立即作废，新计划到达前不可登记发运 (INT5-03)", async () => {
+    let resolveSecond: (value: { data: LoadingPlan }) => void = () => {};
+    mockGetLoadingPlan
+      .mockResolvedValueOnce({ data: READY_PLAN })
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveSecond = resolve)),
+      );
+    mockGetById.mockImplementation(async () => ({
+      data: { ...PACKING_CONTRACT },
+    })); // 新对象：模拟真实刷新
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    const shipButton = await screen.findByRole("button", { name: "登记发运" });
+    await waitFor(() => expect(shipButton).toBeEnabled());
+
+    // 编辑装箱行 → onChanged → 重新取合同；第二次计划请求仍在途
+    await user.click(screen.getAllByRole("button", { name: /^删除 / })[0]);
+    await waitFor(() => expect(mockGetLoadingPlan).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled(),
+    );
+    expect(screen.getByText("正在核对装柜…")).toBeInTheDocument();
+
+    resolveSecond({ data: READY_PLAN });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "登记发运" })).toBeEnabled(),
+    );
   });
 
   it("合同头偏低但明细合计达标时允许登记发运（与后端同源取明细合计）", async () => {

@@ -128,7 +128,9 @@ export function OrderDetailPage({ id }: { id: string }) {
   const [planState, setPlanState] = useState<{
     forContract: SalesContract;
     plan: LoadingPlan | null;
+    failed: boolean;
   } | null>(null);
+  const [planAttempt, setPlanAttempt] = useState(0);
   const [referenceDataLoading, setReferenceDataLoading] = useState(false);
   const referenceDataLoadedRef = useRef(false);
   const queryTab = resolveOrderTab(searchParams?.get("tab"));
@@ -208,15 +210,26 @@ export function OrderDetailPage({ id }: { id: string }) {
       .getLoadingPlan(id)
       .then((res) => {
         if (!cancelled)
-          setPlanState({ forContract: contract, plan: res.data ?? null });
+          setPlanState({
+            forContract: contract,
+            plan: res.data ?? null,
+            failed: !res.data,
+          });
       })
       .catch(() => {
-        if (!cancelled) setPlanState({ forContract: contract, plan: null });
+        if (!cancelled)
+          setPlanState({ forContract: contract, plan: null, failed: true });
       });
     return () => {
       cancelled = true;
     };
-  }, [contract, id]);
+  }, [contract, id, planAttempt]);
+
+  // 失败后重试：先回到「核对中」，再重新取计划
+  const retryPlan = () => {
+    setPlanState(null);
+    setPlanAttempt((n) => n + 1);
+  };
 
   useEffect(() => {
     if (itemDialogOpen || activeTab === "container" || activeTab === "lines") {
@@ -285,10 +298,13 @@ export function OrderDetailPage({ id }: { id: string }) {
   }
 
   const packingRows = contract.packingItems ?? [];
+  const currentPlanState =
+    planState?.forContract === contract ? planState : null;
   const readiness = evaluateOrderReadiness(
     contract.status,
     packingRows,
-    planState?.forContract === contract ? planState.plan : null,
+    currentPlanState?.plan ?? null,
+    currentPlanState?.failed ?? false,
   );
   const nextStep = getNextStep(contract, {
     canGeneratePurchase: Boolean(role && PURCHASE_DRAFT_ROLES.includes(role)),
@@ -393,6 +409,7 @@ export function OrderDetailPage({ id }: { id: string }) {
             inventories={inventories}
             referenceDataLoading={referenceDataLoading}
             readiness={readiness}
+            onRetryPlan={retryPlan}
             itemDialogOpen={itemDialogOpen}
             onItemDialogOpenChange={setItemDialogOpen}
             onImportPurchase={() => setDialog("importPurchase")}

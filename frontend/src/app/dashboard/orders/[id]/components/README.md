@@ -8,6 +8,7 @@
 - `OrderLinesTab.tsx`：只读商品 × 门店网格 + `ContractInfoEditor`（失败保留草稿供明确重试；门店读回保留港口关联）
 - `OrderPurchasesTab.tsx`：由本订单生成的采购单（只含数量与状态，不含采购价格）
 - `OrderContainerTab.tsx`：出柜条件（双 80% + 3D 排柜）、容量卡片、装箱明细、40HQ `Container3DView`、保存为图片
+- `OrderContainerTab.simulation.test.tsx`：货柜页签宿主路径下柜型模拟过期响应（C5-04）；装柜计划加载失败显示「重试」，不再显示 0t / 0 CBM 假上限
 - `PackingItemsCard.tsx`、`PackingItemDialog.tsx`：装箱明细表（手机卡片）与添加/编辑弹窗；采购来源行锁定数量/箱数/毛净重/体积/尺寸
 - `OrderDocsTab.tsx`、`OrderDocsMenu.tsx`：HS 编码汇总 + 附件；「单证 ▾」菜单（生成出口单证、报关单草稿、船司装箱单核对；其他：导出出口工作簿、申报三表）
 - `OrderRefundTab.tsx`：退税材料检查入口（检查不等于正式申报）

@@ -53,6 +53,7 @@ export function OrderContainerTab({
   inventories,
   referenceDataLoading,
   readiness: result,
+  onRetryPlan,
   itemDialogOpen,
   onItemDialogOpenChange,
   onImportPurchase,
@@ -63,6 +64,7 @@ export function OrderContainerTab({
   inventories: Inventory[];
   referenceDataLoading: boolean;
   readiness: OrderReadiness;
+  onRetryPlan: () => void;
   itemDialogOpen: boolean;
   onItemDialogOpenChange: (open: boolean) => void;
   onImportPurchase: () => void;
@@ -126,6 +128,11 @@ export function OrderContainerTab({
             <span className={`text-sm font-semibold ${tone.text}`}>
               {result.headline}
             </span>
+            {summary.failed && (
+              <Button size="sm" variant="outline" onClick={onRetryPlan}>
+                重试
+              </Button>
+            )}
             <span className="text-xs text-muted-foreground">
               {hasShipped
                 ? "当前资料的模拟结果，不代表实际发运结果"
@@ -140,7 +147,11 @@ export function OrderContainerTab({
             <span className={pctClass(readiness.weightPct)}>
               {readiness.weightPct.toFixed(1)}%
             </span>
-            <span className="text-muted-foreground">/ {maxWeight / 1000}t</span>
+            {spec && (
+              <span className="text-muted-foreground">
+                / {maxWeight / 1000}t
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs">
             <Boxes className="h-3.5 w-3.5 text-muted-foreground" />
@@ -148,7 +159,9 @@ export function OrderContainerTab({
             <span className={pctClass(readiness.volumePct)}>
               {readiness.volumePct.toFixed(1)}%
             </span>
-            <span className="text-muted-foreground">/ {maxCbm} CBM</span>
+            {spec && (
+              <span className="text-muted-foreground">/ {maxCbm} CBM</span>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs">
             <Container className="h-3.5 w-3.5 text-muted-foreground" />
@@ -182,7 +195,7 @@ export function OrderContainerTab({
                 {totals.cargoCbm.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">
-                体积 (CBM) / {maxCbm}
+                体积 (CBM){spec ? ` / ${maxCbm}` : ""}
               </p>
               <Progress value={cbmPercent} className="mt-2 h-2" />
             </CardContent>
@@ -193,7 +206,7 @@ export function OrderContainerTab({
                 {totals.grossKg.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                毛重 (kg) / {maxWeight.toLocaleString()}
+                毛重 (kg){spec ? ` / ${maxWeight.toLocaleString()}` : ""}
                 {" · "}净重 {(contract.netWeight || 0).toLocaleString()} kg
               </p>
               <Progress value={weightPercent} className="mt-2 h-2" />
@@ -226,7 +239,9 @@ export function OrderContainerTab({
           <CardDescription>
             {spec
               ? `${spec.label} (${spec.innerMm.length}×${spec.innerMm.width}×${spec.innerMm.height} mm)`
-              : "装柜计划加载中"}
+              : summary.failed
+                ? "装柜计划加载失败"
+                : "装柜计划加载中"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -241,7 +256,9 @@ export function OrderContainerTab({
             <div className="flex h-[200px] items-center justify-center text-muted-foreground">
               {packingRows.length === 0
                 ? "请先添加装箱商品以查看装柜效果"
-                : "装柜计划加载中"}
+                : summary.failed
+                  ? "装柜计划加载失败，请点击上方「重试」"
+                  : "装柜计划加载中"}
             </div>
           )}
         </CardContent>
