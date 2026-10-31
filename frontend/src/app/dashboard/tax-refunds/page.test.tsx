@@ -14,8 +14,17 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("TaxRefundsDashboardPage 重定向", () => {
-  it("旧退税列表路由跳转到 /dashboard/customs", () => {
-    TaxRefundsDashboardPage();
+  it("旧退税列表路由跳转到 /dashboard/customs", async () => {
+    await TaxRefundsDashboardPage({ searchParams: Promise.resolve({}) });
     expect(mockRedirect).toHaveBeenCalledWith("/dashboard/customs");
+  });
+
+  it("保留旧书签里的查询参数（view 等）", async () => {
+    await TaxRefundsDashboardPage({
+      searchParams: Promise.resolve({ view: "refunds", q: "EXP1" }),
+    });
+    expect(mockRedirect).toHaveBeenLastCalledWith(
+      "/dashboard/customs?view=refunds&q=EXP1",
+    );
   });
 });
