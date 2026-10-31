@@ -100,6 +100,23 @@
           }
         ]
       }
+    },
+    {
+      "id": "customers",
+      "routeFile": "backend/src/routes/customers.js",
+      "routes": ["POST /", "PUT /:id"],
+      "update": { "file": "backend/src/controllers/customerController.js", "handler": "update" },
+      "matrix": {
+        "path": "/api/v1/customers",
+        "table": "customers",
+        "create": { "name": "Synthetic matrix customer", "contactName": "Original contact", "contactPhone": "Original phone" },
+        "edit": { "name": "Synthetic edited customer" },
+        "invalid": [{ "name": "   ", "contactName": "Unwanted contact" }, { "name": null, "contactPhone": "Unwanted phone" }, { "isActive": "false" }],
+        "blank": { "contactName": "", "contactPhone": "   " },
+        "clear": { "contactName": null, "contactPhone": null },
+        "clearStatus": 200,
+        "filter": "Synthetic edited customer"
+      }
     }
   ],
   "lists": [
