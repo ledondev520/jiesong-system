@@ -4,7 +4,7 @@
  * Pos: 报价/订单预填价（负责人 2026-11-01 PRICING-LASTPRICE）：老商品取上次确认价，没有才用成本公式。
  *
  * “确认”= 单据已离开 DRAFT（负责人先审再放行）：订单 status != DRAFT 的 SalesItem.sellingPrice，
- * 报价 status ∈ SENT/ACCEPTED/CONVERTED 的 QuoteItem.unitPrice。取更新时间最新者，同刻订单优先；价格须 > 0。
+ * 报价 status ∈ SENT/ACCEPTED/CONVERTED 的 QuoteItem.unitPrice。取“确认时刻”最新者（订单 SalesItem.createdAt，报价 Quote.sentAt；不用 updatedAt，库存分配/状态流转会刷新它），同刻订单优先；价格须 > 0。
  * 同一商品只看 productId（跨客户）。PriceHistory 是供应商采购成本，不是售价，不用。
  * shortcut: 每个商品拉全部历史行在内存里取第一条，数据量小；单品历史上千行时改成按商品分组取最新。
  */
@@ -25,17 +25,18 @@ const lastConfirmedPrices = async (db, productIds, { excludeQuoteId, excludeSale
         salesContract: { status: { not: 'DRAFT' } },
         ...(excludeSalesContractId ? { salesContractId: { not: excludeSalesContractId } } : {}),
       },
-      select: { productId: true, sellingPrice: true, updatedAt: true },
-      orderBy: { updatedAt: 'desc' },
+      select: { productId: true, sellingPrice: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
     }),
     db.quoteItem.findMany({
       where: {
         productId: { in: ids },
         unitPrice: { gt: 0 },
-        quote: { status: { in: CONFIRMED_QUOTE_STATUSES }, ...(excludeQuoteId ? { id: { not: excludeQuoteId } } : {}) },
+        // sentAt 在 DRAFT→SENT 写入、退回 DRAFT 清空；非 DRAFT 报价必有值
+        quote: { status: { in: CONFIRMED_QUOTE_STATUSES }, sentAt: { not: null }, ...(excludeQuoteId ? { id: { not: excludeQuoteId } } : {}) },
       },
-      select: { productId: true, unitPrice: true, quote: { select: { updatedAt: true } } },
-      orderBy: { quote: { updatedAt: 'desc' } },
+      select: { productId: true, unitPrice: true, quote: { select: { sentAt: true } } },
+      orderBy: { quote: { sentAt: 'desc' } },
     }),
   ]);
   const orders = newest(orderRows);
@@ -43,10 +44,10 @@ const lastConfirmedPrices = async (db, productIds, { excludeQuoteId, excludeSale
   for (const id of ids) {
     const order = orders.get(id);
     const quote = quotes.get(id);
-    if (order && (!quote || order.updatedAt >= quote.quote.updatedAt)) {
-      result.set(id, { price: order.sellingPrice, at: order.updatedAt, source: 'ORDER' });
+    if (order && (!quote || order.createdAt >= quote.quote.sentAt)) {
+      result.set(id, { price: order.sellingPrice, at: order.createdAt, source: 'ORDER' });
     } else if (quote) {
-      result.set(id, { price: quote.unitPrice, at: quote.quote.updatedAt, source: 'QUOTE' });
+      result.set(id, { price: quote.unitPrice, at: quote.quote.sentAt, source: 'QUOTE' });
     }
   }
   return result;

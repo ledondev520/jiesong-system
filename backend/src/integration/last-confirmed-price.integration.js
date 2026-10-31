@@ -74,6 +74,18 @@ test('last confirmed price pre-fills repeat products; new products use the formu
   assert.deepEqual((await preview())[0], [2600, 'LAST_CONFIRMED']);
   assert.deepEqual((await preview({ excludeSalesContractId: confirmed.id }))[0], [2500.5, 'LAST_CONFIRMED']);
 
+  // Non-price writes must not reorder history. Bumping an OLDER order item (stock allocation rewrites costPrice, which refreshes
+  // updatedAt) and accepting an OLDER quote must not beat the newer confirmed 2600.
+  const dayAgo = new Date(Date.now() - 86400000);
+  const olderOrder = await order('CONFIRMED', 1800);
+  await db.salesItem.updateMany({ where: { salesContractId: olderOrder.id }, data: { createdAt: dayAgo } });
+  await db.salesItem.updateMany({ where: { salesContractId: olderOrder.id }, data: { costPrice: 10001 } });
+  const olderQuote = await ok('POST', '/quotes', { items: [line({ isManualPrice: true, unitPrice: 1700 })] });
+  await ok('PUT', `/quotes/${olderQuote.id}`, { status: 'SENT' });
+  await db.quote.update({ where: { id: olderQuote.id }, data: { sentAt: dayAgo } });
+  await ok('PUT', `/quotes/${olderQuote.id}`, { status: 'ACCEPTED' });
+  assert.deepEqual((await preview())[0], [2600, 'LAST_CONFIRMED']);
+
   // New orders: an unpriced line takes the same pre-fill server-side; an explicit price is kept.
   const created = await ok('POST', '/sales', { exchangeRate: 6.72, items: [
     { productId: repeat.id, storeId: storeA.id, quantity: 1, costPrice: 10000, unit: 'PCS' },

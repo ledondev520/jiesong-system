@@ -57,7 +57,7 @@ test('老商品未给售价时取上次确认价，新商品仍按规则', async
   const db = {
     product: { findMany: async () => [{ id: 'p-cup', categoryId: null }, { id: 'p-new', categoryId: null }] },
     productCategory: { findMany: async () => [] },
-    salesItem: { findMany: async () => [{ productId: 'p-cup', sellingPrice: 2500.5, updatedAt: new Date('2026-10-01') }] },
+    salesItem: { findMany: async () => [{ productId: 'p-cup', sellingPrice: 2500.5, createdAt: new Date('2026-10-01') }] },
     quoteItem: { findMany: async () => [] },
   };
   const input = normalizeCreation({

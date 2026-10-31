@@ -326,6 +326,27 @@ test('addSalesItem: 未传 sellingPrice 时按唯一报价规则（订单已保�
   }
 });
 
+test('addSalesItem: 未传 sellingPrice 且老商品有上次确认价时直接取该价（排除本订单）', async () => {
+  const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany];
+  let lookup = null;
+  let createArgs = null;
+  prisma.quoteItem.findMany = async () => [];
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5 });
+  prisma.salesItem.create = async (args) => { createArgs = args; return { id: 'si-1', ...args.data }; };
+  prisma.salesItem.findMany = async (args) => {
+    if (args.where?.productId) { lookup = args.where; return [{ productId: 'p-1', sellingPrice: 2500.5, createdAt: new Date('2026-10-01') }]; }
+    return [{ quantity: 2, sellingPrice: 2500.5, costPrice: 50 }];
+  };
+  prisma.salesContract.update = async () => ({ id: 'sc-1' });
+  try {
+    await salesService.addSalesItem('sc-1', { productId: 'p-1', storeId: 's-1', quantity: 2, unit: '件', costPrice: 50 });
+    assert.equal(createArgs.data.sellingPrice, 2500.5);
+    assert.deepEqual(lookup.salesContractId, { not: 'sc-1' });
+  } finally {
+    [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany] = originals;
+  }
+});
+
 test('addSalesItem: 报价转换订单（有 quoteId）已存计价汇率，定价不再重复扣调整', async () => {
   const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.product.findUnique];
   const originalQuoteItems = prisma.quoteItem.findMany;
@@ -490,7 +511,7 @@ test('calculateProductSellingPrice: 带商品时按分类链取瓷砖 ×1.1，�
 
 test('calculateProductSellingPrice: 老商品 recommended 取上次确认价，formulaRecommended 仍是规则价；新商品 RULE', () => withSyntheticCatalog(async () => {
   prisma.salesItem.findMany = async ({ where }) => (where.productId.in.includes('p-cup')
-    ? [{ productId: 'p-cup', sellingPrice: 2500.5, updatedAt: new Date('2026-10-01') }] : []);
+    ? [{ productId: 'p-cup', sellingPrice: 2500.5, createdAt: new Date('2026-10-01') }] : []);
   const repeat = await salesService.calculateProductSellingPrice({ productId: 'p-cup', costPrice: 10000, exchangeRate: 6.72 });
   assert.deepEqual([repeat.recommended, repeat.formulaRecommended, repeat.source], [2500.5, 1994, 'LAST_CONFIRMED']);
   const fresh = await salesService.calculateProductSellingPrice({ productId: 'p-tile', costPrice: 10000, exchangeRate: 6.72 });

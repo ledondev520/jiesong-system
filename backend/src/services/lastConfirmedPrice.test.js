@@ -21,7 +21,7 @@ test('queries only confirmed documents with a positive price and honours exclusi
     productId: { in: ['p1', 'p2'] }, sellingPrice: { gt: 0 }, salesContract: { status: { not: 'DRAFT' } }, salesContractId: { not: 'c9' },
   });
   assert.deepEqual(db.calls.quote.where, {
-    productId: { in: ['p1', 'p2'] }, unitPrice: { gt: 0 }, quote: { status: { in: ['SENT', 'ACCEPTED', 'CONVERTED'] }, id: { not: 'q9' } },
+    productId: { in: ['p1', 'p2'] }, unitPrice: { gt: 0 }, quote: { status: { in: ['SENT', 'ACCEPTED', 'CONVERTED'] }, sentAt: { not: null }, id: { not: 'q9' } },
   });
   const none = stub();
   assert.equal((await lastConfirmedPrices(none, [])).size, 0);
@@ -32,13 +32,13 @@ test('newest of order and quote wins per product; a tie goes to the order', asyn
   const db = stub({
     // rows arrive newest first, as the queries order them
     orders: [
-      { productId: 'tie', sellingPrice: 10, updatedAt: at('05') }, { productId: 'tie', sellingPrice: 1, updatedAt: at('01') },
-      { productId: 'old-order', sellingPrice: 20, updatedAt: at('02') },
+      { productId: 'tie', sellingPrice: 10, createdAt: at('05') }, { productId: 'tie', sellingPrice: 1, createdAt: at('01') },
+      { productId: 'old-order', sellingPrice: 20, createdAt: at('02') },
     ],
     quotes: [
-      { productId: 'tie', unitPrice: 11, quote: { updatedAt: at('05') } },
-      { productId: 'old-order', unitPrice: 21, quote: { updatedAt: at('03') } },
-      { productId: 'quote-only', unitPrice: 30.5, quote: { updatedAt: at('04') } },
+      { productId: 'tie', unitPrice: 11, quote: { sentAt: at('05') } },
+      { productId: 'old-order', unitPrice: 21, quote: { sentAt: at('03') } },
+      { productId: 'quote-only', unitPrice: 30.5, quote: { sentAt: at('04') } },
     ],
   });
   const result = await lastConfirmedPrices(db, ['tie', 'old-order', 'quote-only', 'never-sold']);
