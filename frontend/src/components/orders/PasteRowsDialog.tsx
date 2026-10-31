@@ -7,9 +7,20 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { parsePastedRows, resolvePastedRows, type OrderLine, type StoreRef } from "@/lib/order-lines";
+import {
+  parsePastedRows,
+  resolvePastedRows,
+  type OrderLine,
+  type StoreRef,
+} from "@/lib/order-lines";
 import { productService } from "@/services/product.service";
 
 interface PasteRowsDialogProps {
@@ -18,7 +29,11 @@ interface PasteRowsDialogProps {
   onAdd: (lines: OrderLine[]) => void;
 }
 
-export function PasteRowsDialog({ stores, onClose, onAdd }: PasteRowsDialogProps) {
+export function PasteRowsDialog({
+  stores,
+  onClose,
+  onAdd,
+}: PasteRowsDialogProps) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
@@ -29,12 +44,24 @@ export function PasteRowsDialog({ stores, onClose, onAdd }: PasteRowsDialogProps
     if (rows.length > 100) return setProblems(["一次最多粘贴 100 行"]);
     setBusy(true);
     try {
-      const cache = new Map<string, { id: string; customsName: string; unit?: string } | null>();
+      const cache = new Map<
+        string,
+        { id: string; customsName: string; unit?: string } | null
+      >();
       const result = await resolvePastedRows(rows, stores, async (name) => {
         if (!cache.has(name)) {
-          const response = await productService.getAll({ keyword: name, pageSize: 20, lite: true });
+          const response = await productService.getAll({
+            keyword: name,
+            pageSize: 20,
+            lite: true,
+          });
           // 只接受名称整串相等的商品，避免把「瓷砖」误配到「瓷砖胶」
-          cache.set(name, response?.data.items.find((product) => product.customsName === name) ?? null);
+          cache.set(
+            name,
+            response?.data.items.find(
+              (product) => product.customsName === name,
+            ) ?? null,
+          );
         }
         return cache.get(name) ?? null;
       });
@@ -55,7 +82,8 @@ export function PasteRowsDialog({ stores, onClose, onAdd }: PasteRowsDialogProps
           <DialogTitle>从 Excel 粘贴</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          列顺序：商品名称、门店（简称或名称）、数量、采购成本 ¥（可空）。商品名称须与档案完全一致。
+          列顺序：商品名称、门店（简称或名称）、数量、采购成本
+          ¥（可空）。商品名称须与档案完全一致。
         </p>
         <Textarea
           aria-label="粘贴内容"
@@ -65,12 +93,19 @@ export function PasteRowsDialog({ stores, onClose, onAdd }: PasteRowsDialogProps
           placeholder={"不锈钢门\tSAC\t120\t85.5"}
         />
         {problems.length > 0 ? (
-          <ul role="alert" className="max-h-32 list-disc space-y-1 overflow-auto pl-5 text-sm text-destructive">
-            {problems.map((problem) => <li key={problem}>{problem}</li>)}
+          <ul
+            role="alert"
+            className="max-h-32 list-disc space-y-1 overflow-auto pl-5 text-sm text-destructive"
+          >
+            {problems.map((problem) => (
+              <li key={problem}>{problem}</li>
+            ))}
           </ul>
         ) : null}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>取消</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            取消
+          </Button>
           <Button onClick={() => void submit()} disabled={busy || !text.trim()}>
             {busy ? "匹配中..." : "添加到订单"}
           </Button>

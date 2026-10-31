@@ -73,32 +73,53 @@ function OrdersList() {
       key: "contractNo",
       header: "订单号",
       cell: (order) => (
-        <Link href={`/dashboard/sales/${order.id}`} className="font-medium hover:underline">
+        <Link
+          href={`/dashboard/sales/${order.id}`}
+          className="font-medium hover:underline"
+        >
           {order.contractNo}
         </Link>
       ),
       sortValue: (order) => order.contractNo,
       hideable: false,
     },
-    { key: "stores", header: "门店", cell: (order) => (order.stores?.length ? order.stores.join("、") : "—") },
+    {
+      key: "stores",
+      header: "门店",
+      cell: (order) => (order.stores?.length ? order.stores.join("、") : "—"),
+    },
     { key: "port", header: "目的港", cell: (order) => order.port?.name ?? "—" },
-    { key: "status", header: "状态", cell: (order) => <StatusBadge status={order.status} />, hideable: false },
+    {
+      key: "status",
+      header: "状态",
+      cell: (order) => <StatusBadge status={order.status} />,
+      hideable: false,
+    },
     {
       key: "totalAmount",
       header: "金额 (USD)",
-      cell: (order) => <AmountText>{formatMoney(order.totalAmount, "USD")}</AmountText>,
+      cell: (order) => (
+        <AmountText>{formatMoney(order.totalAmount, "USD")}</AmountText>
+      ),
       sortValue: (order) => order.totalAmount,
       className: "text-right",
     },
     {
       key: "receivedAmount",
       header: "已收 (USD)",
-      cell: (order) => <AmountText>{formatMoney(order.receivedAmount, "USD")}</AmountText>,
+      cell: (order) => (
+        <AmountText>{formatMoney(order.receivedAmount, "USD")}</AmountText>
+      ),
       sortValue: (order) => order.receivedAmount,
       className: "text-right",
       defaultHidden: true,
     },
-    { key: "createdAt", header: "创建日期", cell: (order) => dateText(order.createdAt), sortValue: (order) => order.createdAt },
+    {
+      key: "createdAt",
+      header: "创建日期",
+      cell: (order) => dateText(order.createdAt),
+      sortValue: (order) => order.createdAt,
+    },
   ];
 
   return (
@@ -108,7 +129,10 @@ function OrdersList() {
         description="一张订单 = 客户 + 多个门店；点击订单号进入详情"
         actions={
           <BusinessWrite>
-            <Button className="h-10 rounded-xl" onClick={() => router.push("/dashboard/orders/new")}>
+            <Button
+              className="h-10 rounded-xl"
+              onClick={() => router.push("/dashboard/orders/new")}
+            >
               <Plus className="mr-2 h-4 w-4" /> 新建订单
             </Button>
           </BusinessWrite>
@@ -124,8 +148,16 @@ function OrdersList() {
           error={loadError}
           errorWhat="加载订单失败"
           onRetry={() => void load()}
-          emptyTitle={filters.keyword || filters.status ? "没有符合条件的订单" : "暂无订单"}
-          emptyDescription={filters.keyword || filters.status ? undefined : "点击右上角「新建订单」开始"}
+          emptyTitle={
+            filters.keyword || filters.status
+              ? "没有符合条件的订单"
+              : "暂无订单"
+          }
+          emptyDescription={
+            filters.keyword || filters.status
+              ? undefined
+              : "点击右上角「新建订单」开始"
+          }
           onRowClick={(order) => router.push(`/dashboard/sales/${order.id}`)}
           search={{
             value: filters.keyword,
@@ -136,7 +168,8 @@ function OrdersList() {
             key: status,
             label,
             active: filters.status === status,
-            onToggle: () => setFilters({ status: filters.status === status ? "" : status }),
+            onToggle: () =>
+              setFilters({ status: filters.status === status ? "" : status }),
           }))}
           pagination={{
             page: filters.page,
@@ -158,7 +191,8 @@ function OrdersList() {
                   <StatusBadge status={order.status} />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {order.stores?.length ? order.stores.join("、") : "—"} · {order.port?.name ?? "—"}
+                  {order.stores?.length ? order.stores.join("、") : "—"} ·{" "}
+                  {order.port?.name ?? "—"}
                 </p>
                 <AmountText>{formatMoney(order.totalAmount, "USD")}</AmountText>
               </CardContent>
@@ -166,7 +200,9 @@ function OrdersList() {
           </Link>
         ))}
         {!loading && !loadError && items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">暂无订单</p>
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            暂无订单
+          </p>
         ) : null}
       </div>
     </div>
@@ -175,7 +211,11 @@ function OrdersList() {
 
 export default function OrdersPage() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-muted-foreground">加载中...</div>
+      }
+    >
       <OrdersList />
     </Suspense>
   );

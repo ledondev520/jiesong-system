@@ -16,7 +16,11 @@ interface ProductPickerProps {
   ariaLabel?: string;
 }
 
-export function ProductPicker({ value, onSelect, ariaLabel = "搜索商品" }: ProductPickerProps) {
+export function ProductPicker({
+  value,
+  onSelect,
+  ariaLabel = "搜索商品",
+}: ProductPickerProps) {
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<Product[]>([]);
@@ -30,7 +34,11 @@ export function ProductPicker({ value, onSelect, ariaLabel = "搜索商品" }: P
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
-        const response = await productService.getAll({ keyword: text.trim(), pageSize: 20, lite: true });
+        const response = await productService.getAll({
+          keyword: text.trim(),
+          pageSize: 20,
+          lite: true,
+        });
         if (ticket !== latest.current) return; // 迟到的旧响应不覆盖新搜索
         setResults(response?.data.items ?? []);
         setFailed(false);
@@ -48,7 +56,7 @@ export function ProductPicker({ value, onSelect, ariaLabel = "搜索商品" }: P
       <Input
         aria-label={ariaLabel}
         placeholder={value?.name || "搜索商品名称..."}
-        value={open ? text : value?.name ?? ""}
+        value={open ? text : (value?.name ?? "")}
         onFocus={() => {
           setOpen(true);
           setText("");
@@ -58,10 +66,21 @@ export function ProductPicker({ value, onSelect, ariaLabel = "搜索商品" }: P
         className="h-9"
       />
       {open && text.trim() ? (
-        <ul role="listbox" className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover p-1 text-sm shadow-md">
-          {searching ? <li className="px-2 py-1.5 text-muted-foreground">搜索中...</li> : null}
-          {failed ? <li className="px-2 py-1.5 text-destructive">搜索失败，请重试</li> : null}
-          {!searching && !failed && results.length === 0 ? <li className="px-2 py-1.5 text-muted-foreground">没有匹配的商品</li> : null}
+        <ul
+          role="listbox"
+          className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover p-1 text-sm shadow-md"
+        >
+          {searching ? (
+            <li className="px-2 py-1.5 text-muted-foreground">搜索中...</li>
+          ) : null}
+          {failed ? (
+            <li className="px-2 py-1.5 text-destructive">搜索失败，请重试</li>
+          ) : null}
+          {!searching && !failed && results.length === 0 ? (
+            <li className="px-2 py-1.5 text-muted-foreground">
+              没有匹配的商品
+            </li>
+          ) : null}
           {results.map((product) => (
             <li key={product.id}>
               <button
@@ -76,7 +95,11 @@ export function ProductPicker({ value, onSelect, ariaLabel = "搜索商品" }: P
                 }}
               >
                 {product.customsName}
-                {product.unit ? <span className="ml-2 text-xs text-muted-foreground">{product.unit}</span> : null}
+                {product.unit ? (
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {product.unit}
+                  </span>
+                ) : null}
               </button>
             </li>
           ))}

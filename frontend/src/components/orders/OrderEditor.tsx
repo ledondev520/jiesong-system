@@ -20,15 +20,28 @@ import { Label } from "@/components/ui/label";
 import { describeFailure } from "@/lib/error-reason";
 import { formatMoney } from "@/lib/format";
 import {
-  buildCreationPayload, emptyLine, isManualPrice, lineTotal, orderTotal, storeSubtotals, validateOrder,
-  type OrderHeader, type OrderLine,
+  buildCreationPayload,
+  emptyLine,
+  isManualPrice,
+  lineTotal,
+  orderTotal,
+  storeSubtotals,
+  validateOrder,
+  type OrderHeader,
+  type OrderLine,
 } from "@/lib/order-lines";
 import { customerService, INCOTERM_OPTIONS } from "@/services/customer.service";
 import { pricingPreviewService } from "@/services/pricing-preview.service";
 import { salesService } from "@/services/sales.service";
 import type { Customer, Store } from "@/types";
 
-const emptyHeader: OrderHeader = { customerId: "", incoterm: "FOB", paymentTerms: "", portOfLoading: "", exchangeRate: "" };
+const emptyHeader: OrderHeader = {
+  customerId: "",
+  incoterm: "FOB",
+  paymentTerms: "",
+  portOfLoading: "",
+  exchangeRate: "",
+};
 
 export function OrderEditor() {
   const router = useRouter();
@@ -64,33 +77,56 @@ export function OrderEditor() {
       .then((response) => {
         setCustomers(response.data.items);
         // 只有一个启用客户（Seapot）时默认选中
-        if (response.data.items.length === 1) applyCustomer(response.data.items[0]);
+        if (response.data.items.length === 1)
+          applyCustomer(response.data.items[0]);
       })
       .catch((reason) => setLoadError(describeFailure("加载客户失败", reason)));
   }, [applyCustomer]);
 
   // 实时报价：成本/商品/现汇变化后 350ms 请求服务端；迟到的旧响应丢弃
   const previewKey = useMemo(
-    () => JSON.stringify([header.exchangeRate, lines.map((line) => [line.key, line.productId, line.costCny])]),
+    () =>
+      JSON.stringify([
+        header.exchangeRate,
+        lines.map((line) => [line.key, line.productId, line.costCny]),
+      ]),
     [header.exchangeRate, lines],
   );
   useEffect(() => {
-    const priced = lines.filter((line) => line.productId && Number(line.costCny) > 0);
+    const priced = lines.filter(
+      (line) => line.productId && Number(line.costCny) > 0,
+    );
     if (priced.length === 0) return;
     const ticket = ++previewTicket.current;
     const timer = setTimeout(async () => {
       try {
         const spot = Number(header.exchangeRate);
         const response = await pricingPreviewService.preview(
-          priced.map((line) => ({ productId: line.productId, costCny: Number(line.costCny) })),
+          priced.map((line) => ({
+            productId: line.productId,
+            costCny: Number(line.costCny),
+          })),
           Number.isFinite(spot) && spot > 0 ? spot : undefined,
         );
         if (ticket !== previewTicket.current) return;
-        const byKey = new Map(priced.map((line, index) => [line.key, response.data.results[index]]));
-        setLines((current) => current.map((line) => (byKey.has(line.key)
-          ? { ...line, suggested: byKey.get(line.key)?.unitPriceUsd ?? null }
-          : line)));
-        setHeader((current) => (current.exchangeRate ? current : { ...current, exchangeRate: String(response.data.spotRate) }));
+        const byKey = new Map(
+          priced.map((line, index) => [line.key, response.data.results[index]]),
+        );
+        setLines((current) =>
+          current.map((line) =>
+            byKey.has(line.key)
+              ? {
+                  ...line,
+                  suggested: byKey.get(line.key)?.unitPriceUsd ?? null,
+                }
+              : line,
+          ),
+        );
+        setHeader((current) =>
+          current.exchangeRate
+            ? current
+            : { ...current, exchangeRate: String(response.data.spotRate) },
+        );
       } catch {
         // 预览失败时保留旧建议价；提交时仍会校验可用单价
       }
@@ -100,7 +136,9 @@ export function OrderEditor() {
   }, [previewKey]);
 
   const patchLine = (key: string, patch: Partial<OrderLine>) =>
-    setLines((current) => current.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+    setLines((current) =>
+      current.map((line) => (line.key === key ? { ...line, ...patch } : line)),
+    );
 
   const submit = async () => {
     const problem = validateOrder(header, lines);
@@ -108,7 +146,10 @@ export function OrderEditor() {
     setError(null);
     setSubmitting(true);
     try {
-      const response = await salesService.createWithItems(buildCreationPayload(header, lines), requestKey.current);
+      const response = await salesService.createWithItems(
+        buildCreationPayload(header, lines),
+        requestKey.current,
+      );
       const id = response.data?.id;
       if (!id) throw new Error("创建订单失败：未返回订单ID");
       toast.success("订单已创建");
@@ -122,15 +163,26 @@ export function OrderEditor() {
 
   const total = orderTotal(lines);
   const subtotals = storeSubtotals(lines);
-  const storeName = (id: string) => stores.find((store) => store.id === id)?.name ?? id;
+  const storeName = (id: string) =>
+    stores.find((store) => store.id === id)?.name ?? id;
 
   return (
     <div className="space-y-5">
-      <PageHeader title="新建出口订单" description="先填订单条款，再按商品 × 门店录入明细；单价由报价规则实时给出" backHref="/dashboard/orders" />
-      {loadError ? <p role="alert" className="text-sm text-destructive">{loadError}</p> : null}
+      <PageHeader
+        title="新建出口订单"
+        description="先填订单条款，再按商品 × 门店录入明细；单价由报价规则实时给出"
+        backHref="/dashboard/orders"
+      />
+      {loadError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {loadError}
+        </p>
+      ) : null}
 
       <Card>
-        <CardHeader><CardTitle className="text-base">订单条款</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">订单条款</CardTitle>
+        </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="order-customer">客户 *</Label>
@@ -139,12 +191,18 @@ export function OrderEditor() {
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={header.customerId}
               onChange={(event) => {
-                const customer = customers.find((item) => item.id === event.target.value);
+                const customer = customers.find(
+                  (item) => item.id === event.target.value,
+                );
                 if (customer) applyCustomer(customer);
               }}
             >
               <option value="">请选择</option>
-              {customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="space-y-2">
@@ -157,22 +215,48 @@ export function OrderEditor() {
               id="order-incoterm"
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={header.incoterm}
-              onChange={(event) => setHeader({ ...header, incoterm: event.target.value })}
+              onChange={(event) =>
+                setHeader({ ...header, incoterm: event.target.value })
+              }
             >
-              {INCOTERM_OPTIONS.map((term) => <option key={term} value={term}>{term}</option>)}
+              {INCOTERM_OPTIONS.map((term) => (
+                <option key={term} value={term}>
+                  {term}
+                </option>
+              ))}
             </select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="order-payment">付款条件</Label>
-            <Input id="order-payment" value={header.paymentTerms} onChange={(event) => setHeader({ ...header, paymentTerms: event.target.value })} />
+            <Input
+              id="order-payment"
+              value={header.paymentTerms}
+              onChange={(event) =>
+                setHeader({ ...header, paymentTerms: event.target.value })
+              }
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="order-port">装货港</Label>
-            <Input id="order-port" value={header.portOfLoading} onChange={(event) => setHeader({ ...header, portOfLoading: event.target.value })} />
+            <Input
+              id="order-port"
+              value={header.portOfLoading}
+              onChange={(event) =>
+                setHeader({ ...header, portOfLoading: event.target.value })
+              }
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="order-rate">现汇 (¥/$) *</Label>
-            <Input id="order-rate" inputMode="decimal" value={header.exchangeRate} placeholder="默认取报价规则现汇" onChange={(event) => setHeader({ ...header, exchangeRate: event.target.value })} />
+            <Input
+              id="order-rate"
+              inputMode="decimal"
+              value={header.exchangeRate}
+              placeholder="默认取报价规则现汇"
+              onChange={(event) =>
+                setHeader({ ...header, exchangeRate: event.target.value })
+              }
+            />
           </div>
         </CardContent>
       </Card>
@@ -181,23 +265,48 @@ export function OrderEditor() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">明细（商品 × 门店）</CardTitle>
           <div className="flex gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={!header.customerId} onClick={() => setPasting(true)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!header.customerId}
+              onClick={() => setPasting(true)}
+            >
               <ClipboardPaste className="mr-1 h-4 w-4" /> 从 Excel 粘贴
             </Button>
-            <Button type="button" size="sm" onClick={() => setLines((current) => [...current, emptyLine()])}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setLines((current) => [...current, emptyLine()])}
+            >
               <Plus className="mr-1 h-4 w-4" /> 添加一行
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {lines.map((line, index) => (
-            <div key={line.key} className="grid items-end gap-2 rounded-lg border p-3 md:grid-cols-[2fr_1.4fr_0.8fr_1fr_1fr_auto]" data-testid="order-line">
+            <div
+              key={line.key}
+              className="grid items-end gap-2 rounded-lg border p-3 md:grid-cols-[2fr_1.4fr_0.8fr_1fr_1fr_auto]"
+              data-testid="order-line"
+            >
               <div className="space-y-1">
                 <Label className="text-xs">商品 *</Label>
                 <ProductPicker
                   ariaLabel={`第 ${index + 1} 行搜索商品`}
-                  value={line.productId ? { id: line.productId, name: line.productName } : null}
-                  onSelect={(product) => patchLine(line.key, { productId: product.id, productName: product.customsName, unit: product.unit ?? "", suggested: null })}
+                  value={
+                    line.productId
+                      ? { id: line.productId, name: line.productName }
+                      : null
+                  }
+                  onSelect={(product) =>
+                    patchLine(line.key, {
+                      productId: product.id,
+                      productName: product.customsName,
+                      unit: product.unit ?? "",
+                      suggested: null,
+                    })
+                  }
                 />
               </div>
               <div className="space-y-1">
@@ -206,36 +315,96 @@ export function OrderEditor() {
                   aria-label={`第 ${index + 1} 行门店`}
                   className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                   value={line.storeId}
-                  onChange={(event) => patchLine(line.key, { storeId: event.target.value })}
+                  onChange={(event) =>
+                    patchLine(line.key, { storeId: event.target.value })
+                  }
                 >
-                  <option value="">{header.customerId ? "选择门店" : "先选客户"}</option>
-                  {stores.filter((store) => store.isActive).map((store) => (
-                    <option key={store.id} value={store.id}>{store.code ? `${store.code} · ${store.name}` : store.name}</option>
-                  ))}
+                  <option value="">
+                    {header.customerId ? "选择门店" : "先选客户"}
+                  </option>
+                  {stores
+                    .filter((store) => store.isActive)
+                    .map((store) => (
+                      <option key={store.id} value={store.id}>
+                        {store.code
+                          ? `${store.code} · ${store.name}`
+                          : store.name}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">数量 *</Label>
-                <Input aria-label={`第 ${index + 1} 行数量`} inputMode="decimal" className="h-9" value={line.quantity} onChange={(event) => patchLine(line.key, { quantity: event.target.value })} />
+                <Input
+                  aria-label={`第 ${index + 1} 行数量`}
+                  inputMode="decimal"
+                  className="h-9"
+                  value={line.quantity}
+                  onChange={(event) =>
+                    patchLine(line.key, { quantity: event.target.value })
+                  }
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">采购成本 ¥ *</Label>
-                <Input aria-label={`第 ${index + 1} 行采购成本`} inputMode="decimal" className="h-9" value={line.costCny} onChange={(event) => patchLine(line.key, { costCny: event.target.value, suggested: null })} />
+                <Input
+                  aria-label={`第 ${index + 1} 行采购成本`}
+                  inputMode="decimal"
+                  className="h-9"
+                  value={line.costCny}
+                  onChange={(event) =>
+                    patchLine(line.key, {
+                      costCny: event.target.value,
+                      suggested: null,
+                    })
+                  }
+                />
               </div>
               <div className="space-y-1">
-                <Label className="flex items-center gap-1 text-xs">单价 $ {isManualPrice(line) ? <SemanticBadge tone="warning">手动价</SemanticBadge> : null}</Label>
+                <Label className="flex items-center gap-1 text-xs">
+                  单价 ${" "}
+                  {isManualPrice(line) ? (
+                    <SemanticBadge tone="warning">手动价</SemanticBadge>
+                  ) : null}
+                </Label>
                 <Input
                   aria-label={`第 ${index + 1} 行单价`}
                   inputMode="decimal"
                   className="h-9"
-                  value={isManualPrice(line) ? line.manualPrice : line.suggested === null ? "" : String(line.suggested)}
+                  value={
+                    isManualPrice(line)
+                      ? line.manualPrice
+                      : line.suggested === null
+                        ? ""
+                        : String(line.suggested)
+                  }
                   placeholder={line.suggested === null ? "待报价" : undefined}
-                  onChange={(event) => patchLine(line.key, { manualPrice: event.target.value === String(line.suggested ?? "") ? "" : event.target.value })}
+                  onChange={(event) =>
+                    patchLine(line.key, {
+                      manualPrice:
+                        event.target.value === String(line.suggested ?? "")
+                          ? ""
+                          : event.target.value,
+                    })
+                  }
                 />
               </div>
               <div className="flex items-center justify-between gap-2 md:justify-end">
-                <span className="text-sm tabular-nums text-muted-foreground">{formatMoney(lineTotal(line), "USD")}</span>
-                <Button type="button" variant="ghost" size="icon" aria-label={`删除第 ${index + 1} 行`} disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {formatMoney(lineTotal(line), "USD")}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`删除第 ${index + 1} 行`}
+                  disabled={lines.length === 1}
+                  onClick={() =>
+                    setLines((current) =>
+                      current.filter((item) => item.key !== line.key),
+                    )
+                  }
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -247,14 +416,26 @@ export function OrderEditor() {
       <Card>
         <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1 text-sm">
-            <p className="font-semibold">订单合计 {formatMoney(total, "USD")}</p>
+            <p className="font-semibold">
+              订单合计 {formatMoney(total, "USD")}
+            </p>
             {[...subtotals].map(([storeId, amount]) => (
-              <p key={storeId} className="text-muted-foreground">{storeName(storeId)}：{formatMoney(amount, "USD")}</p>
+              <p key={storeId} className="text-muted-foreground">
+                {storeName(storeId)}：{formatMoney(amount, "USD")}
+              </p>
             ))}
           </div>
           <div className="space-y-2 sm:text-right">
-            {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-            <Button onClick={() => void submit()} disabled={submitting} className="h-10 rounded-xl">
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+            <Button
+              onClick={() => void submit()}
+              disabled={submitting}
+              className="h-10 rounded-xl"
+            >
               {submitting ? "创建中..." : "创建订单"}
             </Button>
           </div>
@@ -265,7 +446,14 @@ export function OrderEditor() {
         <PasteRowsDialog
           stores={stores}
           onClose={() => setPasting(false)}
-          onAdd={(added) => setLines((current) => [...current.filter((line) => line.productId || line.quantity || line.costCny), ...added])}
+          onAdd={(added) =>
+            setLines((current) => [
+              ...current.filter(
+                (line) => line.productId || line.quantity || line.costCny,
+              ),
+              ...added,
+            ])
+          }
         />
       ) : null}
     </div>
