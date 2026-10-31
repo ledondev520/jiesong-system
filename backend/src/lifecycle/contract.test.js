@@ -164,7 +164,7 @@ test('registered updates cannot return to hand-written persistence payloads', (t
 test('registered lists cannot add a second filter owner beside the shared hook', (t) => {
   const f = fixture(t);
   fs.appendFileSync(
-    path.join(f.temp, f.registry.lists[0].file),
+    path.join(f.temp, f.registry.lists.find((list) => list.id === 'inventory').file),
     "\nconst [keyword, setKeyword] = useState('');\n",
   );
   assert.throws(
