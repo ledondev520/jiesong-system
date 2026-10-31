@@ -247,7 +247,7 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
     page.getByRole("button", { name: "登记验货", exact: true }),
   ).toHaveCount(0);
   await page.goto(`/dashboard/sales/${fixture.salesId}`);
-  const ship = page.getByRole("button", { name: "确认发运", exact: true });
+  const ship = page.getByRole("button", { name: "登记发运", exact: true });
   await expect(ship).toBeEnabled();
   const before = readDomain(fixture);
   const rejected = mutation(page, `/sales/${fixture.salesId}/status`, "PUT");
@@ -294,7 +294,7 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   await expect(ship).toHaveCount(0);
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "确认到港", exact: true }),
+    page.getByRole("button", { name: "登记到港", exact: true }),
   ).toBeVisible();
   const domain = readDomain(fixture);
   expect(domain.sales[0].status).toBe("SHIPPED");
@@ -355,7 +355,7 @@ test("BOSS reads purchase and sales UI, hides write controls and cannot mutate r
     page.getByRole("heading", { name: fixture.salesNo, exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "确认发运", exact: true }),
+    page.getByRole("button", { name: "登记发运", exact: true }),
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "从已完工采购导入" }),
@@ -380,7 +380,7 @@ test("BOSS reads purchase and sales UI, hides write controls and cannot mutate r
   expect(readDomain(fixture)).toEqual(before);
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "确认发运", exact: true }),
+    page.getByRole("button", { name: "登记发运", exact: true }),
   ).toHaveCount(0);
   expect(readDomain(fixture)).toEqual(before);
 });

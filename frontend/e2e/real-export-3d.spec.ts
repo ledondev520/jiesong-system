@@ -177,8 +177,8 @@ async function exerciseControl(
  * @throws 页签、真实箱数、尺寸预估提示或商品绘制缺失
  */
 async function openVisualization(page: Page): Promise<Locator> {
-  await page.getByRole("tab", { name: "3D 可视化", exact: true }).click();
-  const panel = page.getByRole("tabpanel", { name: "3D 可视化", exact: true });
+  await page.getByRole("tab", { name: "货柜", exact: true }).click();
+  const panel = page.getByRole("tabpanel", { name: "货柜", exact: true });
   await expect(panel.getByText("已装: 2 箱", { exact: true })).toBeVisible();
   await expect(panel.getByText("未装: 0 箱", { exact: true })).toBeVisible();
   await expect(
@@ -230,7 +230,7 @@ test("SALES 3D canvas renders estimated cargo, controls and resize survive tab r
     await page
       .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
       .click();
-    await expect(page).toHaveURL(`/dashboard/sales/${fixture.salesId}`);
+    await expect(page).toHaveURL(`/dashboard/orders/${fixture.salesId}`);
     await expect(
       page.getByRole("heading", { name: fixture.salesNo!, exact: true }),
     ).toBeVisible();
