@@ -245,12 +245,12 @@ describe("AiSessionsPage", () => {
 
   it("图表库通过延迟加载的内部 Module 隔离", () => {
     const pageSource = readFileSync(
-      "src/app/dashboard/settings/ai-usage/page.tsx",
+      "src/app/dashboard/settings/ai-usage/components/AiUsageTrendCard.tsx",
       "utf8",
     );
 
     expect(pageSource).not.toContain("from 'recharts'");
-    expect(pageSource).toContain("import('./components/AiTokenUsageChart')");
+    expect(pageSource).toContain("import('./AiTokenUsageChart')");
   });
 
   it("有 Token 数据时加载内部图表 Module", async () => {
