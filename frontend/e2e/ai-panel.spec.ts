@@ -31,7 +31,8 @@ test.describe("AI 停靠面板", () => {
   test("旧 /dashboard/ai 重定向并打开面板，参数不留在地址栏", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockApiRoutes(page);
-    await signInAsAdmin(page, "/dashboard/ai");
+    await signInAsAdmin(page, "/dashboard");
+    await page.goto("/dashboard/ai");
     await expect(page.getByTestId("ai-panel")).toBeVisible();
     await expect(page).toHaveURL(/\/dashboard$/);
   });
