@@ -16,6 +16,8 @@ const agentRoutes = require('./agents');
 const supplierRoutes = require('./suppliers');
 const storeRoutes = require('./stores');
 const quoteRoutes = require('./quotes');
+const customerRoutes = require('./customers');
+const pricingPreviewRoutes = require('./pricing');
 const productRoutes = require('./products');
 const purchaseRoutes = require('./purchases');
 const salesRoutes = require('./sales');
@@ -57,6 +59,8 @@ router.use('/agents', agentRoutes);
 router.use('/suppliers', supplierRoutes);
 router.use('/stores', storeRoutes);
 router.use('/quotes', quoteRoutes);
+router.use('/customers', customerRoutes);
+router.use('/pricing', pricingPreviewRoutes);
 router.use('/products', productRoutes);
 router.use('/purchases', purchaseRoutes);
 router.use('/sales', salesRoutes); // 出口合同管理（含货柜/装箱功能）

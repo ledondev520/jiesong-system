@@ -18,10 +18,6 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ModuleTabHeader,
-  FINANCE_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { ErrorState } from "@/components/ui/data-state";
 import { Button } from "@/components/ui/button";
 import { clearApiGetCache } from "@/lib/axios";
@@ -337,8 +333,6 @@ export function FinancialStatementsPageContent() {
 
   return (
     <div className="space-y-6" data-testid="financial-statements-page-content">
-      <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
-
       {(loadError || detailError) && (
         <ErrorState
           title={loadError ? "财务报表读取失败" : "所选账期读取失败"}

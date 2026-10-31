@@ -7,6 +7,9 @@ const { createHash } = require('node:crypto');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { generateNextContractNo } = require('./shared/contractUtils');
+const { priceFor } = require('./exportPricing');
+const { withCategoryChains } = require('./productCategoryChain');
+const { INCOTERMS } = require('./customerService');
 
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const text = (value, label, required = false, max = 2000) => {
@@ -42,13 +45,23 @@ const normalizeCreation = (data) => {
         quantity: number(item.quantity, '数量'),
         unit: text(item.unit, '单位', false, 50),
         costPrice,
-        sellingPrice: number(item.sellingPrice === undefined ? costPrice / exchangeRate * 1.3 : item.sellingPrice, '售价'),
+        // 未给售价时由统一报价规则（priceFor，整美元后取整到 5 的倍数）在事务内计算
+        sellingPrice: item.sellingPrice === undefined ? undefined : number(item.sellingPrice, '售价'),
         specification: text(item.specification, '规格'),
         note: text(item.note, '明细备注'),
       };
     });
   }
+  const currency = data.currency === undefined ? 'USD' : text(data.currency, '币种', true, 10).toUpperCase();
+  if (currency !== 'USD') throw createError('目前仅支持美元(USD)', 400);
+  const incoterm = data.incoterm === undefined || data.incoterm === null ? null : text(data.incoterm, '贸易术语', true, 10).toUpperCase();
+  if (incoterm && !INCOTERMS.includes(incoterm)) throw createError(`贸易术语须为 ${INCOTERMS.join('/')}`, 400);
   return {
+    customerId: data.customerId === undefined || data.customerId === null ? null : text(data.customerId, '客户', true, 128),
+    currency,
+    incoterm,
+    paymentTerms: data.paymentTerms === undefined ? undefined : text(data.paymentTerms, '付款条件', false, 500),
+    portOfLoading: data.portOfLoading === undefined ? undefined : text(data.portOfLoading, '装货港', false, 200),
     contractNo: text(data.contractNo, '合同编号', false, 100),
     exchangeRate,
     signedAt: signedAt?.toISOString() || null,
@@ -108,8 +121,32 @@ const createSalesContractAtomically = async (data, context = {}) => {
         ]);
         if (products !== productIds.length || stores !== storeIds.length) throw createError('商品或门店已不存在，请刷新后重新选择', 400);
       }
+      // 客户：显式选择必须存在且未归档；缺省时仅当恰有一个启用客户才采用，多个则要求选择。
+      // 与 DATA-MODEL-2026 §2.4 的差异：没有任何启用客户时（旧库/测试库）不阻断，客户留空。
+      let customer = null;
+      if (input.customerId) {
+        customer = await tx.customer.findUnique({ where: { id: input.customerId } });
+        if (!customer) throw createError('客户不存在', 400);
+        if (!customer.isActive) throw createError('客户已归档，不能新建订单', 400);
+      } else {
+        const active = await tx.customer.findMany({ where: { isActive: true }, take: 2 });
+        if (active.length > 1) throw createError('请选择客户', 400);
+        customer = active[0] || null;
+      }
+      let pricedItems = input.items;
+      if (input.items?.some(item => item.sellingPrice === undefined)) {
+        const rows = await tx.product.findMany({ where: { id: { in: [...new Set(input.items.map(item => item.productId))] } }, select: { id: true, categoryId: true } });
+        const withChains = await withCategoryChains(rows.map(row => ({ product: row })), tx);
+        const chainByProduct = new Map(withChains.map(row => [row.product.id, row.product.categoryIds || []]));
+        pricedItems = input.items.map(item => {
+          if (item.sellingPrice !== undefined) return item;
+          const priced = priceFor({ costCny: item.costPrice, categoryIds: chainByProduct.get(item.productId) || [], spotRate: input.exchangeRate });
+          if (priced.status !== 'OK') throw createError('无法按报价规则计算售价，请手动填写', 400);
+          return { ...item, sellingPrice: priced.unitPriceUsd };
+        });
+      }
       const contractNo = input.contractNo || await generateNextContractNo({ prisma: tx, year: new Date().getFullYear().toString().slice(-2) });
-      const totalAmount = (input.items || []).reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0);
+      const totalAmount = (pricedItems || []).reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0);
       if (!Number.isFinite(totalAmount) || totalAmount > Number.MAX_SAFE_INTEGER) throw createError('合同金额超出支持范围', 400);
       const contract = await tx.salesContract.create({
         data: {
@@ -118,8 +155,14 @@ const createSalesContractAtomically = async (data, context = {}) => {
           exchangeRate: input.exchangeRate,
           signedAt: input.signedAt ? new Date(input.signedAt) : null,
           note: input.note,
+          customerId: customer?.id ?? null,
+          currency: input.currency,
+          // 新订单复制客户默认条款；显式传入的值优先
+          incoterm: input.incoterm || customer?.defaultIncoterm || null,
+          paymentTerms: input.paymentTerms !== undefined ? input.paymentTerms : customer?.defaultPaymentTerms ?? null,
+          portOfLoading: input.portOfLoading !== undefined ? input.portOfLoading : customer?.defaultPortOfLoading ?? null,
           totalAmount: Number(totalAmount.toFixed(2)),
-          ...(input.items ? { items: { create: input.items } } : {}),
+          ...(pricedItems ? { items: { create: pricedItems } } : {}),
         },
         include: { items: true },
       });
