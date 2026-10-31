@@ -82,9 +82,14 @@ export function SystemConfigTab({
   // API Key 只写式配置：后端仅返回脱敏状态，页面永不渲染完整密钥
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
   const [apiKeyNew, setApiKeyNew] = useState("");
-  const [aiProvider, setAiProvider] = useState<"deepseek" | "kimi">("kimi");
+  const [aiProvider, setAiProvider] = useState<"deepseek" | "kimi" | "openai">(
+    "kimi",
+  );
   const isDeepSeek = aiProvider === "deepseek";
-  const providerLabel = isDeepSeek ? "DeepSeek" : "Kimi";
+  // OpenAI 密钥与模型只来自服务器进程环境：页面不提供密钥输入，也不保存模型/采样参数。
+  const isOpenAI = aiProvider === "openai";
+  const [openaiModel, setOpenaiModel] = useState("");
+  const providerLabel = isOpenAI ? "OpenAI" : isDeepSeek ? "DeepSeek" : "Kimi";
   // 场景化模型配置
   const [chatModel, setChatModel] = useState("kimi-k2-turbo-preview");
   const [hsCodeModel, setHsCodeModel] = useState("kimi-k2-turbo-preview");
@@ -119,13 +124,23 @@ export function SystemConfigTab({
           if (Array.isArray(configs.brokers)) setBrokers(configs.brokers);
           // 1.1. 当前供应商的只写密钥状态
           const deepseek = configs.aiProvider === "deepseek";
-          setAiProvider(deepseek ? "deepseek" : "kimi");
-          const configuredKey = deepseek
-            ? configs.deepseekApiKey || configs.apiKey
-            : configs.apiKey;
-          setApiKeyConfigured(
-            typeof configuredKey === "string" && Boolean(configuredKey),
-          );
+          const openai = configs.aiProvider === "openai";
+          setAiProvider(openai ? "openai" : deepseek ? "deepseek" : "kimi");
+          if (openai) {
+            setApiKeyConfigured(configs.openaiConfigured === true);
+            setOpenaiModel(
+              typeof configs.openaiModel === "string"
+                ? configs.openaiModel
+                : "",
+            );
+          } else {
+            const configuredKey = deepseek
+              ? configs.deepseekApiKey || configs.apiKey
+              : configs.apiKey;
+            setApiKeyConfigured(
+              typeof configuredKey === "string" && Boolean(configuredKey),
+            );
+          }
           // 1.2. 场景化模型配置（优先新 key，兼容旧 key）
           if (deepseek) {
             setChatModel("deepseek-flash");
@@ -231,8 +246,8 @@ export function SystemConfigTab({
         saveConfig("units", units),
         saveConfig("brokers", brokers),
       ];
-      // 1.1. 密钥仅写入当前供应商的专用字段
-      if (apiKeyNew.trim()) {
+      // 1.1. 密钥仅写入当前供应商的专用字段；OpenAI 永不经页面保存
+      if (!isOpenAI && apiKeyNew.trim()) {
         tasks.push(
           saveConfig(
             isDeepSeek ? "deepseekApiKey" : "apiKey",
@@ -240,16 +255,18 @@ export function SystemConfigTab({
           ),
         );
       }
-      // 1.2. 场景化模型与采样参数
-      tasks.push(saveConfig("aiChatModel", chatModel));
-      tasks.push(saveConfig("aiHsCodeModel", hsCodeModel));
-      if (!isDeepSeek) tasks.push(saveConfig("aiTemperature", temperature));
-      tasks.push(saveConfig("aiMaxTokens", maxTokens));
+      // 1.2. 场景化模型与采样参数（OpenAI 由服务器环境决定，不在此保存）
+      if (!isOpenAI) {
+        tasks.push(saveConfig("aiChatModel", chatModel));
+        tasks.push(saveConfig("aiHsCodeModel", hsCodeModel));
+        if (!isDeepSeek) tasks.push(saveConfig("aiTemperature", temperature));
+        tasks.push(saveConfig("aiMaxTokens", maxTokens));
+      }
       // 1.3. 业务流程参数（盖章平台/开票抬头）
       tasks.push(saveConfig("stampPlatformUrl", stampPlatformUrl.trim()));
       tasks.push(saveConfig("invoiceTitleInfo", invoiceTitleInfo.trim()));
       await Promise.all(tasks);
-      if (apiKeyNew.trim()) {
+      if (!isOpenAI && apiKeyNew.trim()) {
         setApiKeyConfigured(true);
         setApiKeyNew("");
       }
@@ -506,9 +523,11 @@ export function SystemConfigTab({
                 AI 模型配置
               </CardTitle>
               <CardDescription>
-                {isDeepSeek
-                  ? "DeepSeek Flash 思考模式已开启，推理强度 high；问答与 HS 推荐使用同一模型。"
-                  : "为不同使用场景选择合适的模型，配置采样参数与 API 密钥。每个场景内置自动降级，无需手动配置备用模型。"}
+                {isOpenAI
+                  ? "OpenAI 的密钥与模型由服务器环境配置（不在此保存）；问答、HS 推荐、视觉与 Agent 使用同一模型。"
+                  : isDeepSeek
+                    ? "DeepSeek Flash 思考模式已开启，推理强度 high；问答与 HS 推荐使用同一模型。"
+                    : "为不同使用场景选择合适的模型，配置采样参数与 API 密钥。每个场景内置自动降级，无需手动配置备用模型。"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -518,12 +537,20 @@ export function SystemConfigTab({
                 <div className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">AI 助手问答</label>
-                    <Select value={chatModel} onValueChange={setChatModel}>
+                    <Select
+                      value={isOpenAI ? openaiModel || "openai" : chatModel}
+                      onValueChange={setChatModel}
+                      disabled={isOpenAI}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {isDeepSeek ? (
+                        {isOpenAI ? (
+                          <SelectItem value={openaiModel || "openai"}>
+                            {openaiModel || "由服务器环境决定"}
+                          </SelectItem>
+                        ) : isDeepSeek ? (
                           <SelectItem value="deepseek-flash">
                             deepseek-flash（思考模式）
                           </SelectItem>
@@ -550,12 +577,20 @@ export function SystemConfigTab({
                     <label className="text-sm font-medium">
                       HS Code 推荐与申报要素
                     </label>
-                    <Select value={hsCodeModel} onValueChange={setHsCodeModel}>
+                    <Select
+                      value={isOpenAI ? openaiModel || "openai" : hsCodeModel}
+                      onValueChange={setHsCodeModel}
+                      disabled={isOpenAI}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {isDeepSeek ? (
+                        {isOpenAI ? (
+                          <SelectItem value={openaiModel || "openai"}>
+                            {openaiModel || "由服务器环境决定"}
+                          </SelectItem>
+                        ) : isDeepSeek ? (
                           <SelectItem value="deepseek-flash">
                             deepseek-flash（思考模式）
                           </SelectItem>
@@ -590,9 +625,11 @@ export function SystemConfigTab({
                       </label>
                       <a
                         href={
-                          isDeepSeek
-                            ? "https://platform.deepseek.com/api_keys"
-                            : "https://platform.moonshot.cn/console/account"
+                          isOpenAI
+                            ? "https://platform.openai.com/api-keys"
+                            : isDeepSeek
+                              ? "https://platform.deepseek.com/api_keys"
+                              : "https://platform.moonshot.cn/console/account"
                         }
                         target="_blank"
                         rel="noopener noreferrer"
@@ -602,25 +639,47 @@ export function SystemConfigTab({
                         控制台
                       </a>
                     </div>
-                    {apiKeyConfigured && (
-                      <Badge variant="secondary" className="w-fit text-[10px]">
-                        已配置（只写）
-                      </Badge>
+                    {isOpenAI ? (
+                      <>
+                        <Badge
+                          variant={
+                            apiKeyConfigured ? "secondary" : "destructive"
+                          }
+                          className="w-fit text-[10px]"
+                        >
+                          {apiKeyConfigured ? "服务器已配置" : "服务器未配置"}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground">
+                          OpenAI
+                          密钥只存在于服务器进程环境，不能在此输入或保存，也不会写入数据库。
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        {apiKeyConfigured && (
+                          <Badge
+                            variant="secondary"
+                            className="w-fit text-[10px]"
+                          >
+                            已配置（只写）
+                          </Badge>
+                        )}
+                        <Input
+                          type="password"
+                          placeholder={
+                            apiKeyConfigured
+                              ? "输入新 Key 以覆盖"
+                              : `输入 ${providerLabel} API Key (sk-...)`
+                          }
+                          value={apiKeyNew}
+                          onChange={(e) => setApiKeyNew(e.target.value)}
+                          autoComplete="new-password"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          密钥只允许覆盖写入，保存后不会再从系统读回或显示。
+                        </p>
+                      </>
                     )}
-                    <Input
-                      type="password"
-                      placeholder={
-                        apiKeyConfigured
-                          ? "输入新 Key 以覆盖"
-                          : `输入 ${providerLabel} API Key (sk-...)`
-                      }
-                      value={apiKeyNew}
-                      onChange={(e) => setApiKeyNew(e.target.value)}
-                      autoComplete="new-password"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      密钥只允许覆盖写入，保存后不会再从系统读回或显示。
-                    </p>
                   </div>
                 </div>
               </div>
@@ -648,12 +707,14 @@ export function SystemConfigTab({
                       step={0.1}
                       value={[temperature ?? 0.7]}
                       onValueChange={([v]) => setTemperature(v ?? 0.7)}
-                      disabled={isDeepSeek}
+                      disabled={isDeepSeek || isOpenAI}
                     />
                     <p className="text-xs text-muted-foreground">
-                      {isDeepSeek
-                        ? "DeepSeek 思考模式不使用温度参数；保留原配置值。"
-                        : "0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。"}
+                      {isOpenAI
+                        ? "OpenAI 请求不使用此处的温度与长度参数（由服务器环境决定）。"
+                        : isDeepSeek
+                          ? "DeepSeek 思考模式不使用温度参数；保留原配置值。"
+                          : "0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。"}
                     </p>
                   </div>
 

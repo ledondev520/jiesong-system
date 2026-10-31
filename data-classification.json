@@ -15,6 +15,7 @@
         "database credentials",
         "HSCIQ API keys",
         "DeepSeek API keys and encrypted deepseekApiKey system overrides",
+        "OpenAI API key (OPENAI_API_KEY from the process environment only; never stored in the database or returned by APIs)",
         "backend environment overrides containing real secrets",
         "signed and system-generated legal/financial contract artifacts",
         "generated shipment tax-refund confirmation checklists and material-version references",

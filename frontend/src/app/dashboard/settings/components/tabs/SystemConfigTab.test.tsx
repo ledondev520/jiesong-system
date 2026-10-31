@@ -6,30 +6,30 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { SystemConfigTab } from './SystemConfigTab';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { SystemConfigTab } from "./SystemConfigTab";
 
 const mockGetSystemConfig = vi.fn();
 const mockUpdateSystemConfig = vi.fn();
 
-vi.mock('@/services/config.service', () => ({
+vi.mock("@/services/config.service", () => ({
   configService: {
     getSystemConfig: (...args: unknown[]) => mockGetSystemConfig(...args),
     updateSystemConfig: (...args: unknown[]) => mockUpdateSystemConfig(...args),
   },
 }));
 
-vi.mock('@/lib/axios', () => ({
+vi.mock("@/lib/axios", () => ({
   default: { post: vi.fn() },
 }));
 
-vi.mock('sonner', () => ({
+vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-describe('SystemConfigTab', () => {
+describe("SystemConfigTab", () => {
   beforeEach(() => {
     mockGetSystemConfig.mockReset();
     mockUpdateSystemConfig.mockReset();
@@ -37,8 +37,8 @@ describe('SystemConfigTab', () => {
       data: {
         exchangeRate: 7.2,
         profitRate: 1.3,
-        units: ['件'],
-        brokers: ['捷淞'],
+        units: ["件"],
+        brokers: ["捷淞"],
         aiTemperature: 0.7,
         aiMaxTokens: 4096,
       },
@@ -46,7 +46,7 @@ describe('SystemConfigTab', () => {
     mockUpdateSystemConfig.mockResolvedValue({});
   });
 
-  it('加载后展示 AI 模型优先级与温度、Max tokens', async () => {
+  it("加载后展示 AI 模型优先级与温度、Max tokens", async () => {
     render(<SystemConfigTab />);
 
     await waitFor(() => {
@@ -58,18 +58,22 @@ describe('SystemConfigTab', () => {
     expect(screen.getByText(/0\.7 — 均衡/)).toBeInTheDocument();
   });
 
-  it('保存时写入 aiTemperature 与 aiMaxTokens', async () => {
+  it("保存时写入 aiTemperature 与 aiMaxTokens", async () => {
     const user = userEvent.setup();
     render(<SystemConfigTab />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /保存配置/ })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /保存配置/ }),
+      ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /保存配置/ }));
+    await user.click(screen.getByRole("button", { name: /保存配置/ }));
 
     await waitFor(() => {
-      const calls = mockUpdateSystemConfig.mock.calls.map((c) => c[0] as Record<string, unknown>);
+      const calls = mockUpdateSystemConfig.mock.calls.map(
+        (c) => c[0] as Record<string, unknown>,
+      );
       const hasTemp = calls.some((p) => p.aiTemperature === 0.7);
       const hasMax = calls.some((p) => p.aiMaxTokens === 4096);
       expect(hasTemp).toBe(true);
@@ -77,14 +81,14 @@ describe('SystemConfigTab', () => {
     });
   });
 
-  it('从不渲染后端返回的完整 Kimi 密钥，只展示已配置状态', async () => {
-    const secret = 'sk-test-secret-should-never-render';
+  it("从不渲染后端返回的完整 Kimi 密钥，只展示已配置状态", async () => {
+    const secret = "sk-test-secret-should-never-render";
     mockGetSystemConfig.mockResolvedValueOnce({
       data: {
         exchangeRate: 7.2,
         profitRate: 1.3,
-        units: ['件'],
-        brokers: ['捷淞'],
+        units: ["件"],
+        brokers: ["捷淞"],
         apiKey: secret,
       },
     });
@@ -92,53 +96,119 @@ describe('SystemConfigTab', () => {
     render(<SystemConfigTab />);
 
     await waitFor(() => {
-      expect(screen.getByText('已配置（只写）')).toBeInTheDocument();
+      expect(screen.getByText("已配置（只写）")).toBeInTheDocument();
     });
 
     expect(screen.queryByText(secret)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain(secret);
   });
 
-  it('Kimi 配置仍将新密钥写入原 apiKey 字段', async () => {
+  it("Kimi 配置仍将新密钥写入原 apiKey 字段", async () => {
     const user = userEvent.setup();
     render(<SystemConfigTab />);
-    const input = await screen.findByPlaceholderText('输入 Kimi API Key (sk-...)');
+    const input = await screen.findByPlaceholderText(
+      "输入 Kimi API Key (sk-...)",
+    );
     // 合成测试占位符，不是生产凭据。
-    await user.type(input, 'test-only-nonproduction-placeholder');
-    await user.click(screen.getByRole('button', { name: /保存配置/ }));
-    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledWith({ apiKey: 'test-only-nonproduction-placeholder' }));
+    await user.type(input, "test-only-nonproduction-placeholder");
+    await user.click(screen.getByRole("button", { name: /保存配置/ }));
+    await waitFor(() =>
+      expect(mockUpdateSystemConfig).toHaveBeenCalledWith({
+        apiKey: "test-only-nonproduction-placeholder",
+      }),
+    );
   });
 
-  it('DeepSeek 限定 Flash 模型、思考模式和专用密钥字段，保留原温度', async () => {
+  it("DeepSeek 限定 Flash 模型、思考模式和专用密钥字段，保留原温度", async () => {
     // 合成测试占位符，不是生产凭据。
-    const newKey = 'test-only-nonproduction-placeholder';
-    mockGetSystemConfig.mockResolvedValueOnce({ data: {
-      exchangeRate: 7.2, profitRate: 1.3, aiProvider: 'deepseek',
-      apiKey: '********configured', deepseekApiKey: '********configured',
-      aiChatModel: 'kimi-k2-turbo-preview', aiHsCodeModel: 'moonshot-v1-8k',
-      aiThinking: true, aiReasoningEffort: 'high', aiTemperature: 0.7,
-    } });
+    const newKey = "test-only-nonproduction-placeholder";
+    mockGetSystemConfig.mockResolvedValueOnce({
+      data: {
+        exchangeRate: 7.2,
+        profitRate: 1.3,
+        aiProvider: "deepseek",
+        apiKey: "********configured",
+        deepseekApiKey: "********configured",
+        aiChatModel: "kimi-k2-turbo-preview",
+        aiHsCodeModel: "moonshot-v1-8k",
+        aiThinking: true,
+        aiReasoningEffort: "high",
+        aiTemperature: 0.7,
+      },
+    });
     const user = userEvent.setup();
     render(<SystemConfigTab />);
 
-    expect(await screen.findByText('DeepSeek API Key')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '控制台' })).toHaveAttribute('href', 'https://platform.deepseek.com/api_keys');
+    expect(await screen.findByText("DeepSeek API Key")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "控制台" })).toHaveAttribute(
+      "href",
+      "https://platform.deepseek.com/api_keys",
+    );
     expect(screen.getByText(/思考模式已开启.*high/)).toBeInTheDocument();
     expect(screen.getByText(/0\.7 — 均衡/)).toBeInTheDocument();
-    expect(screen.getByRole('slider')).toHaveAttribute('data-disabled');
-    const keyInput = screen.getByPlaceholderText('输入新 Key 以覆盖');
-    expect(keyInput).toHaveValue('');
-    await user.click(screen.getAllByRole('combobox')[0]);
-    expect(screen.getAllByRole('option')).toHaveLength(1);
-    expect(screen.getByRole('option', { name: /deepseek-flash/ })).toBeInTheDocument();
-    await user.keyboard('{Escape}');
+    expect(screen.getByRole("slider")).toHaveAttribute("data-disabled");
+    const keyInput = screen.getByPlaceholderText("输入新 Key 以覆盖");
+    expect(keyInput).toHaveValue("");
+    await user.click(screen.getAllByRole("combobox")[0]);
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(
+      screen.getByRole("option", { name: /deepseek-flash/ }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Escape}");
     await user.type(keyInput, newKey);
-    await user.click(screen.getByRole('button', { name: /保存配置/ }));
+    await user.click(screen.getByRole("button", { name: /保存配置/ }));
 
-    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledWith({ deepseekApiKey: newKey }));
-    const writes = Object.assign({}, ...mockUpdateSystemConfig.mock.calls.map(c => c[0]));
-    expect(writes).toMatchObject({ aiChatModel: 'deepseek-flash', aiHsCodeModel: 'deepseek-flash' });
-    expect(writes).not.toHaveProperty('apiKey');
-    expect(writes).not.toHaveProperty('aiTemperature');
+    await waitFor(() =>
+      expect(mockUpdateSystemConfig).toHaveBeenCalledWith({
+        deepseekApiKey: newKey,
+      }),
+    );
+    const writes = Object.assign(
+      {},
+      ...mockUpdateSystemConfig.mock.calls.map((c) => c[0]),
+    );
+    expect(writes).toMatchObject({
+      aiChatModel: "deepseek-flash",
+      aiHsCodeModel: "deepseek-flash",
+    });
+    expect(writes).not.toHaveProperty("apiKey");
+    expect(writes).not.toHaveProperty("aiTemperature");
+  });
+
+  it("OpenAI 不按 Kimi 处理：无密钥输入、只展示服务器状态，保存不写密钥或模型", async () => {
+    mockGetSystemConfig.mockResolvedValueOnce({
+      data: {
+        exchangeRate: 7.2,
+        profitRate: 1.3,
+        aiProvider: "openai",
+        openaiConfigured: true,
+        openaiModel: "gpt-6.1-terra",
+        aiChatModel: "kimi-k2-turbo-preview",
+        aiTemperature: 0.7,
+        aiMaxTokens: 4096,
+      },
+    });
+    const user = userEvent.setup();
+    render(<SystemConfigTab />);
+
+    expect(await screen.findByText("OpenAI API Key")).toBeInTheDocument();
+    expect(screen.getByText("服务器已配置")).toBeInTheDocument();
+    expect(screen.queryByText(/Kimi/)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/API Key/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("gpt-6.1-terra").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: /保存配置/ }));
+    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalled());
+    const writes = Object.assign(
+      {},
+      ...mockUpdateSystemConfig.mock.calls.map((c) => c[0]),
+    );
+    expect(
+      Object.keys(writes).filter((k) =>
+        /apikey|openai|aiChatModel|aiHsCodeModel|aiTemperature|aiMaxTokens/i.test(
+          k,
+        ),
+      ),
+    ).toEqual([]);
   });
 });

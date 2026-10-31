@@ -828,7 +828,11 @@ const getModels = async (req, res, next) => {
     success(res, {
       provider,
       models: aiService.MODELS,
-      description: provider === 'deepseek' ? {
+      description: provider === 'openai' ? {
+        thinking: `${aiService.MODELS.thinking} - OpenAI 当前统一模型`,
+        vision: `${aiService.MODELS.vision} - 图像理解取决于所选 OpenAI 模型`,
+        fast: `${aiService.MODELS.fast} - 当前统一模型`,
+      } : provider === 'deepseek' ? {
         thinking: 'deepseek-flash - 启用思考模式，推理强度 high',
         vision: 'deepseek-flash - 支持图像理解',
         fast: 'deepseek-flash - 当前统一模型',

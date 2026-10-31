@@ -151,6 +151,10 @@ const getConfigs = async (req, res, next) => {
       formatted.deepseekApiKey = formatted.deepseekApiKey ||
         normalizeConfigValueForResponse('deepseekApiKey', activeAi.apiKey || '');
       formatted.apiKey = formatted.deepseekApiKey;
+    } else if (formatted.aiProvider === 'openai') {
+      // OpenAI 密钥只来自进程环境，从不经 API 返回（连掩码后缀也不给）；仅暴露"已配置"与模型名。
+      formatted.openaiConfigured = Boolean(activeAi.apiKey);
+      formatted.openaiModel = activeAi.model;
     } else if (!formatted.apiKey && activeAi.apiKey) {
       formatted.apiKey = normalizeConfigValueForResponse('apiKey', activeAi.apiKey);
     }
@@ -216,6 +220,11 @@ const updateConfig = async (req, res, next) => {
     const { value, note } = req.body;
     if (PRICING_CONFIG_KEYS.includes(key)) {
       throw createError('汇率和加价由报价配置统一维护，请在「系统配置 > 报价配置」中修改', 400);
+    }
+
+    // OpenAI 密钥/模型只来自服务器进程环境，任何 openai* 键都不允许写入数据库。
+    if (/^openai/i.test(String(key))) {
+      throw createError('OpenAI 配置只能通过服务器环境设置，不能保存到系统设置', 400);
     }
 
     const storedValue = normalizeConfigValueForStorage(key, value);
