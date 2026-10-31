@@ -1,7 +1,7 @@
 /**
  * Input: PurchaseStatus、PurchaseContract 类型
  * Output: 采购列表共用的状态 pill、状态色条、金额与分页页码辅助
- * Pos: 采购列表页（ContractsPageContent）拆出的纯展示辅助；草稿状态明确标注不计应付
+ * Pos: 采购列表页（ContractsPageContent）拆出的纯展示辅助；草稿/已取消状态明确标注不计应付（应付口径白名单见 isPayable）
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -161,7 +161,25 @@ export function formatAmount(amount: number) {
 }
 
 /**
- * 职责：草稿合同尚未生效，不属于应付；其余状态沿用合同金额口径
+ * 职责：应付口径白名单（规格 §4.7 / 负责人决定 12，与后端 payablesService 一致）：
+ * 仅「已生效」状态计入应付；DRAFT、CANCELLED 以及任何未知状态都不计入
  */
+const PAYABLE_STATUSES: readonly PurchaseStatus[] = [
+  PurchaseStatus.SIGNED,
+  PurchaseStatus.PRODUCING,
+  PurchaseStatus.READY,
+  PurchaseStatus.SHIPPED,
+  PurchaseStatus.RECEIVED,
+  PurchaseStatus.COMPLETED,
+];
+
 export const isPayable = (contract: Pick<PurchaseContract, "status">) =>
-  contract.status !== PurchaseStatus.DRAFT;
+  PAYABLE_STATUSES.includes(contract.status);
+
+/**
+ * 职责：不计应付合同在详情页「待付金额」位置显示的状态化文案
+ */
+export const nonPayableNotice = (status: PurchaseStatus) =>
+  status === PurchaseStatus.CANCELLED
+    ? { title: "已取消 · 不计应付", hint: "已取消的合同不计入待付金额" }
+    : { title: "草稿 · 不计应付", hint: "合同生效后才计入待付金额" };

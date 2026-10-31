@@ -224,7 +224,7 @@ describe("ContractsPage 交互逻辑", () => {
       screen.getAllByRole("button", { name: "为 CG2500001 生成购销合同" }),
     ).toHaveLength(2);
   });
-  it("草稿合同标注不计应付，已确认合同不标注", async () => {
+  it("草稿与已取消合同标注不计应付，已确认合同不标注", async () => {
     const base = {
       totalAmount: 1000,
       paidAmount: 0,
@@ -241,14 +241,20 @@ describe("ContractsPage 交互逻辑", () => {
             contractNo: "CG-SIGNED",
             status: "SIGNED",
           },
+          {
+            ...base,
+            id: "p-cancelled",
+            contractNo: "CG-CANCELLED",
+            status: "CANCELLED",
+          },
         ],
       },
     });
     render(<ContractsPage />);
 
     await screen.findAllByText("CG-DRAFT");
-    // 桌面表格与移动卡片各一份，仅草稿合同出现「不计应付」
-    expect(screen.getAllByText("不计应付")).toHaveLength(2);
+    // 桌面表格与移动卡片各一份，草稿和已取消合同各出现「不计应付」，已确认合同没有
+    expect(screen.getAllByText("不计应付")).toHaveLength(4);
   });
 
   it("管理员每次导入默认正常，明确勾选历史确认才提交historical", async () => {

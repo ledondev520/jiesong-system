@@ -91,7 +91,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/layout/PageHeader";
 import ContractFiles from "@/components/contract/ContractFiles";
-import { isPayable } from "../components/purchaseListHelpers";
+import { isPayable, nonPayableNotice } from "../components/purchaseListHelpers";
 import { PurchaseReceiptPanel } from "./components/PurchaseReceiptPanel";
 import { PurchaseFlowPanel } from "./components/PurchaseFlowPanel";
 import { PurchaseProductionPanel } from "./components/PurchaseProductionPanel";
@@ -841,9 +841,11 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                   </>
                 ) : (
                   <>
-                    <div className="text-xl font-bold">草稿 · 不计应付</div>
+                    <div className="text-xl font-bold">
+                      {nonPayableNotice(contract.status).title}
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      合同生效后才计入待付金额
+                      {nonPayableNotice(contract.status).hint}
                     </p>
                   </>
                 )}

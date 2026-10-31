@@ -168,11 +168,12 @@ describe("PurchaseDetailPage 交互逻辑", () => {
   });
 
   it.each([
-    ["DRAFT", false],
-    ["SIGNED", true],
+    ["DRAFT", false, "草稿 · 不计应付"],
+    ["CANCELLED", false, "已取消 · 不计应付"],
+    ["SIGNED", true, ""],
   ])(
-    "%s 合同按应付口径显示待付金额（payable=%s；草稿不计应付，与列表同口径）",
-    async (status, payable) => {
+    "%s 合同按应付口径显示待付金额（payable=%s；草稿与已取消不计应付，与列表同口径）",
+    async (status, payable, notice) => {
       mockGetById.mockResolvedValue({
         data: {
           id: "p-1",
@@ -192,10 +193,12 @@ describe("PurchaseDetailPage 交互逻辑", () => {
       if (payable) {
         const label = screen.getByText("待付金额");
         expect(label.previousElementSibling).toHaveTextContent("¥100,000");
-        expect(screen.queryByText("草稿 · 不计应付")).not.toBeInTheDocument();
+        expect(screen.queryByText(/不计应付/)).not.toBeInTheDocument();
+        expect(screen.getByRole("progressbar")).toBeInTheDocument();
       } else {
-        expect(screen.getByText("草稿 · 不计应付")).toBeInTheDocument();
+        expect(screen.getByText(notice)).toBeInTheDocument();
         expect(screen.queryByText("待付金额")).not.toBeInTheDocument();
+        expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
       }
     },
   );
