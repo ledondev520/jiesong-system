@@ -644,6 +644,19 @@ describe("SalesDetailPage 交互逻辑", () => {
     const shipButton = await screen.findByRole("button", { name: "确认发运" });
     expect(shipButton).toBeEnabled();
     await user.click(shipButton);
+    expect(mockUpdateSalesStatus).not.toHaveBeenCalled();
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "取消",
+      }),
+    );
+    expect(mockUpdateSalesStatus).not.toHaveBeenCalled();
+    await user.click(shipButton);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "确认",
+      }),
+    );
 
     expect(mockUpdateSalesStatus).toHaveBeenCalledWith("s-1", "SHIPPED");
   });
@@ -684,6 +697,11 @@ describe("SalesDetailPage 交互逻辑", () => {
     renderPage("s-1");
     const ship = await screen.findByRole("button", { name: "确认发运" });
     await user.click(ship);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "确认",
+      }),
+    );
     await waitFor(() => expect(mockToastError).toHaveBeenCalledWith(message));
     expect(mockToastError).not.toHaveBeenCalledWith("状态推进失败");
     expect(mockGetById).toHaveBeenCalledTimes(1);
@@ -700,6 +718,11 @@ describe("SalesDetailPage 交互逻辑", () => {
     });
     mockGetById.mockResolvedValue({ data: { ...contract, status: "SHIPPED" } });
     await user.click(ship);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "确认",
+      }),
+    );
     await waitFor(() => expect(mockUpdateSalesStatus).toHaveBeenCalledTimes(2));
     expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(1, "s-1", "SHIPPED");
     expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(2, "s-1", "SHIPPED");
