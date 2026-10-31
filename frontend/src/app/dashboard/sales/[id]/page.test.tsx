@@ -574,7 +574,7 @@ describe("SalesDetailPage 交互逻辑", () => {
         id: "s-1",
         contractNo: "EXP260008",
         status: "PACKING",
-        totalBoxes: 1,
+        totalBoxes: 9,
         volume: 60,
         grossWeight: 18000,
         totalAmount: 100,
@@ -604,6 +604,10 @@ describe("SalesDetailPage 交互逻辑", () => {
     expect(screen.queryByText(/满足出柜条件/)).not.toBeInTheDocument();
     // 装箱完成时间线同样取明细合计（1 CBM），而非合同头（60 CBM）
     expect(screen.getByText("1 箱，1.00 CBM")).toBeInTheDocument();
+    // 总箱数卡片同样取明细合计（1），而非合同头（9）
+    expect(screen.getByText("总箱数").previousElementSibling).toHaveTextContent(
+      /^1$/,
+    );
   });
 
   it("合同头偏低但明细合计达标时允许确认发运（与后端同源取明细合计）", async () => {

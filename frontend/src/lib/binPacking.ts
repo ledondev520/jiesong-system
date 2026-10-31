@@ -145,6 +145,7 @@ export interface PackingBoxItemSource {
 
 /** 职责：出柜判定的毛重/体积取自装箱明细行，与后端 sumTotals 一致，不信任可编辑的合同头。 */
 export function sumPackingTotals(packingItems: PackingBoxItemSource[]): {
+  cartons: number;
   grossKg: number;
   cargoCbm: number;
 } {
@@ -156,6 +157,10 @@ export function sumPackingTotals(packingItems: PackingBoxItemSource[]): {
       0,
     );
   return {
+    cartons: packingItems.reduce(
+      (total, item) => total + Math.max(0, Math.trunc(Number(item.boxes) || 0)),
+      0,
+    ),
     grossKg: sum((item) => item.grossWeight),
     cargoCbm: sum((item) => item.volume),
   };

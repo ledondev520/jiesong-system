@@ -709,7 +709,7 @@ export default function SalesDetailPage({ params }: PageProps) {
       timeline.push({
         date: contract.updatedAt,
         label: "装箱完成",
-        description: `${contract.totalBoxes || 0} 箱，${sumPackingTotals(contract.packingItems).cargoCbm.toFixed(2)} CBM`,
+        description: `${sumPackingTotals(contract.packingItems).cartons} 箱，${sumPackingTotals(contract.packingItems).cargoCbm.toFixed(2)} CBM`,
         state:
           currentStep >= STATUS_ORDER[SalesStatus.PACKING]
             ? ("completed" as const)
@@ -820,8 +820,11 @@ export default function SalesDetailPage({ params }: PageProps) {
 
   // 计算容量利用率
   // 与后端出货门槛同源：取装箱明细行合计，而非可被手工改写的合同头
-  const { grossKg: weightUsed, cargoCbm: volumeUsed } =
-    sumPackingTotals(packingRows);
+  const {
+    cartons: totalBoxes,
+    grossKg: weightUsed,
+    cargoCbm: volumeUsed,
+  } = sumPackingTotals(packingRows);
   const weightPercent = Math.min(
     (weightUsed / CONTAINER_40HQ.maxWeight) * 100,
     100,
@@ -1070,9 +1073,7 @@ export default function SalesDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-2">
               <Box className="h-5 w-5 text-primary" />
               <div>
-                <div className="text-2xl font-bold">
-                  {contract.totalBoxes || 0}
-                </div>
+                <div className="text-2xl font-bold">{totalBoxes}</div>
                 <p className="text-xs text-muted-foreground">总箱数</p>
               </div>
             </div>
