@@ -9,6 +9,7 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { PURCHASE_STATUS } = require('../config/constants');
 const { archiveFilter } = require('../utils/archiveFilter');
 const { normalizePagination } = require('../utils/pagination');
 const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
@@ -127,9 +128,11 @@ const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const supplier = await prisma.supplier.findUnique({ where: { id }, select: { _count: { select: { purchaseContracts: true } } } });
+    const supplier = await prisma.supplier.findUnique({ where: { id }, select: { id: true } });
     if (!supplier) throw createError('供应商不存在', 404);
-    if (supplier._count.purchaseContracts > 0) throw createError('已有采购合同的供应商不可删除', 409);
+    // Cancelled contracts do not count as references (owner decision 2026-10-31).
+    const active = await prisma.purchaseContract.count({ where: { supplierId: id, status: { not: PURCHASE_STATUS.CANCELLED } } });
+    if (active > 0) throw createError('已有未取消采购合同的供应商不可删除', 409);
 
     await prisma.supplier.update({
       where: { id },

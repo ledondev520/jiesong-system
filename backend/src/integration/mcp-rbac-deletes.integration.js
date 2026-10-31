@@ -87,7 +87,7 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     assert.equal((await send('DELETE', `/purchases/${clean.id}`, 'ADMIN')).status, 404);
   });
 
-  await t.test('supplier delete: ADMIN/PURCHASE only, refused with 409 while purchase contracts reference it', async () => {
+  await t.test('supplier delete: ADMIN/PURCHASE only, refused with 409 while non-cancelled purchase contracts reference it', async () => {
     const used = await db.supplier.create({ data: { name: 'Synthetic used supplier' } });
     await db.purchaseContract.create({ data: { contractNo: 'MCP-USED-1', supplierId: used.id } });
     const unused = await db.supplier.create({ data: { name: 'Synthetic unused supplier' } });
@@ -97,5 +97,16 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     assert.equal((await send('DELETE', `/suppliers/${unused.id}`, 'PURCHASE')).status, 200);
     assert.equal((await db.supplier.findUnique({ where: { id: unused.id } })).isActive, false);
     assert.equal((await send('DELETE', '/suppliers/does-not-exist', 'ADMIN')).status, 404);
+
+    // Cancelled contracts are not references; any non-cancelled one still blocks.
+    const cancelledOnly = await db.supplier.create({ data: { name: 'Synthetic cancelled-only supplier' } });
+    await db.purchaseContract.create({ data: { contractNo: 'MCP-CANCELLED-1', supplierId: cancelledOnly.id, status: 'CANCELLED' } });
+    const mixed = await db.supplier.create({ data: { name: 'Synthetic mixed supplier' } });
+    await db.purchaseContract.create({ data: { contractNo: 'MCP-CANCELLED-2', supplierId: mixed.id, status: 'CANCELLED' } });
+    await db.purchaseContract.create({ data: { contractNo: 'MCP-ACTIVE-2', supplierId: mixed.id, status: 'SIGNED' } });
+    assert.equal((await send('DELETE', `/suppliers/${mixed.id}`, 'PURCHASE')).status, 409);
+    assert.equal((await db.supplier.findUnique({ where: { id: mixed.id } })).isActive, true);
+    assert.equal((await send('DELETE', `/suppliers/${cancelledOnly.id}`, 'PURCHASE')).status, 200);
+    assert.equal((await db.supplier.findUnique({ where: { id: cancelledOnly.id } })).isActive, false);
   });
 });
