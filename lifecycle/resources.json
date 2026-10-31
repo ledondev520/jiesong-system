@@ -65,6 +65,13 @@
       "test": "backend/src/integration/purchase-drafts.integration.js"
     },
     {
+      "id": "pricing-preview",
+      "kind": "action",
+      "routeFile": "backend/src/routes/pricing.js",
+      "routes": ["POST /preview"],
+      "test": "backend/src/integration/pricing-preview.integration.js"
+    },
+    {
       "id": "pricing-config",
       "kind": "singleton-config",
       "routeFile": "backend/src/routes/system.js",
