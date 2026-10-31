@@ -4,6 +4,7 @@
  * Pos: 旧报关单详情入口兼容 stub
  */
 import { redirect } from "next/navigation";
+import { withQuery } from "@/lib/redirect-query";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -15,13 +16,10 @@ export default async function CustomsDeclarationDetailRedirectPage({
   searchParams,
 }: PageProps) {
   const { id } = await params;
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(await searchParams)) {
-    for (const item of Array.isArray(value) ? value : value ? [value] : []) {
-      query.append(key, item);
-    }
-  }
-  const queryString = query.toString();
-  const suffix = queryString ? `?${queryString}` : "";
-  redirect(`/dashboard/customs/${encodeURIComponent(id)}${suffix}`);
+  redirect(
+    withQuery(
+      `/dashboard/customs/${encodeURIComponent(id)}`,
+      await searchParams,
+    ),
+  );
 }

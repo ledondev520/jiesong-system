@@ -11,3 +11,5 @@
 `run-await.ts` 以回调形式执行请求，成功/失败/收尾回调的微任务时机、同步抛错与回调抛错处理均与 `async try { await } catch finally` 一致；页面 effect 内的请求用它替代 `.then().catch().finally()` 链，避免同一轮多个请求的成功/失败处理顺序改变。
 
 `format.ts` 只负责金额/单价/统计值的显示（`formatMoney` 固定两位小数并带 ¥/$，`formatUnitPrice` 整数不带小数，`formatStat` 在加载/出错时返回「—」而不是 0）；不做任何取整，取整口径由定价配置决定。`error-reason.ts` 从被 reject 的响应体或 Error 取出服务端原因，供 `ErrorState` 显示「<失败的事>：<原因>」。日期仍用 `date-format.ts`。
+
+`redirect-query.ts` 的 `withQuery(target, searchParams)` 供旧路由兼容 stub 重定向时原样保留查询参数。`ai-message-text.ts` 的 `stripPageContext` 去掉用户消息开头的「【当前页面：…】」行（AI 面板恢复历史与会话记录页共用）。
