@@ -295,8 +295,6 @@ describe("DashboardPage 交互逻辑", () => {
     expect(mockPush).toHaveBeenCalledWith("/dashboard/sales/create");
 
     await user.click(screen.getByRole("button", { name: /查看报关单/ }));
-    expect(mockPush).toHaveBeenCalledWith(
-      "/dashboard/customs?view=customs",
-    );
+    expect(mockPush).toHaveBeenCalledWith("/dashboard/customs?view=customs");
   });
 });

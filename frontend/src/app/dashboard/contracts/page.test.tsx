@@ -4,18 +4,18 @@
  * Pos: 前端路由兼容测试
  */
 
-import { describe, expect, it, vi } from 'vitest';
-import ContractsPage from './page';
+import { describe, expect, it, vi } from "vitest";
+import ContractsPage from "./page";
 
 const mockRedirect = vi.fn();
 
-vi.mock('next/navigation', () => ({
+vi.mock("next/navigation", () => ({
   redirect: (...args: unknown[]) => mockRedirect(...args),
 }));
 
-describe('ContractsPage 重定向', () => {
-  it('旧采购合同列表路由跳转到 /dashboard/purchases', () => {
+describe("ContractsPage 重定向", () => {
+  it("旧采购合同列表路由跳转到 /dashboard/purchases", () => {
     ContractsPage();
-    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/purchases');
+    expect(mockRedirect).toHaveBeenCalledWith("/dashboard/purchases");
   });
 });

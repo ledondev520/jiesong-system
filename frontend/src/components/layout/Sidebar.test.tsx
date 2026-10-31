@@ -151,7 +151,9 @@ describe("Sidebar", () => {
     const { getByText, queryByText } = render(<Sidebar />);
 
     expect(
-      getByText("单证与退税").closest("a")?.className.includes("bg-sidebar-accent"),
+      getByText("单证与退税")
+        .closest("a")
+        ?.className.includes("bg-sidebar-accent"),
     ).toBe(true);
     expect(queryByText("出口退税")).toBeNull();
   });

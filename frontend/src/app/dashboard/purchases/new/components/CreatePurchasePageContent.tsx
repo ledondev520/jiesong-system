@@ -95,6 +95,7 @@ import {
   purchaseSchema,
   StepIndicator,
   type PurchaseFormValues,
+  type RecommendedSupplier,
 } from "./purchaseFormParts";
 import {
   Table,

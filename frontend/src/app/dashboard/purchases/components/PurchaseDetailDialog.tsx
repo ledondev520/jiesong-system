@@ -62,9 +62,7 @@ export function PurchaseDetailDialog({
                 {detail.signedAt
                   ? `签订日期：${format(new Date(detail.signedAt), "yyyy-MM-dd")}`
                   : "未设置签订日期"}
-                {detail.storeName && (
-                  <> | 发货店铺：{detail.storeName}</>
-                )}
+                {detail.storeName && <> | 发货店铺：{detail.storeName}</>}
               </DialogDescription>
             </DialogHeader>
 

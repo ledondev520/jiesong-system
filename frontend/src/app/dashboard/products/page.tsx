@@ -430,14 +430,11 @@ function ProductsPageContent() {
                 {
                   label: "净重",
                   value:
-                    product.netWeight != null
-                      ? `${product.netWeight} kg`
-                      : "-",
+                    product.netWeight != null ? `${product.netWeight} kg` : "-",
                 },
                 {
                   label: "体积",
-                  value:
-                    product.volume != null ? `${product.volume} CBM` : "-",
+                  value: product.volume != null ? `${product.volume} CBM` : "-",
                 },
               ]}
               action={
@@ -520,10 +517,7 @@ function ProductsPageContent() {
                           {product.specification || "—"}
                         </p>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className="shrink-0 text-[11px]"
-                      >
+                      <Badge variant="outline" className="shrink-0 text-[11px]">
                         {product.unit || "件"}
                       </Badge>
                     </div>
@@ -647,9 +641,7 @@ function ProductsPageContent() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() =>
-              setCurrentPage((p) => Math.min(totalPages, p + 1))
-            }
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages || totalPages <= 1}
           >
             下一页
@@ -664,10 +656,7 @@ function ProductsPageContent() {
         onSubmit={handleSubmit}
       />
 
-      <AlertDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-      >
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>

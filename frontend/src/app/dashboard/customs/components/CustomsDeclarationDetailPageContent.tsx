@@ -140,9 +140,7 @@ export function CustomsDeclarationDetailPageContent({
               <Button
                 className="rounded-xl"
                 onClick={() =>
-                  router.push(
-                    `/dashboard/customs/${declaration.id}/edit`,
-                  )
+                  router.push(`/dashboard/customs/${declaration.id}/edit`)
                 }
               >
                 <FilePenLine className="mr-2 h-4 w-4" />

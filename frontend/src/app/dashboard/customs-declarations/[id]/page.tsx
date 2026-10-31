@@ -3,7 +3,7 @@
  * Output: 重定向到 /dashboard/customs/[id]，保留查询参数
  * Pos: 旧报关单详情入口兼容 stub
  */
-import { redirect } from 'next/navigation';
+import { redirect } from "next/navigation";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -22,6 +22,6 @@ export default async function CustomsDeclarationDetailRedirectPage({
     }
   }
   const queryString = query.toString();
-  const suffix = queryString ? `?${queryString}` : '';
+  const suffix = queryString ? `?${queryString}` : "";
   redirect(`/dashboard/customs/${encodeURIComponent(id)}${suffix}`);
 }

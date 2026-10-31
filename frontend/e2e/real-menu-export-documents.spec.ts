@@ -119,7 +119,10 @@ test.afterEach(async () => {
  */
 async function enterFromMenu(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
-  await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
+  await page
+    .getByRole("link", { name: "出口订单", exact: true })
+    .first()
+    .click();
   await expect(page).toHaveURL(/\/dashboard\/sales$/);
   await page
     .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
@@ -319,8 +322,7 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   // Next client navigation must commit before reload, or reload cancels it.
   await expect(page).toHaveURL(
     (url) =>
-      url.pathname ===
-      `/dashboard/customs/${saved.customs_declarations[0].id}`,
+      url.pathname === `/dashboard/customs/${saved.customs_declarations[0].id}`,
   );
   await expect(
     page.getByRole("heading", {

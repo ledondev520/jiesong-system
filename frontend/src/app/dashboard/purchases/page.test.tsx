@@ -235,7 +235,12 @@ describe("ContractsPage 交互逻辑", () => {
       data: {
         items: [
           { ...base, id: "p-draft", contractNo: "CG-DRAFT", status: "DRAFT" },
-          { ...base, id: "p-signed", contractNo: "CG-SIGNED", status: "SIGNED" },
+          {
+            ...base,
+            id: "p-signed",
+            contractNo: "CG-SIGNED",
+            status: "SIGNED",
+          },
         ],
       },
     });

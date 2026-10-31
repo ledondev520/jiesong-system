@@ -169,9 +169,7 @@ it("customs detail receives the active filtered return URL", async () => {
     mocks.push.mock.calls.at(-1)![0],
     window.location.origin,
   );
-  expect(destination.pathname).toBe(
-    "/dashboard/customs/synthetic-detail",
-  );
+  expect(destination.pathname).toBe("/dashboard/customs/synthetic-detail");
   expect(destination.searchParams.get("returnTo")).toBe(saved);
 });
 

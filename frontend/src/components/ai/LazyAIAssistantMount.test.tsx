@@ -6,22 +6,23 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { LazyAIAssistantMount } from './LazyAIAssistantMount';
-import { useAiPanelStore } from '@/store/ai-panel.store';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { LazyAIAssistantMount } from "./LazyAIAssistantMount";
+import { useAiPanelStore } from "@/store/ai-panel.store";
 
-let mockPathname = '/dashboard';
+let mockPathname = "/dashboard";
 let mockMobile = false;
 let mockReadOnly = false;
 
-vi.mock('@/lib/hooks/useMobile', () => ({ useMobile: () => mockMobile }));
-vi.mock('@/lib/hooks/useBusinessReadOnly', () => ({
+vi.mock("@/lib/hooks/useMobile", () => ({ useMobile: () => mockMobile }));
+vi.mock("@/lib/hooks/useBusinessReadOnly", () => ({
   useBusinessReadOnly: () => mockReadOnly,
 }));
 
-vi.mock('next/dynamic', () => ({
-  default: () =>
+vi.mock("next/dynamic", () => ({
+  default:
+    () =>
     ({
       presentation,
       pageContext,
@@ -32,59 +33,62 @@ vi.mock('next/dynamic', () => ({
       onClose: () => void;
     }) => (
       <div>
-        AI 助手挂载体 {presentation} {pageContext.route} {pageContext.recordId ?? ''}
+        AI 助手挂载体 {presentation} {pageContext.route}{" "}
+        {pageContext.recordId ?? ""}
         <button onClick={onClose}>关闭面板</button>
       </div>
     ),
 }));
 
-vi.mock('next/navigation', () => ({
+vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname,
 }));
 
 beforeEach(() => {
-  mockPathname = '/dashboard';
+  mockPathname = "/dashboard";
   mockMobile = false;
   mockReadOnly = false;
-  window.history.replaceState({}, '', '/dashboard');
+  window.history.replaceState({}, "", "/dashboard");
   useAiPanelStore.setState({ open: false });
 });
 
-describe('LazyAIAssistantMount', () => {
-  it('首次打开前不加载助手，打开后以停靠形态挂载并带页面上下文', () => {
-    mockPathname = '/dashboard/purchases/pc-001';
+describe("LazyAIAssistantMount", () => {
+  it("首次打开前不加载助手，打开后以停靠形态挂载并带页面上下文", () => {
+    mockPathname = "/dashboard/purchases/pc-001";
     render(<LazyAIAssistantMount />);
     expect(screen.queryByText(/AI 助手挂载体/)).not.toBeInTheDocument();
 
     act(() => useAiPanelStore.getState().setOpen(true));
     expect(
-      screen.getByText('AI 助手挂载体 docked /dashboard/purchases/pc-001 pc-001'),
+      screen.getByText(
+        "AI 助手挂载体 docked /dashboard/purchases/pc-001 pc-001",
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('ai-panel')).not.toHaveClass('md:hidden');
+    expect(screen.getByTestId("ai-panel")).not.toHaveClass("md:hidden");
   });
 
-  it('收起只隐藏面板，保留已挂载的对话', () => {
+  it("收起只隐藏面板，保留已挂载的对话", () => {
     useAiPanelStore.setState({ open: true });
     render(<LazyAIAssistantMount />);
-    fireEvent.click(screen.getByText('关闭面板'));
+    fireEvent.click(screen.getByText("关闭面板"));
     expect(useAiPanelStore.getState().open).toBe(false);
-    expect(screen.getByTestId('ai-panel')).toHaveClass('md:hidden');
+    expect(screen.getByTestId("ai-panel")).toHaveClass("md:hidden");
     expect(screen.getByText(/AI 助手挂载体/)).toBeInTheDocument();
   });
 
-  it('Ctrl+J 与 ⌘+J 切换面板', () => {
+  it("Ctrl+J 与 ⌘+J 切换面板", () => {
     render(<LazyAIAssistantMount />);
-    fireEvent.keyDown(window, { key: 'j', ctrlKey: true });
+    fireEvent.keyDown(window, { key: "j", ctrlKey: true });
     expect(useAiPanelStore.getState().open).toBe(true);
-    fireEvent.keyDown(window, { key: 'J', metaKey: true });
+    fireEvent.keyDown(window, { key: "J", metaKey: true });
     expect(useAiPanelStore.getState().open).toBe(false);
   });
 
-  it('?ai=1 打开面板并从地址栏移除该参数', () => {
-    window.history.replaceState({}, '', '/dashboard?ai=1&keep=1');
+  it("?ai=1 打开面板并从地址栏移除该参数", () => {
+    window.history.replaceState({}, "", "/dashboard?ai=1&keep=1");
     render(<LazyAIAssistantMount />);
     expect(useAiPanelStore.getState().open).toBe(true);
-    expect(window.location.search).toBe('?keep=1');
+    expect(window.location.search).toBe("?keep=1");
   });
 
   it('手机用全屏面板，且别处记住的"已打开"不会自动弹出', () => {
@@ -94,15 +98,15 @@ describe('LazyAIAssistantMount', () => {
     expect(useAiPanelStore.getState().open).toBe(false);
 
     act(() => useAiPanelStore.getState().setOpen(true));
-    expect(screen.getByTestId('ai-panel-sheet')).not.toHaveClass('hidden');
+    expect(screen.getByTestId("ai-panel-sheet")).not.toHaveClass("hidden");
   });
 
-  it('BOSS 没有 AI：不挂载也不响应快捷键', () => {
+  it("BOSS 没有 AI：不挂载也不响应快捷键", () => {
     mockReadOnly = true;
     useAiPanelStore.setState({ open: true });
     render(<LazyAIAssistantMount />);
     expect(screen.queryByText(/AI 助手挂载体/)).not.toBeInTheDocument();
-    fireEvent.keyDown(window, { key: 'j', ctrlKey: true });
+    fireEvent.keyDown(window, { key: "j", ctrlKey: true });
     expect(useAiPanelStore.getState().open).toBe(true);
   });
 });

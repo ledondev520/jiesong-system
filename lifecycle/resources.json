@@ -105,22 +105,22 @@
   "lists": [
     {
       "id": "inventory",
-      "file": "frontend/src/app/dashboard/products/components/InventoryTab.tsx",
-      "test": "frontend/src/app/dashboard/products/components/InventoryTab.lifecycle.test.tsx",
+      "file": "frontend/src/app/dashboard/inventory/components/InventoryTab.tsx",
+      "test": "frontend/src/app/dashboard/inventory/components/InventoryTab.lifecycle.test.tsx",
       "schema": "inventory",
-      "path": "/dashboard/products?tab=inventory&source=qa#rows",
+      "path": "/dashboard/inventory?source=qa#rows",
       "keywordKey": "inventoryKeyword",
       "pageKey": "inventoryPage",
       "pageSizeKey": "inventoryPageSize",
-      "tabKey": "tab",
-      "tab": "inventory"
+      "tabKey": "source",
+      "tab": "qa"
     },
     {
       "id": "customs",
-      "file": "frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.tsx",
-      "test": "frontend/src/app/customs-declarations/components/CustomsDeclarationListPageContent.test.tsx",
+      "file": "frontend/src/app/dashboard/customs/components/CustomsDeclarationListPageContent.tsx",
+      "test": "frontend/src/app/dashboard/customs/components/CustomsDeclarationListPageContent.test.tsx",
       "schema": "customs",
-      "path": "/dashboard/tax-refunds?view=customs&source=qa#rows",
+      "path": "/dashboard/customs?view=customs&source=qa#rows",
       "keywordKey": "keyword",
       "pageKey": "page",
       "pageSizeKey": "pageSize",

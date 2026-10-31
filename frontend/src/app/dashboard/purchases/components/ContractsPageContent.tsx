@@ -985,8 +985,7 @@ export default function ContractsPageContent() {
                     ? undefined
                     : {
                         label: "新建采购合同",
-                        onClick: () =>
-                          router.push("/dashboard/purchases/new"),
+                        onClick: () => router.push("/dashboard/purchases/new"),
                       }
                 }
               />

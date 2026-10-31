@@ -4,19 +4,19 @@
  * Pos: 前端路由兼容测试
  */
 
-import { describe, expect, it, vi } from 'vitest';
-import ContractTemplateUploadPage from './page';
+import { describe, expect, it, vi } from "vitest";
+import ContractTemplateUploadPage from "./page";
 
 const mockRedirect = vi.fn();
 
-vi.mock('next/navigation', () => ({
+vi.mock("next/navigation", () => ({
   redirect: (...args: unknown[]) => mockRedirect(...args),
 }));
 
-describe('ContractTemplateUploadPage', () => {
-  it('旧模板上传路由回到采购合同页', () => {
+describe("ContractTemplateUploadPage", () => {
+  it("旧模板上传路由回到采购合同页", () => {
     ContractTemplateUploadPage();
 
-    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/purchases');
+    expect(mockRedirect).toHaveBeenCalledWith("/dashboard/purchases");
   });
 });

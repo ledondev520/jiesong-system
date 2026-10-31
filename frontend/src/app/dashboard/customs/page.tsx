@@ -5,12 +5,16 @@
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
-import { Suspense } from 'react';
-import { TaxRefundListPageContent } from '@/app/dashboard/tax-refunds/components/TaxRefundListPageContent';
+import { Suspense } from "react";
+import { TaxRefundListPageContent } from "@/app/dashboard/tax-refunds/components/TaxRefundListPageContent";
 
 export default function CustomsDashboardPage() {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-muted-foreground">加载中...</div>
+      }
+    >
       <TaxRefundListPageContent />
     </Suspense>
   );

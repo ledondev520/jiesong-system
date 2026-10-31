@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import { Calculator, Check } from "lucide-react";
+import { Supplier } from "@/types";
 import { cn } from "@/lib/utils";
 
 // ============== Schema ==============
@@ -46,6 +47,12 @@ export const emptyNewSupplier = {
   bankCode: "",
   bankAccount: "",
 };
+
+// ============== 供应商推荐类型 ==============
+export interface RecommendedSupplier extends Supplier {
+  isRecommended?: boolean;
+  purchaseCount?: number;
+}
 
 /**
  * 职责：步骤指示器

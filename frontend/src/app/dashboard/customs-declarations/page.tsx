@@ -4,8 +4,8 @@
  * Pos: 报关单旧列表入口兼容路由
  */
 
-import { redirect } from 'next/navigation';
+import { redirect } from "next/navigation";
 
 export default function CustomsDeclarationsPage() {
-  redirect('/dashboard/customs?view=customs');
+  redirect("/dashboard/customs?view=customs");
 }

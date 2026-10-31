@@ -49,9 +49,7 @@ describe("报关详情的有限返回上下文", () => {
     });
     query.append("tag", "first");
     query.append("tag", "second");
-    const result = resolveCustomsReturnTo(
-      `/dashboard/customs?${query}#rows`,
-    );
+    const result = resolveCustomsReturnTo(`/dashboard/customs?${query}#rows`);
     const parsed = new URL(result, "https://synthetic.invalid");
     expect(parsed.pathname).toBe("/dashboard/customs");
     expect(parsed.searchParams.get("keyword")).toBe(keyword);
@@ -118,8 +116,8 @@ describe("迁移前的退税页签地址", () => {
     expect(resolveCustomsReturnTo("/dashboard/tax-refunds?keyword=QA")).toBe(
       CUSTOMS_RETURN_FALLBACK,
     );
-    expect(
-      resolveCustomsReturnTo("/dashboard/tax-refunds?view=refunds"),
-    ).toBe(CUSTOMS_RETURN_FALLBACK);
+    expect(resolveCustomsReturnTo("/dashboard/tax-refunds?view=refunds")).toBe(
+      CUSTOMS_RETURN_FALLBACK,
+    );
   });
 });

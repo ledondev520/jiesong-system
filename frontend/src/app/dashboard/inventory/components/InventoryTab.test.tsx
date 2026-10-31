@@ -23,9 +23,7 @@ vi.mock("@/lib/api-cache", () => ({
   invalidateCache: vi.fn(),
 }));
 
-beforeEach(() =>
-  window.history.replaceState({}, "", "/dashboard/inventory"),
-);
+beforeEach(() => window.history.replaceState({}, "", "/dashboard/inventory"));
 
 it("库存后端总数与实际页码一致，第二页继续请求服务端", async () => {
   const user = userEvent.setup();

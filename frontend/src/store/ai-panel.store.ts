@@ -9,7 +9,10 @@ export const AI_PANEL_DEFAULT_WIDTH = 400;
 export const clampAiPanelWidth = (width: number) =>
   Math.min(
     AI_PANEL_MAX_WIDTH,
-    Math.max(AI_PANEL_MIN_WIDTH, Math.round(Number(width)) || AI_PANEL_DEFAULT_WIDTH),
+    Math.max(
+      AI_PANEL_MIN_WIDTH,
+      Math.round(Number(width)) || AI_PANEL_DEFAULT_WIDTH,
+    ),
   );
 
 interface AiPanelState {

@@ -48,20 +48,16 @@ vi.mock("@/services/customsDeclaration.service", () => ({
 
 vi.mock("@/services/sales.service", () => ({
   salesService: {
-    getAll: vi
-      .fn()
-      .mockResolvedValue({
-        data: { items: [{ id: "s1", contractNo: "合成合同" }] },
-      }),
+    getAll: vi.fn().mockResolvedValue({
+      data: { items: [{ id: "s1", contractNo: "合成合同" }] },
+    }),
   },
 }));
 vi.mock("@/services/product.service", () => ({
   productService: {
-    getAll: vi
-      .fn()
-      .mockResolvedValue({
-        data: { items: [{ id: "p1", customsName: "合成商品" }] },
-      }),
+    getAll: vi.fn().mockResolvedValue({
+      data: { items: [{ id: "p1", customsName: "合成商品" }] },
+    }),
   },
 }));
 
@@ -174,9 +170,7 @@ describe("EditCustomsDeclarationPage 交互逻辑", () => {
     });
 
     expect(mockToastSuccess).toHaveBeenCalledWith("报关单更新成功");
-    expect(mockRouterPush).toHaveBeenCalledWith(
-      "/dashboard/customs/cd-2",
-    );
+    expect(mockRouterPush).toHaveBeenCalledWith("/dashboard/customs/cd-2");
   });
 
   it("加载失败时提示错误", async () => {

@@ -19,8 +19,8 @@ describe("ai panel store", () => {
     useAiPanelStore.setState({ open: false });
     useAiPanelStore.getState().toggle();
     expect(useAiPanelStore.getState().open).toBe(true);
-    expect(JSON.parse(localStorage.getItem("ai-panel") ?? "{}").state.open).toBe(
-      true,
-    );
+    expect(
+      JSON.parse(localStorage.getItem("ai-panel") ?? "{}").state.open,
+    ).toBe(true);
   });
 });

@@ -193,9 +193,7 @@ describe("退税页签实际组件的路由流转", () => {
     await act(async () => {
       fireEvent.click(detailButton);
     });
-    expect(window.location.pathname).toBe(
-      "/dashboard/customs/qa-customs",
-    );
+    expect(window.location.pathname).toBe("/dashboard/customs/qa-customs");
     await user.click(await screen.findByRole("button", { name: "返回" }));
     await screen.findByRole("heading", { name: "报关单管理" });
     await user.click(screen.getByRole("tab", { name: "退税记录" }));
@@ -226,8 +224,7 @@ describe("退税页签实际组件的路由流转", () => {
     window.history.replaceState(
       {},
       "",
-      "/dashboard/customs/qa-customs?" +
-        new URLSearchParams({ returnTo }),
+      "/dashboard/customs/qa-customs?" + new URLSearchParams({ returnTo }),
     );
     const originalPush = mocks.router.push.getMockImplementation();
     mocks.router.push.mockImplementation(() => {
@@ -308,8 +305,7 @@ describe("退税页签实际组件的路由流转", () => {
     window.history.replaceState(
       {},
       "",
-      "/dashboard/customs/qa-customs?" +
-        new URLSearchParams({ returnTo }),
+      "/dashboard/customs/qa-customs?" + new URLSearchParams({ returnTo }),
     );
     await act(async () => render(<TestRoutes />));
     await user.click(await screen.findByRole("button", { name: "返回" }));

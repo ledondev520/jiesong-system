@@ -78,7 +78,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     expect(input).toHaveValue("");
     expect(mocks.router.replace).not.toHaveBeenCalled();
   });
-  it.each(["/customs-declarations", "/dashboard/customs"])(
+  it.each(["/customs-declarations", "/dashboard/customs-declarations"])(
     "旧独立列表 %s 进入详情只传递内部的规范报关返回上下文",
     async (pathname) => {
       const user = userEvent.setup();

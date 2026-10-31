@@ -270,9 +270,7 @@ export function CustomsDeclarationListPageContent({
             <BusinessWrite>
               <Button
                 className="h-11 rounded-xl"
-                onClick={() =>
-                  router.push("/dashboard/customs/new")
-                }
+                onClick={() => router.push("/dashboard/customs/new")}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 新建报关单

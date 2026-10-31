@@ -1,20 +1,21 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
-import { useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { useBusinessReadOnly } from '@/lib/hooks/useBusinessReadOnly';
-import { useMobile } from '@/lib/hooks/useMobile';
-import { getAiPageContext } from '@/lib/ai-page-context';
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useBusinessReadOnly } from "@/lib/hooks/useBusinessReadOnly";
+import { useMobile } from "@/lib/hooks/useMobile";
+import { getAiPageContext } from "@/lib/ai-page-context";
 import {
   AI_PANEL_MAX_WIDTH,
   AI_PANEL_MIN_WIDTH,
   useAiPanelStore,
-} from '@/store/ai-panel.store';
-import { cn } from '@/lib/utils';
+} from "@/store/ai-panel.store";
+import { cn } from "@/lib/utils";
 
 const LazyAIAssistant = dynamic(
-  () => import('@/components/ai/AIAssistant').then((module) => module.AIAssistant),
+  () =>
+    import("@/components/ai/AIAssistant").then((module) => module.AIAssistant),
   {
     ssr: false,
     loading: () => null,
@@ -52,23 +53,23 @@ export function LazyAIAssistantMount() {
   useEffect(() => {
     if (readOnly) return;
     const url = new URL(window.location.href);
-    if (url.searchParams.get('ai') !== '1') return;
+    if (url.searchParams.get("ai") !== "1") return;
     setOpen(true);
-    url.searchParams.delete('ai');
-    window.history.replaceState(window.history.state, '', url);
+    url.searchParams.delete("ai");
+    window.history.replaceState(window.history.state, "", url);
   }, [pathname, readOnly, setOpen]);
 
   // Ctrl/⌘ + J 切换面板
   useEffect(() => {
     if (readOnly) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'j') {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "j") {
         event.preventDefault();
         useAiPanelStore.getState().toggle();
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [readOnly]);
 
   // 拖动左缘调整宽度；pointer 事件挂在 window 上，拖出手柄也不丢
@@ -79,11 +80,11 @@ export function LazyAIAssistantMount() {
     const onUp = () => {
       dragging.current = false;
     };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
     return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
   }, [setWidth]);
 
@@ -101,7 +102,7 @@ export function LazyAIAssistantMount() {
     return (
       <div
         data-testid="ai-panel-sheet"
-        className={cn('fixed inset-0 z-[150] bg-background', !open && 'hidden')}
+        className={cn("fixed inset-0 z-[150] bg-background", !open && "hidden")}
       >
         {assistant}
       </div>
@@ -112,8 +113,8 @@ export function LazyAIAssistantMount() {
     <div
       data-testid="ai-panel"
       className={cn(
-        'sticky top-0 hidden h-screen shrink-0 border-l bg-background md:flex',
-        !open && 'md:hidden',
+        "sticky top-0 hidden h-screen shrink-0 border-l bg-background md:flex",
+        !open && "md:hidden",
       )}
       style={{ width }}
     >
@@ -131,8 +132,8 @@ export function LazyAIAssistantMount() {
           dragging.current = true;
         }}
         onKeyDown={(event) => {
-          if (event.key === 'ArrowLeft') setWidth(width + KEYBOARD_STEP);
-          if (event.key === 'ArrowRight') setWidth(width - KEYBOARD_STEP);
+          if (event.key === "ArrowLeft") setWidth(width + KEYBOARD_STEP);
+          if (event.key === "ArrowRight") setWidth(width - KEYBOARD_STEP);
         }}
       />
       <div className="min-w-0 flex-1">{assistant}</div>

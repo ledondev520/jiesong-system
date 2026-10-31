@@ -192,7 +192,7 @@ it("库存URL在返回与重新挂载后恢复筛选和分页", async () => {
   window.history.replaceState(
     {},
     "",
-    "/dashboard/inventory&inventoryKeyword=SYN&inventoryPage=2&inventoryPageSize=50&source=qa#rows",
+    "/dashboard/inventory?inventoryKeyword=SYN&inventoryPage=2&inventoryPageSize=50&source=qa#rows",
   );
   getAll.mockResolvedValue({
     data: { items: [stock], pagination: { total: 200 } },
@@ -227,12 +227,12 @@ it("库存URL在返回与重新挂载后恢复筛选和分页", async () => {
   expect(screen.getByPlaceholderText("搜索商品/采购合同...")).toHaveValue(
     "SYN",
   );
-  expect(new URL(saved).searchParams.get("tab")).toBe("inventory");
+  expect(new URL(saved).searchParams.get("source")).toBe("qa");
   await act(async () => {
     window.history.replaceState(
       {},
       "",
-      "/dashboard/inventory&inventoryKeyword=BACK&inventoryPage=2&inventoryPageSize=50",
+      "/dashboard/inventory?inventoryKeyword=BACK&inventoryPage=2&inventoryPageSize=50",
     );
     window.dispatchEvent(new PopStateEvent("popstate"));
   });

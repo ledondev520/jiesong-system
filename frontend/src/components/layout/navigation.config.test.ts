@@ -107,7 +107,7 @@ describe("navigation.config helpers", () => {
       expect(getModuleByPath(path)?.key, path).toBe(key);
   });
 
-  it("子页面入口覆盖原模块 Tab（财务、单证与退税、设置）", () => {
+  it("子页面入口覆盖原模块 Tab（财务、设置；单证与退税为页内页签，无侧栏子项）", () => {
     const labels = (key: string) =>
       MODULE_NAV_ITEMS.find((item) => item.key === key)?.children.map(
         (c) => c.label,
@@ -118,7 +118,7 @@ describe("navigation.config helpers", () => {
       "收付管理",
       "经营执行",
     ]);
-    expect(labels("documents")).toEqual(["报关单", "出口退税"]);
+    expect(labels("documents")).toEqual([]);
     expect(labels("admin")).toEqual(["系统配置", "账号管理", "系统日志"]);
   });
 

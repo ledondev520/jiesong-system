@@ -6,23 +6,23 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { describe, expect, it, vi } from 'vitest';
-import PurchasePage from './page';
+import { describe, expect, it, vi } from "vitest";
+import PurchasePage from "./page";
 
 const mockRedirect = vi.fn();
 
-vi.mock('next/navigation', () => ({
+vi.mock("next/navigation", () => ({
   redirect: (...args: unknown[]) => mockRedirect(...args),
 }));
 
-describe('PurchasePage 重定向', () => {
-  it('访问 /dashboard/purchase 时跳转到采购列表', () => {
+describe("PurchasePage 重定向", () => {
+  it("访问 /dashboard/purchase 时跳转到采购列表", () => {
     try {
       PurchasePage();
     } catch {
       // next redirect throws by design
     }
 
-    expect(mockRedirect).toHaveBeenCalledWith('/dashboard/purchases');
+    expect(mockRedirect).toHaveBeenCalledWith("/dashboard/purchases");
   });
 });

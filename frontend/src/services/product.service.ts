@@ -1,5 +1,5 @@
-import type { Product } from '@/types';
-import { createCrudService } from './crudService';
+import type { Product } from "@/types";
+import { createCrudService } from "./crudService";
 
 type ProductListQuery = {
   page?: number;
@@ -10,8 +10,14 @@ type ProductListQuery = {
   incomplete?: boolean;
 };
 
-const crud = createCrudService<Product, Partial<Product>, Partial<Product>, ProductListQuery>('/products');
+const crud = createCrudService<
+  Product,
+  Partial<Product>,
+  Partial<Product>,
+  ProductListQuery
+>("/products");
 export const productService = {
   ...crud,
-  getAll: async (params?: ProductListQuery) => crud.getAll?.(params as ProductListQuery),
+  getAll: async (params?: ProductListQuery) =>
+    crud.getAll?.(params as ProductListQuery),
 };
