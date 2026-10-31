@@ -4,6 +4,8 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ContractBalanceList } from "./ContractBalanceList";
 
+const dialog = vi.hoisted(() => vi.fn());
+const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 const mocks = vi.hoisted(() => ({
   getPayables: vi.fn(),
   getReceivables: vi.fn(),
@@ -15,21 +17,20 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(window.location.search),
 }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: toasts }));
 vi.mock("./PaymentDialog", () => ({
-  PaymentDialog: ({
-    contractNo,
-    remainingAmount,
-    currency,
-  }: {
+  PaymentDialog: (props: {
     contractNo: string;
     remainingAmount: number;
     currency: string;
-  }) => (
-    <div role="dialog" aria-label="登记">
-      {contractNo}|{remainingAmount}|{currency}
-    </div>
-  ),
+  }) => {
+    dialog(props);
+    return (
+      <div role="dialog" aria-label="登记">
+        {props.contractNo}|{props.remainingAmount}|{props.currency}
+      </div>
+    );
+  },
 }));
 
 const page = (items: unknown[]) => ({
@@ -45,6 +46,9 @@ const stats = {
 
 beforeEach(() => {
   Object.values(mocks).forEach((mock) => mock.mockReset());
+  dialog.mockReset();
+  toasts.success.mockReset();
+  toasts.error.mockReset();
   mocks.getStats.mockResolvedValue(stats);
 });
 
@@ -179,5 +183,86 @@ describe("应收页签", () => {
     await act(async () => resolveOld(page([row("EXP-STALE")])));
     expect(screen.queryByText("EXP-STALE")).toBeNull();
     expect(screen.getByText("EXP-OVERDUE")).toBeInTheDocument();
+  });
+});
+
+describe.each([
+  {
+    kind: "payable" as const,
+    list: "getPayables" as const,
+    button: "登记付款",
+    type: "PAYABLE",
+    idField: "purchaseContractId",
+    currency: "CNY",
+  },
+  {
+    kind: "receivable" as const,
+    list: "getReceivables" as const,
+    button: "登记收款",
+    type: "RECEIVABLE",
+    idField: "salesContractId",
+    currency: "USD",
+  },
+])("$kind 保存（评审 R1-10，移植自旧收付款页）", (c) => {
+  const row = {
+    id: "synthetic",
+    contractNo: "SYNTHETIC",
+    status: "SIGNED",
+    totalAmount: 100,
+    paidAmount: 0,
+    unpaidAmount: 100,
+    receivedAmount: 0,
+    unreceiveAmount: 100,
+  };
+  const data = {
+    amount: "22.6",
+    paymentDate: new Date("2026-10-01"),
+    paymentMethod: "other",
+    note: "合成中文备注",
+  };
+  const openDialog = async () => {
+    mocks[c.list].mockResolvedValue(page([row]));
+    render(<ContractBalanceList kind={c.kind} />);
+    await userEvent
+      .setup()
+      .click(await screen.findByRole("button", { name: c.button }));
+    return dialog.mock.calls.at(-1)![0] as {
+      onSubmit: (value: typeof data) => Promise<void>;
+    };
+  };
+
+  it("保存失败：拒绝回调，弹窗和所选合同保留，不刷新、不报成功", async () => {
+    const props = await openDialog();
+    mocks.createPayment.mockRejectedValue({ message: "合成保存失败" });
+    const loads = mocks[c.list].mock.calls.length;
+    await expect(props.onSubmit(data)).rejects.toEqual({
+      message: "合成保存失败",
+    });
+    expect(mocks.createPayment).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: c.type,
+        [c.idField]: "synthetic",
+        amount: 22.6,
+        currency: c.currency,
+        paymentMethod: "other",
+        paymentDate: "2026-10-01T00:00:00.000Z",
+        note: "合成中文备注",
+      }),
+    );
+    expect(screen.getByRole("dialog", { name: "登记" })).toBeInTheDocument();
+    expect(toasts.success).not.toHaveBeenCalled();
+    expect(mocks[c.list].mock.calls.length).toBe(loads);
+  });
+
+  it("保存成功：关闭弹窗并重新读取列表和统计", async () => {
+    const props = await openDialog();
+    mocks.createPayment.mockResolvedValue({});
+    const loads = mocks[c.list].mock.calls.length;
+    const statLoads = mocks.getStats.mock.calls.length;
+    await act(async () => props.onSubmit(data));
+    expect(toasts.success).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "登记" })).toBeNull();
+    expect(mocks[c.list].mock.calls.length).toBe(loads + 1);
+    expect(mocks.getStats.mock.calls.length).toBe(statLoads + 1);
   });
 });
