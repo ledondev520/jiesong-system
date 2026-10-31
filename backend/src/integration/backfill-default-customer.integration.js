@@ -101,7 +101,7 @@ test('confirm links NULL rows only, backs up, writes a private receipt and print
   assert.equal(second.customerId, out.customerId);
   assert.equal(second.storesLinked, 0);
   assert.equal(second.salesContractsLinked, 0);
-  assert.equal(snapshot(f.database), JSON.stringify(data));
+  assert.deepEqual(JSON.parse(snapshot(f.database)), data);
 });
 
 test('missing --backup-dir/--receipt with --confirm fails before the database is opened', (t) => {
