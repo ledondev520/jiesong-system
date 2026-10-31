@@ -9,7 +9,7 @@ const prisma = require('../../utils/prisma');
 const { success, paginated } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
 const { normalizePagination } = require('../../utils/pagination');
-const { withUtf8Bom } = require('../../utils/csvExport');
+const { withUtf8Bom, csvSafeText } = require('../../utils/csvExport');
 
 const parseOptionalText = (value) => {
   if (value === undefined || value === null) {
@@ -98,7 +98,7 @@ const buildOperationLogWhere = (query = {}) => {
 };
 
 const csvEscape = (value) => {
-  const text = value === undefined || value === null ? '' : String(value);
+  const text = csvSafeText(value);
   return `"${text.replace(/"/g, '""')}"`;
 };
 
@@ -247,4 +247,5 @@ module.exports = {
   getLogs: getOperationLogs,
   getOperationLogs,
   exportOperationLogsCsv,
+  buildOperationLogCsv,
 };

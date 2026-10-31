@@ -7,6 +7,7 @@
 const prisma = require('../utils/prisma');
 const { normalizeInvoiceNumbers } = require('./purchaseInvoiceService');
 const { normalizePurchaseTaxRate } = require('./purchaseAmountService');
+const { csvSafeText } = require('../utils/csvExport');
 
 const MATCH_STATUS = {
   PENDING: 'pending',
@@ -73,7 +74,7 @@ const escapeCsvValue = (value) => {
     return '';
   }
 
-  const text = String(value);
+  const text = csvSafeText(value);
   if (/[",\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;
   }
@@ -454,4 +455,5 @@ const exportTaxRefunds = async (filters = {}) => {
 
 module.exports = {
   exportTaxRefunds,
+  buildCsv,
 };

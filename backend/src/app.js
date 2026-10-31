@@ -112,6 +112,7 @@ app.use(errorHandler);
 const PORT = config.port;
 
 async function startServer() {
+  await require('./utils/sqliteConcurrency').ensureWalJournal(require('./utils/prisma'));
   await require('./services/bootstrapAdmin').ensureBootstrapAdmin(require('./utils/prisma'));
 
   startInventoryAlertJob();
