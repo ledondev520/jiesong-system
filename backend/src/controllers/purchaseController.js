@@ -573,16 +573,24 @@ const getNextContractNo = async (req, res, next) => {
  * 职责：获取商品历史采购价格统计
  * 思路：查询 PurchaseItem 中该商品的所有历史记录，计算均价、最低价、最高价
  * @param productId 商品ID
- * @returns { averagePrice, minPrice, maxPrice, count, history }
+ * @returns { averagePrice, minPrice, maxPrice, count, history, bySupplier }
+ * 草稿/已取消合同不计入（与应付口径一致）；bySupplier 另排除已停用(isActive=false)供应商
  */
 const getProductPriceHistory = async (req, res, next) => {
   try {
     const { productId } = req.params;
 
     const historyItems = await prisma.purchaseItem.findMany({
-      where: { productId, quantity: { gt: 0 } },
+      where: { productId, quantity: { gt: 0 }, purchaseContract: { status: { notIn: ['DRAFT', 'CANCELLED'] } } },
       include: {
-        purchaseContract: { select: { contractNo: true, createdAt: true } },
+        purchaseContract: {
+          select: {
+            contractNo: true,
+            createdAt: true,
+            taxRate: true,
+            supplier: { select: { id: true, name: true, shortName: true, isActive: true, hasQualityIssue: true } },
+          },
+        },
         product: { select: { customsName: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -595,6 +603,7 @@ const getProductPriceHistory = async (req, res, next) => {
         maxPrice: null,
         count: 0,
         history: [],
+        bySupplier: [],
       });
     }
 
@@ -603,6 +612,8 @@ const getProductPriceHistory = async (req, res, next) => {
         contractNo: h.purchaseContract.contractNo,
         price: Number(h.unitPrice),
         date: h.purchaseContract.createdAt,
+        taxRate: h.purchaseContract.taxRate,
+        supplier: h.purchaseContract.supplier,
       }))
       .filter((h) => Number.isFinite(h.price) && h.price > 0);
 
@@ -613,6 +624,7 @@ const getProductPriceHistory = async (req, res, next) => {
         maxPrice: null,
         count: 0,
         history: [],
+        bySupplier: [],
       });
     }
 
@@ -631,11 +643,41 @@ const getProductPriceHistory = async (req, res, next) => {
         price: Number(p.price.toFixed(2)),
         date: p.date,
       })),
+      bySupplier: summarizePricesBySupplier(prices),
     });
   } catch (error) {
     next(error);
   }
 };
+
+/** 按供应商汇总价格（最近价、最低、均价、次数、最近日期）；已停用供应商不参与；最近价最低者在前 */
+function summarizePricesBySupplier(prices) {
+  const groups = new Map();
+  for (const p of prices) {
+    if (!p.supplier || p.supplier.isActive === false) continue;
+    if (!groups.has(p.supplier.id)) groups.set(p.supplier.id, []);
+    groups.get(p.supplier.id).push(p);
+  }
+  return [...groups.values()]
+    .map((list) => {
+      const sorted = [...list].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const last = sorted[0];
+      const values = list.map((p) => p.price);
+      return {
+        supplierId: last.supplier.id,
+        supplierName: last.supplier.shortName || last.supplier.name,
+        hasQualityIssue: last.supplier.hasQualityIssue,
+        lastPrice: Number(last.price.toFixed(2)),
+        lastDate: last.date,
+        lastContractNo: last.contractNo,
+        lastTaxRate: last.taxRate,
+        minPrice: Number(Math.min(...values).toFixed(2)),
+        averagePrice: Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(2)),
+        count: values.length,
+      };
+    })
+    .sort((a, b) => a.lastPrice - b.lastPrice);
+}
 
 /**
  * 职责：根据商品ID列表获取曾供应过这些商品的供应商ID

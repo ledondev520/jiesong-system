@@ -83,14 +83,18 @@ import {
   ParsedQuoteItem,
   PurchaseCreatePayload,
   purchaseService,
-  ProductPriceHistory,
 } from "@/services/purchase.service";
+import type {
+  PriceHistoryWithSuppliers,
+  SupplierPriceSummary,
+} from "@/services/priceComparison";
 import { supplierService } from "@/services/supplier.service";
 import { productService } from "@/services/product.service";
 import { contractTemplateService } from "@/services/contractTemplate.service";
 import { ContractTemplate } from "@/types";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PriceGuard } from "@/components/purchase/PriceGuard";
+import { SupplierPriceComparePopover } from "@/components/purchase/SupplierPriceComparison";
 import {
   Table,
   TableBody,
@@ -352,7 +356,7 @@ export default function CreatePurchasePage() {
 
   // 商品价格历史缓存（按 productId）
   const [priceHistoryMap, setPriceHistoryMap] = useState<
-    Record<string, ProductPriceHistory>
+    Record<string, PriceHistoryWithSuppliers>
   >({});
 
   const { fields, append, remove } = useFieldArray({
@@ -409,6 +413,16 @@ export default function CreatePurchasePage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productIdsKey]);
+
+  const supplierRows = (item: { productId?: string } | undefined) =>
+    priceHistoryMap[item?.productId ?? ""]?.bySupplier ?? [];
+
+  const pickSupplier = (index: number, row: SupplierPriceSummary) => {
+    form.setValue("supplierId", row.supplierId, { shouldDirty: true });
+    form.setValue(`items.${index}.unitPrice`, row.lastPrice, {
+      shouldDirty: true,
+    });
+  };
 
   // ============== 加载合同模板 ==============
   useEffect(() => {
@@ -1110,6 +1124,14 @@ export default function CreatePurchasePage() {
                                       watchItems[index]?.unitPrice || 0
                                     }
                                     supplierId={form.watch("supplierId")}
+                                  />
+                                )}
+                                {/* 供应商比价：「用此供应商」同时填入供应商与不含税单价 */}
+                                {watchItems[index]?.productId && (
+                                  <SupplierPriceComparePopover
+                                    rows={supplierRows(watchItems[index])}
+                                    currentSupplierId={watchSupplierId}
+                                    onPick={(row) => pickSupplier(index, row)}
                                   />
                                 )}
                               </FormItem>
