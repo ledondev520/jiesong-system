@@ -159,14 +159,15 @@ const wrapWithFallback = ({
     }
   };
 
-  const wrapStream = (stream, body, options, startedAt) => {
+  const wrapStream = (stream, body, options, startedAt, fallbackTried) => {
     let current = stream;
     let served;
     let deadlineSignal;
     return {
       get controller() { return current.controller; },
       get servedBy() { return served; },
-      get deadlineSignal() { return deadlineSignal; },
+      // 流实际运行所处的 deadline（主调用重试或回退都可能不是调用方最初的 signal）
+      get deadlineSignal() { return deadlineSignal || options?.signal; },
       async *[Symbol.asyncIterator]() {
         let delivered = false;
         const held = [];
@@ -193,7 +194,7 @@ const wrapWithFallback = ({
         const kind = classifyFailure(error, options?.signal);
         if (kind === 'abort' || kind === 'other') breaker.release();
         else breaker.record(kind === 'provider');
-        if (delivered || kind === 'abort' || kind === 'other') {
+        if (delivered || fallbackTried || kind === 'abort' || kind === 'other') {
           if (error) throw error;
           return; // 调用方（streamHelpers）会按 deadline 抛出
         }
@@ -204,11 +205,14 @@ const wrapWithFallback = ({
         served = servedBy;
         deadlineSignal = fallback.options.signal;
         let fallbackDelivered = false;
+        const fallbackHeld = [];
         try {
           for await (const chunk of fallback.result) {
-            fallbackDelivered = true;
-            yield chunk;
+            if (fallbackDelivered) { yield chunk; continue; }
+            fallbackHeld.push(chunk);
+            if (isDeliverable(chunk)) { fallbackDelivered = true; yield* fallbackHeld.splice(0); }
           }
+          yield* fallbackHeld;
         } catch (fallbackError) {
           log(`[ai-fallback] fallback stream failed (${describe(fallbackError)})`);
           throw fallbackDelivered ? fallbackError : primaryError;
@@ -240,7 +244,7 @@ const wrapWithFallback = ({
     }
     try {
       const result = await primary.chat.completions.create(body, options);
-      if (body?.stream === true) return wrapStream(result, body, options, startedAt);
+      if (body?.stream === true) return wrapStream(result, body, options, startedAt, fallbackTried);
       breaker.record(true);
       return result;
     } catch (error) {

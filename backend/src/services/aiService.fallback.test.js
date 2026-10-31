@@ -162,6 +162,10 @@ test('aiService fallback (mocked transport): chat, SSE, parse, usage model, brea
       useFallback(); config.ai = { provider: 'kimi', apiKey: 'test-only-primary-key', baseUrl: 'https://primary.invalid/v1' };
       assert.equal((await ai.getOpenAIClient({ fallback: false })).apiKey, 'test-only-primary-key', 'raw SDK client');
       assert.equal((await ai.getOpenAIClient()).apiKey, undefined, 'fallback wrapper');
+      reset(); primaryReply = fail(503); fallbackReply = answer('NEVER');
+      const greeting = await ai.generateGreeting();
+      assert.equal(greeting.source, 'local');
+      assert.equal(count('primary'), 1); assert.equal(count('fallback'), 0, 'greeting never falls back');
       config.ai = { ...baseAi };
       console.log('fallback synthetic checks completed');
     })().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => prisma.$disconnect());

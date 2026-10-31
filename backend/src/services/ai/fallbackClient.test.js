@@ -8,6 +8,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const OpenAI = require('openai');
+const { collectStreamedChat } = require('./streamHelpers');
 const {
   wrapWithFallback, createBreaker, classifyFailure, buildFallbackBody, DEEPSEEK_PROFILE,
 } = require('./fallbackClient');
@@ -325,4 +326,35 @@ test('half-open probe whose stream ends cleanly (even empty) closes the breaker'
   clock = 10;
   await collect(await client.chat.completions.create({ ...textBody, stream: true }, {}));
   assert.equal(breaker.state, 'closed');
+});
+
+test('breaker open + DeepSeek fails: the primary-retry stream is judged by its own deadline, not the spent caller signal', async () => {
+  const spent = AbortSignal.abort(Object.assign(new Error('t'), { name: 'TimeoutError' }));
+  const { client, breaker } = build({ primary: fakeClient(() => asyncStream([content('hello'), content(' world')])), fallback: fakeClient(() => { throw apiError(500); }), threshold: 1 });
+  breaker.record(false);
+  const seen = [];
+  const result = await collectStreamedChat({
+    client, model: 'm', messages: [], onChunk: (text) => seen.push(text), requestOptions: { signal: spent },
+  });
+  assert.equal(result.fullContent, 'hello world');
+  assert.deepEqual(seen, ['hello', ' world']);
+});
+
+test('breaker open + DeepSeek fails + primary-retry stream fails early: no second DeepSeek call, primary error surfaces', async () => {
+  const primaryError = apiError(503);
+  const failing = { controller: {}, async *[Symbol.asyncIterator]() { throw primaryError; } };
+  const fallback = fakeClient(() => { throw apiError(500); });
+  const { client, breaker } = build({ primary: fakeClient(() => failing), fallback, threshold: 1 });
+  breaker.record(false);
+  const wrapped = await client.chat.completions.create({ ...textBody, stream: true }, {});
+  await assert.rejects(collect(wrapped), (thrown) => thrown === primaryError);
+  assert.equal(fallback.calls.length, 1);
+});
+
+test('DeepSeek stream that sends only a role chunk then errors surfaces the primary error', async () => {
+  const primaryError = apiError(503);
+  const failingPrimary = { controller: {}, async *[Symbol.asyncIterator]() { throw primaryError; } };
+  const roleThenError = { controller: {}, async *[Symbol.asyncIterator]() { yield { choices: [{ delta: { role: 'assistant', content: '' } }] }; throw apiError(500); } };
+  const { client } = build({ primary: fakeClient(() => failingPrimary), fallback: fakeClient(() => roleThenError) });
+  await assert.rejects(collect(await client.chat.completions.create({ ...textBody, stream: true }, {})), (thrown) => thrown === primaryError);
 });
