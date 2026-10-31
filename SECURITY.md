@@ -191,3 +191,7 @@ Migration A (customers, stores.customerId/code/legalName, sales_contracts custom
 ## Quotes (Migration B2)
 
 `backend/src/services/quoteService.js` + `quoteStateMachine.js` implement Quote/QuoteItem (DATA-MODEL-2026 §4): DRAFT-only edits, CANCELLED instead of delete (no DELETE route), prices only from `priceFor()` (client formulaPrice ignored; manual price needs `isManualPrice`), ACCEPTED→CONVERTED creates one DRAFT sales order in a single transaction guarded by `updateMany` status and unique `sales_contracts.quoteId`. `/api/v1/quotes` read: ADMIN/SALES/PURCHASE/FINANCE/BOSS (cost columns visible to them), write: ADMIN/SALES; WAREHOUSE denied; BOSS whitelist is `/quotes` and `/quotes/:id` only (the J21 export stays denied). Quote prices and reference costs are Confidential. Migration is a one-way door: back up before deploy.
+
+## Quotation / PI export
+
+`GET /api/v1/quotes/:id/export.xlsx` and `/print` (`quoteExportService.js`, `quoteExportController.js`) stream the 外销合同-layout workbook / script-free HTML straight to the response (`Cache-Control: no-store`); nothing is written to disk or `UPLOAD_DIR`. Roles ADMIN/SALES/PURCHASE/FINANCE; BOSS and WAREHOUSE are denied (generated documents; the BOSS whitelist matches only `/quotes` and `/quotes/:id`). Both outputs are built from one document model that never contains cost, markup, cost supplier/contract or manual-price flags; the seller prints the company name only, no bank identifiers.

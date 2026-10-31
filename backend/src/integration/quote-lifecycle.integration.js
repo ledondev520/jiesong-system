@@ -193,6 +193,27 @@ test('quote service over HTTP', async (t) => {
     assert.equal((await ok('SALES', 'GET', '/quotes?keyword=zzz-no-match')).items.length, 0);
   });
 
+  await t.test('export.xlsx and print view are streamed, role-limited and never stored', async () => {
+    const quote = await ok('SALES', 'POST', '/quotes', { items: [line(), line({ productId: tile.id, storeId: storeB.id, quantity: 2 })] });
+    const raw = async (role, route) => fetch(base + route, { headers: { authorization: `Bearer ${roles[role].token}` } });
+    for (const role of ['SALES', 'ADMIN', 'PURCHASE', 'FINANCE']) {
+      const response = await raw(role, `/quotes/${quote.id}/export.xlsx`);
+      assert.equal(response.status, 200, role);
+      assert.match(response.headers.get('content-type'), /spreadsheetml/);
+      assert.match(response.headers.get('content-disposition'), new RegExp(quote.quoteNo));
+      assert.equal(Buffer.from(await response.arrayBuffer()).subarray(0, 2).toString(), 'PK');
+    }
+    const html = await (await raw('SALES', `/quotes/${quote.id}/print`)).text();
+    assert.ok(html.includes(quote.quoteNo));
+    assert.ok(!html.includes('10000')); // no cost column
+    for (const role of ['BOSS', 'WAREHOUSE']) {
+      assert.equal((await raw(role, `/quotes/${quote.id}/export.xlsx`)).status, 403, role);
+      assert.equal((await raw(role, `/quotes/${quote.id}/print`)).status, 403, role);
+    }
+    assert.equal((await raw('SALES', '/quotes/missing/export.xlsx')).status, 404);
+    assert.deepEqual(fs.existsSync(process.env.UPLOAD_DIR) ? fs.readdirSync(process.env.UPLOAD_DIR) : [], []);
+  });
+
   await t.test('roles: WAREHOUSE denied, PURCHASE/FINANCE read-only, BOSS read-only, anonymous 401', async () => {
     const quote = await ok('ADMIN', 'POST', '/quotes', { items: [line()] });
     assert.equal((await call(null, 'GET', '/quotes')).status, 401);

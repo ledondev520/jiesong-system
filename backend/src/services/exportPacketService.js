@@ -471,6 +471,10 @@ module.exports = {
   DEFAULT_SELLER_NAME,
   get FX_BUFFER() { return -loadPricingConfig().exchangeAdjustment; },
   buildExportPacketWorkbook,
+  // Sheet styling helpers shared with the quotation export (quoteExportService.js).
+  applyTitle,
+  styleTable,
+  configureSheet,
   evaluateExportPacket,
   generateExportPacket,
   historicalQuoteAllowed,
