@@ -123,6 +123,8 @@ async function enterFromMenu(page: Page) {
     .getByRole("link", { name: "出口订单", exact: true })
     .first()
     .click();
+  await expect(page).toHaveURL(/\/dashboard\/orders$/);
+  await page.getByRole("link", { name: fixture.salesNo!, exact: true }).click();
   await expect(page).toHaveURL(`/dashboard/orders/${fixture.salesId}`);
   await expect(
     page.getByRole("heading", { name: fixture.salesNo!, exact: true }),

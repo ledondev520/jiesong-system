@@ -880,6 +880,48 @@ describe("OrderDetailPage 交互逻辑", () => {
     ).toBeInTheDocument();
   });
 
+  it("手机上 3D 装箱不渲染 3D 场景，只给出说明；桌面照常渲染", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "SYNTHETIC-3D",
+        status: "PACKING",
+        totalBoxes: 1,
+        volume: 1,
+        grossWeight: 1,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-1",
+            productId: "p-1",
+            boxes: 1,
+            quantity: 1,
+            volume: 1,
+            product: { id: "p-1", customsName: "合成商品" },
+          },
+        ],
+        port: { name: "合成港口" },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+    const user = userEvent.setup();
+    mockIsMobile.mockReturnValue(true);
+    const { unmount } = renderPage("s-1");
+    await user.click(await screen.findByRole("tab", { name: "货柜" }));
+    expect(
+      await screen.findByText(/3D 装箱视图仅在电脑上提供/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("3D容器视图")).not.toBeInTheDocument();
+    unmount();
+
+    mockIsMobile.mockReturnValue(false);
+    renderPage("s-1");
+    await user.click(await screen.findByRole("tab", { name: "货柜" }));
+    expect(await screen.findByText("3D容器视图")).toBeInTheDocument();
+  });
+
   it("手机装箱卡片编辑保持采购来源数量、箱数、重量和尺寸锁定", async () => {
     mockIsMobile.mockReturnValue(true);
     mockGetById.mockResolvedValue({
