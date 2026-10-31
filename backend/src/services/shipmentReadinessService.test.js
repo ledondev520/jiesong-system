@@ -203,3 +203,18 @@ test('evaluateLoadingCheck: 重心偏离超过柜长 20% 给出提示但不阻�
   assert.equal(check.ready, true);
   assert.match(check.warnings.find((item) => item.code === 'cog-offset').message, /^重心偏后 3\.50 m/);
 });
+
+test('C5-02 回归：底座 9000 mm 长、上层 4 箱共 12000 mm，不得再因块平均支撑放行悬空的第 4 箱', () => {
+  const items = [
+    { id: 'base', boxes: 1, quantity: 1, grossWeight: 17600, volume: 27, length: 9000, width: 2000, height: 1500,
+      product: { customsName: 'base' } },
+    { id: 'upper', boxes: 4, quantity: 4, grossWeight: 40, volume: 26.4, length: 3000, width: 2000, height: 1100,
+      product: { customsName: 'upper' } },
+  ];
+  const { plan } = buildLoadingPlan({ packingItems: items });
+  const cartons = plan.containers.flatMap((container) => container.blocks);
+  assert.equal(cartons.reduce((sum, block) => sum + block.cartons, 0) + plan.unplaced.reduce((sum, entry) => sum + entry.cartons, 0), 5);
+  // 底座顶面之上的块都必须落在底座 x∈[0,9000) 内；伸出者即无支撑。
+  const overhang = cartons.filter((block) => block.z > 0 && block.x + block.nx * block.cartonMm.length > 9000);
+  assert.deepEqual(overhang, []);
+});
