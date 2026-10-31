@@ -155,6 +155,18 @@ test('quote service over HTTP', async (t) => {
     assert.equal(order.items.length, 2);
     const item = order.items.find((i) => i.productId === normal.id);
     assert.deepEqual([item.storeId, item.quantity, item.costPrice, item.sellingPrice], [storeA.id, 10, 10000, 1995]);
+    // R1-1: export pricing on the converted order applies the FX adjustment once — same cost, same rule, same price as the quote.
+    const detail = await ok('SALES', 'GET', `/sales/${order.id}`);
+    assert.deepEqual([detail.rateBasis, detail.spotRate, detail.exchangeRate], ['effective', 6.72, 6.52]);
+    const { evaluateExportReadiness } = require('../services/exportReadinessService');
+    const { evaluateExportPacket } = require('../services/exportPacketService');
+    const exported = { ...order, packingItems: [{ id: 'pk-r1', productId: normal.id, quantity: 10, purchaseCost: 100000, product: { customsName: 'Synthetic normal good' } }] };
+    const readiness = evaluateExportReadiness(exported);
+    assert.equal(readiness.lines[0].recommendedUnitPriceUsd, 1995);
+    const untouched = evaluateExportPacket(exported, readiness, [], {});
+    assert.deepEqual([untouched.pricingPolicy.spotRate, untouched.pricingPolicy.effectiveRate], [6.72, 6.52]);
+    const typed = evaluateExportPacket(exported, readiness, [], { spotRate: detail.spotRate });
+    assert.equal(typed.pricingPolicy.effectiveRate, 6.52);
     assert.equal((await call('SALES', 'PUT', `/quotes/${quote.id}`, { status: 'CONVERTED' })).status, 400);
     assert.equal(await db.salesContract.count({ where: { quoteId: quote.id } }), 1);
   });

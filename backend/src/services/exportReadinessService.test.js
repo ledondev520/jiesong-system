@@ -146,3 +146,14 @@ test('本票装箱确认的 HS 和申报要素优先于历史与共享商品档�
   assert.equal(result.lines[0].declarationElements, '0|0|铝合金|型材|挤压喷涂|||无品牌');
   assert.equal(result.lines[0].origin, '广东省佛山市');
 });
+
+test('评审 R1-1：报价转换的订单 exchangeRate 已是计价汇率，建议售价只做一次汇率调整', () => {
+  const config = { exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5 };
+  const priced = (contract) => evaluateExportReadiness(makeContract({ ...contract, packingItems: [{ ...makeContract().packingItems[0], purchaseCost: 10000, quantity: 10 }] }), {}, config);
+  const manual = priced({ exchangeRate: 6.72 });
+  const converted = priced({ exchangeRate: 6.52, quoteId: 'quote-1' });
+  assert.equal(manual.lines[0].recommendedUnitPriceUsd, 200); // 1000 × 1.3 ÷ 6.52 = 199.39 → 200
+  assert.equal(converted.lines[0].recommendedUnitPriceUsd, 200);
+  // Without the quote link the same 6.52 would be treated as spot (6.32) — the double adjustment the review found.
+  assert.equal(priced({ exchangeRate: 6.52 }).lines[0].recommendedUnitPriceUsd, 205);
+});

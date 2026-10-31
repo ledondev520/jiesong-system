@@ -9,7 +9,7 @@ const { createError } = require('../middleware/errorHandler');
 const { normalizePurchaseTaxRate, roundMoney } = require('./purchaseAmountService');
 
 const { loadPricingConfig } = require('./pricingConfigService');
-const { effectiveRateFor, markupFor, priceFor, round } = require('./exportPricing');
+const { markupFor, orderEffectiveRate, orderRateInput, priceFor, round } = require('./exportPricing');
 const { withCategoryChains } = require('./productCategoryChain');
 const PRICE_EPSILON = 0.01;
 
@@ -99,7 +99,7 @@ const evaluateExportReadiness = (contract = {}, {
   activeTaxRates = [],
 } = {}, config = loadPricingConfig()) => {
   const exchangeRate = toPositiveOrNull(contract.exchangeRate);
-  const effectiveExchangeRate = effectiveRateFor(contract.exchangeRate, config);
+  const effectiveExchangeRate = orderEffectiveRate(contract, config);
   const overrideByPackingItem = getFirstByKey(overrides, 'packingItemId');
   const historyByProduct = getFirstByKey(historicalItems, 'productId');
   const hsByCode = new Map(
@@ -169,7 +169,7 @@ const evaluateExportReadiness = (contract = {}, {
     const targetMarkup = markupFor(categoryIds, config);
     // 唯一报价规则：单位成本 = 行采购成本 ÷ 数量；缺成本/缺现汇不给建议价
     const formula = purchaseCostCny && exchangeRate && quantity
-      ? priceFor({ costCny: purchaseCostCny / quantity, categoryIds, spotRate: exchangeRate }, config)
+      ? priceFor({ costCny: purchaseCostCny / quantity, categoryIds, ...orderRateInput(contract) }, config)
       : null;
     if (refundRate === null) {
       issues.push(makeIssue('MISSING_REFUND_RATE', 'error', 'tax_refund', '当前税则未提供出口退税率'));

@@ -28,7 +28,7 @@ const buildPackingSourceVersion = (items) => crypto.createHash('sha256').update(
 )).digest('hex');
 
 const { loadPricingConfig } = require('./pricingConfigService');
-const { effectiveRateFor, historicalQuoteAllowed, markupFor, priceFor, realizedMarkup, round, PRICE_TOLERANCE } = require('./exportPricing');
+const { effectiveRateFor, historicalQuoteAllowed, markupFor, orderEffectiveRate, orderRateInput, priceFor, realizedMarkup, round, PRICE_TOLERANCE } = require('./exportPricing');
 const { withCategoryChains } = require('./productCategoryChain');
 const toNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 const normalizeText = (value) => String(value || '').trim().replace(/\s+/g, '').toLowerCase();
@@ -48,8 +48,11 @@ const findHistoricalQuote = (historicalQuotes, item, productName) => (
 /** 纯函数：用同一组输入形成页面预览和生成器消费的冻结快照。 */
 const evaluateExportPacket = (contract, readiness, historicalQuotes = [], options = {}, config = loadPricingConfig()) => {
   const FX_BUFFER = -config.exchangeAdjustment;
-  const spotRate = toNumber(options.spotRate ?? contract.exchangeRate);
-  const effectiveRate = effectiveRateFor(spotRate, config);
+  // 用户在工作台填的总是现汇；没填时按订单保存的口径（报价转换的订单存计价汇率，评审 R1-1），调整只做一次。
+  const typedSpot = options.spotRate !== undefined && options.spotRate !== null;
+  const rateInput = typedSpot ? { spotRate: toNumber(options.spotRate) } : orderRateInput(contract);
+  const effectiveRate = typedSpot ? effectiveRateFor(rateInput.spotRate, config) : orderEffectiveRate(contract, config);
+  const spotRate = typedSpot ? rateInput.spotRate : (contract.quoteId ? round(effectiveRate - config.exchangeAdjustment, 6) : toNumber(contract.exchangeRate));
   const validRate = effectiveRate > 0;
   const buyerName = String(options.buyerName || '').trim();
   const sellerName = String(options.sellerName || '').trim();
@@ -118,7 +121,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       : null;
     // 唯一报价规则：单位成本 = 行采购成本 ÷ 数量
     const formulaResult = validRate && purchaseCostCny > 0 && quantity > 0
-      ? priceFor({ costCny: purchaseCostCny / quantity, categoryIds, spotRate }, config)
+      ? priceFor({ costCny: purchaseCostCny / quantity, categoryIds, ...rateInput }, config)
       : null;
     const formula = formulaResult?.status === 'OK'
       ? {
@@ -445,7 +448,8 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
       where: { id: salesContractId },
       data: {
         ...buildDerivedSalesAmountUpdate(sources.contract, packet.summary.totalUsd),
-        exchangeRate: packet.pricingPolicy.spotRate,
+        // 写回保持订单口径：报价转换的订单仍存计价汇率，其余存现汇。
+        exchangeRate: sources.contract.quoteId ? packet.pricingPolicy.effectiveRate : packet.pricingPolicy.spotRate,
       },
     });
     file = await fileService.archiveGeneratedFile({

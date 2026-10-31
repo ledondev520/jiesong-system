@@ -129,3 +129,13 @@ test('分类加价沿祖先链取最近一项：瓷砖 10%，单价向上取整�
   assert.equal(packet.lines[0].unitPriceUsd, 110);
   assert.equal(packet.lines[0].roundingMethod, 'round_up_unit');
 });
+
+test('评审 R1-1：报价转换的订单未填现汇时用保存的计价汇率，填了现汇时按现汇；调整都只做一次', () => {
+  const converted = contract({ quoteId: 'quote-1', exchangeRate: 6.6 });
+  const { spotRate: _typed, ...withoutSpot } = options();
+  const untouched = evaluateExportPacket(converted, readiness(), [], withoutSpot);
+  assert.equal(untouched.pricingPolicy.effectiveRate, 6.6);
+  assert.equal(untouched.lines[0].unitPriceUsd, evaluateExportPacket(contract(), readiness(), [], options()).lines[0].unitPriceUsd);
+  const typed = evaluateExportPacket(converted, readiness(), [], { ...withoutSpot, spotRate: 6.8 });
+  assert.equal(typed.pricingPolicy.effectiveRate, 6.6);
+});

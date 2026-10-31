@@ -131,6 +131,7 @@ const getSalesContractById = async (id) => {
         orderBy: { createdAt: 'asc' },
       },
       payments: true,
+      quote: { select: { spotRate: true } },
     },
   });
 
@@ -140,8 +141,12 @@ const getSalesContractById = async (id) => {
 
   const sourceParties = getThirdPartySources(contract.packingItems || []);
 
+  const { quote, ...rest } = contract;
   return {
-    ...contract,
+    ...rest,
+    // 汇率口径（评审 R1-1）：报价转换的订单 exchangeRate 存的是计价汇率，spotRate 给出现汇供页面预填。
+    rateBasis: contract.quoteId ? 'effective' : 'spot',
+    spotRate: contract.quoteId ? (quote?.spotRate ?? null) : contract.exchangeRate,
     hasThirdPartyCargo: sourceParties.length > 0,
     sourceParties,
   };

@@ -43,6 +43,21 @@ const effectiveRateFor = (spotRate, config = loadPricingConfig()) => {
   return Number.isFinite(spot) && spot > 0 ? round(spot + config.exchangeAdjustment, 6) : 0;
 };
 
+/**
+ * 订单保存的汇率口径（评审 R1-1）：由报价转换的订单（有 quoteId）保存的是报价用的计价汇率（现汇 − 调整，负责人 2026-10-31
+ * 决定，见 DATA-MODEL-2026 §491），其余订单保存现汇。下游定价用本函数取输入，保证调整只做一次。
+ */
+const orderRateInput = (contract = {}) => (contract?.quoteId
+  ? { effectiveRate: Number(contract.exchangeRate) }
+  : { spotRate: contract?.exchangeRate });
+
+/** 订单的计价汇率；口径同 orderRateInput。非法时返回 0。 */
+const orderEffectiveRate = (contract = {}, config = loadPricingConfig()) => {
+  if (!contract?.quoteId) return effectiveRateFor(contract?.exchangeRate, config);
+  const rate = Number(contract.exchangeRate);
+  return Number.isFinite(rate) && rate > 0 ? round(rate, 6) : 0;
+};
+
 /** categoryIds 为从商品分类到最顶层祖先的链（最近的在前）；命中第一个已配置的分类 */
 const markupFor = (categoryIds, config = loadPricingConfig()) => {
   const byId = new Map(config.categoryMarkups.map((entry) => [entry.categoryId, entry.markup]));
@@ -57,15 +72,18 @@ const realizedMarkup = (unitPriceUsd, quantity, effectiveRate, costCny) => (
 /**
  * 职责：按唯一规则给出建议单价。
  * 返回 status：OK | MISSING_COST（缺成本，不给建议价）| INVALID_RATE（现汇缺失或调整后非正）
- * @param {{ costCny: number, categoryIds?: string[], spotRate?: number }} input costCny 为单位采购成本(¥)；
- *   spotRate 缺省取配置现汇，已有订单应传该订单保存的现汇
+ * @param {{ costCny: number, categoryIds?: string[], spotRate?: number, effectiveRate?: number }} input costCny 为单位采购成本(¥)；
+ *   spotRate 缺省取配置现汇；已有订单用 orderRateInput(订单) 展开，由报价转换的订单直接给 effectiveRate（不再加调整）
  */
-const priceFor = ({ costCny, categoryIds = [], spotRate } = {}, config = loadPricingConfig()) => {
+const priceFor = ({ costCny, categoryIds = [], spotRate, effectiveRate } = {}, config = loadPricingConfig()) => {
   const cost = Number(costCny);
   if (costCny === null || costCny === undefined || costCny === '' || !Number.isFinite(cost) || cost <= 0) {
     return { status: 'MISSING_COST', unitPriceUsd: null };
   }
-  const rate = effectiveRateFor(spotRate === undefined ? config.exchangeRate : spotRate, config);
+  const given = Number(effectiveRate);
+  const rate = effectiveRate !== undefined
+    ? (Number.isFinite(given) && given > 0 ? round(given, 6) : 0)
+    : effectiveRateFor(spotRate === undefined ? config.exchangeRate : spotRate, config);
   if (!(rate > 0)) return { status: 'INVALID_RATE', unitPriceUsd: null };
   const markup = markupFor(categoryIds, config);
   const pricedCny = cost * (1 + markup);
@@ -87,5 +105,5 @@ const historicalQuoteAllowed = ({ unitPriceUsd, quantity, effectiveRate, costCny
 };
 
 module.exports = {
-  DEFAULT_ROUND_UP_TO, PRICE_TOLERANCE, effectiveRateFor, historicalQuoteAllowed, markupFor, priceFor, realizedMarkup, round, roundUp, snapPrice,
+  DEFAULT_ROUND_UP_TO, PRICE_TOLERANCE, effectiveRateFor, historicalQuoteAllowed, markupFor, orderEffectiveRate, orderRateInput, priceFor, realizedMarkup, round, roundUp, snapPrice,
 };
