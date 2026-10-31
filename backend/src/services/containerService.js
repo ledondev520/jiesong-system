@@ -5,17 +5,12 @@ const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
 const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
 const { SALES_STATUS, normalizeSalesStatus } = require('./salesStateMachine');
+const { getContainerSpec } = require('./containerSpecs');
 const {
   generateNextContractNo,
   normalizeFilterStatus,
   parseNullableNumber,
 } = require('./shared/contractUtils');
-
-const DEFAULT_CONTAINER_DIMENSIONS_MM = Object.freeze({
-  length: 12032,
-  width: 2352,
-  height: 2698,
-});
 
 const DEFAULT_ITEM_DIMENSION_MM = 500;
 const ASCII_GRID_WIDTH = 48;
@@ -431,7 +426,7 @@ const getVisualization = async (id) => {
     throw createError('货柜不存在', 404);
   }
 
-  const dimensionsMm = { ...DEFAULT_CONTAINER_DIMENSIONS_MM };
+  const dimensionsMm = { ...getContainerSpec().innerMm };
   const capacityCbm = roundNumber(
     (dimensionsMm.length * dimensionsMm.width * dimensionsMm.height) / 1_000_000_000,
     3

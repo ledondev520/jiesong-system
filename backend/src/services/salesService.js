@@ -17,7 +17,8 @@ const {
 const inventorySnapshot = require('./inventorySnapshot');
 const { defaultSpotRate, orderMargin, priceFor } = require('./exportPricing');
 const { categoryIdsByProduct, withCategoryChains } = require('./productCategoryChain');
-const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
+const { checkUtilisation, evaluateShipmentReadiness } = require('./shipmentReadinessService');
+const { getContainerSpec } = require('./containerSpecs');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
@@ -105,6 +106,8 @@ const getSalesContracts = async ({ page, pageSize, status, storeId, customerId, 
     const sourceParties = getThirdPartySources(c.packingItems || []);
     return {
       ...c,
+      // 列表只做汇总利用率（合同头由装箱明细汇总而来）；能否装下仅在详情页排柜后得知。
+      loadingUtilisation: checkUtilisation({ grossKg: c.grossWeight, cargoCbm: c.volume }, getContainerSpec()),
       stores: Array.from(storeMap.values()),
       hasThirdPartyCargo: sourceParties.length > 0,
       sourceParties,
@@ -271,6 +274,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
             id: true,
             boxes: true,
             quantity: true,
+            grossWeight: true,
             volume: true,
             length: true,
             width: true,
@@ -306,20 +310,9 @@ const updateSalesStatus = async (id, status, context = {}) => {
     const finalStatus = targetStatus === SALES_STATUS.CONFIRMED
       && existingContract.packingItems.some(item => Number(item.boxes) > 0) ? SALES_STATUS.PACKING : settledStatus;
     if (isTransition && targetStatus === SALES_STATUS.SHIPPED) {
-      const readiness = evaluateShipmentReadiness(existingContract);
-      if (!readiness.ready) {
-        let message = '当前货柜不满足发运条件';
-        if (readiness.unplacedBoxCount > 0) {
-          message = `仍有 ${readiness.unplacedBoxCount} 箱无法装入 40HQ 货柜`;
-        } else if (readiness.overloaded) {
-          message = `货柜${readiness.overloadReasons.includes('weight') ? '毛重超过22吨' : '体积超过68立方米'}`;
-        } else if (readiness.missingBoxItemCount > 0 || existingContract.packingItems.length === 0) {
-          message = '装箱明细或箱数未填写完整';
-        } else if (!readiness.utilizationReady) {
-          message = '毛重和体积均未达到80%出柜标准';
-        }
-        throw createError(message, 400);
-      }
+      // 门槛固定按默认柜型（40HQ）；柜型是否落库待业主决定。
+      const { check } = evaluateShipmentReadiness(existingContract);
+      if (!check.ready) throw createError(check.headline, 400);
     }
     const contract = await tx.salesContract.update({
       where: { id },

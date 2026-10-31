@@ -32,6 +32,7 @@
         "storage": [
           "Secrets only in .env or secret manager",
           "PR Review reporting uses zero GITHUB_TOKEN permissions and Actions summaries; failed check states are retained, and its locked formatter rejects incomplete history or unreadable changed source (scripts/check-pr-format.cjs)",
+          "UI-only PR label adds the scripts/check-ui-only.cjs check and never relaxes required checks; backend suites skip only when the whole diff is proven UI-only (fail-safe to full run)",
           "Unchecked-login bearer tokens remain tab-scoped in sessionStorage; optional browser credentials are HttpOnly/Secure/SameSite=Strict cookies with existing absolute expiry and only hashed server-side; JavaScript holds only a session-bound CSRF proof",
           "System-configured API keys are write-only; encrypted storage is permitted but complete values must never be returned or rendered",
           "System configuration environment-key fallbacks use the same masked response helper as database keys",

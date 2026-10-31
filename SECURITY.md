@@ -2,6 +2,9 @@
 
 PR Review (`.github/workflows/pr-review.yml`) reports checks through Actions `GITHUB_STEP_SUMMARY` with `permissions: {}`; it does not need GitHub comment-write access. Failed/cancelled type or lint/format checks remain failed. The locked formatter uses full Git history and explicit PR SHAs, preserves literal NUL-separated paths and fails on missing history/file reads (`scripts/check-pr-format.cjs`).
 
+Lightweight UI-only PRs do not weaken required checks: `scripts/check-ui-only.cjs` checks the whole PR diff against the redesign spec §14.1 allowlist/denylist (the `ui-only` label only adds `.github/workflows/ui-only.yml`), and backend suites are skipped only when that gate proves a UI-only diff; push events, missing history and gate errors run the full backend tests. Required checks are never filtered by workflow-level `paths`.
+
+
 ## 5-Layer Defense Architecture
 
 复核时效由 `scripts/check-review-freshness.cjs` 检查：仅信任 PR 作者或仓库 owner 创建的最新标记评论；PR 文件集合取 B0/H、B1/H 两对所有最佳共同祖先（`merge-base --all`）到 H 的 diff 文件并集，避免交叉合并漏掉文件；head 改变、base 后续文件交集、无效标记或历史/API 信息不足（含任一对没有共同祖先、Git 命令失败）均拒绝，以避免过期复核被沿用。`.github/workflows/review-freshness.yml` 仅使用 contents、pull-requests、issues 的 read 权限；合并前必须本地运行同一 CLI，因为 main 前进不会自动撤回已绿的检查。GitHub 强制拦截还需管理员将 `review-freshness` 设为必过检查。
