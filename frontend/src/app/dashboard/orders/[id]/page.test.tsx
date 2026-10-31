@@ -1,0 +1,1077 @@
+/**
+ * Input: 出口订单详情页、sales/product/store/inventory 服务、router、toast
+ * Output: 订单详情各页签（概览/明细/货柜/单证/收款）、唯一下一步、「单证 ▾」菜单与阶段/合同头失败重试测试，隔离并等待成功后的延迟退税弹窗
+ * Pos: 前端详情页交互测试（原 /dashboard/sales/[id] 用例迁移，默认从 ?tab=container 进入）
+ *
+ * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ */
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Suspense } from "react";
+import SalesDetailPage from "./page";
+
+let mockSearch = new URLSearchParams("tab=container");
+
+const mockIsMobile = vi.fn(() => false);
+
+vi.mock("@/lib/hooks/useMobile", () => ({ useMobile: () => mockIsMobile() }));
+
+const mockGetById = vi.fn();
+const mockProductGetAll = vi.fn();
+const mockStoreGetAll = vi.fn();
+const mockInventoryGetAll = vi.fn();
+const mockApiGet = vi.fn();
+const mockApiDelete = vi.fn();
+const mockToastError = vi.fn();
+const mockExportPdf = vi.fn();
+const mockExportExcel = vi.fn();
+const mockUpdateSalesStatus = vi.fn();
+const mockUpdateSales = vi.fn();
+const mockForexRender = vi.fn();
+
+vi.mock("react", async () => {
+  const actual = await vi.importActual<typeof import("react")>("react");
+  return {
+    ...actual,
+    use: (value: unknown) => {
+      if (value && typeof (value as { then?: unknown }).then === "function") {
+        return { id: "s-1" };
+      }
+      return actual.use(value as never);
+    },
+  };
+});
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    back: vi.fn(),
+    replace: vi.fn(),
+  }),
+  usePathname: () => "/dashboard/orders/s-1",
+  useSearchParams: () => mockSearch,
+}));
+
+vi.mock("@/services/sales.service", () => ({
+  salesService: {
+    getById: (...args: unknown[]) => mockGetById(...args),
+    update: (...args: unknown[]) => mockUpdateSales(...args),
+    addPackingItem: vi.fn(),
+    updatePackingItem: vi.fn(),
+    removePackingItem: vi.fn(),
+    exportPdf: (...args: unknown[]) => mockExportPdf(...args),
+    exportExcel: (...args: unknown[]) => mockExportExcel(...args),
+    updateStatus: (...args: unknown[]) => mockUpdateSalesStatus(...args),
+  },
+}));
+
+vi.mock("@/services/product.service", () => ({
+  productService: {
+    getAll: (...args: unknown[]) => mockProductGetAll(...args),
+  },
+}));
+
+vi.mock("@/services/store.service", () => ({
+  storeService: {
+    getAll: (...args: unknown[]) => mockStoreGetAll(...args),
+  },
+}));
+
+vi.mock("@/services/inventory.service", () => ({
+  inventoryService: {
+    getAll: (...args: unknown[]) => mockInventoryGetAll(...args),
+  },
+}));
+
+vi.mock("@/lib/axios", () => ({
+  default: {
+    get: (...args: unknown[]) => mockApiGet(...args),
+    delete: (...args: unknown[]) => mockApiDelete(...args),
+  },
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: vi.fn(),
+    info: vi.fn(),
+  },
+}));
+
+vi.mock("@/components/container/Container3DView", () => ({
+  default: () => <div>3D容器视图</div>,
+}));
+
+vi.mock("@/components/dialog/GenerateThreeFormsDialog", () => ({
+  GenerateThreeFormsDialog: ({ open }: { open: boolean }) =>
+    open ? <div>申报三表 HS 处理区</div> : null,
+}));
+
+vi.mock("@/components/dialog/ExportPacketWorkbenchDialog", () => ({
+  ExportPacketWorkbenchDialog: ({ open }: { open: boolean }) =>
+    open ? <div>出口三单预检区</div> : null,
+}));
+
+// This suite tests the parent flow; preparation API details have their own dialog tests.
+vi.mock("@/components/dialog/TaxRefundPreparationDialog", () => ({
+  TaxRefundPreparationDialog: ({ open }: { open: boolean }) =>
+    open ? <div role="dialog" aria-label="退税准备测试弹窗" /> : null,
+}));
+
+vi.mock("./components/SalesFinancePanel", () => ({
+  SalesFinancePanel: () => <div>单柜财务测试面板</div>,
+}));
+vi.mock("@/components/finance/ForexVerificationPanel", () => ({
+  ForexVerificationPanel: ({
+    salesContractId,
+  }: {
+    salesContractId: string;
+  }) => {
+    mockForexRender(salesContractId);
+    return <div>合同核销跟进测试面板</div>;
+  },
+}));
+
+describe("OrderDetailPage 交互逻辑", () => {
+  beforeEach(() => {
+    mockIsMobile.mockReturnValue(false);
+    mockSearch = new URLSearchParams("tab=container");
+    mockGetById.mockReset();
+    mockProductGetAll.mockReset();
+    mockStoreGetAll.mockReset();
+    mockInventoryGetAll.mockReset();
+    mockApiGet.mockReset();
+    mockApiDelete.mockReset();
+    mockToastError.mockReset();
+    mockExportPdf.mockReset();
+    mockExportExcel.mockReset();
+    mockUpdateSalesStatus.mockReset();
+    mockUpdateSales.mockReset();
+    mockForexRender.mockReset();
+    mockApiGet.mockResolvedValue({ data: [] });
+  });
+
+  /**
+   * 职责：使用 Suspense 渲染依赖 use(params) 的详情页
+   * 思路：统一包裹 fallback，确保 Promise params 能被 React 解析
+   * @param id 合同ID
+   */
+  const renderPage = (id = "s-1") => {
+    return render(
+      <Suspense fallback={<div>页面加载中...</div>}>
+        <SalesDetailPage params={Promise.resolve({ id })} />
+      </Suspense>,
+    );
+  };
+
+  it("合同头目的港选项使用带港口关联的门店读回而不是 lite 空选项", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP-SYNTHETIC-PORT",
+        status: "PACKING",
+        exchangeRate: 7.2,
+        portId: "port-1",
+        packingItems: [],
+        port: { id: "port-1", name: "合成原始港口" },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+    // The real stores controller omits port relations for lite:true.
+    mockStoreGetAll.mockImplementation(({ lite }: { lite?: boolean }) =>
+      Promise.resolve({
+        data: {
+          items: [
+            {
+              id: "store-2",
+              name: "合成港口门店",
+              portId: "port-2",
+              ...(!lite
+                ? { port: { id: "port-2", name: "合成可选择港口" } }
+                : {}),
+            },
+          ],
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "明细" }));
+    const panel = within(screen.getByRole("tabpanel", { name: "明细" }));
+    await user.click(panel.getByRole("button", { name: "编辑" }));
+    await user.click(panel.getByRole("combobox", { name: "目的港" }));
+    expect(
+      await screen.findByRole("option", { name: "合成可选择港口" }),
+    ).toBeVisible();
+    expect(mockStoreGetAll).toHaveBeenCalledWith({ pageSize: 100 });
+  });
+
+  it("合同头真实编辑器保留失败草稿并仅在明确纠正重试成功后关闭", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP-SYNTHETIC-HEADER",
+        status: "PACKING",
+        exchangeRate: 7.2,
+        signedAt: "2026-10-01T00:00:00.000Z",
+        estimatedArrival: "2026-11-01T00:00:00.000Z",
+        portId: "port-1",
+        totalAmount: 20,
+        receivedAmount: 5,
+        totalBoxes: 2,
+        grossWeight: 20,
+        netWeight: 18,
+        volume: 0.2,
+        packingItems: [],
+        port: { id: "port-1", name: "合成原始港口" },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+    mockUpdateSales
+      .mockRejectedValueOnce({ message: "汇率必须为正数" })
+      .mockResolvedValueOnce({ data: {} });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("tab", { name: "明细" }));
+    const panel = within(screen.getByRole("tabpanel", { name: "明细" }));
+    await user.click(panel.getByRole("button", { name: "编辑" }));
+    await user.clear(panel.getByRole("spinbutton"));
+    const signedAt = panel.getByDisplayValue("2026-10-01");
+    await user.clear(signedAt);
+    await user.type(signedAt, "2026-10-03");
+    const arrival = panel.getByDisplayValue("2026-11-01");
+    await user.clear(arrival);
+    await user.type(arrival, "2026-11-03");
+    await user.click(panel.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(mockUpdateSales).toHaveBeenCalledTimes(1));
+    expect(mockToastError).toHaveBeenCalledWith("汇率必须为正数");
+    await waitFor(() =>
+      expect(panel.getByRole("button", { name: "保存" })).toBeEnabled(),
+    );
+    expect(panel.getByRole("spinbutton")).toHaveValue(0);
+    expect(panel.getByDisplayValue("2026-10-03")).toBeInTheDocument();
+    expect(panel.getByDisplayValue("2026-11-03")).toBeInTheDocument();
+    expect(mockGetById).toHaveBeenCalledTimes(1);
+    await user.type(panel.getByRole("spinbutton"), "7.4");
+    await user.click(panel.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(mockUpdateSales).toHaveBeenCalledTimes(2));
+    expect(mockUpdateSales).toHaveBeenLastCalledWith("s-1", {
+      exchangeRate: 7.4,
+      signedAt: "2026-10-03",
+      estimatedArrival: "2026-11-03",
+      portId: "port-1",
+    });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "编辑" })).toBeInTheDocument(),
+    );
+  });
+
+  it("加载成功后展示合同号与空装箱态", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP2500001",
+        status: "DRAFT",
+        totalBoxes: 0,
+        volume: 0,
+        grossWeight: 0,
+        totalAmount: 0,
+        packingItems: [],
+        port: { name: "LA" },
+      },
+    });
+    mockSearch = new URLSearchParams();
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    expect(
+      await screen.findByRole("heading", { name: "EXP2500001" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "概览" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("暂无订单明细")).toBeInTheDocument();
+    expect(mockApiGet).toHaveBeenCalledWith("/contracts/s-1/files", {
+      params: { contractType: "SALES" },
+    });
+    // 概览与单证不加载商品/门店/库存
+    await user.click(screen.getByRole("tab", { name: "单证" }));
+    expect(
+      screen.getByText("暂无附件，点击「上传附件」归档出货源文件"),
+    ).toBeInTheDocument();
+    expect(mockProductGetAll).not.toHaveBeenCalled();
+    expect(mockStoreGetAll).not.toHaveBeenCalled();
+    expect(mockInventoryGetAll).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("tab", { name: "货柜" }));
+    expect(
+      screen.getByText("暂无装箱商品，可从已完工采购导入，也可手动添加"),
+    ).toBeInTheDocument();
+  });
+
+  it("点击添加商品会打开明细弹窗", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP2500001",
+        status: "DRAFT",
+        totalBoxes: 0,
+        volume: 0,
+        grossWeight: 0,
+        totalAmount: 0,
+        packingItems: [],
+        port: { name: "LA" },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /添加商品/ }),
+      ).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole("button", { name: /添加商品/ }));
+    expect(screen.getByText("添加商品到货柜")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockProductGetAll).toHaveBeenCalled();
+      expect(mockStoreGetAll).toHaveBeenCalled();
+      expect(mockInventoryGetAll).toHaveBeenCalled();
+    });
+  });
+
+  it("加载失败时提示错误", async () => {
+    mockGetById.mockRejectedValue(new Error("load failed"));
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+
+    renderPage("s-1");
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith("加载数据失败");
+    });
+  });
+
+  it("导出 PDF 按钮已移除，页面只保留保存为图片", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP2500001",
+        status: "DRAFT",
+        totalBoxes: 0,
+        volume: 0,
+        grossWeight: 0,
+        totalAmount: 0,
+        packingItems: [],
+        port: { name: "LA" },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+
+    renderPage("s-1");
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: /导出合同 PDF/ }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("详情页可直接导出标准出口工作簿", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 1,
+        volume: 60,
+        grossWeight: 1000,
+        totalAmount: 100,
+        packingItems: [],
+        port: { name: "Oakland" },
+      },
+    });
+    mockExportExcel.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    await user.click(await screen.findByRole("button", { name: "单证" }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: "导出出口工作簿" }),
+    );
+
+    expect(mockExportExcel).toHaveBeenCalledWith("s-1", "EXP260008");
+  });
+
+  it("「单证 ▾」菜单区分生成出口单证与申报三表入口", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260011",
+        status: "DRAFT",
+        exchangeRate: 6.8,
+        totalBoxes: 0,
+        volume: 0,
+        grossWeight: 0,
+        netWeight: 0,
+        totalAmount: 0,
+        packingItems: [],
+        port: { name: "洛杉矶" },
+      },
+    });
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    await user.click(await screen.findByRole("button", { name: "单证" }));
+    expect(
+      await screen.findByRole("menuitem", { name: /申报三表/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "船司装箱单核对" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "报关单草稿" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: /生成出口单证/ }));
+    expect(await screen.findByText("出口三单预检区")).toBeInTheDocument();
+    // 原先三个含义相近的页头按钮不再单独出现
+    expect(
+      screen.queryByRole("button", { name: "出口三单工作台" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "生成申报三表" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("报关汇总明确警示缺失 HS 编码的装箱商品并提供处理入口", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 2,
+        volume: 2,
+        grossWeight: 200,
+        totalAmount: 200,
+        packingItems: [
+          {
+            id: "pk-ready",
+            productId: "p-ready",
+            quantity: 1,
+            boxes: 1,
+            totalPrice: 100,
+            product: {
+              id: "p-ready",
+              customsName: "灯具",
+              hsCode: "9405110000",
+            },
+          },
+          {
+            id: "pk-missing",
+            productId: "p-missing",
+            quantity: 1,
+            boxes: 1,
+            totalPrice: 100,
+            product: { id: "p-missing", customsName: "隔断", hsCode: null },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    await user.click(await screen.findByRole("tab", { name: "单证" }));
+
+    expect(
+      screen.getByText("仍有 1 项装箱商品未匹配 HS 编码"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("未匹配：隔断")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "处理未匹配 HS 编码" }),
+    );
+    expect(await screen.findByText("申报三表 HS 处理区")).toBeInTheDocument();
+  });
+
+  it("报关汇总不会把相同 HS 编码的不同商品合并成一行", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 2,
+        volume: 2,
+        grossWeight: 200,
+        totalAmount: 4200,
+        packingItems: [
+          {
+            id: "pk-bar",
+            productId: "p-bar",
+            quantity: 3,
+            boxes: 1,
+            totalPrice: 1200,
+            product: {
+              id: "p-bar",
+              customsName: "1.2米常温调酒台",
+              hsCode: "9403200000",
+            },
+          },
+          {
+            id: "pk-screen",
+            productId: "p-screen",
+            quantity: 1,
+            boxes: 1,
+            totalPrice: 3000,
+            product: {
+              id: "p-screen",
+              customsName: "隔断",
+              hsCode: "9403200000",
+            },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    await user.click(await screen.findByRole("tab", { name: "单证" }));
+    const customsPanel = screen.getByRole("tabpanel", { name: "单证" });
+
+    expect(
+      within(customsPanel).getByRole("row", { name: /1\.2米常温调酒台 3/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(customsPanel).getByRole("row", { name: /隔断 1/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("商业利用率达标但有箱件未装下时禁止登记发运", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 1,
+        volume: 60,
+        grossWeight: 1000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-oversize",
+            productId: "p-1",
+            boxes: 1,
+            quantity: 1,
+            volume: 60,
+            length: 13000,
+            width: 1000,
+            height: 1000,
+            product: { id: "p-1", customsName: "超长货物" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+
+    renderPage("s-1");
+
+    expect(
+      await screen.findByText("不可出货：仍有 1 箱未装下"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled();
+  });
+
+  it("合同头虚高但明细合计未达标时禁止登记发运（与后端同源取明细合计）", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 9,
+        volume: 60,
+        grossWeight: 18000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-small",
+            productId: "p-1",
+            boxes: 1,
+            quantity: 1,
+            volume: 1,
+            grossWeight: 5000,
+            length: 1000,
+            width: 1000,
+            height: 1000,
+            product: { id: "p-1", customsName: "小件货物" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    expect(
+      await screen.findByRole("button", { name: "登记发运" }),
+    ).toBeDisabled();
+    expect(screen.queryByText(/满足出柜条件/)).not.toBeInTheDocument();
+    // 总箱数卡片同样取明细合计（1），而非合同头（9）
+    expect(screen.getByText("总箱数").previousElementSibling).toHaveTextContent(
+      /^1$/,
+    );
+    // 装箱完成时间线同样取明细合计（1 CBM），而非合同头（60 CBM）
+    await user.click(screen.getByRole("tab", { name: "概览" }));
+    expect(screen.getByText("1 箱，1.00 CBM")).toBeInTheDocument();
+  });
+
+  it("合同头偏低但明细合计达标时允许登记发运（与后端同源取明细合计）", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 1,
+        volume: 1,
+        grossWeight: 5000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-big",
+            productId: "p-1",
+            boxes: 1,
+            quantity: 1,
+            volume: 60,
+            grossWeight: 18000,
+            length: 1000,
+            width: 1000,
+            height: 1000,
+            product: { id: "p-1", customsName: "大宗货物" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+
+    renderPage("s-1");
+
+    expect(
+      await screen.findByRole("button", { name: "登记发运" }),
+    ).toBeEnabled();
+  });
+
+  it("商业利用率达标但有明细未填箱数时禁止登记发运，与后端一致", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 0,
+        volume: 60,
+        grossWeight: 1000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-nobox",
+            productId: "p-1",
+            boxes: null,
+            quantity: 1,
+            volume: 60,
+            length: 1000,
+            width: 1000,
+            height: 1000,
+            product: { id: "p-1", customsName: "未填箱数货物" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+
+    renderPage("s-1");
+
+    expect(
+      await screen.findByText("不可出货：1 行装箱明细未填写箱数"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled();
+  });
+
+  it.each(["SHIPPED", "ARRIVED", "COMPLETED"])(
+    "已发运阶段 %s 的模拟异常明确标为历史核对",
+    async (status) => {
+      mockGetById.mockResolvedValue({
+        data: {
+          id: "s-1",
+          contractNo: "SYNTHETIC-SHIP",
+          status,
+          totalBoxes: 1,
+          volume: 60,
+          grossWeight: 1000,
+          totalAmount: 100,
+          packingItems: [
+            {
+              id: "pk-history",
+              productId: "p-1",
+              boxes: 1,
+              quantity: 1,
+              volume: 60,
+              length: 13000,
+              width: 1000,
+              height: 1000,
+              product: { id: "p-1", customsName: "合成超长货物" },
+            },
+          ],
+          port: { name: "Synthetic Port" },
+        },
+      });
+      renderPage("s-1");
+      expect(
+        await screen.findByText("历史装箱数据待核对：仍有 1 箱未装下"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("当前资料的模拟结果，不代表实际发运结果"),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/不可出货/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "登记发运" }),
+      ).not.toBeInTheDocument();
+      expect(mockUpdateSalesStatus).not.toHaveBeenCalled();
+    },
+  );
+
+  it("装柜达标且全部箱件可放下时允许登记发运", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 1,
+        volume: 60,
+        grossWeight: 1000,
+        totalAmount: 100,
+        packingItems: [
+          {
+            id: "pk-fit",
+            productId: "p-1",
+            boxes: 1,
+            quantity: 1,
+            volume: 60,
+            length: 1000,
+            width: 1000,
+            height: 1000,
+            product: { id: "p-1", customsName: "可装货物" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+    mockUpdateSalesStatus.mockResolvedValue({ data: { status: "SHIPPED" } });
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    const shipButton = await screen.findByRole("button", { name: "登记发运" });
+    expect(shipButton).toBeEnabled();
+    await user.click(shipButton);
+
+    expect(mockUpdateSalesStatus).toHaveBeenCalledWith("s-1", "SHIPPED");
+  });
+
+  it("发运HTTP错误DTO保留库存不足原因，阶段不推进且允许原样重试", async () => {
+    const contract = {
+      id: "s-1",
+      contractNo: "SYNTHETIC-STOCK-GUARD",
+      status: "PACKING",
+      totalBoxes: 1,
+      volume: 60,
+      grossWeight: 1000,
+      totalAmount: 100,
+      packingItems: [
+        {
+          id: "pk-fit",
+          productId: "p-1",
+          boxes: 1,
+          quantity: 50,
+          volume: 60,
+          length: 1000,
+          width: 1000,
+          height: 1000,
+          product: { id: "p-1", customsName: "合成发运商品" },
+        },
+      ],
+      port: { name: "合成港口" },
+    };
+    mockGetById.mockResolvedValue({ data: contract });
+    const message = "商品 p-1 库存不足，需出库 50，可用 30";
+    // Shared Axios rejects response.data, not an Error instance, for HTTP errors.
+    mockUpdateSalesStatus.mockRejectedValueOnce({
+      code: 400,
+      message,
+      data: null,
+    });
+    const user = userEvent.setup();
+    renderPage("s-1");
+    const ship = await screen.findByRole("button", { name: "登记发运" });
+    await user.click(ship);
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith(message));
+    expect(mockToastError).not.toHaveBeenCalledWith("状态推进失败");
+    expect(mockGetById).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "登记发运" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "登记到港" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "退税准备测试弹窗" }),
+    ).not.toBeInTheDocument();
+
+    mockUpdateSalesStatus.mockResolvedValueOnce({
+      data: { ...contract, status: "SHIPPED" },
+    });
+    mockGetById.mockResolvedValue({ data: { ...contract, status: "SHIPPED" } });
+    await user.click(ship);
+    await waitFor(() => expect(mockUpdateSalesStatus).toHaveBeenCalledTimes(2));
+    expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(1, "s-1", "SHIPPED");
+    expect(mockUpdateSalesStatus).toHaveBeenNthCalledWith(2, "s-1", "SHIPPED");
+    expect(
+      await screen.findByRole("button", { name: "登记到港" }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "登记发运" }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: "退税准备测试弹窗" }),
+    ).toBeInTheDocument();
+  });
+
+  it("手机装箱卡片编辑保持采购来源数量、箱数、重量和尺寸锁定", async () => {
+    mockIsMobile.mockReturnValue(true);
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP260008",
+        status: "PACKING",
+        totalBoxes: 4,
+        volume: 2,
+        grossWeight: 400,
+        totalAmount: 0,
+        packingItems: [
+          {
+            id: "pk-imported",
+            purchaseItemId: "pi-1",
+            purchaseContractNo: "CG260001",
+            productId: "p-1",
+            quantity: 40,
+            boxes: 4,
+            unitPrice: null,
+            grossWeight: 400,
+            netWeight: 380,
+            volume: 2,
+            length: 500,
+            width: 400,
+            height: 300,
+            product: { id: "p-1", customsName: "已完工商品" },
+          },
+        ],
+        port: { name: "Oakland" },
+      },
+    });
+    mockProductGetAll.mockResolvedValue({ data: { items: [] } });
+    mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+    mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    const editButton = await screen.findByRole("button", {
+      name: "编辑 已完工商品",
+    });
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    await user.click(editButton);
+
+    expect(
+      screen.getByText(/若需改变箱数，请删除后重新导入/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "数量" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "箱数" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "毛重" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "净重" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "体积" })).toBeDisabled();
+    expect(screen.getByRole("spinbutton", { name: "单价" })).toBeEnabled();
+  });
+  it("概览展示按门店履约表；草稿的唯一下一步是确认订单", async () => {
+    mockSearch = new URLSearchParams();
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP-STORES",
+        status: "DRAFT",
+        totalAmount: 0,
+        items: [
+          {
+            id: "i1",
+            productId: "p1",
+            storeId: "st1",
+            quantity: 12,
+            store: { name: "合成门店A" },
+          },
+        ],
+        packingItems: [],
+        purchaseContracts: [
+          {
+            id: "pc1",
+            contractNo: "P-1",
+            status: "SIGNED",
+            items: [
+              {
+                id: "pi1",
+                productId: "p1",
+                storeId: "st1",
+                quantity: 12,
+                receiptItems: [{ acceptedQuantity: 7 }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    mockUpdateSalesStatus.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    renderPage();
+    expect(
+      await screen.findByRole("row", { name: "合成门店A 12 12 7 0" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "确认订单" }));
+    await waitFor(() =>
+      expect(mockUpdateSalesStatus).toHaveBeenCalledWith("s-1", "CONFIRMED"),
+    );
+    await user.click(screen.getByRole("tab", { name: "采购" }));
+    expect(screen.getByRole("link", { name: "P-1" })).toHaveAttribute(
+      "href",
+      "/dashboard/purchase/pc1",
+    );
+  });
+
+  it("旧链接 ?tab=finance 打开收款页签", async () => {
+    mockSearch = new URLSearchParams("tab=finance");
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP-LEGACY",
+        status: "SHIPPED",
+        packingItems: [],
+      },
+    });
+    renderPage();
+    expect(await screen.findByText("单柜财务测试面板")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "收款" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("核销跟进只在财务标签加载并绑定当前合同", async () => {
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "EXP-TEST",
+        status: "DRAFT",
+        totalBoxes: 0,
+        volume: 0,
+        grossWeight: 0,
+        totalAmount: 0,
+        packingItems: [],
+        port: { name: "测试港" },
+      },
+    });
+    const user = userEvent.setup();
+    renderPage("s-1");
+    await screen.findByRole("heading", { name: "EXP-TEST" });
+    expect(mockForexRender).not.toHaveBeenCalled();
+    expect(screen.queryByText("合同核销跟进测试面板")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "收款" }));
+    expect(await screen.findByText("合同核销跟进测试面板")).toBeInTheDocument();
+    expect(mockForexRender).toHaveBeenCalledWith("s-1");
+  });
+  it.each([false, true])(
+    "发运后保留资料编辑并锁定增删与数量（手机：%s）",
+    async (mobile) => {
+      mockIsMobile.mockReturnValue(mobile);
+      mockGetById.mockResolvedValue({
+        data: {
+          id: "s-1",
+          contractNo: "SYNTHETIC-SHIPPED",
+          status: "SHIPPED",
+          totalBoxes: 5,
+          grossWeight: 20000,
+          volume: 5,
+          totalAmount: 600,
+          packingItems: [
+            {
+              id: "pk-1",
+              productId: "p-1",
+              quantity: 50,
+              boxes: 5,
+              unitPrice: 12,
+              grossWeight: 20000,
+              netWeight: 19000,
+              volume: 5,
+              length: 1000,
+              width: 1000,
+              height: 1000,
+              product: { id: "p-1", customsName: "合成商品" },
+            },
+          ],
+        },
+      });
+      mockProductGetAll.mockResolvedValue({
+        data: { items: [{ id: "p-1", customsName: "合成商品" }] },
+      });
+      mockStoreGetAll.mockResolvedValue({ data: { items: [] } });
+      mockInventoryGetAll.mockResolvedValue({ data: { items: [] } });
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByRole("heading", { name: "SYNTHETIC-SHIPPED" });
+      expect(
+        screen.getByRole("button", { name: "从已完工采购导入" }),
+      ).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: "手动添加商品" }),
+      ).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: "删除 合成商品" }),
+      ).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "编辑 合成商品" }));
+      expect(screen.getByRole("spinbutton", { name: "数量" })).toBeDisabled();
+      expect(
+        screen.getByRole("spinbutton", { name: "单价" }),
+      ).not.toBeDisabled();
+      expect(
+        screen.getByRole("spinbutton", { name: "长度" }),
+      ).not.toBeDisabled();
+      // 关闭后不遗留编辑弹层，重新打开仍然保持货物锁定。
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: "取消",
+        }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      await user.click(screen.getByRole("button", { name: "编辑 合成商品" }));
+      expect(screen.getByRole("spinbutton", { name: "数量" })).toBeDisabled();
+    },
+  );
+});

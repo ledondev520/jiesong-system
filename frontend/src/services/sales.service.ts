@@ -354,6 +354,22 @@ export const salesService = {
   },
 
   /** 按出口合同状态机推进到下一阶段。 */
+  /** 生成采购单：每个供应商一份 DRAFT 采购合同（ADMIN/PURCHASE） */
+  generatePurchaseDrafts: async (
+    salesContractId: string,
+    lines: Array<{
+      salesItemId: string;
+      supplierId: string;
+      unitPrice: number;
+    }>,
+  ) => {
+    return api.post<
+      ApiResponse<{ contracts: Array<{ id: string; contractNo: string }> }>,
+      ApiResponse<{ contracts: Array<{ id: string; contractNo: string }> }>,
+      { lines: typeof lines }
+    >(`/sales/${salesContractId}/purchase-drafts`, { lines });
+  },
+
   updateStatus: async (id: string, status: SalesContract["status"]) => {
     return api.put<
       ApiResponse<SalesContract>,

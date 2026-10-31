@@ -157,7 +157,7 @@ export function OrderEditor() {
       const id = response.data?.id;
       if (!id) throw new Error("创建订单失败：未返回订单ID");
       toast.success("订单已创建");
-      router.push(`/dashboard/sales/${id}`);
+      router.push(`/dashboard/orders/${id}`);
     } catch (reason) {
       setError(describeFailure("创建失败", reason));
     } finally {

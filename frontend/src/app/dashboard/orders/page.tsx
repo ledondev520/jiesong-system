@@ -1,7 +1,7 @@
 /**
  * Input: 出口订单服务、列表 URL 状态（q/status/shipped/shippedFrom/shippedTo/storeId/page/pageSize，沿用旧 /sales 参数名）
  * Output: 出口订单表格（服务端分页、状态 chip、关键词），行点击进入订单详情
- * Pos: 业务 > 出口订单；旧 /dashboard/sales 列表重定向到这里。详情/新建仍在 /dashboard/sales/*，随 J18/J19 迁到 /orders/*
+ * Pos: 业务 > 出口订单；旧 /dashboard/sales 列表重定向到这里。详情在 /dashboard/orders/[id]，新建在 /dashboard/orders/new
  */
 "use client";
 
@@ -74,7 +74,7 @@ function OrdersList() {
       header: "订单号",
       cell: (order) => (
         <Link
-          href={`/dashboard/sales/${order.id}`}
+          href={`/dashboard/orders/${order.id}`}
           className="font-medium hover:underline"
         >
           {order.contractNo}
@@ -158,7 +158,7 @@ function OrdersList() {
               ? undefined
               : "点击右上角「新建订单」开始"
           }
-          onRowClick={(order) => router.push(`/dashboard/sales/${order.id}`)}
+          onRowClick={(order) => router.push(`/dashboard/orders/${order.id}`)}
           search={{
             value: filters.keyword,
             onChange: (keyword) => setFilters({ keyword }),
@@ -183,7 +183,7 @@ function OrdersList() {
 
       <div className="grid gap-3 md:hidden">
         {items.map((order) => (
-          <Link key={order.id} href={`/dashboard/sales/${order.id}`}>
+          <Link key={order.id} href={`/dashboard/orders/${order.id}`}>
             <Card className="border-border/70">
               <CardContent className="space-y-1 p-4">
                 <div className="flex items-start justify-between gap-3">
