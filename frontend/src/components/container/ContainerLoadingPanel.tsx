@@ -8,7 +8,7 @@
 
 "use client";
 
-import { Suspense, lazy, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Download, FileText, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,8 @@ export default function ContainerLoadingPanel({
   const [containerIndex, setContainerIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const printRoot = useRef<HTMLDivElement>(null);
+  // 每次选择/重置/换合同或默认计划都 +1，只有最新一次请求的结果才会生效 (C5-04)。
+  const simRequest = useRef(0);
   const active = simPlan ?? plan;
   const simulating = active.containerType !== plan.containerType;
   const index = Math.min(
@@ -65,6 +67,7 @@ export default function ContainerLoadingPanel({
 
   // 柜型切换只是模拟：重新向后端取该柜型的计划，确认发运仍按默认柜型校验。
   const changeType = async (code: ContainerTypeCode) => {
+    const request = ++simRequest.current;
     setContainerIndex(0);
     if (code === plan.containerType) {
       setSimPlan(null);
@@ -72,11 +75,18 @@ export default function ContainerLoadingPanel({
     }
     try {
       const res = await salesService.getLoadingPlan(salesContractId, code);
-      setSimPlan(res.data);
+      if (request === simRequest.current) setSimPlan(res.data);
     } catch {
-      toast.error("柜型模拟失败");
+      if (request === simRequest.current) toast.error("柜型模拟失败");
     }
   };
+
+  // 来源合同或默认计划变化：作废在途模拟并回到默认计划。
+  useEffect(() => {
+    simRequest.current += 1;
+    setSimPlan(null);
+    setContainerIndex(0);
+  }, [salesContractId, plan]);
 
   const pages = () =>
     Array.from(
