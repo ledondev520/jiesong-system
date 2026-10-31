@@ -5,15 +5,25 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { convertPricingConfig } = require('./convert-pricing-config');
+const { DEFAULT_ROUND_UP_TO, priceFor } = require('../src/services/exportPricing');
 
 const oldTiered = { mode: 'tiered', exchangeAdjustment: -0.2, refundableMarkup: 0.3, noRefundMarkup: 0.1, multiplier: 1.3 };
 const script = path.join(__dirname, 'convert-pricing-config.js');
 
 test('旧 tiered 取可退税加价为默认加价，multiplier 取 乘数-1，其余字段保留', () => {
   assert.deepEqual(convertPricingConfig(oldTiered, 6.72), {
-    exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 1,
+    exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5,
   });
   assert.equal(convertPricingConfig({ ...oldTiered, mode: 'multiplier', multiplier: 1.4 }, 7).defaultMarkup, 0.4);
+});
+
+test('转换后的取整步长与仓库报价规则一致：同成本同现汇得到同一单价（评审 R1-8）', () => {
+  const committed = require('../../config/pricing.json');
+  assert.equal(DEFAULT_ROUND_UP_TO, committed.roundUpTo);
+  const converted = convertPricingConfig(oldTiered, 6.72);
+  // 1005 × 1.3 ÷ 6.52 = 200.38 → 201 → 最近的 5 的倍数 200（旧转换器步长 1 得 201）
+  assert.equal(priceFor({ costCny: 1005 }, converted).unitPriceUsd, 200);
+  assert.equal(priceFor({ costCny: 1005 }, converted).unitPriceUsd, priceFor({ costCny: 1005 }, { ...committed, exchangeRate: 6.72, categoryMarkups: [] }).unitPriceUsd);
 });
 
 test('已是新结构返回 null；未知结构或非法现汇抛错', () => {

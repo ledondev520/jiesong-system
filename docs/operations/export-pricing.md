@@ -52,4 +52,6 @@ node backend/scripts/convert-pricing-config.js --file config/pricing.json --spot
 # 回滚：把备份文件复制回 config/pricing.json，并部署旧版本
 ```
 
+转换写入的取整步长 `roundUpTo` 取报价代码的默认值 `DEFAULT_ROUND_UP_TO`（5，负责人终版：整美元后取最近的 5 的倍数），与仓库 `config/pricing.json` 相同；dry-run 输出里可核对。
+
 旧 `tiered` 的 `refundableMarkup` → `defaultMarkup`（`multiplier` 模式取 `multiplier - 1`）；`noRefundMarkup`（零退税 10% 档）不再存在，改为按分类设置。

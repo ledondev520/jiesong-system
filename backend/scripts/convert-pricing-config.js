@@ -4,12 +4,14 @@
  * Output: 新结构 pricing.json（exchangeRate/exchangeAdjustment/defaultMarkup/categoryMarkups/roundUpTo）
  * Pos: 运行时 pricing.json 的一次性迁移（部署保留服务器文件，合并不会转换它）。默认 dry-run，只打印结果；
  *      --confirm 需同时给 --backup-dir：先备份(0700 目录/0600 文件)，再原子替换，最后用后端同一校验器核对。
+ * 取整步长用报价代码的同一默认值 DEFAULT_ROUND_UP_TO（exportPricing.js，负责人终版 5），不另定规则。
  * 不读取 .env 和数据库；分类加价（如瓷砖 10%）需转换后由 ADMIN 在 设置 > 报价规则 中添加。
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { validatePricingConfig } = require('../src/services/pricingConfigService');
+const { DEFAULT_ROUND_UP_TO } = require('../src/services/exportPricing');
 
 const NEW_KEYS = ['exchangeRate', 'exchangeAdjustment', 'defaultMarkup', 'categoryMarkups', 'roundUpTo'];
 
@@ -23,7 +25,7 @@ const convertPricingConfig = (old, spotRate) => {
     ? Math.round((old.multiplier - 1) * 1e10) / 1e10
     : old.refundableMarkup;
   return validatePricingConfig({
-    exchangeRate: spotRate, exchangeAdjustment: old.exchangeAdjustment, defaultMarkup, categoryMarkups: [], roundUpTo: 1,
+    exchangeRate: spotRate, exchangeAdjustment: old.exchangeAdjustment, defaultMarkup, categoryMarkups: [], roundUpTo: DEFAULT_ROUND_UP_TO,
   });
 };
 
