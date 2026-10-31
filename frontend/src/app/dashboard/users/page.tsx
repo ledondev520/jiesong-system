@@ -58,10 +58,6 @@ import {
   X,
 } from "lucide-react";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
-import {
-  ModuleTabHeader,
-  ADMIN_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserDialog } from "./components/UserDialog";
 import { AgentAccountDialog } from "@/components/dialog/AgentAccountDialog";
@@ -350,7 +346,6 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="账号管理"
         description="管理系统用户与外部 Agent 账号"

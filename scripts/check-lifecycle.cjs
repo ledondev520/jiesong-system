@@ -8,6 +8,7 @@ const BASE = '56426be209e270024008b761dbd835a54a6c4c47';
 const REGISTRY = 'lifecycle/resources.json';
 const TEMPLATE = 'lifecycle/resource.template.json';
 const SINGLETON_TEMPLATE = 'lifecycle/singleton-config.template.json';
+const ACTION_TEMPLATE = 'lifecycle/action.template.json';
 const MATRIX = 'backend/src/integration/resource-lifecycle.integration.js';
 const LIST_MATRIX = 'frontend/src/lib/hooks/list-lifecycle.test.tsx';
 
@@ -184,12 +185,32 @@ function check(root = ROOT, { baselineRoutes } = {}) {
     }
     const m = resource.matrix;
     const singleton = resource.kind === 'singleton-config';
+    const action = resource.kind === 'action';
     if (
       resource.kind !== undefined &&
-      !['archive', 'singleton-config'].includes(resource.kind)
+      !['archive', 'singleton-config', 'action'].includes(resource.kind)
     )
       fail(`${REGISTRY}: ${resource.id} has unsupported resource kind`);
-    if (singleton) {
+    if (action) {
+      // One-shot action route (e.g. generate drafts): one POST, no CRUD matrix, proven by a named test file.
+      const route = resource.routes?.[0] || '';
+      const path = route.slice(5);
+      const testSource = exists(resource.test) ? read(resource.test) : '';
+      const pattern = new RegExp(
+        path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/:[A-Za-z]\w*/g, '[^/\'"`\\s]+'),
+      );
+      if (
+        resource.routes?.length !== 1 ||
+        !route.startsWith('POST /') ||
+        resource.matrix !== undefined ||
+        resource.update !== undefined ||
+        !exists(resource.test) ||
+        !pattern.test(testSource)
+      )
+        fail(
+          `${REGISTRY}: ${resource.id} action needs exactly one POST route, no matrix/update, and a test file that calls the route path; copy ${ACTION_TEMPLATE}`,
+        );
+    } else if (singleton) {
       // Each singleton adapter owns an exact route and persistence contract.
       if (
         resource.id !== 'pricing-config' ||
@@ -313,6 +334,7 @@ function check(root = ROOT, { baselineRoutes } = {}) {
         );
       }
     }
+    if (action) continue;
     matrixPaths.add(m?.path);
     const update = resource.update;
     if (
