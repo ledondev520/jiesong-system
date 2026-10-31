@@ -826,3 +826,34 @@ test('AI 库存确认执行时重新检查来源，不能绕开验货/发运', a
     assert.equal(updates, 0);
   });
 });
+
+
+test('AI 不能写卖方公司信息，也读不到银行资料或旧开票抬头文本（可能含银行行）', async () => {
+  let upserts = 0;
+  await withPatched({
+    'prisma.systemConfig.findUnique': async ({ where }) => ({ key: where.key, value: JSON.stringify('SECRET-ACCT-123'), note: null }),
+    'prisma.systemConfig.upsert': async () => { upserts += 1; return {}; },
+    'prisma.operationLog.create': async () => ({}),
+  }, async () => {
+    const read = openAgentService.buildToolPool(spec => spec, [], []).find(item => item.name === 'GetSystemConfig');
+    for (const key of ['companyBankInfo', 'invoiceTitleInfo']) {
+      const refused = await read.call({ key });
+      assert.equal(refused.includes('SECRET-ACCT-123'), false, key);
+      assert.match(refused, /不可通过助手读取/);
+    }
+    // 普通的卖方名称/地址不属于受限数据，仍可读
+    assert.match(await read.call({ key: 'companyName' }), /SECRET-ACCT-123/);
+
+    const write = openAgentService.buildWriteToolPool(spec => spec, 'test-admin', 'ADMIN', [], [])
+      .find(item => item.name === 'UpdateSystemConfig');
+    for (const key of ['companyName', 'companyAddress', 'companyPhone', 'companyTaxId', 'companyBankInfo', 'invoiceTitleInfo']) {
+      const refused = JSON.parse(await write.call({ key, value: 'x' }));
+      assert.match(refused.error, /公司信息/);
+      assert.equal(refused.actionId, undefined, key);
+    }
+    const ok = JSON.parse(await write.call({ key: 'stampPlatformUrl', value: 'https://example.invalid' }));
+    assert.ok(ok.actionId);
+    await openAgentService.executeAction(ok.actionId, 'test-admin');
+    assert.equal(upserts, 1);
+  });
+});

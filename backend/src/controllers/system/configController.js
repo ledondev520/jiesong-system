@@ -14,7 +14,8 @@ const {
   normalizeConfigValueForResponse,
   normalizeConfigValueForStorage,
 } = require('../../utils/secretCrypto');
-const { isCompanyConfigKey, validateCompanyConfigValue } = require('../../utils/companyConfig');
+const { isCompanyConfigKey, isLegacyInvoiceTitleKey, validateCompanyConfigValue } = require('../../utils/companyConfig');
+const { loadSellerIdentity } = require('../../services/sellerIdentityService');
 
 const parsePositiveIntEnv = (value, fallback) => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -34,12 +35,14 @@ const CONFIG_DOMAIN_MAP = {
   exchangeRate: { domain: 'params', label: '基础参数', note: '用于销售合同初始汇率填充' },
   profitRate:   { domain: 'params', label: '基础参数', note: '例如 1.3 表示 30% 利润率' },
   stampPlatformUrl: { domain: 'params', label: '基础参数', note: '线上盖章平台链接（购销合同生成后跳转盖章）' },
-  invoiceTitleInfo: { domain: 'params', label: '基础参数', note: '我方开票抬头信息（催票文本附带，多行）' },
+  invoiceTitleInfo: { domain: 'company', label: '公司信息', note: '（旧，只读别名）我方开票抬头信息；已并入公司信息，请在「设置 > 公司信息」维护' },
 
   // 公司信息域：报价/PI 导出的卖方块（负责人 2026-10-31）。银行信息为 Restricted，仅 ADMIN/FINANCE 可经 GET /configs 读取。
   companyName:     { domain: 'company', label: '公司信息', note: '报价/PI 卖方公司名称' },
   companyAddress:  { domain: 'company', label: '公司信息', note: '报价/PI 卖方地址' },
   companyBankInfo: { domain: 'company', label: '公司信息', note: '报价/PI 收款银行信息（多行，Restricted）' },
+  companyPhone:    { domain: 'company', label: '公司信息', note: '卖方电话（报价/PI、开票抬头）' },
+  companyTaxId:    { domain: 'company', label: '公司信息', note: '纳税人识别号（开票抬头）' },
 
   // 数据字典域：系统枚举值与下拉列表
   units:        { domain: 'dictionary', label: '数据字典', note: '商品计量单位枚举' },
@@ -62,7 +65,8 @@ const CONFIG_DOMAIN_MAP = {
 
 // Restricted company bank details are returned only to the roles that may already read bank evidence.
 const BANK_CONFIG_READ_ROLES = ['ADMIN', 'FINANCE'];
-const RESTRICTED_CONFIG_KEYS = ['companyBankInfo'];
+// 旧 invoiceTitleInfo 文本可能含开户行及账号，按同一受限口径处理。
+const RESTRICTED_CONFIG_KEYS = ['companyBankInfo', 'invoiceTitleInfo'];
 
 const getDomainMeta = (key) => CONFIG_DOMAIN_MAP[key] || { domain: 'other', label: '其他', note: '' };
 
@@ -228,6 +232,9 @@ const updateConfig = async (req, res, next) => {
   try {
     const { key } = req.params;
     const { value, note } = req.body;
+    if (isLegacyInvoiceTitleKey(key)) {
+      throw createError('开票抬头信息已并入公司信息，请在「设置 > 公司信息」中修改', 400);
+    }
 
     // 公司信息三个键：严格校验（文本、无控制字符、长度/行数上限）后再存；失败 400 且不写库
     const storedValue = normalizeConfigValueForStorage(key, isCompanyConfigKey(key) ? validateCompanyConfigValue(key, value) : value);
@@ -303,7 +310,17 @@ const syncExchangeRate = async (req, res, next) => {
   }
 };
 
+/** 统一卖方信息（canonical 键 + 旧 invoiceTitleInfo 别名兜底）；银行资料仅 ADMIN/FINANCE 可得。 */
+const getSellerIdentity = async (req, res, next) => {
+  try {
+    success(res, await loadSellerIdentity({ includeBank: BANK_CONFIG_READ_ROLES.includes(req.user?.role) }));
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
+  getSellerIdentity,
   fetchUsdCnyRate,
   getConfigs,
   getConfigsByDomain,

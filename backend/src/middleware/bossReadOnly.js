@@ -30,7 +30,7 @@ const READ_PATHS = [
   /^\/bank-flow\/(transactions(\/stats)?|invoices(\/stats|\/by-seller)?|batches|reconciliation(\/full)?|incoming-summary)$/,
   /^\/tax-refunds\/workbench$/,
   /^\/hs-codes(\/(search|hsciq-usage|\d+))?$/,
-  /^\/system\/(notifications|exchange-rate|ports|categories|customs-brokers)$/,
+  /^\/system\/(notifications|exchange-rate|seller-identity|ports|categories|customs-brokers)$/,
   /^\/notifications(\/unread-count)?$/,
   /^\/search$/,
 ];

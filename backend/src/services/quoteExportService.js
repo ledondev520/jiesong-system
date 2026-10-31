@@ -10,10 +10,9 @@
 const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
-const { normalizeConfigValueForResponse } = require('../utils/secretCrypto');
+const { loadSellerIdentity } = require('./sellerIdentityService');
 const { applyTitle, styleTable, configureSheet } = require('./exportPacketService');
 
-const COMPANY_KEYS = ['companyName', 'companyAddress', 'companyBankInfo'];
 
 const SHANGHAI_OFFSET_MS = 8 * 3600 * 1000;
 const COLUMNS = ['No.', 'Description', 'Specification', 'HS Code', 'Quantity', 'Unit', 'Unit Price (USD)', 'Amount (USD)', 'Ship-to Store', 'Remarks'];
@@ -140,11 +139,10 @@ table{border-collapse:collapse;width:100%}td,th{border:1px solid #b7c4ce;padding
 <tr class="sum"><td colspan="4">TOTAL / 合计</td>${cell(doc.totalQuantity)}<td colspan="2"></td>${cell(money(doc.totalAmount))}<td colspan="2"></td></tr></tbody></table>${doc.bankDetails ? `<table class="meta"><tr><td><b>Bank Details</b></td><td class="multi">${escapeHtml(doc.bankDetails)}</td></tr></table>` : ''}</body></html>`;
 };
 
-/** Company settings for the Seller block; missing keys stay empty. */
+/** Seller block: the one seller identity (canonical company keys, legacy invoiceTitleInfo only fills empty fields). Quote/PI exporters (ADMIN/SALES/PURCHASE/FINANCE) print bank details by owner decision. */
 const loadSeller = async () => {
-  const rows = await prisma.systemConfig.findMany({ where: { key: { in: COMPANY_KEYS } }, select: { key: true, value: true } });
-  const byKey = Object.fromEntries(rows.map((row) => [row.key, String(normalizeConfigValueForResponse(row.key, row.value) ?? '').trim()]));
-  return { name: byKey.companyName, address: byKey.companyAddress, bank: byKey.companyBankInfo };
+  const identity = await loadSellerIdentity({ includeBank: true });
+  return { name: identity.name, address: [identity.address, identity.phone].filter(Boolean).join('\n'), bank: identity.bank };
 };
 
 const loadQuoteDocument = async (id) => {
@@ -166,4 +164,4 @@ const exportQuoteXlsx = async (id) => {
 
 const renderQuoteHtml = async (id) => buildQuoteHtml((await loadQuoteDocument(id)).doc);
 
-module.exports = { buildQuoteDocument, buildQuoteWorkbook, buildQuoteHtml, exportQuoteXlsx, renderQuoteHtml };
+module.exports = { loadSeller, buildQuoteDocument, buildQuoteWorkbook, buildQuoteHtml, exportQuoteXlsx, renderQuoteHtml };

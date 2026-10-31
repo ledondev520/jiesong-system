@@ -82,7 +82,8 @@ const isSensitiveField = (key) => {
 };
 
 // 公司银行资料（Restricted）：系统配置记录的 value 永不写入审计日志，只记录谁在何时改了该键。
-const REDACTED_CONFIG_KEYS = new Set(['companybankinfo']);
+// 旧 invoiceTitleInfo 文本可能含开户行及账号，同样不记录内容。
+const REDACTED_CONFIG_KEYS = new Set(['companybankinfo', 'invoicetitleinfo']);
 
 const isSensitiveConfigRecord = (value) => {
   if (!isObject(value) || typeof value.key !== 'string') {

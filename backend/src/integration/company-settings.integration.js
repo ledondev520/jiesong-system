@@ -1,4 +1,4 @@
-/** Real HTTP/RBAC/SQLite coverage for 公司信息 (companyName / companyAddress / companyBankInfo): ADMIN-only writes, validated, role-scoped reads, audit never carries the bank text. */
+/** Real HTTP/RBAC/SQLite coverage for 公司信息 (companyName / companyAddress / companyPhone / companyTaxId / companyBankInfo): ADMIN-only writes, validated, role-scoped reads, audit never carries the bank text. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -65,6 +65,16 @@ test('HTTP/SQLite: company settings are empty by default, ADMIN-written and vali
   }
   assert.equal(await db.systemConfig.count({ where: { key: { in: ['companyName', 'companyAddress', 'companyBankInfo'] } } }), 0);
 
+  // Phone / tax id (merged in from the old invoice title): one line, tax id restricted to letters, digits, spaces and hyphens.
+  for (const [key, value] of [['companyPhone', 'a\nb'], ['companyPhone', 'x'.repeat(51)], ['companyTaxId', '91-ABC;DROP'], ['companyTaxId', 'x'.repeat(51)], ['companyTaxId', 5]]) {
+    assert.equal((await put(key, value)).status, 400, `${key} ${String(JSON.stringify(value)).slice(0, 30)}`);
+  }
+  assert.equal((await put('companyPhone', ' +1  555 0100 ')).status, 200);
+  assert.equal((await put('companyTaxId', '91-3100  ABC')).status, 200);
+  assert.equal(JSON.parse((await db.systemConfig.findUnique({ where: { key: 'companyPhone' } })).value), '+1 555 0100');
+  assert.equal(JSON.parse((await db.systemConfig.findUnique({ where: { key: 'companyTaxId' } })).value), '91-3100 ABC');
+  await db.systemConfig.deleteMany({ where: { key: { in: ['companyPhone', 'companyTaxId'] } } });
+
   // Valid writes are normalised.
   assert.equal((await put('companyName', '  Synthetic   Export Co ')).status, 200);
   assert.equal((await put('companyAddress', '1 Synthetic Road \r\nCity')).status, 200);
@@ -73,7 +83,9 @@ test('HTTP/SQLite: company settings are empty by default, ADMIN-written and vali
   assert.equal(JSON.parse((await db.systemConfig.findUnique({ where: { key: 'companyAddress' } })).value), '1 Synthetic Road\nCity');
 
   // Reads through the flat list: name/address for every role, the bank text only for ADMIN and FINANCE.
-  for (const role of ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
+  // BOSS has no access to the settings list at all (not on the read whitelist).
+  assert.equal((await call('GET', '/configs', undefined, 'BOSS')).status, 403);
+  for (const role of ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE']) {
     const flat = (await call('GET', '/configs', undefined, role)).data;
     assert.equal(flat.companyName, 'Synthetic Export Co', role);
     assert.equal(flat.companyAddress, '1 Synthetic Road\nCity', role);
