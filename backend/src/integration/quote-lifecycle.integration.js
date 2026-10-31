@@ -281,6 +281,8 @@ test('quote service over HTTP', async (t) => {
     assert.equal(await db.quote.count(), before, 'nothing written');
     const quote = await ok('SALES', 'POST', '/quotes', body(mine.id));
     assert.equal((await call('SALES', 'PUT', `/quotes/${quote.id}`, { items: [line({ storeId: theirs.id })] })).status, 400, 'items edit');
+    const both = await call('SALES', 'PUT', `/quotes/${quote.id}`, { items: [line({ storeId: theirs.id })], spotRate: 0.1 });
+    assert.match(both.message, /门店不属于所选客户/, 'ownership is reported before pricing (INT6-01)');
     assert.equal((await call('SALES', 'PUT', `/quotes/${quote.id}`, { customerId: other.id })).status, 400, 'switching customer keeps the old customer\'s stores');
     // Relinked after the quote was saved: conversion refuses rather than writing a mismatched order.
     await db.store.update({ where: { id: mine.id }, data: { customerId: other.id } });

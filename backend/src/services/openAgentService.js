@@ -1257,7 +1257,10 @@ const executeAction = async (actionId, userId, { automatic = false } = {}) => {
   try {
     const result = await executor(action.params, userId);
     // 写已生效：标记失败（如 SQLITE_BUSY）不得把它记成 failed 引发用户重复写；行保持 executing 直到过期，不可再次确认
-    await pendingStore.finishClaimed(actionId, 'executed').catch(() => {});
+    await pendingStore.finishClaimed(actionId, 'executed').catch((error) => {
+      // Never log params or the raw message (may carry query values); the row stays executing until expiry.
+      console.warn('[agent] pending action executed-status write failed', { actionId, name: error?.name, code: error?.code ?? null });
+    });
 
     // 写入审计日志
     await prisma.operationLog.create({

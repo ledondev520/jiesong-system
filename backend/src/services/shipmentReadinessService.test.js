@@ -218,3 +218,11 @@ test('C5-02 回归：底座 9000 mm 长、上层 4 箱共 12000 mm，不得再�
   const overhang = cartons.filter((block) => block.z > 0 && block.x + block.nx * block.cartonMm.length > 9000);
   assert.deepEqual(overhang, []);
 });
+
+test('INT6-02 排柜算力预算耗尽：独立阻塞原因，不冒充装不下', () => {
+  const plan = { spec, totals: { cartons: 10, grossKg: 100, cargoCbm: 1 }, lines: [], containers: [],
+    unplaced: [{ lineId: 'l1', name: '货物', cartons: 7, reason: 'compute-budget', cartonMm: null }] };
+  const { blockers } = evaluateLoadingCheck(plan, { packingLineCount: 1, linesMissingBoxes: 0 });
+  assert.deepEqual(blockers.map((item) => item.code).filter((code) => code !== 'under-utilised'), ['compute-budget']);
+  assert.match(blockers.find((item) => item.code === 'compute-budget').message, /超出上限，仍有 7 箱未能排完/);
+});

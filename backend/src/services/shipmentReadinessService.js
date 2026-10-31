@@ -82,11 +82,16 @@ const evaluateLoadingCheck = (plan, facts) => {
   for (const entry of plan.unplaced.filter((item) => item.reason === 'oversize' || item.reason === 'door')) {
     add('oversize', `${entry.name} 箱规 ${dimsText(entry.cartonMm)} mm 超过${type}内尺寸，无法装入`);
   }
+  // 排柜算力预算耗尽：结果不完整，不是箱规问题，也不再给出“需要N个柜”的误导数字（INT6-02）。
+  const budgetCartons = plan.unplaced.filter((item) => item.reason === 'compute-budget').reduce((sum, item) => sum + item.cartons, 0);
+  if (budgetCartons > 0) {
+    add('compute-budget', `货物品种或箱数过多，排柜计算超出上限，仍有 ${budgetCartons} 箱未能排完，请拆分订单后再核对`);
+  }
   // 首柜之外的箱子（溢出柜 + 任何柜都放不进的箱）都意味着一个柜装不下。
   const overflowCartons = containers.slice(1).reduce((sum, container) => sum + container.cartons, 0)
     + plan.unplaced.filter((item) => item.reason === 'no-space').reduce((sum, item) => sum + item.cartons, 0);
   // 汇总已超限时“超重/超体积”已说明一个柜装不下，不再重复提示溢出。
-  if (overflowCartons > 0 && util.overReasons.length === 0) {
+  if (overflowCartons > 0 && util.overReasons.length === 0 && budgetCartons === 0) {
     add('unplaced', `仍有 ${overflowCartons} 箱装不下，共需 ${Math.max(2, containers.length)} 个${type}，请拆分订单或更换柜型`);
   }
   if (!util.utilisationReady) {

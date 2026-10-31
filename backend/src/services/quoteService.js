@@ -197,18 +197,20 @@ const editQuote = async (id, body) => {
   const data = partialUpdate(body, headerFields);
   if (data.customerId) await assertActiveCustomer(prisma, data.customerId);
   const spotChanged = Object.hasOwn(data, 'spotRate') && data.spotRate !== current.spotRate;
+  let rows = null;
   let priced = null;
   if (body.items !== undefined || spotChanged) {
     const raw = body.items ?? current.items.map((i) => ({ ...i, unitPrice: i.unitPrice }));
-    const spot = Object.hasOwn(data, 'spotRate') ? data.spotRate : (current.spotRate ?? undefined);
-    priced = await priceItems(prisma, await normalizeItems(prisma, raw), spot ?? undefined, { excludeQuoteId: id });
+    rows = await normalizeItems(prisma, raw);
   }
+  const spot = Object.hasOwn(data, 'spotRate') ? data.spotRate : (current.spotRate ?? undefined);
   delete data.spotRate;
-  // Stores must belong to the final customer, whether the items or the customer changed (R1-3).
+  // Stores must belong to the final customer, whether the items or the customer changed (R1-3); checked before pricing (INT6-01).
   const finalCustomerId = Object.hasOwn(data, 'customerId') ? data.customerId : current.customerId;
-  if (priced || Object.hasOwn(data, 'customerId')) {
-    await assertStoresOwnedBy(prisma, (priced ? priced.items : current.items).map((i) => i.storeId), finalCustomerId);
+  if (rows || Object.hasOwn(data, 'customerId')) {
+    await assertStoresOwnedBy(prisma, (rows ?? current.items).map((i) => i.storeId), finalCustomerId);
   }
+  if (rows) priced = await priceItems(prisma, rows, spot ?? undefined, { excludeQuoteId: id });
   if (!priced && !Object.keys(data).length) return present(current);
   await prisma.$transaction(async (tx) => {
     const result = await tx.quote.updateMany({ where: { id, status: QUOTE_STATUS.DRAFT }, data: {

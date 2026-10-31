@@ -274,6 +274,7 @@ test('C5-01 计算预算耗尽时 fail-closed：剩余箱进入 unplaced，不�
   const result = packContainers(lines, spec, config, { budget: 1 });
   assert.equal(totalPlaced(result), 0);
   assert.equal(result.unplaced.reduce((sum, entry) => sum + entry.cartons, 0), 50);
+  assert.deepEqual([...new Set(result.unplaced.map((entry) => entry.reason))], ['compute-budget']); // not no-space (INT6-02)
 });
 
 test('C5-02 底座块只托住上层块的一部分：悬出的单箱必须另放，不得凭块平均支撑通过', () => {
