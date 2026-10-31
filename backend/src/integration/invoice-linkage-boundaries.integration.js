@@ -156,6 +156,16 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     const selectable = await get('/finance/contracts-for-match?contractType=PURCHASE');
     assert.ok(selectable.some(row => row.id === originalTarget.id));
     assert.equal(selectable.some(row => row.id === cancelled.id), false);
+    // 用途划分：付款匹配（缺省）不列草稿，发票关联列草稿；两者都不列已取消。
+    const draft = await purchase({ status: 'DRAFT' });
+    assert.equal(selectable.some(row => row.id === draft.id), false);
+    const forPayment = await get('/finance/contracts-for-match?contractType=PURCHASE&purpose=PAYMENT');
+    assert.equal(forPayment.some(row => row.id === draft.id), false);
+    const forInvoice = await get('/finance/contracts-for-match?contractType=PURCHASE&purpose=INVOICE');
+    assert.equal(forInvoice.some(row => row.id === draft.id), true);
+    assert.equal(forInvoice.some(row => row.id === originalTarget.id), true);
+    assert.equal(forInvoice.some(row => row.id === cancelled.id), false);
+    assert.equal((await fetch(`${base}/finance/contracts-for-match?contractType=PURCHASE&purpose=BOGUS`, { headers: { authorization: `Bearer ${tokens.FINANCE}` } })).status, 400);
     const source = await invoice();
     await good('/finance/match', { entityType: 'INVOICE', entityId: source.id, contractId: originalTarget.id, contractType: 'PURCHASE' });
     const before = snapshot();

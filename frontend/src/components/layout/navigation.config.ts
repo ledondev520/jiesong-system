@@ -161,9 +161,13 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     childPrefixes: ["/dashboard/payments", "/dashboard/reports"],
     children: [
       { href: "/dashboard/finance", label: "财务概览" },
+      { href: "/dashboard/finance/receivable", label: "应收" },
+      { href: "/dashboard/finance/payable", label: "应付" },
+      { href: "/dashboard/finance/bank-flow", label: "银行流水" },
+      { href: "/dashboard/finance/invoices", label: "发票" },
+      { href: "/dashboard/finance/reconciliation", label: "对账" },
       { href: "/dashboard/finance/statements", label: "财务报表" },
-      { href: "/dashboard/payments", label: "收付管理" },
-      { href: "/dashboard/reports", label: "经营执行" },
+      { href: "/dashboard/finance/analysis", label: "经营分析" },
     ],
     group: "business",
   },
@@ -300,17 +304,5 @@ export const isTabRouteActive = (pathname: string | null, href: string) => {
   if (!pathname) return false;
   if (href === "/dashboard" || href === "/dashboard/finance")
     return pathname === href;
-  if (href === "/dashboard/payments") {
-    return [
-      "/dashboard/payments",
-      "/dashboard/finance/receivable",
-      "/dashboard/finance/payable",
-      "/dashboard/finance/bank-flow",
-      "/dashboard/finance/invoices",
-      "/dashboard/finance/reconciliation",
-    ].some(
-      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-    );
-  }
   return pathname === href || pathname.startsWith(`${href}/`);
 };

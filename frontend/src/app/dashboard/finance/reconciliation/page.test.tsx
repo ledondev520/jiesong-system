@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { expect, it, vi, beforeEach } from "vitest";
 import ReconciliationPage from "./page";
 const unmatched = vi.fn();
+const contractsFor = vi.fn(async (..._args: unknown[]) => []);
 const recon = vi.fn();
 const emptyRecon = {
   matched: [],
@@ -26,7 +27,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/services/bankFlow.service", () => ({
   getFullReconciliation: (...args: unknown[]) => recon(...args),
   getUnmatchedItems: (...args: unknown[]) => unmatched(...args),
-  getContractsForMatch: async () => [],
+  getContractsForMatch: (...args: unknown[]) => contractsFor(...args),
   postAutoMatch: async () => {},
   postManualMatch: async () => {},
   postIgnore: async () => {},
@@ -84,4 +85,10 @@ it("汇总失败可重试，保留失败边界", async () => {
     expect(screen.queryByText("对账数据读取失败")).not.toBeInTheDocument(),
   );
   expect(recon).toHaveBeenCalledTimes(2);
+});
+it("没有选中银行流水时，合同选择器按发票关联用途读取（含草稿采购合同的那一类）", async () => {
+  render(<ReconciliationPage />);
+  await waitFor(() =>
+    expect(contractsFor).toHaveBeenCalledWith("PURCHASE", undefined, "INVOICE"),
+  );
 });

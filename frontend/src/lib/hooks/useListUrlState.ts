@@ -35,6 +35,20 @@ export const listUrlFields = {
     page: { default: 1 },
     pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
   },
+  // 财务报表页内页签（?view=）
+  statements: {
+    view: {
+      default: "overview",
+      values: [
+        "overview",
+        "balance",
+        "income",
+        "cashflow",
+        "ledger",
+        "library",
+      ],
+    },
+  },
   customs: {
     keyword: { default: "", resetPage: true },
     status: {

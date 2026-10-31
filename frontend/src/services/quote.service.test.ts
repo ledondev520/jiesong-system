@@ -31,14 +31,12 @@ describe("quoteService", () => {
 
   it("xlsx download uses the bearer token on the export URL", async () => {
     const blob = new Blob(["x"]);
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(blob, {
-          status: 200,
-          headers: { "Content-Disposition": 'attachment; filename="QT1.xlsx"' },
-        }),
-      );
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(blob, {
+        status: 200,
+        headers: { "Content-Disposition": 'attachment; filename="QT1.xlsx"' },
+      }),
+    );
     vi.stubGlobal("fetch", fetchMock);
     URL.createObjectURL = vi.fn(() => "blob:x");
     URL.revokeObjectURL = vi.fn();
@@ -52,13 +50,11 @@ describe("quoteService", () => {
   it("a failed export surfaces the server message", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ message: "无权限执行此操作" }), {
-            status: 403,
-          }),
-        ),
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ message: "无权限执行此操作" }), {
+          status: 403,
+        }),
+      ),
     );
     await expect(quoteService.downloadXlsx("q1", "x.xlsx")).rejects.toThrow(
       "无权限执行此操作",

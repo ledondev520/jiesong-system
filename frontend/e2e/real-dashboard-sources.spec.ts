@@ -65,8 +65,9 @@ async function expectWorkbenchSources(page: Page) {
     ).toBeVisible();
   }
   // DERIVED 700-(250*0.7)=525; FORMAL_DOCUMENT 400-100=300. No cross-currency sum.
+  // Payables: only in-effect contracts (SIGNED 300-100 = 200); drafts and cancelled never count.
   await expect(page.getByText("$825", { exact: true })).toBeVisible();
-  await expect(page.getByText("¥1,350", { exact: true })).toBeVisible();
+  await expect(page.getByText("¥200", { exact: true })).toBeVisible();
   await expect(page.getByText("资金读取失败", { exact: true })).toHaveCount(0);
   await expect(
     page.getByText("专项单主线路暂时不可用，请稍后刷新。", { exact: true }),
@@ -133,7 +134,7 @@ test("PURCHASE mounted dashboard reads literal KPIs and historical risks then op
     [
       ["DRAFT", 1130, 130],
       ["DRAFT", 200, 50],
-      ["PENDING", 300, 100],
+      ["SIGNED", 300, 100],
       ["CANCELLED", 900, 100],
       ["COMPLETED", 100, 100],
     ].sort(),

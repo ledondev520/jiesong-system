@@ -1,13 +1,19 @@
 /**
- * Input: 旧应付账款路由请求
- * Output: 重定向到收付管理应付视图
- * Pos: 财务模块旧独立页兼容入口，避免财务顶层 Tab 重新膨胀
- *
- * Note: 财务顶层 Interface 只保留概览、报表、收付管理。
+ * Input: 无
+ * Output: 财务 > 应付：已生效采购合同的未付余额（口径来自后端 payablesService）
+ * Pos: 取代旧的到收付管理的重定向；旧 /dashboard/payments?tab=payable 重定向到这里
  */
-
-import { redirect } from 'next/navigation';
+import { Suspense } from "react";
+import { ContractBalanceList } from "../components/ContractBalanceList";
 
 export default function PayablePage() {
-  redirect('/dashboard/payments?tab=payable');
+  return (
+    <Suspense
+      fallback={
+        <div className="py-12 text-center text-muted-foreground">加载中...</div>
+      }
+    >
+      <ContractBalanceList kind="payable" />
+    </Suspense>
+  );
 }

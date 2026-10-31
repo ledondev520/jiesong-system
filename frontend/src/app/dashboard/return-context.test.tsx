@@ -22,7 +22,7 @@ import {
   vi,
 } from "vitest";
 import DashboardPage from "./page";
-import BusinessReportsPage from "./reports/page";
+import BusinessReportsPage from "./finance/analysis/page";
 import type { BusinessOverview } from "@/services/reports.service";
 
 const mocks = vi.hoisted(() => {
@@ -179,7 +179,7 @@ function Routes() {
     () => window.location.pathname,
   );
   if (path === "/dashboard") return <DashboardPage />;
-  if (path === "/dashboard/reports") return <BusinessReportsPage />;
+  if (path === "/dashboard/finance/analysis") return <BusinessReportsPage />;
   return <h1>合成销售明细</h1>;
 }
 const replace = window.history.replaceState.bind(window.history);
@@ -308,7 +308,7 @@ describe("经营执行应用期间返回上下文", () => {
     window.history.replaceState(
       null,
       "",
-      "/dashboard/reports?source=qa#report",
+      "/dashboard/finance/analysis?source=qa#report",
     );
     const view = render(<Routes />);
     await screen.findByText("¥200.00");
@@ -363,7 +363,11 @@ describe("经营执行应用期间返回上下文", () => {
     ["?startDate=not-a-date", {}],
     ["?startDate=2026-10-06&endDate=2026-10-05", {}],
   ])("日期查询 %s 只提交有效日期范围", async (query, period) => {
-    window.history.replaceState(null, "", "/dashboard/reports" + query);
+    window.history.replaceState(
+      null,
+      "",
+      "/dashboard/finance/analysis" + query,
+    );
     render(<Routes />);
     await screen.findByText("¥200.00");
     expect(mocks.overview).toHaveBeenCalledTimes(1);
@@ -376,7 +380,7 @@ describe("经营执行应用期间返回上下文", () => {
     window.history.replaceState(
       null,
       "",
-      "/dashboard/reports?startDate=2026-10-05&endDate=2026-10-05",
+      "/dashboard/finance/analysis?startDate=2026-10-05&endDate=2026-10-05",
     );
     mocks.nextQuery = "?startDate=2026-10-05&endDate=2026-10-05";
     render(<Routes />);
@@ -386,7 +390,7 @@ describe("经营执行应用期间返回上下文", () => {
       window.history.pushState(
         null,
         "",
-        "/dashboard/reports?endDate=2026-12-31",
+        "/dashboard/finance/analysis?endDate=2026-12-31",
       ),
     );
     await waitFor(() =>
@@ -411,7 +415,7 @@ describe("经营执行应用期间返回上下文", () => {
       mocks.overview.mockImplementation((period) =>
         period.startDate ? old.promise : Promise.resolve(report({}, 46)),
       );
-      window.history.replaceState(null, "", "/dashboard/reports");
+      window.history.replaceState(null, "", "/dashboard/finance/analysis");
       render(<Routes />);
       await screen.findByText("¥200.00");
       editDates("2026-10-05", "2026-10-05");
@@ -440,7 +444,7 @@ describe("经营执行应用期间返回上下文", () => {
     },
   );
   it("日期草稿倒序时禁用应用，重置后恢复", async () => {
-    window.history.replaceState(null, "", "/dashboard/reports");
+    window.history.replaceState(null, "", "/dashboard/finance/analysis");
     render(<Routes />);
     await screen.findByText("¥200.00");
     editDates("2026-10-06", "2026-10-05");
