@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -63,11 +64,13 @@ const KIND = {
   },
 };
 
-export function ContractBalanceList({ kind }: { kind: keyof typeof KIND }) {
+export function ContractBalanceList({ kind, refreshKey = 0 }: { kind: keyof typeof KIND; refreshKey?: number }) {
   const config = KIND[kind];
+  // 旧 /dashboard/payments 链接带 overdue / pastDelivery：重定向后仍落在对应筛选上
+  const params = useSearchParams();
   const [search, setSearch] = useState("");
   const [outstandingOnly, setOutstandingOnly] = useState(true);
-  const [flagged, setFlagged] = useState(false);
+  const [flagged, setFlagged] = useState(params?.get(kind === "payable" ? "pastDelivery" : "overdue") === "true");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [rows, setRows] = useState<BalanceRow[]>([]);
@@ -98,7 +101,7 @@ export function ContractBalanceList({ kind }: { kind: keyof typeof KIND }) {
     } finally {
       setLoading(false);
     }
-  }, [kind, page, pageSize, search, outstandingOnly, flagged]);
+  }, [kind, page, pageSize, search, outstandingOnly, flagged, refreshKey]);
 
   useEffect(() => {
     void load();

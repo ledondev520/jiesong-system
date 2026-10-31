@@ -68,15 +68,12 @@ async function expectContractBalance(
   const row = page.getByRole("row").filter({
     has: page.getByText(contractNo, { exact: true }),
   });
-  await expect(row.getByRole("cell").nth(3)).toHaveText(
-    total.toLocaleString("en-US"),
-  );
-  await expect(row.getByRole("cell").nth(4)).toHaveText(
-    received.toLocaleString("en-US"),
-  );
-  await expect(row.getByRole("cell").nth(5)).toHaveText(
-    (total - received).toLocaleString("en-US"),
-  );
+  // 应收页签的金额统一显示 $ 和两位小数（UX 规范 §8.9）
+  const usd = (value: number) =>
+    `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  await expect(row.getByRole("cell").nth(3)).toHaveText(usd(total));
+  await expect(row.getByRole("cell").nth(4)).toHaveText(usd(received));
+  await expect(row.getByRole("cell").nth(5)).toHaveText(usd(total - received));
 }
 
 test("FINANCE splits a USD receipt, reloads real balances and consumes only its remainder", async ({
@@ -86,7 +83,7 @@ test("FINANCE splits a USD receipt, reloads real balances and consumes only its 
   const token = await loginAs(page, fixture, "FINANCE");
   const pool = poolMetadata();
   const [first, second] = pool.contracts;
-  await page.goto("/dashboard/payments?tab=receivable");
+  await page.goto("/dashboard/finance/receivable");
   await expect(sourceRow(page, "USD")).toContainText("剩余待分配 USD 1,000");
   await expectContractBalance(page, first.contractNo, 800, 0);
   await expectContractBalance(page, second.contractNo, 1000, 0);
@@ -222,7 +219,7 @@ test("FINANCE rejected CNY allocation retains its draft for retry and cancel nev
       writes.push(request.postData() || "");
     }
   });
-  await page.goto("/dashboard/payments?tab=receivable");
+  await page.goto("/dashboard/finance/receivable");
   const before = readReceiptPool(fixture);
   await sourceRow(page, "CNY")
     .getByRole("button", { name: "分配", exact: true })
@@ -284,7 +281,7 @@ test("BOSS sees receipt-pool balances but allocation and automatch stay read-onl
 }) => {
   const token = await loginAs(page, fixture, "BOSS");
   const pool = poolMetadata();
-  await page.goto("/dashboard/payments?tab=receivable");
+  await page.goto("/dashboard/finance/receivable");
   await expect(sourceRow(page, "USD")).toContainText("剩余待分配 USD 1,000");
   await expect(sourceRow(page, "CNY")).toContainText("剩余待分配 CNY 500");
   await expectContractBalance(page, pool.contracts[0].contractNo, 800, 0);

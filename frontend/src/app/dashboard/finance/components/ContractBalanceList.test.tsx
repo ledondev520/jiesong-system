@@ -6,7 +6,10 @@ import { ContractBalanceList } from "./ContractBalanceList";
 
 const mocks = vi.hoisted(() => ({ getPayables: vi.fn(), getReceivables: vi.fn(), getStats: vi.fn(), createPayment: vi.fn() }));
 vi.mock("@/services/finance.service", () => ({ financeService: mocks }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), back: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("./PaymentDialog", () => ({
   PaymentDialog: ({ contractNo, remainingAmount, currency }: { contractNo: string; remainingAmount: number; currency: string }) => (
@@ -51,6 +54,16 @@ describe("应付页签", () => {
     expect(await screen.findByText(/服务暂时不可用/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /重试/ }));
     await waitFor(() => expect(mocks.getPayables).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("应付页签 URL 筛选", () => {
+  it("旧链接的 pastDelivery=true 重定向后仍带着该筛选", async () => {
+    window.history.pushState({}, "", "/dashboard/finance/payable?pastDelivery=true");
+    mocks.getPayables.mockResolvedValue(page([]));
+    render(<ContractBalanceList kind="payable" />);
+    await waitFor(() => expect(mocks.getPayables).toHaveBeenCalledWith(expect.objectContaining({ pastDelivery: true })));
+    window.history.pushState({}, "", "/");
   });
 });
 
