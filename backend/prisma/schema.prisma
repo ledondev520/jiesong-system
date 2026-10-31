@@ -177,7 +177,6 @@ model Port {
 
   stores         Store[]
   salesContracts SalesContract[]
-  quotes         Quote[]
 
   @@map("ports")
 }
@@ -245,6 +244,7 @@ model Customer {
 
   stores         Store[]
   salesContracts SalesContract[]
+  quotes         Quote[]
 
   @@map("customers")
 }

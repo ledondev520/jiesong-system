@@ -164,8 +164,8 @@ test('quote service over HTTP', async (t) => {
     const quote = await acceptedQuote([line()]);
     const year = new Date().getFullYear();
     const taken = await db.salesContract.count({ where: { contractNo: { startsWith: `EXP${year}` } } });
-    // Occupy the number the convert transaction will generate next → unique violation → 409.
-    await db.salesContract.create({ data: { contractNo: `EXP${year}${String(taken + 1).padStart(5, '0')}`, exchangeRate: 7 } });
+    // The generator uses count+1; inserting one row shifts the count, so occupy taken+2 to collide → unique violation → 409.
+    await db.salesContract.create({ data: { contractNo: `EXP${year}${String(taken + 2).padStart(5, '0')}`, exchangeRate: 7 } });
     const result = await call('SALES', 'PUT', `/quotes/${quote.id}`, { status: 'CONVERTED' });
     assert.equal(result.status, 409);
     assert.equal((await db.quote.findUnique({ where: { id: quote.id } })).status, 'ACCEPTED');
