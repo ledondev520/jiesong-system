@@ -10,6 +10,7 @@ const { createError } = require('../middleware/errorHandler');
 const { generateNextContractNo } = require('./shared/contractUtils');
 const { priceFor } = require('./exportPricing');
 const { categoryIdsByProduct } = require('./productCategoryChain');
+const { lastConfirmedPrices } = require('./lastConfirmedPrice');
 const { resolveOrderCustomerFields } = require('./customerService');
 const { roundMoney } = require('../utils/money');
 
@@ -69,12 +70,15 @@ const normalizeCreation = (data) => {
   };
 };
 
-/** 未给售价的明细按唯一报价规则（分类加价、现汇 + 调整、单价取整）定价；规则无法定价时拒绝。 */
+/** 未给售价的明细：老商品取上次确认价，新商品按唯一报价规则（分类加价、现汇 + 调整、向上取整）定价；规则无法定价时拒绝。 */
 const withRulePrices = async (input, db) => {
   if (!input.items.some(item => item.sellingPrice === undefined)) return input.items;
-  const chains = await categoryIdsByProduct(input.items.map(item => item.productId), db);
+  const unpriced = input.items.filter(item => item.sellingPrice === undefined).map(item => item.productId);
+  const [chains, last] = await Promise.all([categoryIdsByProduct(unpriced, db), lastConfirmedPrices(db, unpriced)]);
   return input.items.map(item => {
     if (item.sellingPrice !== undefined) return item;
+    const confirmed = last.get(item.productId);
+    if (confirmed) return { ...item, sellingPrice: confirmed.price };
     const priced = priceFor({ costCny: item.costPrice, categoryIds: chains.get(item.productId) || [], spotRate: input.exchangeRate });
     if (priced.status !== 'OK') throw createError('缺少有效成本或汇率，无法按报价规则定价，请填写售价', 400);
     return { ...item, sellingPrice: priced.unitPriceUsd };

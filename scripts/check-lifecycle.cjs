@@ -263,7 +263,11 @@ function check(root = ROOT, { baselineRoutes } = {}) {
           )
         )
           return false;
-        const fieldsValid = schema.required.every((key) => {
+        // Deprecated optional keys (roundUpTo) are still validated when present.
+        const checked = Object.keys(schema.properties).filter(
+          (key) => schema.required.includes(key) || value[key] !== undefined,
+        );
+        const fieldsValid = checked.every((key) => {
           const rule = schema.properties[key];
           const item = value[key];
           if (rule.type === 'array')

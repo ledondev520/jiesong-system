@@ -79,7 +79,6 @@ export interface ExportPacketPreview {
     fxBuffer: number;
     effectiveRate: number;
     defaultMarkup: number;
-    roundUpTo: number;
     historyRule: string;
   };
   issues: ExportPacketIssue[];

@@ -12,7 +12,7 @@ const path = require('node:path');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-local-pricing-'));
 process.env.JIESONG_PRICING_CONFIG = path.join(dir, 'pricing.json');
 fs.writeFileSync(process.env.JIESONG_PRICING_CONFIG, JSON.stringify({
-  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5,
+  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [],
 }), { mode: 0o600 });
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const prisma = require('../utils/prisma');
@@ -30,9 +30,9 @@ test('汇率问答来自报价配置，不读 SystemConfig', async () => {
   }
 });
 
-test('售价问答使用唯一规则：¥10000 → 1995，而不是旧的 6.6/×1.3 口径', async () => {
+test('售价问答使用唯一规则：¥10000 → 1994，而不是旧的 6.6/×1.3 口径', async () => {
   const answer = await generateLocalResponse('成本10000的价格是多少');
-  assert.match(answer, /\$1995/);
+  assert.match(answer, /\$1994/);
   assert.doesNotMatch(answer, /6\.6/);
   assert.match(await generateLocalResponse('成本0的价格'), /大于0/);
 });

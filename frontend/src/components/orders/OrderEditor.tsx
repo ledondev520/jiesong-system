@@ -1,7 +1,7 @@
 /**
  * Input: 客户（含默认条款）、该客户的门店、商品（服务端搜索）、服务端报价预览
  * Output: 新建出口订单：订单级表头（客户、USD、贸易术语、付款条件、装货港、现汇）+ 商品 × 门店明细网格
- * Pos: /dashboard/orders/new；单价只来自 POST /pricing/preview（整美元后取整到 5 的倍数），可人工覆盖并标记「手动价」
+ * Pos: /dashboard/orders/new；单价只来自 POST /pricing/preview（老商品取上次确认价，新商品向上取整到整美元），可人工覆盖并标记「手动价」
  */
 "use client";
 
@@ -138,6 +138,7 @@ export function OrderEditor() {
             {
               suggested: response.data.results[index]?.unitPriceUsd ?? null,
               suggestedFor: pricingInputs(line, rate),
+              suggestedSource: response.data.results[index]?.source,
             },
           ]),
         );
@@ -399,6 +400,9 @@ export function OrderEditor() {
                   单价 ${" "}
                   {isManualPrice(line) ? (
                     <SemanticBadge tone="warning">手动价</SemanticBadge>
+                  ) : line.suggested !== null &&
+                    line.suggestedSource === "LAST_CONFIRMED" ? (
+                    <SemanticBadge tone="info">上次成交价</SemanticBadge>
                   ) : null}
                 </Label>
                 <Input

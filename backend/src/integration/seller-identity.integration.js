@@ -17,7 +17,7 @@ test('seller identity: canonical + legacy alias, role-scoped bank, refused legac
   process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = 'test-only-seller-identity-never-for-production';
   const pricingFile = path.join(directory, 'pricing.json');
-  fs.writeFileSync(pricingFile, JSON.stringify({ exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5 }), { mode: 0o600 });
+  fs.writeFileSync(pricingFile, JSON.stringify({ exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [] }), { mode: 0o600 });
   process.env.JIESONG_PRICING_CONFIG = pricingFile;
   let db, server;
   t.after(async () => {

@@ -32,28 +32,28 @@ const line = (patch: Partial<OrderLine> = {}): OrderLine => ({
   storeId: "s1",
   quantity: "10",
   costCny: "10000",
-  suggested: 1995,
+  suggested: 1994,
   ...patch,
 });
 
 describe("prices and totals", () => {
   it("人工价优先于建议价；无效人工价不回退到建议价", () => {
-    expect(effectivePrice(line())).toBe(1995);
+    expect(effectivePrice(line())).toBe(1994);
     expect(effectivePrice(line({ manualPrice: "2000" }))).toBe(2000);
     expect(effectivePrice(line({ manualPrice: "abc" }))).toBeNull();
     expect(effectivePrice(line({ suggested: null }))).toBeNull();
   });
   it("行小计、合计和门店小计按两位小数求和", () => {
-    expect(lineTotal(line())).toBe(19950);
+    expect(lineTotal(line())).toBe(19940);
     expect(lineTotal(line({ quantity: "0" }))).toBe(0);
     const lines = [
       line(),
       line({ storeId: "s2", quantity: "1", suggested: 20 }),
       line({ storeId: "s2", quantity: "2", suggested: 5 }),
     ];
-    expect(orderTotal(lines)).toBe(19980);
+    expect(orderTotal(lines)).toBe(19970);
     expect([...storeSubtotals(lines)]).toEqual([
-      ["s1", 19950],
+      ["s1", 19940],
       ["s2", 30],
     ]);
   });
@@ -120,9 +120,9 @@ describe("stale suggested prices (R1-2)", () => {
   };
   it("a suggestion counts only for the rate, product and cost it was computed for", () => {
     const current = priced("6.72");
-    expect(withCurrentPricing([current], "6.72")[0].suggested).toBe(1995);
+    expect(withCurrentPricing([current], "6.72")[0].suggested).toBe(1994);
     expect(pricingPending([current], "6.72")).toBe(false);
-    // FX changed 6.72 -> 3.36: the old $1995 must not survive as a price
+    // FX changed 6.72 -> 3.36: the old $1994 must not survive as a price
     expect(withCurrentPricing([current], "3.36")[0].suggested).toBeNull();
     expect(pricingPending([current], "3.36")).toBe(true);
     expect(

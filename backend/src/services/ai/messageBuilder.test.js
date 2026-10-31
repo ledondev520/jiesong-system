@@ -70,7 +70,7 @@ test('系统提示词的定价口径来自唯一报价配置，不再写死 ×1.
   const previous = process.env.JIESONG_PRICING_CONFIG;
   process.env.JIESONG_PRICING_CONFIG = file;
   try {
-    fs.writeFileSync(file, JSON.stringify({ exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.35, categoryMarkups: [], roundUpTo: 5 }), { mode: 0o600 });
+    fs.writeFileSync(file, JSON.stringify({ exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.35, categoryMarkups: [] }), { mode: 0o600 });
     const prompt = getSystemPrompt();
     assert.match(prompt, /默认0\.35/);
     assert.match(prompt, /当前现汇6\.72/);

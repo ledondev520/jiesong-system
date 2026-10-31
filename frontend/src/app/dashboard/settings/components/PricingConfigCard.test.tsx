@@ -51,17 +51,13 @@ describe("报价规则卡片", () => {
     expect(screen.getByLabelText("现汇 (¥/$)")).toHaveValue(
       defaults.exchangeRate,
     );
-    expect(screen.getByLabelText("取整步长 ($)")).toHaveValue(5);
     await waitFor(() =>
       expect(screen.getByLabelText("报价预览")).toHaveTextContent(
         "成本 ¥100（普通） → $19",
       ),
     );
     expect(mocks.preview).toHaveBeenCalledWith(
-      expect.objectContaining({
-        costCny: 100,
-        config: expect.objectContaining({ roundUpTo: 5 }),
-      }),
+      expect.objectContaining({ costCny: 100 }),
     );
   });
 

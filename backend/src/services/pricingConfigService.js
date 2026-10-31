@@ -61,6 +61,8 @@ const validatePricingConfig = value => {
       config[key] = value[key];
     }
   }
+  // 已弃用的 roundUpTo（旧线上文件仍带 5）：存在时仍校验，但代码不再使用，也不带入快照
+  if (value.roundUpTo !== undefined) checkNumber('roundUpTo', value.roundUpTo, schema.properties.roundUpTo);
   // 实际报价汇率 = 现汇 + 调整；不得为 0 或负数，否则无法报价
   if (!(config.exchangeRate + config.exchangeAdjustment > 0)) {
     throw bad('exchangeAdjustment', '使 现汇+调整 不大于 0，无法报价');

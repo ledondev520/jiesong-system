@@ -13,7 +13,7 @@ const path = require('node:path');
 const pricingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sales-service-pricing-'));
 process.env.JIESONG_PRICING_CONFIG = path.join(pricingDir, 'pricing.json');
 fs.writeFileSync(process.env.JIESONG_PRICING_CONFIG, JSON.stringify({
-  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, roundUpTo: 5,
+  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3,
   categoryMarkups: [{ categoryId: 'cat-tile', categoryName: '瓷砖', markup: 0.1 }],
 }), { mode: 0o600 });
 test.after(() => fs.rmSync(pricingDir, { recursive: true, force: true }));
@@ -284,6 +284,8 @@ test('addSalesItem: 未传 sellingPrice 时按唯一报价规则（订单已保�
   let updateArgs = null;
 
   const originalProduct = prisma.product.findUnique;
+  const originalQuoteItems = prisma.quoteItem.findMany;
+  prisma.quoteItem.findMany = async () => [];
   prisma.product.findUnique = async () => ({ id: 'p-1', categoryId: null });
   prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5, customerId: 'c-1' });
   prisma.store.findMany = async () => [{ id: 's-1', customerId: 'c-1' }];
@@ -310,14 +312,15 @@ test('addSalesItem: 未传 sellingPrice 时按唯一报价规则（订单已保�
       costPrice: 50,
     });
 
-    // 成本 ¥50 × 1.3 ÷ (5 − 0.2) = 13.54 → 14 → 15（≥5 美元：整美元后取最近的 5 的倍数，个位 4 → 5）；不是旧的 ×1.3 公式
-    assert.equal(createArgs.data.sellingPrice, 15);
+    // 成本 ¥50 × 1.3 ÷ (5 − 0.2) = 13.54 → 14（向上取整到整美元）；不是旧的 ×1.3 公式
+    assert.equal(createArgs.data.sellingPrice, 14);
     assert.deepEqual(updateArgs, {
       where: { id: 'sc-1' },
       data: { totalAmount: 26 },
     });
   } finally {
     prisma.product.findUnique = originalProduct;
+    prisma.quoteItem.findMany = originalQuoteItems;
     prisma.salesContract.findUnique = originalFindUnique;
     prisma.salesItem.create = originalCreate;
     prisma.salesItem.findMany = originalFindMany;
@@ -341,9 +344,32 @@ test('addSalesItem: 门店属于其他客户时拒绝写入（评审 R1-3）', a
   }
 });
 
+test('addSalesItem: 未传 sellingPrice 且老商品有上次确认价时直接取该价（排除本订单）', async () => {
+  const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany];
+  let lookup = null;
+  let createArgs = null;
+  prisma.quoteItem.findMany = async () => [];
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5 });
+  prisma.salesItem.create = async (args) => { createArgs = args; return { id: 'si-1', ...args.data }; };
+  prisma.salesItem.findMany = async (args) => {
+    if (args.where?.productId) { lookup = args.where; return [{ productId: 'p-1', sellingPrice: 2500.5, createdAt: new Date('2026-10-01') }]; }
+    return [{ quantity: 2, sellingPrice: 2500.5, costPrice: 50 }];
+  };
+  prisma.salesContract.update = async () => ({ id: 'sc-1' });
+  try {
+    await salesService.addSalesItem('sc-1', { productId: 'p-1', storeId: 's-1', quantity: 2, unit: '件', costPrice: 50 });
+    assert.equal(createArgs.data.sellingPrice, 2500.5);
+    assert.deepEqual(lookup.salesContractId, { not: 'sc-1' });
+  } finally {
+    [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany] = originals;
+  }
+});
+
 test('addSalesItem: 报价转换订单（有 quoteId）已存计价汇率，定价不再重复扣调整', async () => {
   const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.product.findUnique, prisma.store.findMany];
+  const originalQuoteItems = prisma.quoteItem.findMany;
   let created = null;
+  prisma.quoteItem.findMany = async () => [];
   prisma.product.findUnique = async () => ({ id: 'p-1', categoryId: null });
   prisma.store.findMany = async () => [{ id: 's-1', customerId: 'c-1' }];
   prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 6.52, quoteId: 'q-1', customerId: 'c-1' });
@@ -352,10 +378,11 @@ test('addSalesItem: 报价转换订单（有 quoteId）已存计价汇率，定�
   prisma.salesContract.update = async () => ({ id: 'sc-1' });
   try {
     await salesService.addSalesItem('sc-1', { productId: 'p-1', storeId: 's-1', quantity: 1, unit: '件', costPrice: 10000 });
-    // 成本 ¥10000 × 1.3 ÷ 6.52 = 1993.87 → 1994 → 1995；若再扣 0.2 会得到 2055
-    assert.equal(created.data.sellingPrice, 1995);
+    // 成本 ¥10000 × 1.3 ÷ 6.52 = 1993.87 → 1994；若再扣 0.2 会得到 2055
+    assert.equal(created.data.sellingPrice, 1994);
   } finally {
     [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.product.findUnique, prisma.store.findMany] = originals;
+    prisma.quoteItem.findMany = originalQuoteItems;
   }
 });
 
@@ -464,19 +491,23 @@ test('calculateSellingPrice: 只按唯一报价规则；拒绝请求里的 profi
   );
   assert.throws(() => salesService.calculateSellingPrice({ costPrice: 0, exchangeRate: 7 }), (error) => error.statusCode === 400);
 
-  // 负责人示例：¥10000 @6.72 → 13000 ÷ 6.52 = 1993.87 → 1994 → 1995
+  // 负责人示例：¥10000 @6.72 → 13000 ÷ 6.52 = 1993.87 → 1994
   const result = salesService.calculateSellingPrice({ costPrice: 10000, exchangeRate: 6.72 });
   assert.deepEqual(
     [result.exact, result.roundedUp, result.roundedDown, result.recommended, result.effectiveRate, result.markup],
-    ['1993.87', 1994, 1993, 1995, 6.52, 0.3],
+    ['1993.87', 1994, 1993, 1994, 6.52, 0.3],
   );
-  assert.equal(salesService.calculateSellingPrice({ costPrice: 10000 }).recommended, 1995); // 现汇取配置 6.72
+  assert.equal(salesService.calculateSellingPrice({ costPrice: 10000 }).recommended, 1994); // 现汇取配置 6.72
 });
 
 // 合成商品：p-tile 属于“瓷砖”子分类（祖先命中 cat-tile 加价 10%），p-cup 无分类
 const withSyntheticCatalog = async (run) => {
   const originalProducts = prisma.product.findMany;
   const originalCategories = prisma.productCategory.findMany;
+  const originalOrders = prisma.salesItem.findMany;
+  const originalQuotes = prisma.quoteItem.findMany;
+  prisma.salesItem.findMany = async () => [];
+  prisma.quoteItem.findMany = async () => [];
   prisma.product.findMany = async ({ where }) => [{ id: 'p-tile', categoryId: 'cat-tile-sub' }, { id: 'p-cup', categoryId: null }]
     .filter((product) => where.id.in.includes(product.id));
   prisma.productCategory.findMany = async () => [{ id: 'cat-tile-sub', parentId: 'cat-tile' }, { id: 'cat-tile', parentId: null }];
@@ -485,21 +516,32 @@ const withSyntheticCatalog = async (run) => {
   } finally {
     prisma.product.findMany = originalProducts;
     prisma.productCategory.findMany = originalCategories;
+    prisma.salesItem.findMany = originalOrders;
+    prisma.quoteItem.findMany = originalQuotes;
   }
 };
 
 test('calculateProductSellingPrice: 带商品时按分类链取瓷砖 ×1.1，无分类按默认 ×1.3', () => withSyntheticCatalog(async () => {
-  // 11000 ÷ 6.52 = 1687.12 → 1688 → 个位 8 → 1690；13000 ÷ 6.52 → 1995
-  assert.equal((await salesService.calculateProductSellingPrice({ productId: 'p-tile', costPrice: 10000, exchangeRate: 6.72 })).recommended, 1690);
-  assert.equal((await salesService.calculateProductSellingPrice({ productId: 'p-cup', costPrice: 10000, exchangeRate: 6.72 })).recommended, 1995);
-  assert.equal((await salesService.calculateProductSellingPrice({ costPrice: 10000, exchangeRate: 6.72 })).recommended, 1995);
+  // 11000 ÷ 6.52 = 1687.12 → 1688；13000 ÷ 6.52 → 1994
+  assert.equal((await salesService.calculateProductSellingPrice({ productId: 'p-tile', costPrice: 10000, exchangeRate: 6.72 })).recommended, 1688);
+  assert.equal((await salesService.calculateProductSellingPrice({ productId: 'p-cup', costPrice: 10000, exchangeRate: 6.72 })).recommended, 1994);
+  assert.equal((await salesService.calculateProductSellingPrice({ costPrice: 10000, exchangeRate: 6.72 })).recommended, 1994);
+}));
+
+test('calculateProductSellingPrice: 老商品 recommended 取上次确认价，formulaRecommended 仍是规则价；新商品 RULE', () => withSyntheticCatalog(async () => {
+  prisma.salesItem.findMany = async ({ where }) => (where.productId.in.includes('p-cup')
+    ? [{ productId: 'p-cup', sellingPrice: 2500.5, createdAt: new Date('2026-10-01') }] : []);
+  const repeat = await salesService.calculateProductSellingPrice({ productId: 'p-cup', costPrice: 10000, exchangeRate: 6.72 });
+  assert.deepEqual([repeat.recommended, repeat.formulaRecommended, repeat.source], [2500.5, 1994, 'LAST_CONFIRMED']);
+  const fresh = await salesService.calculateProductSellingPrice({ productId: 'p-tile', costPrice: 10000, exchangeRate: 6.72 });
+  assert.deepEqual([fresh.recommended, fresh.source], [1688, 'RULE']);
 }));
 
 test('previewOrderMargin: 返回订单整体利润率与不阻断提示；瓷砖行不参与区间检查', () => withSyntheticCatalog(async () => {
-  const cup = { productId: 'p-cup', quantity: 2, costPrice: 10000, sellingPrice: 1995 };
-  const tile = { productId: 'p-tile', quantity: 1, costPrice: 10000, sellingPrice: 1690 };
+  const cup = { productId: 'p-cup', quantity: 2, costPrice: 10000, sellingPrice: 1994 };
+  const tile = { productId: 'p-tile', quantity: 1, costPrice: 10000, sellingPrice: 1688 };
   const inBand = await salesService.previewOrderMargin({ exchangeRate: 6.72, items: [cup, tile] });
-  assert.deepEqual([inBand.marginPct, inBand.excludedLines, inBand.warning], [30.07, 1, null]);
+  assert.deepEqual([inBand.marginPct, inBand.excludedLines, inBand.warning], [30.01, 1, null]);
   const low = await salesService.previewOrderMargin({ exchangeRate: 6.72, items: [{ ...cup, sellingPrice: 1900 }, tile] });
   assert.equal(low.warning, '订单整体利润率 23.88% 不在 30%~35% 范围内');
   const tilesOnly = await salesService.previewOrderMargin({ exchangeRate: 6.72, items: [tile] });

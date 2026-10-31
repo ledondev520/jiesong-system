@@ -113,15 +113,13 @@
           "exchangeRate": 6.72,
           "exchangeAdjustment": -0.2,
           "defaultMarkup": 0.3,
-          "categoryMarkups": [],
-          "roundUpTo": 5
+          "categoryMarkups": []
         },
         "replace": {
           "exchangeRate": 7.1,
           "exchangeAdjustment": -0.1,
           "defaultMarkup": 0.25,
-          "categoryMarkups": [],
-          "roundUpTo": 1
+          "categoryMarkups": []
         },
         "invalid": [
           {},
@@ -134,29 +132,25 @@
             "exchangeRate": 0,
             "exchangeAdjustment": -0.2,
             "defaultMarkup": 0.3,
-            "categoryMarkups": [],
-            "roundUpTo": 1
+            "categoryMarkups": []
           },
           {
             "exchangeRate": "6.72",
             "exchangeAdjustment": -0.2,
             "defaultMarkup": 0.3,
-            "categoryMarkups": [],
-            "roundUpTo": 1
+            "categoryMarkups": []
           },
           {
             "exchangeRate": 6.72001,
             "exchangeAdjustment": -0.2,
             "defaultMarkup": 0.3,
-            "categoryMarkups": [],
-            "roundUpTo": 1
+            "categoryMarkups": []
           },
           {
             "exchangeRate": 6.72,
             "exchangeAdjustment": -0.2,
             "defaultMarkup": 1.5,
-            "categoryMarkups": [],
-            "roundUpTo": 1
+            "categoryMarkups": []
           },
           {
             "exchangeRate": 6.72,
@@ -182,15 +176,13 @@
                 "categoryName": "x",
                 "markup": 2
               }
-            ],
-            "roundUpTo": 1
+            ]
           },
           {
             "exchangeRate": 0.1,
             "exchangeAdjustment": -0.2,
             "defaultMarkup": 0.3,
-            "categoryMarkups": [],
-            "roundUpTo": 1
+            "categoryMarkups": []
           },
           {
             "exchangeRate": 6.72,

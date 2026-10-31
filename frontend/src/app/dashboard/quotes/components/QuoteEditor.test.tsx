@@ -82,9 +82,9 @@ const saved = {
       note: null,
       costCny: 10000,
       isManualPrice: false,
-      unitPrice: 1995,
-      formulaPrice: 1995,
-      totalPrice: 19950,
+      unitPrice: 1994,
+      formulaPrice: 1994,
+      totalPrice: 19940,
       product: { customsName: "合成商品" },
     },
   ],
@@ -96,7 +96,7 @@ describe("quote editor", () => {
     mocks.getAll.mockResolvedValue({ data: { items: [customer] } });
     mocks.getStores.mockResolvedValue({ data: { items: [store] } });
     mocks.preview.mockResolvedValue({
-      data: { results: [{ unitPriceUsd: 1995 }], spotRate: 6.72 },
+      data: { results: [{ unitPriceUsd: 1994 }], spotRate: 6.72 },
     });
   });
 
@@ -144,11 +144,12 @@ describe("quote editor", () => {
     await waitFor(() =>
       expect(
         (screen.getByLabelText("第 1 行单价") as HTMLInputElement).value,
-      ).toBe("1995"),
+      ).toBe("1994"),
     );
     expect(mocks.preview).toHaveBeenCalledWith(
       [{ productId: "p1", costCny: 10000 }],
       undefined,
+      undefined, // 新报价：没有要排除的单据
     );
     fireEvent.click(screen.getByText("保存草稿"));
     await waitFor(() => expect(mocks.create).toHaveBeenCalled());
@@ -192,6 +193,10 @@ describe("quote editor", () => {
     render(<QuoteEditor quote={saved as never} onSaved={onSaved} />);
     await waitFor(() => expect(mocks.getStores).toHaveBeenCalledWith("c1"));
     expect(mocks.getAll).toHaveBeenCalled();
+    // the quote being edited is excluded from its own last-price pre-fill
+    await waitFor(() =>
+      expect(mocks.preview).toHaveBeenCalledWith(expect.anything(), 6.72, "q1"),
+    );
     fireEvent.click(screen.getByText("保存并标记已发送"));
     await waitFor(() => expect(mocks.update).toHaveBeenCalled());
     const [id, body] = mocks.update.mock.calls[0];

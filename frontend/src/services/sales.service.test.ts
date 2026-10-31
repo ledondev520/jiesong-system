@@ -224,12 +224,12 @@ describe("salesService api", () => {
 });
 
 describe("salesService.calculatePrice / getExchangeRate", () => {
-  it("推荐售价来自后端报价规则：成本 10000 @ 现汇 6.72 → 1995", async () => {
+  it("推荐售价来自后端报价规则：成本 10000 @ 现汇 6.72 → 1994", async () => {
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { recommended: 1995 },
+      data: { recommended: 1994 },
     });
 
-    expect(await salesService.calculatePrice(10000, 6.72)).toBe(1995);
+    expect(await salesService.calculatePrice(10000, 6.72)).toBe(1994);
     expect(api.post).toHaveBeenCalledWith("/sales/calculate-price", {
       costPrice: 10000,
       exchangeRate: 6.72,
@@ -247,7 +247,7 @@ describe("salesService.calculatePrice / getExchangeRate", () => {
 
   it("带商品时把 productId 交给后端取分类加价；订单利润率预览走同一端点的 items 模式", async () => {
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { recommended: 1690, warning: null },
+      data: { recommended: 1688, warning: null },
     });
     await salesService.calculatePrice(10000, 6.72, "prod-tile");
     expect(api.post).toHaveBeenLastCalledWith("/sales/calculate-price", {
@@ -259,7 +259,7 @@ describe("salesService.calculatePrice / getExchangeRate", () => {
       { productId: "p", quantity: 1, costPrice: 100, sellingPrice: 20 },
     ];
     expect(await salesService.previewOrderMargin(6.72, items)).toEqual({
-      recommended: 1690,
+      recommended: 1688,
       warning: null,
     });
     expect(api.post).toHaveBeenLastCalledWith("/sales/calculate-price", {

@@ -19,6 +19,8 @@ export interface OrderLine {
   suggested: number | null;
   /** 建议单价是按哪组输入（现汇、商品、成本）算出的，见 pricingInputs；输入一变就作废 */
   suggestedFor?: string;
+  /** 建议价来源：LAST_CONFIRMED = 该商品上次确认价；RULE = 成本公式（新商品） */
+  suggestedSource?: "LAST_CONFIRMED" | "RULE";
   /** 人工单价；空串 = 采用建议价 */
   manualPrice: string;
 }

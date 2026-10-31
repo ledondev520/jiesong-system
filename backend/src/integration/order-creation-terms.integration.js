@@ -28,7 +28,7 @@ test('HTTP/SQLite: new orders need an active customer (none → 400), adopt a si
   execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', database], { input: ddl });
   fs.chmodSync(database, 0o600);
   const pricingFile = path.join(directory, 'pricing.json');
-  fs.writeFileSync(pricingFile, JSON.stringify({ ...require('../../../config/pricing.json'), exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, roundUpTo: 5, categoryMarkups: [] }), { mode: 0o600 });
+  fs.writeFileSync(pricingFile, JSON.stringify({ ...require('../../../config/pricing.json'), exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [] }), { mode: 0o600 });
   process.env.JIESONG_PRICING_CONFIG = pricingFile;
   db = require('../utils/prisma');
   const user = await db.user.create({ data: { username: 'synthetic-terms-sales', password: 'test-only-unused-hash', name: '合成销售', role: 'SALES' } });
@@ -63,8 +63,8 @@ test('HTTP/SQLite: new orders need an active customer (none → 400), adopt a si
   assert.equal(adopted.status, 201);
   assert.equal(adopted.data.customerId, seapot.id);
   assert.equal(adopted.data.currency, 'USD');
-  assert.equal(adopted.data.items[0].sellingPrice, 1995, '¥10,000 → 1993.87 → 1994 → 1995 by the locked rule');
-  assert.equal(adopted.data.totalAmount, 19950);
+  assert.equal(adopted.data.items[0].sellingPrice, 1994, '¥10,000 → 1993.87 → 1994 by the locked rule (ceil to whole USD)');
+  assert.equal(adopted.data.totalAmount, 19940);
   assert.deepEqual([adopted.data.incoterm, adopted.data.paymentTerms, adopted.data.portOfLoading], ['FOB', '30% deposit', 'Shanghai']);
   // Explicit values override the copied defaults; an explicit selling price is kept as entered.
   const explicit = await create(order({ incoterm: 'cif', paymentTerms: 'T/T', items: [line({ sellingPrice: 1234 })] }));

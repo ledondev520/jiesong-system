@@ -139,6 +139,7 @@ export function QuoteEditor({ quote, onSaved }: Props) {
             costCny: Number(line.costCny),
           })),
           Number.isFinite(spot) && spot > 0 ? spot : undefined,
+          quote?.id,
         );
         if (ticket !== previewTicket.current) return;
         const byKey = new Map(
@@ -150,6 +151,7 @@ export function QuoteEditor({ quote, onSaved }: Props) {
               ? {
                   ...line,
                   suggested: byKey.get(line.key)?.unitPriceUsd ?? null,
+                  suggestedSource: byKey.get(line.key)?.source,
                 }
               : line,
           ),
@@ -405,6 +407,9 @@ export function QuoteEditor({ quote, onSaved }: Props) {
                   单价 ${" "}
                   {isManualPrice(line) ? (
                     <SemanticBadge tone="warning">手动价</SemanticBadge>
+                  ) : line.suggested !== null &&
+                    line.suggestedSource === "LAST_CONFIRMED" ? (
+                    <SemanticBadge tone="info">上次成交价</SemanticBadge>
                   ) : null}
                 </Label>
                 <Input

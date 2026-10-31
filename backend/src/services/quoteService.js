@@ -10,6 +10,7 @@ const { createError } = require('../middleware/errorHandler');
 const { partialUpdate } = require('../utils/partialUpdate');
 const { loadPricingSnapshot } = require('./pricingConfigService');
 const { priceFor, effectiveRateFor, round } = require('./exportPricing');
+const { lastConfirmedPrices } = require('./lastConfirmedPrice');
 const { withCategoryChains } = require('./productCategoryChain');
 const { generateNextContractNo } = require('./shared/contractUtils');
 const { QUOTE_STATUS, NOT_ALLOWED, planTransition } = require('./quoteStateMachine');
@@ -111,16 +112,20 @@ const normalizeItems = async (db, raw) => {
     .then((withChains) => withChains.map((r) => ({ ...r, unit: r.unit ?? r.product.unit ?? null, specification: r.specification ?? r.product.specification ?? null })));
 };
 
-/** The only place prices are produced: formulaPrice from priceFor(), manual override kept, totals rounded to cents. */
-const priceItems = (rows, spotRate) => {
+/**
+ * The only place prices are produced: formulaPrice from priceFor(), manual override kept, totals rounded to cents.
+ * Non-manual lines of repeat products take the last owner-confirmed price (lastConfirmedPrice.js); formulaPrice stays the rule price.
+ */
+const priceItems = async (db, rows, spotRate, { excludeQuoteId } = {}) => {
   const { config, revision } = loadPricingSnapshot();
   const spot = spotRate ?? config.exchangeRate;
   const pricingRate = effectiveRateFor(spot, config);
   if (!(pricingRate > 0)) throw bad('现汇无效，无法计算报价');
+  const last = await lastConfirmedPrices(db, rows.filter((row) => !row.isManualPrice).map((row) => row.productId), { excludeQuoteId });
   const items = rows.map(({ product, manualPrice, ...row }) => {
     const priced = priceFor({ costCny: row.costCny, categoryIds: product?.categoryIds || [], spotRate: spot }, config);
     const formulaPrice = priced.status === 'OK' ? priced.unitPriceUsd : null;
-    const unitPrice = row.isManualPrice ? manualPrice : (formulaPrice ?? 0);
+    const unitPrice = row.isManualPrice ? manualPrice : (last.get(row.productId)?.price ?? formulaPrice ?? 0);
     return { ...row, markup: priced.status === 'OK' ? priced.markup : null, formulaPrice, unitPrice,
       totalPrice: round(unitPrice * row.quantity, 2) };
   });
@@ -170,7 +175,7 @@ const createQuote = async (body = {}, actor) => {
     data.portOfLoading ??= customer.defaultPortOfLoading;
   }
   delete data.spotRate;
-  const priced = rawItems === undefined ? null : priceItems(await normalizeItems(prisma, rawItems), spotInput);
+  const priced = rawItems === undefined ? null : await priceItems(prisma, await normalizeItems(prisma, rawItems), spotInput);
   if (priced) await assertStoresOwnedBy(prisma, priced.items.map((i) => i.storeId), data.customerId);
   const id = await createWithNumber(async (tx) => {
     const quote = await tx.quote.create({ data: {
@@ -195,7 +200,7 @@ const editQuote = async (id, body) => {
   if (body.items !== undefined || spotChanged) {
     const raw = body.items ?? current.items.map((i) => ({ ...i, unitPrice: i.unitPrice }));
     const spot = Object.hasOwn(data, 'spotRate') ? data.spotRate : (current.spotRate ?? undefined);
-    priced = priceItems(await normalizeItems(prisma, raw), spot ?? undefined);
+    priced = await priceItems(prisma, await normalizeItems(prisma, raw), spot ?? undefined, { excludeQuoteId: id });
   }
   delete data.spotRate;
   // Stores must belong to the final customer, whether the items or the customer changed (R1-3).

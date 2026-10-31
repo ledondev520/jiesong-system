@@ -3,12 +3,10 @@
  * Output: 唯一的报价规则实现 priceFor()，以及加价/汇率/实现加价辅助函数
  * Pos: 出口备单与单据生成共用；Node 内不再有第二份公式（UX 规范 §7.2，负责人 2026-10-31 取整决定）
  *
- * 规则（负责人 2026-10-31 14:33 SGT 终版，14:36 确认；按单价取整，从不按行合计取整）：
- *   原始单价(USD) = 成本¥ × (1+加价) ÷ (现汇 + 调整)
- *   原始单价 < 步长(默认 5)：向上取整到整美元（0.20→1，4.01→5，4.99→5）
- *   原始单价 ≥ 步长：先向上取整到整美元，再按个位取最近的 5 的倍数
- *     （0 不变；1、2 往下到 0；3–7 到 5；8、9 往上到下一个 0）：1993.87→1994→1995，1996→1995，1998→2000，5.01→6→5
- * 步长取配置键 roundUpTo（键名是历史遗留，现在含义是“取整步长”，不是向上取整的上限；负责人锁定为 5）。
+ * 规则（负责人 2026-11-01 00:28 SGT 终版 PRICING-LASTPRICE；按单价取整，从不按行合计取整）：
+ *   原始单价(USD) = 成本¥ × (1+加价) ÷ (现汇 + 调整)，向上取整到整美元，不再取 5 的倍数：
+ *   0.20→1，6.50→7，13000÷6.52=1993.87→1994
+ * 老商品默认取上次确认价（lastConfirmedPrice.js），本文件只负责新商品的成本公式。
  * 加价取商品分类、其最近祖先分类的 categoryMarkups，否则 defaultMarkup。
  */
 const { loadPricingConfig } = require('./pricingConfigService');
@@ -26,16 +24,8 @@ const round = (value, digits = 2) => {
   return Math.round((toNumber(value) + Number.EPSILON) * factor) / factor;
 };
 
-/**
- * 单价取整（见文件头规则）。toFixed(6) 浮点保护使 19.0000000001 仍按 19 处理。
- * ≥ 步长时的“最近倍数”对整美元无平局（步长 5）；步长为偶数时平局向上。
- */
-const roundUnitPrice = (rawUsd, step) => {
-  const guarded = Number(toNumber(rawUsd).toFixed(6));
-  const whole = Math.ceil(guarded);
-  if (guarded < step) return whole;
-  return Math.floor(whole / step + 0.5) * step;
-};
+/** 单价向上取整到整美元。toFixed(6) 浮点保护使 19.0000000001 仍按 19 处理。 */
+const roundUnitPrice = (rawUsd) => Math.ceil(Number(toNumber(rawUsd).toFixed(6)));
 
 /** 现汇 + 调整 = 报价用汇率；现汇缺失/非法时返回 0（调用方据此拒绝报价） */
 const effectiveRateFor = (spotRate, config = loadPricingConfig()) => {
@@ -128,7 +118,7 @@ const priceFor = ({ costCny, categoryIds = [], spotRate, effectiveRate } = {}, c
   const rawUnitPriceUsd = pricedCny / rate;
   return {
     status: 'OK',
-    unitPriceUsd: roundUnitPrice(rawUnitPriceUsd, config.roundUpTo),
+    unitPriceUsd: roundUnitPrice(rawUnitPriceUsd),
     rawUnitPriceUsd,
     pricedCny,
     markup,
@@ -142,7 +132,6 @@ const currentRates = (config = loadPricingConfig()) => ({
   adjustment: config.exchangeAdjustment,
   effectiveRate: effectiveRateFor(config.exchangeRate, config),
   defaultMarkup: config.defaultMarkup,
-  roundUpTo: config.roundUpTo,
 });
 
 /** 新建订单未显式给汇率时的默认现汇：只取唯一报价配置，不再有 7.0/7.2 等代码内默认。 */

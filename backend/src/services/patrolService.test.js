@@ -180,7 +180,7 @@ describe('runSystemPatrol: 报价配置是唯一的汇率/加价来源', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   };
-  const valid = { exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [], roundUpTo: 5 };
+  const valid = { exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [] };
 
   it('配置合法且新近：不产生配置类发现', async () => {
     const findings = await withPricing((file) => fs.writeFileSync(file, JSON.stringify(valid), { mode: 0o600 }), runSystemPatrol);

@@ -147,7 +147,7 @@ type ItemLike = {
   product?: { customsName: string } | null;
 };
 
-/** 已保存明细 → 订单网格行：规则价作为 suggested（缺成本为 null），手动价回填 manualPrice。 */
+/** 已保存明细 → 订单网格行：非手动行的 suggested 取已存单价（可能是上次确认价），手动行取规则价（缺成本为 null）；手动价回填 manualPrice。 */
 export const linesFromItems = (items: ItemLike[] = []): OrderLine[] =>
   items.map((item, index) => ({
     key: `saved-${index}`,
@@ -157,7 +157,10 @@ export const linesFromItems = (items: ItemLike[] = []): OrderLine[] =>
     storeId: item.storeId ?? "",
     quantity: String(item.quantity),
     costCny: item.costCny === null ? "" : String(item.costCny),
-    suggested: item.formulaPrice,
+    suggested:
+      !item.isManualPrice && item.unitPrice > 0
+        ? item.unitPrice
+        : item.formulaPrice,
     manualPrice: item.isManualPrice ? String(item.unitPrice) : "",
   }));
 
