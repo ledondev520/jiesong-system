@@ -14,6 +14,7 @@ const {
   normalizeConfigValueForResponse,
   normalizeConfigValueForStorage,
 } = require('../../utils/secretCrypto');
+const { isCompanyConfigKey, validateCompanyConfigValue } = require('../../utils/companyConfig');
 
 const parsePositiveIntEnv = (value, fallback) => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -228,7 +229,8 @@ const updateConfig = async (req, res, next) => {
     const { key } = req.params;
     const { value, note } = req.body;
 
-    const storedValue = normalizeConfigValueForStorage(key, value);
+    // 公司信息三个键：严格校验（文本、无控制字符、长度/行数上限）后再存；失败 400 且不写库
+    const storedValue = normalizeConfigValueForStorage(key, isCompanyConfigKey(key) ? validateCompanyConfigValue(key, value) : value);
 
     const config = await prisma.systemConfig.upsert({
       where: { key },
