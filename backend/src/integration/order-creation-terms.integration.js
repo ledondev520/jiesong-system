@@ -19,7 +19,7 @@ test('HTTP/SQLite: new orders need an active customer (none → 400), adopt a si
     if (server) { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
     if (db) await db.$disconnect();
     delete process.env.JIESONG_PRICING_CONFIG;
-    fs.rmSync(directory, { recursive: true, force: true });
+    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); // a trailing audit-log write can recreate files mid-delete
   });
   const migrations = path.resolve(__dirname, '../../prisma/migrations');
   const ddl = fs.readdirSync(migrations).sort()
@@ -81,4 +81,15 @@ test('HTTP/SQLite: new orders need an active customer (none → 400), adopt a si
   assert.equal((await create(order({ currency: 'EUR' }))).status, 400);
   assert.equal((await create(order({ incoterm: 'DAP' }))).status, 400);
   assert.equal(await db.salesContract.count(), before + 1, 'only the valid explicit-customer order was written');
+
+  // A store linked to another customer is refused; unlinked legacy stores and the owner's own stores pass (review R1-3).
+  const ownStore = await db.store.create({ data: { name: 'Synthetic own store', portId: port.id, customerId: seapot.id } });
+  const foreignStore = await db.store.create({ data: { name: 'Synthetic foreign store', portId: port.id, customerId: (await db.customer.create({ data: { name: 'Synthetic Third' } })).id } });
+  const count = await db.salesContract.count();
+  const foreign = await create(order({ customerId: seapot.id, items: [line({ storeId: foreignStore.id })] }));
+  assert.equal(foreign.status, 400);
+  assert.match(foreign.message, /门店不属于所选客户/);
+  assert.equal(await db.salesContract.count(), count, 'nothing written for a cross-customer store');
+  assert.equal((await create(order({ customerId: seapot.id, items: [line({ storeId: ownStore.id })] }))).status, 201);
+  assert.equal((await create(order({ customerId: seapot.id, items: [line()] }))).status, 201, 'a legacy store with no customer link still passes');
 });

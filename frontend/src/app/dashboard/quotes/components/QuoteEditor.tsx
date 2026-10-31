@@ -71,12 +71,21 @@ export function QuoteEditor({ quote, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const previewTicket = useRef(0);
+  const storesTicket = useRef(0);
 
   const loadStores = useCallback((id: string) => {
+    // 换客户先清空旧门店；迟到的旧客户响应丢弃（评审 R1-3）
+    const ticket = ++storesTicket.current;
+    setStores([]);
     customerService
       .getStores(id)
-      .then((response) => setStores(response.data.items))
-      .catch((reason) => setLoadError(describeFailure("加载门店失败", reason)));
+      .then((response) => {
+        if (ticket === storesTicket.current) setStores(response.data.items);
+      })
+      .catch((reason) => {
+        if (ticket === storesTicket.current)
+          setLoadError(describeFailure("加载门店失败", reason));
+      });
   }, []);
 
   // 换客户：带出客户默认条款，并清空已选门店（门店属于客户）

@@ -58,6 +58,7 @@ export function OrderEditor() {
   const [submitting, setSubmitting] = useState(false);
   const requestKey = useRef(crypto.randomUUID());
   const previewTicket = useRef(0);
+  const storesTicket = useRef(0);
   // 最近一次失败的报价预览对应的 previewKey；输入再变化会重新请求并清除
   const [previewFailedFor, setPreviewFailedFor] = useState<string | null>(null);
   const [previewRetry, setPreviewRetry] = useState(0);
@@ -71,10 +72,18 @@ export function OrderEditor() {
       portOfLoading: customer.defaultPortOfLoading ?? "",
     }));
     setLines((current) => current.map((line) => ({ ...line, storeId: "" })));
+    // 换客户先清空旧门店；迟到的旧客户响应丢弃（评审 R1-3）
+    const ticket = ++storesTicket.current;
+    setStores([]);
     customerService
       .getStores(customer.id)
-      .then((response) => setStores(response.data.items))
-      .catch((reason) => setLoadError(describeFailure("加载门店失败", reason)));
+      .then((response) => {
+        if (ticket === storesTicket.current) setStores(response.data.items);
+      })
+      .catch((reason) => {
+        if (ticket === storesTicket.current)
+          setLoadError(describeFailure("加载门店失败", reason));
+      });
   }, []);
 
   useEffect(() => {

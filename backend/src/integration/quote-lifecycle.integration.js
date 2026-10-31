@@ -270,4 +270,22 @@ test('quote service over HTTP', async (t) => {
     assert.equal((await call('ADMIN', 'PUT', `/quotes/${quote.id}`, { note: 'admin edit' })).status, 200);
     assert.equal((await db.quote.findUnique({ where: { id: quote.id } })).createdById, roles.ADMIN.id);
   });
+  await t.test('stores must belong to the quote customer on create, edit and conversion (review R1-3)', async () => {
+    const other = await db.customer.create({ data: { name: 'Synthetic other customer' } });
+    const [mine, theirs] = await Promise.all([customer, other].map((c, n) => db.store.create({ data: { name: `Owned store ${n}`, portId: port.id, customerId: c.id } })));
+    const body = (storeId) => ({ customerId: customer.id, items: [line({ storeId })] });
+    const before = await db.quote.count();
+    const refused = await call('SALES', 'POST', '/quotes', body(theirs.id));
+    assert.equal(refused.status, 400);
+    assert.match(refused.message, /门店不属于所选客户/);
+    assert.equal(await db.quote.count(), before, 'nothing written');
+    const quote = await ok('SALES', 'POST', '/quotes', body(mine.id));
+    assert.equal((await call('SALES', 'PUT', `/quotes/${quote.id}`, { items: [line({ storeId: theirs.id })] })).status, 400, 'items edit');
+    assert.equal((await call('SALES', 'PUT', `/quotes/${quote.id}`, { customerId: other.id })).status, 400, 'switching customer keeps the old customer\'s stores');
+    // Relinked after the quote was saved: conversion refuses rather than writing a mismatched order.
+    await db.store.update({ where: { id: mine.id }, data: { customerId: other.id } });
+    const orders = await db.salesContract.count();
+    assert.equal((await call('SALES', 'PUT', `/quotes/${quote.id}`, { status: 'CONVERTED' })).status, 400);
+    assert.equal(await db.salesContract.count(), orders);
+  });
 });

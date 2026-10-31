@@ -240,4 +240,88 @@ describe("DataTable", () => {
     await user.click(screen.getByRole("button", { name: "下一页" }));
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
+
+  describe("renderCard (narrow screens, review R1-5)", () => {
+    // jsdom applies no CSS, so assert the layout classes: only the table may be desktop-only.
+    const desktopOnly = (el: HTMLElement) =>
+      Boolean(el.closest(".hidden:not([class*='md:'])")) ||
+      Boolean(el.closest("[class~='hidden']"));
+    const cards = () => document.querySelector(".md\\:hidden") as HTMLElement;
+
+    it("search, filters and paging stay outside the desktop-only table; 21+ rows stay reachable", async () => {
+      const onPageChange = vi.fn();
+      render(
+        <DataTable
+          columns={columns}
+          data={rows}
+          rowKey={(r) => r.id}
+          renderCard={(r) => <span>card-{r.name}</span>}
+          search={{ value: "", onChange: vi.fn() }}
+          filters={[
+            { key: "f", label: "筛选A", active: false, onToggle: vi.fn() },
+          ]}
+          pagination={{
+            page: 1,
+            pageSize: 20,
+            total: 45,
+            onPageChange,
+            onPageSizeChange: vi.fn(),
+          }}
+        />,
+      );
+      expect(within(cards()).getByText("card-Beta")).toBeInTheDocument();
+      for (const control of [
+        screen.getByRole("textbox", { name: "搜索" }),
+        screen.getByRole("button", { name: "筛选A" }),
+        screen.getByRole("button", { name: "下一页" }),
+      ])
+        expect(desktopOnly(control)).toBe(false);
+      await userEvent.click(screen.getByRole("button", { name: "下一页" }));
+      expect(onPageChange).toHaveBeenCalledWith(2);
+      expect(screen.getByRole("table").closest(".hidden")).not.toBeNull();
+    });
+
+    it("a failed load shows the reason and a retry inside the card list", async () => {
+      const onRetry = vi.fn();
+      render(
+        <DataTable
+          columns={columns}
+          data={[]}
+          rowKey={(r) => r.id}
+          renderCard={(r) => <span>card-{r.name}</span>}
+          error={new Error("boom")}
+          errorWhat="加载失败了"
+          onRetry={onRetry}
+        />,
+      );
+      expect(within(cards()).getByText(/加载失败了/)).toBeInTheDocument();
+      await userEvent.click(
+        within(cards()).getByRole("button", { name: "重试" }),
+      );
+      expect(onRetry).toHaveBeenCalled();
+    });
+
+    it("empty and loading states render in the card list", () => {
+      const { rerender } = render(
+        <DataTable
+          columns={columns}
+          data={[]}
+          rowKey={(r) => r.id}
+          renderCard={() => null}
+          emptyTitle="啥也没有"
+        />,
+      );
+      expect(within(cards()).getByText("啥也没有")).toBeInTheDocument();
+      rerender(
+        <DataTable
+          columns={columns}
+          data={[]}
+          rowKey={(r) => r.id}
+          renderCard={() => null}
+          loading
+        />,
+      );
+      expect(within(cards()).getByRole("status")).toBeInTheDocument();
+    });
+  });
 });

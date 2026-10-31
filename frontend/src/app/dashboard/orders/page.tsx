@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { formatMoney } from "@/lib/format";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
+import { useLatestRequest } from "@/lib/hooks/useLatestRequest";
 import { salesService } from "@/services/sales.service";
 import { SalesStatus, type SalesContract } from "@/types";
 
@@ -51,7 +52,10 @@ function OrdersList() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
 
+  const startRequest = useLatestRequest();
+
   const load = useCallback(async () => {
+    const isCurrent = startRequest();
     setLoading(true);
     try {
       const response = await salesService.getAll?.({
@@ -65,15 +69,17 @@ function OrdersList() {
         storeId: storeId || undefined,
         lite: true,
       });
+      if (!isCurrent()) return;
       setItems(response?.data.items ?? []);
       setTotal(response?.data.pagination.total ?? 0);
       setLoadError(null);
     } catch (error) {
-      setLoadError(error ?? new Error("加载失败"));
+      if (isCurrent()) setLoadError(error ?? new Error("加载失败"));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   }, [
+    startRequest,
     page,
     pageSize,
     keyword,
@@ -159,51 +165,9 @@ function OrdersList() {
         }
       />
 
-      <div className="hidden md:block">
-        <DataTable
-          columns={columns}
-          data={items}
-          rowKey={(order) => order.id}
-          loading={loading}
-          error={loadError}
-          errorWhat="加载订单失败"
-          onRetry={() => void load()}
-          emptyTitle={
-            filters.keyword || filters.status
-              ? "没有符合条件的订单"
-              : "暂无订单"
-          }
-          emptyDescription={
-            filters.keyword || filters.status
-              ? undefined
-              : "点击右上角「新建订单」开始"
-          }
-          onRowClick={(order) => router.push(`/dashboard/orders/${order.id}`)}
-          search={{
-            value: filters.keyword,
-            onChange: (keyword) => setFilters({ keyword }),
-            placeholder: "搜索订单号、港口或门店...",
-          }}
-          filters={STATUS_FILTERS.map(({ status, label }) => ({
-            key: status,
-            label,
-            active: filters.status === status,
-            onToggle: () =>
-              setFilters({ status: filters.status === status ? "" : status }),
-          }))}
-          pagination={{
-            page: filters.page,
-            pageSize: filters.pageSize,
-            total,
-            onPageChange: (page) => setFilters({ page }),
-            onPageSizeChange: (pageSize) => setFilters({ pageSize }),
-          }}
-        />
-      </div>
-
-      <div className="grid gap-3 md:hidden">
-        {items.map((order) => (
-          <Link key={order.id} href={`/dashboard/orders/${order.id}`}>
+      <DataTable
+        renderCard={(order) => (
+          <Link href={`/dashboard/orders/${order.id}`}>
             <Card className="border-border/70">
               <CardContent className="space-y-1 p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -218,13 +182,43 @@ function OrdersList() {
               </CardContent>
             </Card>
           </Link>
-        ))}
-        {!loading && !loadError && items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            暂无订单
-          </p>
-        ) : null}
-      </div>
+        )}
+        columns={columns}
+        data={items}
+        rowKey={(order) => order.id}
+        loading={loading}
+        error={loadError}
+        errorWhat="加载订单失败"
+        onRetry={() => void load()}
+        emptyTitle={
+          filters.keyword || filters.status ? "没有符合条件的订单" : "暂无订单"
+        }
+        emptyDescription={
+          filters.keyword || filters.status
+            ? undefined
+            : "点击右上角「新建订单」开始"
+        }
+        onRowClick={(order) => router.push(`/dashboard/orders/${order.id}`)}
+        search={{
+          value: filters.keyword,
+          onChange: (keyword) => setFilters({ keyword }),
+          placeholder: "搜索订单号、港口或门店...",
+        }}
+        filters={STATUS_FILTERS.map(({ status, label }) => ({
+          key: status,
+          label,
+          active: filters.status === status,
+          onToggle: () =>
+            setFilters({ status: filters.status === status ? "" : status }),
+        }))}
+        pagination={{
+          page: filters.page,
+          pageSize: filters.pageSize,
+          total,
+          onPageChange: (page) => setFilters({ page }),
+          onPageSizeChange: (pageSize) => setFilters({ pageSize }),
+        }}
+      />
     </div>
   );
 }
