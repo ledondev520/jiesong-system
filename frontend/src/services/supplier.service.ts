@@ -1,4 +1,5 @@
-import type { Supplier } from "@/types";
+import api from "@/lib/axios";
+import type { ApiResponse, Supplier } from "@/types";
 import { createCrudService } from "./crudService";
 
 type SupplierListQuery = {
@@ -23,7 +24,25 @@ const crud = createCrudService<
   SupplierListQuery
 >("/suppliers");
 
+export interface SupplierHardDeletePreview {
+  counts: Record<string, number>;
+  blockers: string[];
+  canDelete: boolean;
+  confirmToken: string | null;
+}
+
 export const supplierService = {
   ...crud,
+  // ADMIN only: preview counts + token, then delete with the matching token (one server transaction).
+  hardDeletePreview: (id: string) =>
+    api.get<
+      ApiResponse<SupplierHardDeletePreview>,
+      ApiResponse<SupplierHardDeletePreview>
+    >(`/suppliers/${id}/hard-delete-preview`),
+  hardDelete: (id: string, confirmToken: string) =>
+    api.post<ApiResponse<unknown>, ApiResponse<unknown>>(
+      `/suppliers/${id}/hard-delete`,
+      { confirmToken },
+    ),
   getAll: async (params?: SupplierListQuery) => crud.getAll?.(params),
 };

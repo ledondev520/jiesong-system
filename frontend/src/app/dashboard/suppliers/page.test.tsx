@@ -13,6 +13,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import SuppliersPage from "./page";
@@ -27,6 +28,8 @@ const mockGetAll = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockDelete = vi.fn();
+const mockHardPreview = vi.fn();
+const mockHardDelete = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 
@@ -44,6 +47,8 @@ vi.mock("@/services/supplier.service", () => ({
     create: (...args: unknown[]) => mockCreate(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
     delete: (...args: unknown[]) => mockDelete(...args),
+    hardDeletePreview: (...args: unknown[]) => mockHardPreview(...args),
+    hardDelete: (...args: unknown[]) => mockHardDelete(...args),
   },
 }));
 
@@ -419,6 +424,84 @@ describe("supplier catalog identity and deletion sessions", () => {
       ).not.toBeInTheDocument();
     },
   );
+
+  it.each([Role.PURCHASE, Role.SALES, Role.FINANCE, Role.WAREHOUSE])(
+    "%s does not see the permanent delete button",
+    async (role) => {
+      useAuthStore.setState({ user: { id: "synthetic", role } as never });
+      render(<SuppliersPage />);
+      await screen.findByRole("button", { name: "选择供应商 合成供应商甲" });
+      expect(
+        screen.queryByRole("button", { name: "永久删除" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("ADMIN permanent delete lists counts and needs the typed name before sending the preview token", async () => {
+    useAuthStore.setState({
+      user: { id: "synthetic-admin", role: Role.ADMIN } as never,
+    });
+    mockHardPreview.mockResolvedValue({
+      data: {
+        counts: { contracts: 3, items: 7 },
+        blockers: [],
+        canDelete: true,
+        confirmToken: "synthetic-token",
+      },
+    });
+    mockHardDelete.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    render(<SuppliersPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
+    );
+    await user.click(screen.getByRole("button", { name: "永久删除" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("采购合同");
+    expect(dialog).toHaveTextContent("3");
+    const confirmButton = within(dialog).getByRole("button", {
+      name: "永久删除",
+    });
+    expect(confirmButton).toBeDisabled();
+    await user.type(
+      within(dialog).getByLabelText("输入供应商名称确认"),
+      "合成供应商甲",
+    );
+    await user.click(confirmButton);
+    await waitFor(() =>
+      expect(mockHardDelete).toHaveBeenCalledExactlyOnceWith(
+        "synthetic-a",
+        "synthetic-token",
+      ),
+    );
+    expect(mockToastSuccess).toHaveBeenCalledWith("供应商已永久删除");
+  });
+
+  it("blocked permanent delete shows the reason and cannot be confirmed", async () => {
+    useAuthStore.setState({
+      user: { id: "synthetic-admin", role: Role.ADMIN } as never,
+    });
+    mockHardPreview.mockResolvedValue({
+      data: {
+        counts: { contracts: 1 },
+        blockers: ["存在 2 条付款/应付核销记录"],
+        canDelete: false,
+        confirmToken: null,
+      },
+    });
+    const user = userEvent.setup();
+    render(<SuppliersPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
+    );
+    await user.click(screen.getByRole("button", { name: "永久删除" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("存在 2 条付款/应付核销记录");
+    expect(
+      within(dialog).getByRole("button", { name: "永久删除" }),
+    ).toBeDisabled();
+    expect(mockHardDelete).not.toHaveBeenCalled();
+  });
 
   it("a refreshed catalog omitting the selected record cannot turn its draft into creation", async () => {
     mockGetAll

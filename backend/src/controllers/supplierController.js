@@ -9,9 +9,9 @@
 const prisma = require('../utils/prisma');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
-const { PURCHASE_STATUS } = require('../config/constants');
 const { archiveFilter } = require('../utils/archiveFilter');
 const { normalizePagination } = require('../utils/pagination');
+const supplierHardDelete = require('../services/supplierHardDeleteService');
 const { createSupplier, updateSupplier, assertActiveChangeAllowed } = require('../agent/commands/supplier');
 
 
@@ -119,7 +119,7 @@ const update = async (req, res, next) => {
 };
 
 /**
- * 职责：归档供应商（软删除，可由 ADMIN 恢复，历史单据保持关联）
+ * 职责：归档供应商（软停用，任何时候可归档、不检查合同；可由 ADMIN 恢复，历史单据保持关联）
  */
 const remove = async (req, res, next) => {
   try {
@@ -127,16 +127,41 @@ const remove = async (req, res, next) => {
 
     const supplier = await prisma.supplier.findUnique({ where: { id }, select: { id: true } });
     if (!supplier) throw createError('供应商不存在', 404);
-    // Cancelled contracts do not count as references (owner decision 2026-10-31).
-    const active = await prisma.purchaseContract.count({ where: { supplierId: id, status: { not: PURCHASE_STATUS.CANCELLED } } });
-    if (active > 0) throw createError('已有未取消采购合同的供应商不可删除', 409);
 
     await prisma.supplier.update({
       where: { id },
       data: { isActive: false },
     });
     
-    success(res, null, '供应商删除成功');
+    success(res, null, '供应商归档成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：永久删除预览（ADMIN）：各类关联记录计数、阻断原因与确认令牌
+ */
+const hardDeletePreview = async (req, res, next) => {
+  try {
+    success(res, await supplierHardDelete.preview(prisma, req.params.id));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：永久删除供应商及其关联历史（ADMIN，需与预览匹配的令牌，单事务）
+ */
+const hardDelete = async (req, res, next) => {
+  try {
+    const result = await supplierHardDelete.hardDelete(prisma, {
+      supplierId: req.params.id,
+      confirmToken: req.body?.confirmToken,
+      actorId: req.user.id,
+      req,
+    });
+    success(res, result, '供应商已永久删除');
   } catch (error) {
     next(error);
   }
@@ -185,6 +210,8 @@ module.exports = {
   create,
   update,
   remove,
+  hardDeletePreview,
+  hardDelete,
   addAlias,
   markQualityIssue,
 };

@@ -98,13 +98,14 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     assert.equal((await send('DELETE', `/purchases/${clean.id}`, 'ADMIN')).status, 404);
   });
 
-  await t.test('supplier delete: ADMIN/PURCHASE only, refused with 409 while non-cancelled purchase contracts reference it', async () => {
+  await t.test('supplier archive: ADMIN/PURCHASE only, allowed any time regardless of contracts', async () => {
     const used = await db.supplier.create({ data: { name: 'Synthetic used supplier' } });
     await db.purchaseContract.create({ data: { contractNo: 'MCP-USED-1', supplierId: used.id } });
     const unused = await db.supplier.create({ data: { name: 'Synthetic unused supplier' } });
     for (const role of ['SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']) assert.equal((await send('DELETE', `/suppliers/${unused.id}`, role)).status, 403, role);
-    assert.equal((await send('DELETE', `/suppliers/${used.id}`, 'PURCHASE')).status, 409);
-    assert.equal((await db.supplier.findUnique({ where: { id: used.id } })).isActive, true);
+    assert.equal((await send('DELETE', `/suppliers/${used.id}`, 'PURCHASE')).status, 200);
+    assert.equal((await db.supplier.findUnique({ where: { id: used.id } })).isActive, false);
+    assert.ok(await db.purchaseContract.findUnique({ where: { contractNo: 'MCP-USED-1' } }), 'archive keeps history');
     assert.equal((await send('DELETE', `/suppliers/${unused.id}`, 'PURCHASE')).status, 200);
     assert.equal((await db.supplier.findUnique({ where: { id: unused.id } })).isActive, false);
     assert.equal((await send('DELETE', '/suppliers/does-not-exist', 'ADMIN')).status, 404);
@@ -128,15 +129,104 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     assert.equal((await send('PUT', `/suppliers/${target.id}`, 'PURCHASE', { isActive: true })).status, 403);
     assert.equal((await send('PUT', `/suppliers/${target.id}`, 'ADMIN', { isActive: true })).status, 200);
 
-    // Cancelled contracts are not references; any non-cancelled one still blocks.
-    const cancelledOnly = await db.supplier.create({ data: { name: 'Synthetic cancelled-only supplier' } });
-    await db.purchaseContract.create({ data: { contractNo: 'MCP-CANCELLED-1', supplierId: cancelledOnly.id, status: 'CANCELLED' } });
-    const mixed = await db.supplier.create({ data: { name: 'Synthetic mixed supplier' } });
-    await db.purchaseContract.create({ data: { contractNo: 'MCP-CANCELLED-2', supplierId: mixed.id, status: 'CANCELLED' } });
-    await db.purchaseContract.create({ data: { contractNo: 'MCP-ACTIVE-2', supplierId: mixed.id, status: 'SIGNED' } });
-    assert.equal((await send('DELETE', `/suppliers/${mixed.id}`, 'PURCHASE')).status, 409);
-    assert.equal((await db.supplier.findUnique({ where: { id: mixed.id } })).isActive, true);
-    assert.equal((await send('DELETE', `/suppliers/${cancelledOnly.id}`, 'PURCHASE')).status, 200);
-    assert.equal((await db.supplier.findUnique({ where: { id: cancelledOnly.id } })).isActive, false);
+  });
+
+  await t.test('supplier hard delete: ADMIN only, preview + matching token, one transaction, blocked by money records', async () => {
+    const supplier = await db.supplier.create({ data: { name: 'Synthetic hard-delete supplier', aliases: { create: [{ alias: 'synthetic-hd-alias' }] } } });
+    await db.productSupplier.create({ data: { productId: product.id, supplierId: supplier.id } });
+    const contract = await db.purchaseContract.create({ data: { contractNo: 'HD-1', supplierId: supplier.id, items: { create: [{ productId: product.id, quantity: 2, unitPrice: 1, totalPrice: 2 }] } }, include: { items: true } });
+    const receipt = await db.purchaseReceipt.create({ data: { purchaseContractId: contract.id, requestId: 'hd-r', requestHash: 'hd-h', arrivedAt: new Date(), createdById: users.PURCHASE.id } });
+    const receiptItem = await db.purchaseReceiptItem.create({ data: { receiptId: receipt.id, purchaseItemId: contract.items[0].id, arrivedQuantity: 2, acceptedQuantity: 2 } });
+    const inspection = await db.purchaseReceiptInspection.create({ data: { receiptId: receipt.id, receiptItemId: receiptItem.id, requestId: 'hd-i', requestHash: 'hd-ih', acceptedQuantity: 2, acceptedIncrement: 2, reinspectionQuantity: 0, pendingQuantity: 0, note: 'synthetic', inspectedById: users.PURCHASE.id } });
+    await db.inventory.create({ data: { productId: product.id, purchaseItemId: contract.items[0].id, receiptInspectionId: inspection.id, quantity: 2 } });
+    const sale = await db.salesContract.create({ data: { contractNo: 'EXP-HD-1', exchangeRate: 7 } });
+    await db.packingItem.create({ data: { salesContractId: sale.id, purchaseItemId: contract.items[0].id, productId: product.id, quantity: 1 } });
+    const other = await db.supplier.create({ data: { name: 'Synthetic bystander supplier' } });
+    const otherContract = await db.purchaseContract.create({ data: { contractNo: 'HD-OTHER', supplierId: other.id } });
+
+    for (const role of ['PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
+      assert.equal((await send('GET', `/suppliers/${supplier.id}/hard-delete-preview`, role)).status, 403, `preview ${role}`);
+      assert.equal((await send('POST', `/suppliers/${supplier.id}/hard-delete`, role, { confirmToken: 'x' })).status, 403, `delete ${role}`);
+    }
+    assert.equal((await send('GET', '/suppliers/does-not-exist/hard-delete-preview', 'ADMIN')).status, 404);
+    assert.equal((await send('POST', '/suppliers/does-not-exist/hard-delete', 'ADMIN', { confirmToken: 'x' })).status, 404);
+
+    const preview = (await send('GET', `/suppliers/${supplier.id}/hard-delete-preview`, 'ADMIN')).json.data;
+    assert.equal(preview.canDelete, true);
+    assert.deepEqual(preview.blockers, []);
+    assert.deepEqual(preview.counts, { aliases: 1, productLinks: 1, contractTemplates: 0, contracts: 1, items: 1, inventories: 1, packingItems: 1, files: 0, receipts: 1, receiptItems: 1, inspections: 1 });
+
+    // Missing, wrong, or another supplier's token deletes nothing.
+    const otherToken = (await send('GET', `/suppliers/${other.id}/hard-delete-preview`, 'ADMIN')).json.data.confirmToken;
+    for (const confirmToken of [undefined, 'wrong', otherToken]) {
+      assert.equal((await send('POST', `/suppliers/${supplier.id}/hard-delete`, 'ADMIN', { confirmToken })).status, 409);
+    }
+    assert.ok(await db.supplier.findUnique({ where: { id: supplier.id } }));
+
+    // A change after the preview invalidates its token (also covers a payment added meanwhile).
+    await db.supplierAlias.create({ data: { supplierId: supplier.id, alias: 'synthetic-hd-alias-2' } });
+    assert.equal((await send('POST', `/suppliers/${supplier.id}/hard-delete`, 'ADMIN', { confirmToken: preview.confirmToken })).status, 409);
+    assert.equal(await db.supplierAlias.count({ where: { supplierId: supplier.id } }), 2);
+
+    // Money: a payment, a matched bank row, or a matched invoice blocks and the preview says why.
+    const payment = await db.payment.create({ data: { type: 'EXPENSE', amount: 5, paymentDate: new Date(), purchaseContractId: contract.id } });
+    const blocked = (await send('GET', `/suppliers/${supplier.id}/hard-delete-preview`, 'ADMIN')).json.data;
+    assert.equal(blocked.canDelete, false);
+    assert.equal(blocked.confirmToken, null);
+    assert.match(blocked.blockers.join(), /付款/);
+    assert.equal((await send('POST', `/suppliers/${supplier.id}/hard-delete`, 'ADMIN', { confirmToken: preview.confirmToken })).status, 409);
+    await db.payment.delete({ where: { id: payment.id } });
+    const batch = await db.financeDataBatch.create({ data: { type: 'BANK_FLOW', fileName: 'synthetic.csv', recordCount: 1 } });
+    const bank = await db.bankTransaction.create({ data: { batchId: batch.id, txnTime: '2026-01-01 00:00:00', txnDate: '2026-01-01', amount: -5, direction: 'OUT', matchedContractId: contract.id, matchedContractType: 'PURCHASE' } });
+    assert.match((await send('GET', `/suppliers/${supplier.id}/hard-delete-preview`, 'ADMIN')).json.data.blockers.join(), /银行流水/);
+    await db.bankTransaction.delete({ where: { id: bank.id } });
+
+    const fresh = (await send('GET', `/suppliers/${supplier.id}/hard-delete-preview`, 'ADMIN')).json.data;
+    assert.equal(fresh.canDelete, true);
+    assert.equal(fresh.counts.aliases, 2);
+    const done = await send('POST', `/suppliers/${supplier.id}/hard-delete`, 'ADMIN', { confirmToken: fresh.confirmToken });
+    assert.equal(done.status, 200);
+    assert.deepEqual(done.json.data.counts, fresh.counts);
+    const where = { purchaseContractId: contract.id };
+    assert.equal(await db.supplier.count({ where: { id: supplier.id } }), 0);
+    assert.equal(await db.supplierAlias.count({ where: { supplierId: supplier.id } }), 0);
+    assert.equal(await db.productSupplier.count({ where: { supplierId: supplier.id } }), 0);
+    assert.equal(await db.purchaseContract.count({ where: { supplierId: supplier.id } }), 0);
+    assert.equal(await db.purchaseItem.count({ where }), 0);
+    assert.equal(await db.purchaseReceipt.count({ where }), 0);
+    assert.equal(await db.purchaseReceiptInspection.count({ where: { receiptId: receipt.id } }), 0);
+    assert.equal(await db.inventory.count({ where: { receiptInspectionId: inspection.id } }), 0);
+    assert.equal(await db.packingItem.count({ where: { salesContractId: sale.id } }), 0);
+    assert.ok(await db.salesContract.findUnique({ where: { id: sale.id } }), 'sales contract itself is kept');
+    // Other suppliers and the product catalogue are untouched.
+    assert.ok(await db.supplier.findUnique({ where: { id: other.id } }));
+    assert.ok(await db.purchaseContract.findUnique({ where: { id: otherContract.id } }));
+    assert.ok(await db.product.findUnique({ where: { id: product.id } }));
+    const log = await db.operationLog.findFirst({ where: { entity: 'Supplier', action: 'HARD_DELETE', entityId: supplier.id } });
+    assert.equal(log.userId, users.ADMIN.id);
+    assert.deepEqual(JSON.parse(log.oldValue).counts, fresh.counts);
+    // Replaying the token for a now-missing supplier is 404, not a second delete.
+    assert.equal((await send('POST', `/suppliers/${supplier.id}/hard-delete`, 'ADMIN', { confirmToken: fresh.confirmToken })).status, 404);
+  });
+
+  await t.test('supplier hard delete: rolls back completely when a later step fails; customs/invoice links block', async () => {
+    const supplier = await db.supplier.create({ data: { name: 'Synthetic rollback supplier' } });
+    const contract = await db.purchaseContract.create({ data: { contractNo: 'HD-RB', supplierId: supplier.id, items: { create: [{ productId: product.id, quantity: 1, unitPrice: 1, totalPrice: 1 }] } }, include: { items: true } });
+    const sale = await db.salesContract.create({ data: { contractNo: 'EXP-HD-RB', exchangeRate: 7 } });
+    const packing = await db.packingItem.create({ data: { salesContractId: sale.id, purchaseItemId: contract.items[0].id, productId: product.id, quantity: 1 } });
+    const token = (await send('GET', `/suppliers/${supplier.id}/hard-delete-preview`, 'ADMIN')).json.data.confirmToken;
+    // Force the final operation_logs insert to fail: the whole delete must roll back.
+    await db.$executeRawUnsafe('CREATE TRIGGER hd_fail BEFORE INSERT ON operation_logs WHEN NEW.action = \'HARD_DELETE\' BEGIN SELECT RAISE(ABORT, \'synthetic failure\'); END');
+    assert.equal((await send('POST', `/suppliers/${supplier.id}/hard-delete`, 'ADMIN', { confirmToken: token })).status, 500);
+    await db.$executeRawUnsafe('DROP TRIGGER hd_fail');
+    assert.ok(await db.supplier.findUnique({ where: { id: supplier.id } }));
+    assert.ok(await db.purchaseContract.findUnique({ where: { id: contract.id } }));
+    assert.ok(await db.packingItem.findUnique({ where: { id: packing.id } }));
+
+    const declaration = await db.customsDeclaration.create({ data: { declarationNo: 'HD-DECL', salesContractId: sale.id } });
+    await db.customsDeclarationItem.create({ data: { customsDeclarationId: declaration.id, productId: product.id, packingItemId: packing.id, customsName: 'SYNTH', quantity: 1 } });
+    const customs = (await send('GET', `/suppliers/${supplier.id}/hard-delete-preview`, 'ADMIN')).json.data;
+    assert.equal(customs.canDelete, false);
+    assert.match(customs.blockers.join(), /报关/);
   });
 });

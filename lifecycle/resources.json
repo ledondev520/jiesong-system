@@ -82,6 +82,13 @@
       "test": "backend/src/integration/purchase-drafts.integration.js"
     },
     {
+      "id": "supplier-hard-delete",
+      "kind": "action",
+      "routeFile": "backend/src/routes/suppliers.js",
+      "routes": ["POST /:id/hard-delete"],
+      "test": "backend/src/integration/mcp-rbac-deletes.integration.js"
+    },
+    {
       "id": "pricing-preview",
       "kind": "action",
       "routeFile": "backend/src/routes/pricing.js",

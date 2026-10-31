@@ -36,7 +36,11 @@ import {
   X,
 } from "lucide-react";
 import type { Supplier } from "@/types";
-import { supplierService } from "@/services/supplier.service";
+import {
+  supplierService,
+  type SupplierHardDeletePreview,
+} from "@/services/supplier.service";
+import { HardDeleteSupplierDialog } from "./components/HardDeleteSupplierDialog";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
 import { useMobile } from "@/lib/hooks/useMobile";
@@ -283,6 +287,9 @@ export default function SuppliersPage() {
   const canArchive = useAuthStore((state) =>
     ["ADMIN", "PURCHASE"].includes(state.user?.role ?? ""),
   );
+  const [hardDeletePreview, setHardDeletePreview] =
+    useState<SupplierHardDeletePreview | null>(null);
+  const [hardDeleting, setHardDeleting] = useState(false);
   const hasActiveFilters = keyword.trim() || statusFilter !== "all";
 
   const resetFilters = () => {
@@ -387,6 +394,43 @@ export default function SuppliersPage() {
     }
   };
 
+  // ADMIN only: load the server preview (counts + token), confirm in the dialog, then delete in one transaction.
+  const openHardDelete = async () => {
+    const supplier = activeSupplier;
+    if (!supplier || saving) return;
+    try {
+      const res = await supplierService.hardDeletePreview(supplier.id);
+      setHardDeletePreview(res.data);
+    } catch {
+      toast.error("加载永久删除预览失败");
+    }
+  };
+
+  const handleHardDelete = async () => {
+    const supplier = activeSupplier;
+    const token = hardDeletePreview?.confirmToken;
+    if (!supplier || !token || hardDeleting) return;
+    setHardDeleting(true);
+    try {
+      await supplierService.hardDelete(supplier.id, token);
+      invalidateCache("suppliers-list");
+      setHardDeletePreview(null);
+      if (mounted.current) {
+        beginEditorSession();
+        setActiveSupplier(null);
+        form.reset(emptySupplierValues);
+        toast.success("供应商已永久删除");
+        await loadSuppliers();
+      }
+    } catch {
+      // Data may have changed since the preview; the token is then stale, so require a fresh preview.
+      setHardDeletePreview(null);
+      toast.error("永久删除失败，关联数据可能已变化，请重新预览");
+    } finally {
+      setHardDeleting(false);
+    }
+  };
+
   const handleDeleteActive = async () => {
     const supplier = activeSupplier;
     const session = editorSession.current;
@@ -421,6 +465,16 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-6">
+      {activeSupplier && (
+        <HardDeleteSupplierDialog
+          key={hardDeletePreview?.confirmToken ?? activeSupplier.id}
+          supplierName={activeSupplier.name}
+          preview={hardDeletePreview}
+          deleting={hardDeleting}
+          onCancel={() => setHardDeletePreview(null)}
+          onConfirm={handleHardDelete}
+        />
+      )}
       <PageHeader
         title="供应商管理"
         actions={
@@ -637,6 +691,20 @@ export default function SuppliersPage() {
                   >
                     <Trash2 className="mr-1.5 h-4 w-4" />
                     归档当前
+                  </Button>
+                </BusinessWrite>
+              )}
+              {isAdmin && (
+                <BusinessWrite>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
+                    disabled={!activeSupplier || saving}
+                    onClick={openHardDelete}
+                  >
+                    <Trash2 className="mr-1.5 h-4 w-4" />
+                    永久删除
                   </Button>
                 </BusinessWrite>
               )}
