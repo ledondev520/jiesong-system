@@ -4,7 +4,7 @@
  * Pos: 首页共享的前端数据 Module；不在前端重算口径
  */
 
-import api from "@/lib/axios";
+import api, { type ApiRequestConfig } from "@/lib/axios";
 import type { ApiResponse } from "@/types";
 
 export type TodoKey =
@@ -53,6 +53,6 @@ export const dashboardTodosService = {
   get: () =>
     api.get<ApiResponse<DashboardTodos>, ApiResponse<DashboardTodos>>(
       "/dashboard/todos",
-      { cache: { enabled: false } },
+      { cache: { enabled: false } } as ApiRequestConfig,
     ),
 };
