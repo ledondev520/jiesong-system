@@ -1,5 +1,5 @@
 /**
- * Input: 当前 AI provider（DeepSeek / Kimi）、Prisma客户端
+ * Input: 当前 AI provider（OpenAI / DeepSeek / Kimi）、Prisma客户端
  * Output: AI对话和解析结果
  * Pos: AI服务，处理智能问答和辅助录入（含图像理解）；统一 provider/profile、完整 deadline 与流式 usage
  * 
@@ -12,9 +12,13 @@ const { buildChatSession } = require('./ai/chatOrchestrator');
 const { collectStreamedChat } = require('./ai/streamHelpers');
 
 const OpenAI = require('openai');
+const { wrapOpenAIClient } = require('./ai/openaiProvider');
 const { decryptApiKeyFromStorage } = require('../utils/secretCrypto');
 const getActiveAIConfig = () => config.ai || config.kimi;
 const isDeepSeek = () => getActiveAIConfig().provider === 'deepseek';
+const isOpenAI = () => getActiveAIConfig().provider === 'openai';
+// DeepSeek/OpenAI 没有 Kimi 的 tokenizer 与问候接口：用上游 usage，缺失时不估算，问候走本地。
+const usesUpstreamUsage = () => isDeepSeek() || isOpenAI();
 
 const parsePositiveIntEnv = (value, fallback, min, max) => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -37,7 +41,13 @@ const kimiRequestTimeoutMs = parsePositiveIntEnv(process.env.KIMI_REQUEST_TIMEOU
 const kimiGreetingTimeoutMs = parsePositiveIntEnv(process.env.KIMI_GREETING_TIMEOUT_MS, 300, 200, 10000);
 
 // DeepSeek 统一四个场景；Kimi 保留既有模型配置。
-const MODELS = isDeepSeek() ? {
+const MODELS = isOpenAI() ? {
+  // OPENAI_MODEL（默认 gpt-6.1-terra）同时服务聊天、视觉、快速与"思考"场景；无回退模型。
+  default: getActiveAIConfig().model,
+  vision: getActiveAIConfig().model,
+  fast: getActiveAIConfig().model,
+  thinking: getActiveAIConfig().model,
+} : isDeepSeek() ? {
   default: 'deepseek-flash',
   vision: 'deepseek-flash',
   fast: 'deepseek-flash',
@@ -49,9 +59,12 @@ const MODELS = isDeepSeek() ? {
   thinking: 'kimi-k2-thinking-turbo', // 带思考过程的模型
 };
 
-const getAIModelOptions = () => isDeepSeek()
-  ? { model: 'deepseek-flash', thinking: { type: 'enabled' }, reasoning_effort: 'high' }
-  : {};
+const getAIModelOptions = () => {
+  if (isOpenAI()) return { model: getActiveAIConfig().model };
+  return isDeepSeek()
+    ? { model: 'deepseek-flash', thinking: { type: 'enabled' }, reasoning_effort: 'high' }
+    : {};
+};
 
 const safeToNumber = (value) => {
   const parsed = Number(value);
@@ -94,6 +107,10 @@ const extractErrorMessage = (error) => {
 
   if (error.status === 401 || error.message?.includes('Unauthorized')) {
     return '错误：API Key无效或已过期，请联系管理员检查配置。';
+  }
+  // OpenAI 额度（负责人在控制台设置的花费上限）用尽：不是限流，重试也无用。
+  if (error.code === 'insufficient_quota' || error.error?.code === 'insufficient_quota') {
+    return '错误：AI 用量额度已用完，请联系管理员处理。';
   }
   if (error.status === 429 || error.message?.includes('rate limit')) {
     return '错误：请求过于频繁，请稍后再试。';
@@ -148,13 +165,17 @@ const getOpenAIClient = async () => {
     apiKey = (stored?.value && decryptApiKeyFromStorage(stored.value)) || apiKey;
   }
   if (!apiKey) return null;
-  return new OpenAI({
+  const client = new OpenAI({
     apiKey,
     baseURL: active.baseUrl,
     timeout: kimiRequestTimeoutMs,
     maxRetries: 0,
     logLevel: 'off',
   });
+  // SDK 自身重试保持关闭；OpenAI 仅在共用 deadline 内对创建请求做 429/5xx 有限重试（流开始后不重放）。
+  return isOpenAI()
+    ? wrapOpenAIClient(client, { maxRetries: active.maxRetries, maxOutputTokens: active.maxOutputTokens })
+    : client;
 };
 
 const persistChatMessage = ({ userId, sessionId, role, content, imageUrl = null, promptTokens = 0, outputTokens = 0, modelUsed = null }) => {
@@ -236,7 +257,7 @@ const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }
     });
 
     tokenUsage.promptTokens = safeToNumber(streamResult.tokenUsage?.promptTokens);
-    tokenUsage.outputTokens = streamResult.tokenUsage?.outputTokens ?? (isDeepSeek() ? 0 : Math.ceil((streamResult.fullContent.length + streamResult.thinkingContent.length) / 2));
+    tokenUsage.outputTokens = streamResult.tokenUsage?.outputTokens ?? (usesUpstreamUsage() ? 0 : Math.ceil((streamResult.fullContent.length + streamResult.thinkingContent.length) / 2));
 
     return {
       response: streamResult.fullContent,
@@ -608,7 +629,7 @@ const callKimiAPI = async (messages, model = MODELS.default) => {
     });
     const fullContent = streamResult.fullContent;
     // ponytail: 上游未提供 usage 时仅保留输出估算；精确计费需要上游 usage。
-    const tokenUsage = streamResult.tokenUsage || { promptTokens: 0, outputTokens: isDeepSeek() ? 0 : Math.ceil(fullContent.length / 2) };
+    const tokenUsage = streamResult.tokenUsage || { promptTokens: 0, outputTokens: usesUpstreamUsage() ? 0 : Math.ceil(fullContent.length / 2) };
     
     return {
       content: fullContent || '抱歉，我暂时无法回答这个问题。',
@@ -632,7 +653,7 @@ const callKimiAPI = async (messages, model = MODELS.default) => {
  * @returns {Object} Token估算结果 { data: { total_tokens: number } }
  */
 const estimateTokens = async (messages, model = MODELS.default) => {
-  if (isDeepSeek()) {
+  if (usesUpstreamUsage()) {
     // ponytail: 字符长度只作保守上下文预算，精确计费必须使用 completion usage。
     return { data: { total_tokens: JSON.stringify(messages).length } };
   }
@@ -975,7 +996,7 @@ const MAYDAY_SONGS = [
  * 3. 让模型生成问候语
  */
 const generateGreeting = async () => {
-  if (isDeepSeek()) return getLocalGreeting();
+  if (usesUpstreamUsage()) return getLocalGreeting();
   const client = await getOpenAIClient();
   if (!client) {
     return getLocalGreeting();
