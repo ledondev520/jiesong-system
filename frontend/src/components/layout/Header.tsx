@@ -85,7 +85,7 @@ export function Header() {
         <Breadcrumbs />
       </div>
 
-      <div className="flex shrink-0 items-center gap-4">
+      <div className="flex min-w-0 shrink items-center gap-4">
         <div className="hidden xl:block">
           <HeaderContextPills todayLabel={todayLabel} />
         </div>

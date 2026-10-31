@@ -123,7 +123,7 @@ for (const width of [320, 390, 430]) {
         sheet.getByRole("button", { name: "设置", exact: true }),
       ).toBeVisible();
       await sheet
-        .getByRole("button", { name: "系统管理", exact: true })
+        .getByRole("button", { name: "设置", exact: true })
         .click();
       await expect(page).toHaveURL(/\/dashboard\/settings$/);
       await page.getByRole("button", { name: /搜索商品/ }).click();
