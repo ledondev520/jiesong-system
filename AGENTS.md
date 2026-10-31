@@ -124,6 +124,8 @@
 ## 流程自动化边界
 - `backend/src/services/openAgentService.js` 中仅内部采购、报关、核销、退税草稿按请求直接执行，沿用工具角色校验、执行日志与单轮去重；签约、付款、实物状态及异常处理保留一次业务确认。AI 发运登记必须调用 `salesService.updateSalesStatus`，不能用合同头更新接口虚报状态已变化。
 
+- Agent pending write actions live in SQLite (`agent_pending_actions`, `backend/src/services/agentPendingActionService.js`), not a per-process Map: a confirm is claimed with an atomic `UPDATE ... WHERE status='pending'` so a double or cross-worker confirm executes once; a failed execution stays `failed` (never auto-retried), expiry (30 min) is checked in the DB and purged lazily on the next create. Rows hold the proposed params (Confidential); audit stays in `operationLog`.
+
 - 报关自动生成只允许原子替换 DRAFT，保留单据 ID 与编号；已放行等业务状态必须拒绝替换（`backend/src/services/customsDeclarationDraftService.js`）。出货按自有装箱行与采购来源扣减合格库存，重复保存相同业务资料不使退税确认失效。
 
 - Agent 普通与流式入口必须检查 SDK query 的终止结果（`backend/src/services/openAgentService.js`）；上游错误返回 503/SSE error，不写入成功回放，不自动重试。

@@ -7,20 +7,14 @@
  */
 
 const prisma = require('../utils/prisma');
-const { currentRates } = require('./exportPricing');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
 const financeService = require('./financeService');
 const salesService = require('./salesService');
-const importService = require('./importService');
 const aiService = require('./aiService');
-const { searchEntities } = require('../agent/commands/query');
-const { getInventorySnapshot } = require('./inventorySnapshot');
-const { listLowStockAlerts } = require('./inventoryAlertService');
 const customsDeclarationService = require('./customsDeclarationService');
 const taxRefundService = require('./taxRefundService');
 const forexVerificationService = require('./forexVerificationService');
-const eventLedgerService = require('./eventLedgerService');
 const { buildGovernanceReplayProfile } = require('./governanceReplayService');
 const { buildReplaySummaryRecord, upsertReplaySummary } = require('./agentReplaySummaryService');
 const { getOpenAgentRuntimeToken } = require('../utils/openAgentRuntimeAuth');
@@ -29,6 +23,7 @@ const { outstandingOf } = require('./payablesService');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
 const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
 const { validateInventoryTransition } = require('../utils/inventoryStateMachine');
+const pendingStore = require('./agentPendingActionService');
 
 const SUPPORTED_AGENT_TYPES = ['finance', 'export', 'executive', 'unified'];
 const PRIMARY_AGENT_TYPE = 'unified';
@@ -36,23 +31,7 @@ const LEGACY_AGENT_TYPES = ['finance', 'export', 'executive'];
 const TOOL_TRACE_ITEMS_LIMIT = 40;
 const ACTION_RECOMMENDATIONS_LIMIT = 20;
 
-// ── Pending Action Store（内存，30 分钟 TTL）────────────────
-const PENDING_ACTION_TTL_MS = 30 * 60 * 1000;
-const pendingActionStore = new Map();
-
-/**
- * 职责：定时清理过期 pendingAction，防止内存泄漏
- */
-const cleanExpiredPendingActions = () => {
-  const now = Date.now();
-  for (const [key, action] of pendingActionStore) {
-    if (now - action.createdAt > PENDING_ACTION_TTL_MS) {
-      pendingActionStore.delete(key);
-    }
-  }
-};
-const _cleanupTimer = setInterval(cleanExpiredPendingActions, 5 * 60 * 1000);
-_cleanupTimer.unref();
+// ── Pending Action Store：SQLite（agentPendingActionService），多进程共享 ──
 
 const WRITE_CONFIRMATION_INSTRUCTION = [
   '',
@@ -351,19 +330,22 @@ const isSamePendingAction = (action, recommendation) => action
   && action.actionType === recommendation.actionType
   && JSON.stringify(action.params || {}) === JSON.stringify(recommendation.params || {});
 
-const materializeRecommendationPendingActions = ({ userId, recommendations, collectedIds = [] }) => {
+const materializeRecommendationPendingActions = async ({ userId, recommendations, collectedIds = [] }) => {
   if (!userId || !Array.isArray(recommendations) || !Array.isArray(collectedIds)) return [];
 
   const created = [];
-  summarizeActionRecommendations(recommendations).forEach((recommendation) => {
+  for (const recommendation of summarizeActionRecommendations(recommendations)) {
     if (recommendation.executionMode !== 'confirmable_write' || !recommendation.actionType || !recommendation.params) {
-      return;
+      continue;
     }
 
-    const exists = collectedIds.some((id) => isSamePendingAction(pendingActionStore.get(id), recommendation));
-    if (exists) return;
+    let exists = false;
+    for (const id of collectedIds) {
+      if (isSamePendingAction(await pendingStore.getPendingRecord(id), recommendation)) { exists = true; break; }
+    }
+    if (exists) continue;
 
-    createPendingAction(
+    await createPendingAction(
       userId,
       recommendation.actionType,
       recommendation.params,
@@ -372,15 +354,15 @@ const materializeRecommendationPendingActions = ({ userId, recommendations, coll
     );
 
     const actionId = collectedIds[collectedIds.length - 1];
-    const action = pendingActionStore.get(actionId);
-    if (!action) return;
+    const action = await pendingStore.getPendingRecord(actionId);
+    if (!action) continue;
     created.push({
       actionId,
       actionType: action.actionType,
       description: action.description,
       params: action.params,
     });
-  });
+  }
 
   return created;
 };
@@ -844,1154 +826,32 @@ const collectCompositeRecommendations = (tool, rawResult, recommendationStore) =
   });
 };
 
-const READ_TOOL_SPECS = [
-  {
-    name: 'SearchEntities',
-    domain: 'search',
-    access: 'read',
-    confirmationRequired: false,
-    description: '统一搜索商品、供应商、采购合同、出口合同，适合用户问题还不够具体时先建立上下文',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: '搜索关键字，至少 2 个字符' },
-        types: {
-          type: 'array',
-          description: '限定搜索范围，可选 product/supplier/purchase/sales',
-          items: { type: 'string' },
-        },
-        limit: { type: 'number', description: '结果上限，最大 20' },
-      },
-      required: ['query'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const result = await searchEntities({
-        query: input?.query,
-        types: input?.types,
-        limit: input?.limit,
-      });
-      return toJson({
-        total: result.length,
-        items: result,
-      });
-    },
-  },
-  {
-    name: 'GetFinanceOverview',
-    domain: 'finance',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取财务总览、应收、实收、待分配收款等关键指标',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call() {
-      const stats = await financeService.getStats();
-      const receivables = await financeService.getReceivables({ page: 1, pageSize: 8, skip: 0 });
-      const pool = await financeService.listUnallocatedPayments();
-      return toJson({
-        stats,
-        receivables: receivables.receivables || [],
-        receivableTotal: receivables.total || 0,
-        unallocatedPoolCount: pool.length,
-        unallocatedPoolPreview: pool.slice(0, 8).map((payment) => ({
-          id: payment.id,
-          customerName: payment.customerName,
-          amount: payment.amount,
-          remainingAmount: payment.remainingAmount,
-          note: payment.note,
-          paidAt: payment.paidAt,
-        })),
-      });
-    },
-  },
-  {
-    name: 'GetReceivablesByCustomer',
-    domain: 'finance',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取客户欠款与应收合同概览',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: { type: 'number' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const limit = Math.max(1, Math.min(Number(input?.limit || 10), 20));
-      const receivables = await financeService.getReceivables({ page: 1, pageSize: limit, skip: 0 });
-      return toJson({
-        total: receivables.total || 0,
-        items: (receivables.receivables || []).slice(0, limit).map((item) => ({
-          contractNo: item.contractNo,
-          totalAmount: item.totalAmount,
-          receivedAmount: item.receivedAmount,
-          unreceiveAmount: item.unreceiveAmount,
-          stores: item.stores,
-          hasThirdPartyCargo: item.hasThirdPartyCargo,
-          sourceParties: item.sourceParties,
-        })),
-      });
-    },
-  },
-  {
-    name: 'GetExportOverview',
-    domain: 'sales-export',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取出口合同概览、最近合同和第三方拼柜来源',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        keyword: { type: 'string' },
-        limit: { type: 'number' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const limit = Math.max(1, Math.min(Number(input?.limit || 10), 20));
-      const result = await salesService.getSalesContracts({
-        page: 1,
-        pageSize: limit,
-        keyword: typeof input?.keyword === 'string' ? input.keyword.trim() : undefined,
-        lite: true,
-      });
-      return toJson({
-        total: result.total || 0,
-        contracts: (result.contracts || []).slice(0, limit).map((contract) => ({
-          contractNo: contract.contractNo,
-          status: contract.status,
-          totalAmount: contract.totalAmount,
-          receivedAmount: contract.receivedAmount,
-          stores: contract.stores,
-          hasThirdPartyCargo: contract.hasThirdPartyCargo,
-          sourceParties: contract.sourceParties,
-          signedAt: contract.signedAt,
-        })),
-      });
-    },
-  },
-  {
-    name: 'GetPurchaseOverview',
-    domain: 'procurement',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取采购合同概览、供应商信息和近期采购状态',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        keyword: { type: 'string', description: '可选，按合同号或供应商过滤' },
-        limit: { type: 'number', description: '返回条数，默认 10，最大 20' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const limit = Math.max(1, Math.min(Number(input?.limit || 10), 20));
-      const keyword = typeof input?.keyword === 'string' ? input.keyword.trim() : '';
-      const where = {};
-      if (keyword) {
-        where.OR = [
-          { contractNo: { contains: keyword } },
-          { supplier: { name: { contains: keyword } } },
-        ];
-      }
+// 汇率/加价只由报价配置（config/pricing.json，ADMIN 在「系统配置 > 报价配置」修改）维护；助手不能读写这两个遗留 SystemConfig 键。
+const PRICING_CONFIG_KEYS = ['exchangeRate', 'profitRate'];
+const PRICING_CONFIG_REFUSAL = '汇率和加价由报价配置统一维护，助手不能修改，请在「系统配置 > 报价配置」中调整';
+// 卖方信息（公司名称/地址/电话/税号/银行 + 旧开票抬头别名）只经「设置 > 公司信息」维护；助手不能写，银行资料与旧抬头文本不能读。
+const SELLER_CONFIG_KEYS = ['companyName', 'companyAddress', 'companyPhone', 'companyTaxId', 'companyBankInfo', 'invoiceTitleInfo'];
+const AGENT_HIDDEN_CONFIG_KEYS = ['companyBankInfo', 'invoiceTitleInfo'];
+const SELLER_CONFIG_REFUSAL = '卖方公司信息只能由管理员在「设置 > 公司信息」中维护，助手不能修改';
 
-      const items = await prisma.purchaseContract.findMany({
-        where,
-        take: limit,
-        include: {
-          supplier: {
-            select: { id: true, name: true, hasQualityIssue: true },
-          },
-        },
-        orderBy: { contractNo: 'desc' },
-      });
+const READ_TOOL_SPECS = require('./agent/tools/readTools')({
+  toJson,
+  buildSalesContractFlowDiagnostic,
+  buildPurchaseExecutionDiagnostic,
+  buildTradeComplianceReadinessDiagnostic,
+  PRICING_CONFIG_KEYS,
+  AGENT_HIDDEN_CONFIG_KEYS,
+});
 
-      return toJson({
-        total: items.length,
-        contracts: items.map((item) => ({
-          id: item.id,
-          contractNo: item.contractNo,
-          status: item.status,
-          totalAmount: item.totalAmount,
-          paidAmount: item.paidAmount,
-          supplier: item.supplier,
-          signedAt: item.signedAt,
-        })),
-      });
-    },
-  },
-  {
-    name: 'GetPurchaseContractDetail',
-    domain: 'procurement',
-    access: 'read',
-    confirmationRequired: false,
-    description: '按采购合同号读取采购合同详情，包括供应商、状态、金额和明细摘要',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        contractNo: { type: 'string', description: '采购合同号，如 CG2600001' },
-      },
-      required: ['contractNo'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const keyword = String(input?.contractNo || '').trim();
-      const contract = await prisma.purchaseContract.findFirst({
-        where: { contractNo: keyword },
-        include: {
-          supplier: {
-            select: { id: true, name: true, shortName: true, hasQualityIssue: true },
-          },
-          items: {
-            include: {
-              product: {
-                select: { id: true, customsName: true, specification: true, unit: true },
-              },
-            },
-          },
-        },
-      });
-      if (!contract) return toJson({ error: `采购合同 ${keyword} 不存在` });
-      return toJson({
-        id: contract.id,
-        contractNo: contract.contractNo,
-        status: contract.status,
-        totalAmount: contract.totalAmount,
-        paidAmount: contract.paidAmount,
-        signedAt: contract.signedAt,
-        supplier: contract.supplier,
-        items: (contract.items || []).map((item) => ({
-          id: item.id,
-          quantity: item.quantity,
-          unit: item.unit,
-          unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice,
-          product: item.product,
-        })),
-      });
-    },
-  },
-  {
-    name: 'GetSupplierOverview',
-    domain: 'procurement',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取供应商列表概览、质量问题标记与活跃状态',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        keyword: { type: 'string', description: '可选，按供应商名称或简称过滤' },
-        limit: { type: 'number', description: '返回条数，默认 10，最大 20' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const limit = Math.max(1, Math.min(Number(input?.limit || 10), 20));
-      const keyword = typeof input?.keyword === 'string' ? input.keyword.trim() : '';
-      const where = keyword
-        ? {
-            isActive: true,
-            OR: [
-              { name: { contains: keyword } },
-              { shortName: { contains: keyword } },
-            ],
-          }
-        : { isActive: true };
-
-      const items = await prisma.supplier.findMany({
-        where,
-        take: limit,
-        select: {
-          id: true,
-          name: true,
-          shortName: true,
-          hasQualityIssue: true,
-          qualityNote: true,
-          isActive: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      return toJson({
-        total: items.length,
-        suppliers: items,
-      });
-    },
-  },
-  {
-    name: 'GetSalesContractDetail',
-    domain: 'sales-export',
-    access: 'read',
-    confirmationRequired: false,
-    description: '按出口合同号读取销售合同详情，包括状态、金额、门店、拼柜来源和商品摘要',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        contractNo: { type: 'string', description: '出口合同号，如 EXP2600001' },
-      },
-      required: ['contractNo'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const keyword = String(input?.contractNo || '').trim();
-      const contract = await prisma.salesContract.findFirst({
-        where: { contractNo: keyword },
-        include: {
-          items: {
-            include: {
-              product: {
-                select: { id: true, customsName: true, specification: true, unit: true },
-              },
-              store: {
-                select: { id: true, name: true },
-              },
-            },
-          },
-          packingItems: true,
-          port: {
-            select: { id: true, name: true },
-          },
-        },
-      });
-      if (!contract) return toJson({ error: `出口合同 ${keyword} 不存在` });
-      const sourceParties = salesService.getThirdPartySources(contract.packingItems || []);
-      return toJson({
-        id: contract.id,
-        contractNo: contract.contractNo,
-        status: contract.status,
-        totalAmount: contract.totalAmount,
-        receivedAmount: contract.receivedAmount,
-        port: contract.port || null,
-        hasThirdPartyCargo: sourceParties.length > 0,
-        sourceParties,
-        items: (contract.items || []).map((item) => ({
-          id: item.id,
-          quantity: item.quantity,
-          sellingPrice: item.sellingPrice,
-          store: item.store,
-          product: item.product,
-        })),
-      });
-    },
-  },
-  {
-    name: 'GetFinanceRiskOverview',
-    domain: 'finance',
-    access: 'read',
-    confirmationRequired: false,
-    isComposite: true,
-    description: '读取财务风险视角：应收逾期、收付款趋势、待分配收款池',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        trendDays: { type: 'number', description: '趋势统计天数，默认 90' },
-        overdueDays: { type: 'number', description: '逾期阈值天数，默认 30' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const trendDays = Math.max(7, Math.min(Number(input?.trendDays || 90), 180));
-      const overdueDays = Math.max(1, Math.min(Number(input?.overdueDays || 30), 180));
-      const [trends, overdue, pool] = await Promise.all([
-        financeService.getPaymentTrends(trendDays),
-        financeService.getOverdueReceivables(overdueDays),
-        financeService.listUnallocatedPayments(),
-      ]);
-
-      return toJson({
-        trendDays,
-        overdueDays,
-        trends,
-        overdueReceivables: overdue,
-        unallocatedPoolCount: pool.length,
-      });
-    },
-  },
-  {
-    name: 'GetInventoryOverview',
-    domain: 'inventory',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取库存快照，返回按商品聚合后的库存数量、平均成本与样本商品',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        productId: { type: 'string', description: '可选，限定某个商品 ID' },
-        limit: { type: 'number', description: '样本商品返回数量，默认 8，最大 20' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const snapshot = await getInventorySnapshot(prisma, {
-        productId: input?.productId || null,
-      });
-      const limit = Math.max(1, Math.min(Number(input?.limit || 8), 20));
-      return toJson({
-        totalQuantity: snapshot.totalQuantity,
-        productCount: snapshot.byProduct.length,
-        byProductPreview: snapshot.byProduct.slice(0, limit),
-      });
-    },
-  },
-  {
-    name: 'GetLowStockAlerts',
-    domain: 'inventory',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取低库存预警，帮助统一主 Agent 发现缺货风险',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        keyword: { type: 'string', description: '可选，按商品关键字过滤' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const result = await listLowStockAlerts(prisma, {
-        keyword: input?.keyword,
-      });
-      return toJson(result);
-    },
-  },
-  {
-    name: 'GetTaxComplianceOverview',
-    domain: 'trade-compliance',
-    access: 'read',
-    confirmationRequired: false,
-    isComposite: true,
-    description: '读取报关、收汇核销、退税三条税退链路的近期概览',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: { type: 'number', description: '每类返回数量，默认 5，最大 10' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const limit = Math.max(1, Math.min(Number(input?.limit || 5), 10));
-      const [customs, forex, taxRefunds] = await Promise.all([
-        customsDeclarationService.listCustomsDeclarations({ page: 1, pageSize: limit }),
-        forexVerificationService.listForexVerifications({ page: 1, pageSize: limit }),
-        taxRefundService.listTaxRefunds({ page: 1, pageSize: limit }),
-      ]);
-
-      return toJson({
-        customsDeclarations: {
-          total: customs.total,
-          items: customs.items || [],
-        },
-        forexVerifications: {
-          total: forex.total,
-          items: forex.items || [],
-        },
-        taxRefunds: {
-          total: taxRefunds.total,
-          items: taxRefunds.items || [],
-        },
-      });
-    },
-  },
-  {
-    name: 'GetCustomsDeclarationDetail',
-    domain: 'trade-compliance',
-    access: 'read',
-    confirmationRequired: false,
-    description: '按报关单 ID 读取报关详情',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', description: '报关单 ID' },
-      },
-      required: ['id'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const record = await customsDeclarationService.getCustomsDeclarationById(input?.id);
-      return toJson(record);
-    },
-  },
-  {
-    name: 'GetTaxRefundDetail',
-    domain: 'trade-compliance',
-    access: 'read',
-    confirmationRequired: false,
-    description: '按退税记录 ID 读取退税详情',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', description: '退税记录 ID' },
-      },
-      required: ['id'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const record = await taxRefundService.getTaxRefundById(input?.id);
-      return toJson(record);
-    },
-  },
-  {
-    name: 'GetForexVerificationDetail',
-    domain: 'trade-compliance',
-    access: 'read',
-    confirmationRequired: false,
-    description: '按收汇核销记录 ID 读取核销详情',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', description: '收汇核销记录 ID' },
-      },
-      required: ['id'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const record = await forexVerificationService.getForexVerificationById(input?.id);
-      return toJson(record);
-    },
-  },
-  {
-    name: 'GetRecentEvents',
-    domain: 'events',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取最近系统事件、AI/Agent 事件和导入异常，帮助统一感知系统动态',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: { type: 'number', description: '返回事件数量，默认 10，最大 20' },
-        category: { type: 'string', description: '可选，限定 AUDIT/IMPORT/AI/AGENT' },
-        keyword: { type: 'string', description: '可选，按关键字过滤' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const limit = Math.max(1, Math.min(Number(input?.limit || 10), 20));
-      const result = await eventLedgerService.listEventLedger(1, limit, {
-        category: input?.category,
-        keyword: input?.keyword,
-      });
-      return toJson({
-        total: result.total,
-        events: result.events,
-      });
-    },
-  },
-  {
-    name: 'DiagnoseSalesContractFlow',
-    domain: 'sales-export',
-    access: 'read',
-    confirmationRequired: false,
-    isComposite: true,
-    description: '按出口合同号做跨域诊断，聚合销售、回款、库存、报关、核销、退税链路并输出阻塞项与下一步动作',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        contractNo: { type: 'string', description: '出口合同号，如 EXP2600001' },
-      },
-      required: ['contractNo'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      return toJson(await buildSalesContractFlowDiagnostic({ contractNo: input?.contractNo }));
-    },
-  },
-  {
-    name: 'DiagnosePurchaseExecution',
-    domain: 'procurement',
-    access: 'read',
-    confirmationRequired: false,
-    isComposite: true,
-    description: '按采购合同号做跨域诊断，聚合采购、付款、供应商质量风险与入库执行状态',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        contractNo: { type: 'string', description: '采购合同号，如 CG2600001' },
-      },
-      required: ['contractNo'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      return toJson(await buildPurchaseExecutionDiagnostic({ contractNo: input?.contractNo }));
-    },
-  },
-  {
-    name: 'DiagnoseTradeComplianceReadiness',
-    domain: 'trade-compliance',
-    access: 'read',
-    confirmationRequired: false,
-    isComposite: true,
-    description: '按出口合同号判断报关、核销、退税链路的就绪度、缺口与下一步动作',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        contractNo: { type: 'string', description: '出口合同号，如 EXP2600001' },
-      },
-      required: ['contractNo'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      return toJson(await buildTradeComplianceReadinessDiagnostic({ contractNo: input?.contractNo }));
-    },
-  },
-  {
-    name: 'GetOpsOverview',
-    domain: 'ops',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取导入记录和系统操作概览，帮助判断系统近期运行情况',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: { type: 'number' },
-      },
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      const limit = Math.max(1, Math.min(Number(input?.limit || 10), 20));
-      const imports = await importService.getImportRecords(1, limit, {});
-      const recentLogs = await prisma.operationLog.findMany({
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          actorType: true,
-          action: true,
-          entity: true,
-          entityId: true,
-          createdAt: true,
-        },
-      });
-      return toJson({
-        imports: imports.records || [],
-        importTotal: imports.total || 0,
-        recentLogs,
-      });
-    },
-  },
-  {
-    name: 'GetExecutiveOverview',
-    domain: 'executive',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取老板视角经营摘要：财务、销售、采购、导入和系统操作的压缩概览',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call() {
-      const [financeStats, salesCount, purchaseCount, latestImports] = await Promise.all([
-        financeService.getStats(),
-        prisma.salesContract.count(),
-        prisma.purchaseContract.count(),
-        importService.getImportRecords(1, 5, {}),
-      ]);
-      return toJson({
-        finance: financeStats,
-        salesContractCount: salesCount,
-        purchaseContractCount: purchaseCount,
-        latestImports: latestImports.records || [],
-      });
-    },
-  },
-  {
-    name: 'GetSystemConfig',
-    domain: 'system',
-    access: 'read',
-    confirmationRequired: false,
-    description: '读取系统配置（汇率 exchangeRate、利润率 profitRate 取自报价配置）',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        key: { type: 'string', description: '配置键名，如 exchangeRate / profitRate' },
-      },
-      required: ['key'],
-    },
-    isReadOnly: true,
-    isConcurrencySafe: true,
-    async call(input) {
-      // 汇率/加价：只读唯一报价配置（遗留 SystemConfig 行不再作为来源）
-      if (PRICING_CONFIG_KEYS.includes(input.key)) {
-        const rates = currentRates();
-        return toJson({ key: input.key, value: input.key === 'exchangeRate'
-          ? { rate: rates.spotRate, buffer: -rates.adjustment, effectiveRate: rates.effectiveRate }
-          : 1 + rates.defaultMarkup, note: '来自报价配置' });
-      }
-      // Restricted company bank details are not exposed to the AI assistant.
-      // 旧 invoiceTitleInfo 文本可能含开户行及账号，同样不可读。
-      if (AGENT_HIDDEN_CONFIG_KEYS.includes(input.key)) return toJson({ error: '该配置项不可通过助手读取' });
-      const row = await prisma.systemConfig.findUnique({ where: { key: input.key } });
-      if (!row) return toJson({ error: `配置项 ${input.key} 不存在` });
-      try {
-        return toJson({ key: row.key, value: JSON.parse(row.value), note: row.note });
-      } catch {
-        return toJson({ key: row.key, value: row.value, note: row.note });
-      }
-    },
-  },
-];
-
-const WRITE_TOOL_SPECS = [
-  {
-    name: 'AllocatePayment',
-    domain: 'finance',
-    access: 'write',
-    confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.FINANCE],
-    description: '将待分配收款挂到指定出口合同（需用户确认后执行）。调用前请先用 GetFinanceOverview 获取待分配收款列表。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        paymentId: { type: 'string', description: '待分配收款的 ID' },
-        contractNo: { type: 'string', description: '目标出口合同号' },
-        amount: { type: 'number', description: '分配金额（USD）' },
-      },
-      required: ['paymentId', 'contractNo', 'amount'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const payment = await prisma.payment.findUnique({ where: { id: input.paymentId } });
-      if (!payment) return toJson({ error: '收款记录不存在', paymentId: input.paymentId });
-
-      const contract = await prisma.salesContract.findFirst({
-        where: { contractNo: input.contractNo },
-        select: { id: true, contractNo: true },
-      });
-      if (!contract) return toJson({ error: `合同 ${input.contractNo} 不存在` });
-
-      return createPendingAction(userId, 'AllocatePayment', {
-        paymentId: input.paymentId,
-        salesContractId: contract.id,
-        contractNo: input.contractNo,
-        amount: Number(input.amount),
-        customerName: payment.customerName || '未知客户',
-      }, `将收款「${payment.customerName || '未知'}」¥${input.amount} 分配到合同 ${input.contractNo}`, collectedIds);
-    },
-  },
-  {
-    name: 'UpdateExportContractStatus',
-    domain: 'sales-export',
-    access: 'write',
-    confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.SALES],
-    description: '更新出口合同状态（需用户确认后执行）。调用前请先用 GetExportOverview 确认当前状态。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        contractNo: { type: 'string', description: '出口合同号' },
-        newStatus: { type: 'string', description: '新状态，如 SHIPPED / DELIVERED / COMPLETED' },
-        note: { type: 'string', description: '变更备注（可选）' },
-      },
-      required: ['contractNo', 'newStatus'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const contract = await prisma.salesContract.findFirst({
-        where: { contractNo: input.contractNo },
-        select: { id: true, contractNo: true, status: true },
-      });
-      if (!contract) return toJson({ error: `合同 ${input.contractNo} 不存在` });
-
-      return createPendingAction(userId, 'UpdateExportContractStatus', {
-        salesContractId: contract.id,
-        contractNo: input.contractNo,
-        oldStatus: contract.status,
-        newStatus: input.newStatus,
-        note: input.note || '',
-      }, `将合同 ${input.contractNo} 状态从「${contract.status}」变更为「${input.newStatus}」`, collectedIds);
-    },
-  },
-  {
-    name: 'CreatePaymentRecord',
-    domain: 'finance',
-    access: 'write',
-    confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.FINANCE],
-    description: '创建一条收/付款记录（需用户确认后执行）',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        type: { type: 'string', description: '类型：RECEIVABLE_RECEIPT（收款）或 PAYABLE_PAYMENT（付款）' },
-        amount: { type: 'number', description: '金额' },
-        customerName: { type: 'string', description: '客户/供应商名称' },
-        note: { type: 'string', description: '备注（建议包含合同号）' },
-      },
-      required: ['type', 'amount'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const validTypes = ['RECEIVABLE_RECEIPT', 'PAYABLE_PAYMENT'];
-      if (!validTypes.includes(input.type)) {
-        return toJson({ error: `type 必须是 ${validTypes.join(' 或 ')}` });
-      }
-      const label = input.type === 'RECEIVABLE_RECEIPT' ? '收款' : '付款';
-      return createPendingAction(userId, 'CreatePaymentRecord', {
-        type: input.type,
-        amount: Number(input.amount),
-        customerName: input.customerName || '',
-        note: input.note || '',
-      }, `创建${label}记录：${input.customerName || ''}  ¥${input.amount}`, collectedIds);
-    },
-  },
-  {
-    name: 'UpdateSystemConfig',
-    domain: 'system',
-    access: 'write',
-    confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN],
-    description: '修改普通系统配置（需用户确认后执行）。汇率、加价等报价参数不可通过本工具修改，由「报价配置」统一维护。',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        key: { type: 'string', description: '配置键名（不含报价参数 exchangeRate / profitRate）' },
-        value: { type: 'string', description: '新值（字符串或 JSON 字符串）' },
-        note: { type: 'string', description: '变更说明' },
-      },
-      required: ['key', 'value'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      if (PRICING_CONFIG_KEYS.includes(input.key)) return toJson({ error: PRICING_CONFIG_REFUSAL });
-      if (SELLER_CONFIG_KEYS.includes(input.key)) return toJson({ error: SELLER_CONFIG_REFUSAL });
-      const existing = await prisma.systemConfig.findUnique({ where: { key: input.key } });
-      const oldDisplay = existing ? existing.value : '（不存在）';
-      const displayValue = input.value;
-
-      return createPendingAction(userId, 'UpdateSystemConfig', {
-        key: input.key,
-        value: displayValue,
-        note: input.note || `Agent 修改 ${input.key}`,
-        oldValue: oldDisplay,
-      }, `将系统配置「${input.key}」从 ${oldDisplay} 修改为 ${displayValue}`, collectedIds);
-    },
-  },
-  {
-    name: 'CreateSupplierRecord',
-    domain: 'procurement',
-    access: 'write',
-    confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
-    description: '创建供应商记录（需用户确认后执行）',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        shortName: { type: 'string' },
-        contactName: { type: 'string' },
-        contactPhone: { type: 'string' },
-        contactEmail: { type: 'string' },
-      },
-      required: ['name'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const name = String(input?.name || '').trim();
-      if (!name) return toJson({ error: '供应商名称不能为空' });
-      return createPendingAction(userId, 'CreateSupplierRecord', {
-        name,
-        shortName: input?.shortName || null,
-        contactName: input?.contactName || null,
-        contactPhone: input?.contactPhone || null,
-        contactEmail: input?.contactEmail || null,
-      }, `创建供应商「${name}」`, collectedIds);
-    },
-  },
-  {
-    name: 'UpdateSupplierRecord',
-    domain: 'procurement',
-    access: 'write',
-    confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
-    description: '更新供应商记录（需用户确认后执行）',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        name: { type: 'string' },
-        shortName: { type: 'string' },
-        contactName: { type: 'string' },
-        contactPhone: { type: 'string' },
-        contactEmail: { type: 'string' },
-      },
-      required: ['id'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const supplier = await prisma.supplier.findUnique({
-        where: { id: input?.id },
-        select: { id: true, name: true },
-      });
-      if (!supplier) return toJson({ error: '供应商不存在', id: input?.id });
-      return createPendingAction(userId, 'UpdateSupplierRecord', {
-        id: supplier.id,
-        input: {
-          name: input?.name,
-          shortName: input?.shortName,
-          contactName: input?.contactName,
-          contactPhone: input?.contactPhone,
-          contactEmail: input?.contactEmail,
-        },
-      }, `更新供应商「${supplier.name}」`, collectedIds);
-    },
-  },
-  {
-    name: 'CreatePurchaseContract',
-    domain: 'procurement',
-    access: 'write',
-    confirmationRequired: false,
-    allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
-    description: '按用户请求直接创建内部采购草稿及明细，不签约或付款；先查询已有草稿，避免跨轮重复创建',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        supplierId: { type: 'string' },
-        taxRate: { type: 'number' },
-        signedAt: { type: 'string' },
-        expectedDate: { type: 'string' },
-        note: { type: 'string' },
-        items: { type: 'array', items: { type: 'object' } },
-      },
-      required: ['supplierId', 'items'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      if (!input?.supplierId) return toJson({ error: 'supplierId 不能为空' });
-      if (!Array.isArray(input?.items) || input.items.length === 0) {
-        return toJson({ error: '至少提供一条采购明细' });
-      }
-      const supplier = await prisma.supplier.findUnique({
-        where: { id: input.supplierId },
-        select: { id: true, name: true },
-      });
-      if (!supplier) return toJson({ error: '供应商不存在', supplierId: input.supplierId });
-      return createPendingAction(userId, 'CreatePurchaseContract', {
-        input: {
-          supplierId: input.supplierId,
-          taxRate: input.taxRate,
-          signedAt: input.signedAt,
-          expectedDate: input.expectedDate,
-          note: input.note,
-          items: input.items,
-        },
-      }, `为供应商「${supplier.name}」创建采购合同`, collectedIds);
-    },
-  },
-  {
-    name: 'UpdatePurchaseContract',
-    domain: 'procurement',
-    access: 'write',
-    confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
-    description: '更新采购合同头信息（需用户确认后执行）',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        taxRate: { type: 'number' },
-        signedAt: { type: 'string' },
-        expectedDate: { type: 'string' },
-        invoiceNo: { type: 'string' },
-        note: { type: 'string' },
-      },
-      required: ['id'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const contract = await prisma.purchaseContract.findUnique({
-        where: { id: input?.id },
-        select: { id: true, contractNo: true },
-      });
-      if (!contract) return toJson({ error: '采购合同不存在', id: input?.id });
-      return createPendingAction(userId, 'UpdatePurchaseContract', {
-        id: contract.id,
-        input: {
-          taxRate: input?.taxRate,
-          signedAt: input?.signedAt,
-          expectedDate: input?.expectedDate,
-          invoiceNo: input?.invoiceNo,
-          note: input?.note,
-        },
-      }, `更新采购合同「${contract.contractNo}」`, collectedIds);
-    },
-  },
-  {
-    name: 'UpdateInventoryStatus',
-    domain: 'inventory',
-    access: 'write',
-    confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.WAREHOUSE],
-    description: '更新单条库存状态（需用户确认后执行）',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        status: { type: 'string' },
-      },
-      required: ['id', 'status'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const inventory = await prisma.inventory.findUnique({
-        where: { id: input?.id },
-        select: { id: true, status: true, salesContractId: true, purchaseItemId: true, receiptInspectionId: true },
-      });
-      if (!inventory) return toJson({ error: '库存记录不存在', id: input?.id });
-      const validationResult = validateInventoryTransition(inventory.status, input?.status, inventory);
-      if (!validationResult.valid) {
-        return toJson({ error: validationResult.message || '非法库存状态流转' });
-      }
-      return createPendingAction(userId, 'UpdateInventoryStatus', {
-        id: inventory.id,
-        status: input.status,
-      }, `将库存 ${inventory.id} 状态从「${inventory.status}」改为「${input.status}」`, collectedIds);
-    },
-  },
-  {
-    name: 'CreateCustomsDeclarationDraft',
-    domain: 'trade-compliance',
-    access: 'write',
-    confirmationRequired: false,
-    allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE, ROLES.WAREHOUSE],
-    description: '按用户请求直接创建内部报关草稿，不进行正式报关',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        salesContractId: { type: 'string' },
-        contractNo: { type: 'string' },
-        totalAmount: { type: 'number' },
-        totalQuantity: { type: 'number' },
-        currency: { type: 'string' },
-        note: { type: 'string' },
-      },
-      required: ['salesContractId'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const contract = await prisma.salesContract.findUnique({
-        where: { id: input?.salesContractId },
-        select: { id: true, contractNo: true, totalAmount: true },
-      });
-      if (!contract) return toJson({ error: '出口合同不存在', id: input?.salesContractId });
-      const existing = await prisma.customsDeclaration.findFirst({
-        where: { salesContractId: contract.id, status: { not: 'VOID' } },
-        select: { id: true, declarationNo: true },
-      });
-      if (existing) return toJson({ error: `合同 ${contract.contractNo} 已存在报关单 ${existing.declarationNo}` });
-      return createPendingAction(userId, 'CreateCustomsDeclarationDraft', {
-        salesContractId: contract.id,
-        contractNo: contract.contractNo,
-        totalAmount: Number(input?.totalAmount ?? contract.totalAmount ?? 0),
-        totalQuantity: Number(input?.totalQuantity || 0),
-        currency: input?.currency || 'USD',
-        note: input?.note || 'Agent 创建报关草稿',
-      }, `为合同 ${contract.contractNo} 创建报关草稿`, collectedIds);
-    },
-  },
-  {
-    name: 'CreateForexVerificationDraft',
-    domain: 'trade-compliance',
-    access: 'write',
-    confirmationRequired: false,
-    allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE],
-    description: '按用户请求直接创建内部收汇核销草稿，不代表银行或官方已核销',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        salesContractId: { type: 'string' },
-        contractNo: { type: 'string' },
-        customsDeclarationId: { type: 'string' },
-        receivedAmount: { type: 'number' },
-        currency: { type: 'string' },
-        note: { type: 'string' },
-      },
-      required: ['salesContractId', 'receivedAmount'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const contract = await prisma.salesContract.findUnique({
-        where: { id: input?.salesContractId },
-        select: { id: true, contractNo: true, receivedAmount: true },
-      });
-      if (!contract) return toJson({ error: '出口合同不存在', id: input?.salesContractId });
-      const existing = await prisma.forexVerification.findFirst({
-        where: { salesContractId: contract.id },
-        select: { id: true, verificationNo: true },
-      });
-      if (existing) return toJson({ error: `合同 ${contract.contractNo} 已存在核销记录 ${existing.verificationNo}` });
-      return createPendingAction(userId, 'CreateForexVerificationDraft', {
-        salesContractId: contract.id,
-        contractNo: contract.contractNo,
-        customsDeclarationId: input?.customsDeclarationId || null,
-        receivedAmount: Number(input?.receivedAmount ?? contract.receivedAmount ?? 0),
-        currency: input?.currency || 'USD',
-        note: input?.note || 'Agent 创建收汇核销草稿',
-      }, `为合同 ${contract.contractNo} 创建收汇核销草稿`, collectedIds);
-    },
-  },
-  {
-    name: 'CreateTaxRefundDraft',
-    domain: 'trade-compliance',
-    access: 'write',
-    confirmationRequired: false,
-    allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE],
-    description: '按用户请求直接创建内部退税草稿，不提交税局',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        salesContractId: { type: 'string' },
-        contractNo: { type: 'string' },
-        customsDeclarationId: { type: 'string' },
-        forexVerificationId: { type: 'string' },
-        note: { type: 'string' },
-      },
-      required: ['salesContractId', 'customsDeclarationId'],
-    },
-    isReadOnly: false,
-    async call(input, { userId, collectedIds }) {
-      const contract = await prisma.salesContract.findUnique({
-        where: { id: input?.salesContractId },
-        select: { id: true, contractNo: true },
-      });
-      if (!contract) return toJson({ error: '出口合同不存在', id: input?.salesContractId });
-      const existing = await prisma.taxRefund.findFirst({
-        where: { salesContractId: contract.id, customsDeclarationId: input?.customsDeclarationId },
-        select: { id: true, refundNo: true },
-      });
-      if (existing) return toJson({ error: `合同 ${contract.contractNo} 已存在退税记录 ${existing.refundNo}` });
-      return createPendingAction(userId, 'CreateTaxRefundDraft', {
-        salesContractId: contract.id,
-        contractNo: contract.contractNo,
-        customsDeclarationId: input?.customsDeclarationId,
-        forexVerificationId: input?.forexVerificationId || null,
-        note: input?.note || 'Agent 创建退税草稿',
-      }, `为合同 ${contract.contractNo} 创建退税草稿`, collectedIds);
-    },
-  },
-];
+const WRITE_TOOL_SPECS = require('./agent/tools/writeTools')({
+  toJson,
+  // 定义在后面，写工具只在调用时使用，故延迟取值
+  createPendingAction: (...args) => createPendingAction(...args),
+  PRICING_CONFIG_KEYS,
+  PRICING_CONFIG_REFUSAL,
+  SELLER_CONFIG_KEYS,
+  SELLER_CONFIG_REFUSAL,
+});
 
 const listToolRegistry = () => [...READ_TOOL_SPECS, ...WRITE_TOOL_SPECS].map((tool) => ({
   name: tool.name,
@@ -2120,19 +980,10 @@ const buildToolPool = (defineTool, traceStore, recommendationStore, toolSpecs = 
  * @param {object} params - 操作参数
  * @param {string} description - 面向用户的操作说明
  * @param {string[]} collectedIds - 收集本次 run 产生的 actionId
- * @returns {string} JSON 字符串，agent 会拿到此结果
+ * @returns {Promise<string>} JSON 字符串，agent 会拿到此结果
  */
-const createPendingAction = (userId, actionType, params, description, collectedIds) => {
-  const actionId = `pa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  pendingActionStore.set(actionId, {
-    actionType,
-    params,
-    description,
-    userId,
-    createdAt: Date.now(),
-    status: 'pending',
-    sessionId: null,
-  });
+const createPendingAction = async (userId, actionType, params, description, collectedIds) => {
+  const actionId = await pendingStore.createPendingRecord({ userId, actionType, params, description });
   collectedIds.push(actionId);
   return toJson({
     __pendingAction: true,
@@ -2166,8 +1017,7 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
       if (!tool.confirmationRequired) {
         const pending = JSON.parse(result);
         if (pending.__pendingAction) {
-          pendingActionStore.get(pending.actionId).automatic = true;
-          result = toJson({ ...await executeAction(pending.actionId, userId), automatic: true });
+          result = toJson({ ...await executeAction(pending.actionId, userId, { automatic: true }), automatic: true });
           automaticResults.set(key, result);
         }
       }
@@ -2195,14 +1045,6 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
 });
 
 // ── 执行已确认的 pendingAction ──────────────────────────
-
-// 汇率/加价只由报价配置（config/pricing.json，ADMIN 在「系统配置 > 报价配置」修改）维护；助手不能读写这两个遗留 SystemConfig 键。
-const PRICING_CONFIG_KEYS = ['exchangeRate', 'profitRate'];
-const PRICING_CONFIG_REFUSAL = '汇率和加价由报价配置统一维护，助手不能修改，请在「系统配置 > 报价配置」中调整';
-// 卖方信息（公司名称/地址/电话/税号/银行 + 旧开票抬头别名）只经「设置 > 公司信息」维护；助手不能写，银行资料与旧抬头文本不能读。
-const SELLER_CONFIG_KEYS = ['companyName', 'companyAddress', 'companyPhone', 'companyTaxId', 'companyBankInfo', 'invoiceTitleInfo'];
-const AGENT_HIDDEN_CONFIG_KEYS = ['companyBankInfo', 'invoiceTitleInfo'];
-const SELLER_CONFIG_REFUSAL = '卖方公司信息只能由管理员在「设置 > 公司信息」中维护，助手不能修改';
 
 const ACTION_EXECUTORS = {
   /**
@@ -2389,19 +1231,32 @@ const ACTION_EXECUTORS = {
  * @param {string} userId - 当前用户（必须与创建者一致）
  * @returns {object} 执行结果
  */
-const executeAction = async (actionId, userId) => {
-  const action = pendingActionStore.get(actionId);
+const PENDING_STATUS_MESSAGES = {
+  executed: '该操作已执行',
+  executing: '该操作正在执行中',
+  cancelled: '该操作已取消',
+  failed: '该操作已失败，请重新向 Agent 提问',
+};
+
+const executeAction = async (actionId, userId, { automatic = false } = {}) => {
+  const action = await pendingStore.getPendingRecord(actionId);
   if (!action) throw createError('该操作已过期或不存在，请重新向 Agent 提问', 404);
   if (action.userId !== userId) throw createError('无权执行此操作', 403);
-  if (action.status !== 'pending') throw createError(`该操作已${action.status === 'executed' ? '执行' : '取消'}`, 409);
+  if (action.status !== 'pending') throw createError(PENDING_STATUS_MESSAGES[action.status] || '该操作已不可执行', 409);
 
   const executor = ACTION_EXECUTORS[action.actionType];
   if (!executor) throw createError(`不支持的操作类型: ${action.actionType}`, 400);
 
+  // 原子抢占：并发/跨进程的重复确认只有一方能把 pending 改成 executing
+  if (!(await pendingStore.claimPending(actionId, userId))) {
+    const latest = await pendingStore.getPendingRecord(actionId);
+    if (!latest) throw createError('该操作已过期或不存在，请重新向 Agent 提问', 404);
+    throw createError(PENDING_STATUS_MESSAGES[latest.status] || '该操作已不可执行', 409);
+  }
+
   try {
     const result = await executor(action.params, userId);
-    action.status = 'executed';
-    action.executedAt = Date.now();
+    await pendingStore.finishClaimed(actionId, 'executed');
 
     // 写入审计日志
     await prisma.operationLog.create({
@@ -2415,7 +1270,7 @@ const executeAction = async (actionId, userId) => {
           sessionId: action.sessionId || null,
           actionType: action.actionType,
           status: 'executed',
-          automatic: action.automatic === true,
+          automatic,
           params: action.params,
           result: { success: result.success, detail: result.detail },
         }),
@@ -2424,8 +1279,8 @@ const executeAction = async (actionId, userId) => {
 
     return { actionId, actionType: action.actionType, description: action.description, ...result };
   } catch (error) {
-    action.status = 'failed';
-    action.failedAt = Date.now();
+    // 失败不回到 pending：写操作可能已部分生效，需用户重新发起
+    await pendingStore.finishClaimed(actionId, 'failed', error?.message || String(error)).catch(() => {});
     await prisma.operationLog.create({
       data: {
         actorType: 'USER',
@@ -2450,12 +1305,9 @@ const executeAction = async (actionId, userId) => {
  * 职责：取消一个 pendingAction
  */
 const cancelAction = async (actionId, userId) => {
-  const action = pendingActionStore.get(actionId);
-  if (!action) return;
-  if (action.userId !== userId) return;
-  if (action.status !== 'pending') return;
-  action.status = 'cancelled';
-  action.cancelledAt = Date.now();
+  const action = await pendingStore.getPendingRecord(actionId);
+  if (!action || action.userId !== userId) return;
+  if (!(await pendingStore.cancelPending(actionId, userId))) return;
   await prisma.operationLog.create({
     data: {
       actorType: 'USER',
@@ -2472,6 +1324,19 @@ const cancelAction = async (actionId, userId) => {
       }),
     },
   });
+};
+
+/** 把本次 run 收集到的待确认操作绑定到会话并返回摘要（已过期的略过） */
+const collectRunActions = async (ids, sessionId) => {
+  await pendingStore.attachSession(ids, sessionId);
+  const records = await Promise.all(ids.map((id) => pendingStore.getPendingRecord(id)));
+  return records.map((action, index) => (action ? {
+    actionId: ids[index],
+    actionType: action.actionType,
+    description: action.description,
+    params: action.params,
+    status: action.status,
+  } : null)).filter(Boolean);
 };
 
 const resolveSdkSessionConfig = (sessionId) => {
@@ -2721,25 +1586,12 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
     result.duration_ms = Date.now() - startedAt;
 
     const actionRecommendations = summarizeActionRecommendations(actionRecommendationTrace);
-    materializeRecommendationPendingActions({
+    await materializeRecommendationPendingActions({
       userId,
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });
-    const actions = collectedActionIds
-      .map((id) => {
-        const action = pendingActionStore.get(id);
-        if (!action) return null;
-        action.sessionId = resolvedSessionId;
-        return {
-          actionId: id,
-          actionType: action.actionType,
-          description: action.description,
-          params: action.params,
-          status: action.status,
-        };
-      })
-      .filter(Boolean);
+    const actions = await collectRunActions(collectedActionIds, resolvedSessionId);
     const pendingActions = actions.filter(action => action.status === 'pending');
 
     // 3. 持久化
@@ -2862,25 +1714,12 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
     }
 
     const actionRecommendations = summarizeActionRecommendations(actionRecommendationTrace);
-    materializeRecommendationPendingActions({
+    await materializeRecommendationPendingActions({
       userId,
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });
-    const actions = collectedActionIds
-      .map((id) => {
-        const action = pendingActionStore.get(id);
-        if (!action) return null;
-        action.sessionId = resolvedSessionId;
-        return {
-          actionId: id,
-          actionType: action.actionType,
-          description: action.description,
-          params: action.params,
-          status: action.status,
-        };
-      })
-      .filter(Boolean);
+    const actions = await collectRunActions(collectedActionIds, resolvedSessionId);
     const pendingActions = actions.filter(action => action.status === 'pending');
 
     // 3. 持久化
