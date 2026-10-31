@@ -645,7 +645,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     totalAmount: contract.totalAmount,
     paidAmount: contract.paidAmount,
   });
-  // 草稿合同尚未生效，不属于应付（与列表页同一口径）：不显示待付金额与付款进度。
+  // 只有已生效状态计入应付（规格 §4.7 白名单，见 isPayable）；草稿、已取消不属于应付（与列表页同一口径）：不显示待付金额与付款进度。
   const payable = isPayable(contract);
   const paidPercent =
     amountSummary.grossAmount > 0
