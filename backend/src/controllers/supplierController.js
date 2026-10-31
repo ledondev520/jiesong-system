@@ -11,7 +11,8 @@ const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { archiveFilter } = require('../utils/archiveFilter');
 const { normalizePagination } = require('../utils/pagination');
-const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
+const supplierHardDelete = require('../services/supplierHardDeleteService');
+const { createSupplier, updateSupplier, assertActiveChangeAllowed } = require('../agent/commands/supplier');
 
 
 /**
@@ -104,10 +105,7 @@ const create = async (req, res, next) => {
  */
 const update = async (req, res, next) => {
   try {
-    // 恢复已归档供应商（isActive=true）仅 ADMIN；归档沿用 DELETE。
-    if (req.body?.isActive === true && req.user?.role !== 'ADMIN') {
-      throw createError('仅管理员可恢复已归档供应商', 403);
-    }
+    assertActiveChangeAllowed(req.user?.role, req.body?.isActive);
     const supplier = await updateSupplier({
       id: req.params.id,
       input: req.body,
@@ -121,18 +119,49 @@ const update = async (req, res, next) => {
 };
 
 /**
- * 职责：归档供应商（软删除，可由 ADMIN 恢复，历史单据保持关联）
+ * 职责：归档供应商（软停用，任何时候可归档、不检查合同；可由 ADMIN 恢复，历史单据保持关联）
  */
 const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
-    
+
+    const supplier = await prisma.supplier.findUnique({ where: { id }, select: { id: true } });
+    if (!supplier) throw createError('供应商不存在', 404);
+
     await prisma.supplier.update({
       where: { id },
       data: { isActive: false },
     });
     
-    success(res, null, '供应商删除成功');
+    success(res, null, '供应商归档成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：永久删除预览（ADMIN）：各类关联记录计数、阻断原因与确认令牌
+ */
+const hardDeletePreview = async (req, res, next) => {
+  try {
+    success(res, await supplierHardDelete.preview(prisma, req.params.id));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * 职责：永久删除供应商及其关联历史（ADMIN，需与预览匹配的令牌，单事务）
+ */
+const hardDelete = async (req, res, next) => {
+  try {
+    const result = await supplierHardDelete.hardDelete(prisma, {
+      supplierId: req.params.id,
+      confirmToken: req.body?.confirmToken,
+      actorId: req.user.id,
+      req,
+    });
+    success(res, result, '供应商已永久删除');
   } catch (error) {
     next(error);
   }
@@ -181,6 +210,8 @@ module.exports = {
   create,
   update,
   remove,
+  hardDeletePreview,
+  hardDelete,
   addAlias,
   markQualityIssue,
 };

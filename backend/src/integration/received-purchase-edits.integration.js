@@ -87,7 +87,8 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
       ['删除整个合同', 'DELETE', url, undefined],
     ];
     for (const [description, method, endpoint, input] of edits) {
-      await call(method, endpoint, input, 400, role);
+      // DELETE is ADMIN/PURCHASE only and refuses with 409 once receipts exist (AUDIT-JS-2).
+      await call(method, endpoint, input, method === 'DELETE' ? (['ADMIN', 'PURCHASE'].includes(role) ? 409 : 403) : 400, role);
       assert.deepEqual(await snapshot(), before, `${description}不能改写来源、证据、库存、分配或付款义务`);
     }
     for (const status of ['CANCELLED', 'DRAFT', incomplete ? 'RECEIVED' : 'COMPLETED']) {

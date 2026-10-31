@@ -1,7 +1,8 @@
 const { createSupplier } = require('./createSupplier');
-const { updateSupplier } = require('./updateSupplier');
+const { updateSupplier, assertActiveChangeAllowed } = require('./updateSupplier');
 
 module.exports = {
   createSupplier,
   updateSupplier,
+  assertActiveChangeAllowed,
 };
