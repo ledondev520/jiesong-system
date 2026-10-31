@@ -58,7 +58,7 @@ const navGroups: NavGroup[] = [
   {
     label: "基础数据",
     items: [
-      { href: "/dashboard/settings/ports", label: "港口", icon: Anchor },
+      { href: "/dashboard/settings/ports", label: "港口管理", icon: Anchor },
       { href: "/dashboard/settings/categories", label: "商品分类", icon: Tag },
       {
         href: "/dashboard/settings/customs-brokers",
