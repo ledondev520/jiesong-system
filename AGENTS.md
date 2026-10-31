@@ -27,7 +27,7 @@
 - 财务迁移 `preview` 使用 `backend/scripts/financial-evidence-readonly.py` 的 SQLite `mode=ro`、`query_only` 与只读 authorizer，在同一读取快照内仅取候选来源及其账期；`financial-evidence-readonly.js` 只读 Adapter 生成与导入兼容的目标计划，不加载Prisma写连接。rollback-journal 正常读取不新增目录文件；WAL 必须已有私有普通 -wal/-shm，缺失则在连接前拒绝，不使用忽略WAL的immutable。在线模式保留SQLite锁/共享内存协调，不承诺文件系统字节零变更；要求可信操作者不并发移除辅助文件。远端核验可将该读取器经可信SSH执行，数据只流入本地私有管道，不能打印原行或复制整库。
 - `financialEvidenceTransferService.js` 在查询目标前拒绝包内重复 sourceKey 或重复 category/contentSha256；累计期间与留存解析一致，按 sourceRange 起点的前三个物理行查找，不固定 D2，不将空行压缩后混入数据行。
 
-- 商品档案在 `frontend/src/components/layout/navigation.config.ts` 归采购模块，使已有权限的采购员可达现有页面；后端 `backend/src/routes/products.js` 继续执行读写角色校验，导航不授予额外 API 权限。
+- 商品在 `frontend/src/components/layout/navigation.config.ts` 归「资料」分组（原归采购模块），仍对 PURCHASE 等已有权限角色可见，使采购员可达现有页面；后端 `backend/src/routes/products.js` 继续执行读写角色校验，导航不授予额外 API 权限。
 
 ## UI Design System (强制)
 - **所有前端页面开发必须遵循 SHADCN/UI 设计风格**.

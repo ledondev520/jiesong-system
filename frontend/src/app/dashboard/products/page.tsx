@@ -33,10 +33,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ProductDialog } from "./components/ProductDialog";
 import { InventoryTab } from "./components/InventoryTab";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  PROCUREMENT_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { MobileListCard } from "@/components/mobile";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -301,7 +297,6 @@ function ProductsPageContent() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={PROCUREMENT_TABS} moduleName="采购" />
       <PageHeader title="商品管理" />
 
       <Tabs

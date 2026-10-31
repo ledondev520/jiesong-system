@@ -72,10 +72,6 @@ import { Input } from "@/components/ui/input";
 import { formatDate } from "@/lib/date-format";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  EXPORT_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { MobileListCard } from "@/components/mobile";
 import { useTableSort } from "@/lib/hooks/useTableSort";
@@ -613,7 +609,6 @@ export default function SalesPage() {
 
   return (
     <div className="min-w-0 space-y-5">
-      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="出口合同"
         actions={

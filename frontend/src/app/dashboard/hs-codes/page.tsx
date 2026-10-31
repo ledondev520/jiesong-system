@@ -53,10 +53,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  EXPORT_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { Badge } from "@/components/ui/badge";
@@ -568,7 +564,6 @@ function HsCodesPageContent() {
 
   return (
     <div className="flex flex-col h-full">
-      <ModuleTabHeader tabs={EXPORT_TABS} moduleName="出口" />
       <PageHeader
         title="HS 编码查询"
         description="默认展示全量列表。输入商品名称（可模糊）或 4–12 位纯数字 HS 编码（支持首尾空格，自动 trim）即可检索；编码按库内 hsCode 前缀精确匹配。"

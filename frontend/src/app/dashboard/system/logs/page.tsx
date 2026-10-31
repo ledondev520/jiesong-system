@@ -33,10 +33,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  ADMIN_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { Badge } from "@/components/ui/badge";
 import {
   exportSystemLogsCsv,
@@ -280,7 +276,6 @@ export default function SystemLogsPage() {
   if (!user) {
     return (
       <div className="space-y-6">
-        <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="系统日志"
           description="查看系统操作日志，记录所有用户操作与系统变更。"
@@ -301,7 +296,6 @@ export default function SystemLogsPage() {
   if (!canAccess) {
     return (
       <div className="space-y-6">
-        <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
         <PageHeader
           title="系统日志"
           description="查看系统操作日志，记录所有用户操作与系统变更。"
@@ -323,7 +317,6 @@ export default function SystemLogsPage() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={ADMIN_TABS} moduleName="系统管理" />
       <PageHeader
         title="系统日志"
         description="查看系统操作日志，记录所有用户操作与系统变更。"

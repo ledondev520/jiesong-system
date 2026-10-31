@@ -76,10 +76,6 @@ import { cachedFetch, invalidateCache } from "@/lib/api-cache";
 import { runAwait } from "@/lib/run-await";
 import { errorLogger } from "@/lib/error-logger";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  ModuleTabHeader,
-  FINANCE_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { LoadingState, TableStateRow } from "@/components/ui/data-state";
 import type { Payment } from "@/types";
 import { buildReceiptNote } from "@/lib/finance-note";
@@ -847,7 +843,6 @@ function PaymentsPageContent() {
 
   return (
     <div className="space-y-6">
-      <ModuleTabHeader tabs={FINANCE_TABS} moduleName="财务" />
       <PageHeader
         title="收付管理"
         description="管理应付账款与应收账款"
