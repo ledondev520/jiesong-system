@@ -56,6 +56,9 @@ router.put('/notifications/:id/read', roleAuth('ADMIN', 'BOSS', 'PURCHASE', 'SAL
   systemController.markNotificationRead
 ));
 
+// GET /api/v1/system/seller-identity - 统一卖方信息（公司信息 + 旧开票抬头别名；银行资料仅 ADMIN/FINANCE）
+router.get('/seller-identity', systemController.getSellerIdentity);
+
 // GET /api/v1/system/exchange-rate - 获取当前汇率
 router.get('/exchange-rate', systemController.getExchangeRate);
 

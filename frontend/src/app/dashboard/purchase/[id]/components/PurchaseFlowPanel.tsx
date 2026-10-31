@@ -86,8 +86,8 @@ interface PurchaseFlowPanelProps {
   contract: PurchaseContract;
   /** 付款/发票登记成功后的回调（父组件重新加载合同） */
   onUpdated: () => void;
-  /** 我方开票抬头信息（系统配置 invoiceTitleInfo，可为空） */
-  invoiceTitleInfo?: string;
+  /** 我方开票抬头文本（统一卖方信息 /system/seller-identity 生成，可为空） */
+  invoiceTitleText?: string;
 }
 
 /**
@@ -124,7 +124,7 @@ function normalizeInvoiceNoInput(invoiceNo: string | null | undefined) {
 export function PurchaseFlowPanel({
   contract,
   onUpdated,
-  invoiceTitleInfo,
+  invoiceTitleText,
 }: PurchaseFlowPanelProps) {
   const isMobile = useMobile();
   const readOnly = useBusinessReadOnly();
@@ -257,12 +257,12 @@ export function PurchaseFlowPanel({
         "金额提示：合同总额与商品明细不一致，请先按原合同复核，确认后再开票。",
       );
     }
-    if (invoiceTitleInfo?.trim()) {
-      lines.push("—— 购方开票抬头 ——", invoiceTitleInfo.trim());
+    if (invoiceTitleText?.trim()) {
+      lines.push("—— 购方开票抬头 ——", invoiceTitleText.trim());
     }
     lines.push("请开具增值税专用发票后回传发票号码，谢谢！");
     return lines.join("\n");
-  }, [cgNo, supplier, items, amountSummary, invoiceTitleInfo]);
+  }, [cgNo, supplier, items, amountSummary, invoiceTitleText]);
 
   /**
    * 职责：登记一笔付款（定金/尾款）到收付管理

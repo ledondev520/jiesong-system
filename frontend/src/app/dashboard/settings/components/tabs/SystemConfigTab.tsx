@@ -85,9 +85,8 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
   const [hsciqToggling, setHsciqToggling] = useState(false);
   // 汇率同步
   const [syncing, setSyncing] = useState(false);
-  // 业务流程参数：线上盖章平台链接 + 我方开票抬头
+  // 业务流程参数：线上盖章平台链接（卖方/开票抬头信息已并入「设置 > 公司信息」）
   const [stampPlatformUrl, setStampPlatformUrl] = useState('');
-  const [invoiceTitleInfo, setInvoiceTitleInfo] = useState('');
 
   const form = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
@@ -137,7 +136,6 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
           }
           // 1.5. 业务流程参数
           if (typeof configs.stampPlatformUrl === 'string') setStampPlatformUrl(configs.stampPlatformUrl);
-          if (typeof configs.invoiceTitleInfo === 'string') setInvoiceTitleInfo(configs.invoiceTitleInfo);
         }
       } catch (error) {
         console.error('加载配置失败:', error);
@@ -188,9 +186,8 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
       tasks.push(saveConfig('aiHsCodeModel', hsCodeModel));
       if (!isDeepSeek) tasks.push(saveConfig('aiTemperature', temperature));
       tasks.push(saveConfig('aiMaxTokens', maxTokens));
-      // 1.3. 业务流程参数（盖章平台/开票抬头）
+      // 1.3. 业务流程参数（盖章平台）
       tasks.push(saveConfig('stampPlatformUrl', stampPlatformUrl.trim()));
-      tasks.push(saveConfig('invoiceTitleInfo', invoiceTitleInfo.trim()));
       await Promise.all(tasks);
       if (apiKeyNew.trim()) {
         setApiKeyConfigured(true);
@@ -451,7 +448,7 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
             </CardContent>
           </Card>
 
-          {/* 业务流程参数：盖章平台 + 开票抬头 */}
+          {/* 业务流程参数：盖章平台（卖方公司信息与开票抬头在「设置 > 公司信息」） */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -470,17 +467,6 @@ export function SystemConfigTab({ showDictOnly = false }: { showDictOnly?: boole
                   onChange={(e) => setStampPlatformUrl(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">采购合同详情页「在线盖章」按钮的跳转地址。</p>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium" htmlFor="invoice-title-info">我方开票抬头信息</label>
-                <textarea
-                  id="invoice-title-info"
-                  className="flex min-h-[96px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                  placeholder={'公司名称：XXX有限公司\n纳税人识别号：91XXXXXXXXXXXXXXXX\n地址电话：...\n开户行及账号：...'}
-                  value={invoiceTitleInfo}
-                  onChange={(e) => setInvoiceTitleInfo(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">催开发票时附在开票信息文本末尾，便于供应商开具增值税专用发票。</p>
               </div>
             </CardContent>
           </Card>

@@ -336,3 +336,38 @@ test('syncExchangeRate: 外部同步成功时写入当前 schema 支持的配置
     https.get = originalHttpsGet;
   }
 });
+
+
+test('updateConfig: invoiceTitleInfo 已并入公司信息，不能再写入（400，不写库）', async () => {
+  const originalUpsert = prisma.systemConfig.upsert;
+  let upserts = 0;
+  prisma.systemConfig.upsert = async () => { upserts += 1; return {}; };
+  try {
+    let captured = null;
+    await configController.updateConfig({ params: { key: 'invoiceTitleInfo' }, body: { value: 'x' } }, createMockRes(), (error) => { captured = error; });
+    assert.equal(captured?.statusCode, 400);
+    assert.match(captured.message, /公司信息/);
+    assert.equal(upserts, 0);
+  } finally {
+    prisma.systemConfig.upsert = originalUpsert;
+  }
+});
+
+test('getConfigs: 旧 invoiceTitleInfo（可能含银行行）与 companyBankInfo 一样仅 ADMIN/FINANCE 可读', async () => {
+  const originalFindMany = prisma.systemConfig.findMany;
+  prisma.systemConfig.findMany = async () => [
+    { key: 'invoiceTitleInfo', value: JSON.stringify('公司名称：X\n开户行及账号：SECRET-ACCT') },
+    { key: 'companyName', value: JSON.stringify('X') },
+  ];
+  try {
+    for (const [role, visible] of [['ADMIN', true], ['FINANCE', true], ['SALES', false], ['PURCHASE', false], ['BOSS', false], [undefined, false]]) {
+      const res = createMockRes();
+      await configController.getConfigs({ user: role ? { role } : undefined }, res, (error) => { throw error; });
+      assert.equal(Object.hasOwn(res.payload.data, 'invoiceTitleInfo'), visible, String(role));
+      assert.equal(res.payload.data.companyName, 'X');
+      assert.equal(JSON.stringify(res.payload).includes('SECRET-ACCT'), visible, String(role));
+    }
+  } finally {
+    prisma.systemConfig.findMany = originalFindMany;
+  }
+});

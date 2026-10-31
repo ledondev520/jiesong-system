@@ -28,9 +28,10 @@ describe("navigation.config helpers", () => {
     }
   });
 
-  it("菜单顺序：首页 / 业务 / 资料（含客户与门店） / 设置，报价页面上线前隐藏", () => {
+  it("菜单顺序：首页 / 业务（报价在订单之前） / 资料（含客户与门店） / 设置", () => {
     expect(getMenuNavItems(Role.ADMIN).map((item) => item.label)).toEqual([
       "首页",
+      "报价",
       "出口订单",
       "采购",
       "库存",
@@ -44,6 +45,7 @@ describe("navigation.config helpers", () => {
     ]);
     expect(getMenuNavItems(Role.ADMIN).map((item) => item.group)).toEqual([
       "main",
+      "business",
       "business",
       "business",
       "business",
@@ -100,10 +102,10 @@ describe("navigation.config helpers", () => {
       "/dashboard/hs-codes": "hs-codes",
       "/dashboard/finance/statements": "finance",
       "/dashboard/payments": "finance",
-      "/dashboard/ai/sessions": "ai",
-      "/dashboard/users": "admin",
-      "/dashboard/system/logs": "admin",
-      "/dashboard/about": "admin",
+      "/dashboard/settings/ai-usage": "admin",
+      "/dashboard/settings/users": "admin",
+      "/dashboard/settings/logs": "admin",
+      "/dashboard/settings/ai-access": "admin",
     };
     for (const [path, key] of Object.entries(owner))
       expect(getModuleByPath(path)?.key, path).toBe(key);
@@ -124,13 +126,14 @@ describe("navigation.config helpers", () => {
     expect(labels("admin")).toEqual(["系统配置", "账号管理", "系统日志"]);
   });
 
-  it("移动端底栏：首页·订单·采购·库存，其余进入更多（隐藏项不出现）", () => {
+  it("移动端底栏：首页·订单·采购·库存，其余进入更多（隐藏项不出现；报价进入更多）", () => {
     expect(
       getPrimaryMobileModuleNavItems(Role.ADMIN).map(
         (item) => item.mobileLabel ?? item.label,
       ),
     ).toEqual(["首页", "订单", "采购", "库存"]);
     expect(keys(getSecondaryMobileModuleNavItems(Role.ADMIN))).toEqual([
+      "quotes",
       "documents",
       "finance",
       "customers",

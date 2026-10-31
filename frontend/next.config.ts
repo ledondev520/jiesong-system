@@ -24,6 +24,18 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  /* 旧地址永久指向合并后的设置/通知页（规格 §3.4） */
+  async redirects() {
+    return [
+      { source: '/dashboard/users', destination: '/dashboard/settings/users', permanent: true },
+      { source: '/dashboard/system', destination: '/dashboard/settings', permanent: true },
+      { source: '/dashboard/system/logs', destination: '/dashboard/settings/logs', permanent: true },
+      { source: '/dashboard/system/notifications', destination: '/dashboard/notifications', permanent: true },
+      { source: '/dashboard/about', destination: '/dashboard/settings/ai-access', permanent: true },
+      { source: '/dashboard/ai/sessions', destination: '/dashboard/settings/ai-usage', permanent: true },
+    ];
+  },
+
   /* 图片优化：自动 WebP/AVIF 转换、缓存、尺寸限制 */
   images: {
     formats: ['image/avif', 'image/webp'],

@@ -200,7 +200,7 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
       <PurchaseFlowPanel
         contract={contract}
         onUpdated={onUpdated}
-        invoiceTitleInfo="购方：捷淞"
+        invoiceTitleText="购方：捷淞"
       />,
     );
 

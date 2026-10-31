@@ -1530,6 +1530,9 @@ const READ_TOOL_SPECS = [
     isReadOnly: true,
     isConcurrencySafe: true,
     async call(input) {
+      // Restricted company bank details are not exposed to the AI assistant.
+      // 旧 invoiceTitleInfo 文本可能含开户行及账号，同样不可读。
+      if (AGENT_HIDDEN_CONFIG_KEYS.includes(input.key)) return toJson({ error: '该配置项不可通过助手读取' });
       const row = await prisma.systemConfig.findUnique({ where: { key: input.key } });
       if (!row) return toJson({ error: `配置项 ${input.key} 不存在` });
       try {
@@ -1661,6 +1664,7 @@ const WRITE_TOOL_SPECS = [
     },
     isReadOnly: false,
     async call(input, { userId, collectedIds }) {
+      if (SELLER_CONFIG_KEYS.includes(input.key)) return toJson({ error: SELLER_CONFIG_REFUSAL });
       const existing = await prisma.systemConfig.findUnique({ where: { key: input.key } });
       const oldDisplay = existing ? existing.value : '（不存在）';
 
@@ -2192,6 +2196,11 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
 
 // ── 执行已确认的 pendingAction ──────────────────────────
 
+// 卖方信息（公司名称/地址/电话/税号/银行 + 旧开票抬头别名）只经「设置 > 公司信息」维护；助手不能写，银行资料与旧抬头文本不能读。
+const SELLER_CONFIG_KEYS = ['companyName', 'companyAddress', 'companyPhone', 'companyTaxId', 'companyBankInfo', 'invoiceTitleInfo'];
+const AGENT_HIDDEN_CONFIG_KEYS = ['companyBankInfo', 'invoiceTitleInfo'];
+const SELLER_CONFIG_REFUSAL = '卖方公司信息只能由管理员在「设置 > 公司信息」中维护，助手不能修改';
+
 const ACTION_EXECUTORS = {
   /**
    * 职责：执行收款分配
@@ -2230,6 +2239,8 @@ const ACTION_EXECUTORS = {
    * 职责：更新系统配置
    */
   async UpdateSystemConfig(params, userId) {
+    // 即使存在旧的待确认动作，也不得绕过「公司信息」的校验直接写卖方信息
+    if (SELLER_CONFIG_KEYS.includes(params.key)) throw new Error(SELLER_CONFIG_REFUSAL);
     await prisma.systemConfig.upsert({
       where: { key: params.key },
       update: { value: params.value, note: params.note },
@@ -2914,6 +2925,7 @@ module.exports = {
   resolveSystemPrompt,
   inferRoutePlan,
   listToolRegistry,
+  buildToolPool,
   buildWriteToolPool,
   buildToolRegistryPayload,
   buildSalesContractFlowDiagnostic,
