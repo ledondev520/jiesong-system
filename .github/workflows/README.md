@@ -10,6 +10,8 @@ GitHub Actions 工作流配置，实现完整的自动化开发循环。
 |-------|------|---------|------|
 | **CI** | `ci.yml` | PR / Push | 代码质量检查 + 单元测试 |
 | **Test And Acceptance** | `test-and-acceptance.yml` | PR / Push | 后端、前端单测/coverage及hosted Playwright验收 |
+
+E2E 分片：`e2e-shard` 为 4 片（原 3 片，run 41268231634 实测 285/252/236 s，其中 `next build`+启动约 35–50 s/片）。曾评估“单独 build job + 产物下载”：额外 job 约 100 s 且在关键路径上，会使 E2E 关键路径变长，故未采用；改为第 4 片缩短测试段。必过检查名 `Frontend E2E Acceptance` 由汇总 job 提供，分片数变化不影响 ruleset 上下文。
 | **QA & Health** | `qa.yml` | Daily / Push | 自动化测试 + 健康度检查 |
 | **PR Review** | `pr-review.yml` | PR | 类型、ESLint、锁定 Prettier 的 PR 源码检查与 Actions 摘要 |
 | **Review Freshness** | `review-freshness.yml` | 指向 main 的 PR opened / synchronize / reopened（edited 仅 base 变化）；含 `review-freshness/` 的 PR 评论（issue_comment，运行 main 上的版本） | 只读检查复核标记与 base 后续改动；承载 job 为 `Review Freshness Evaluate`，必过检查 `review-freshness` 由其经 Checks API 发布：无标记（规则 a）保持 in_progress 挡住合并且不失败，有效为 success，规则 b-e 为 failure |
