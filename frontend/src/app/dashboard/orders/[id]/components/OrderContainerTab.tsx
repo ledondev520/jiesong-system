@@ -113,7 +113,7 @@ export function OrderContainerTab({
   };
 
   const pctClass = (pct: number) =>
-    pct >= thresholdPct
+    !hasShipped && pct >= thresholdPct
       ? "font-semibold tabular-nums text-emerald-700 dark:text-emerald-400"
       : "font-semibold tabular-nums";
 
