@@ -40,6 +40,7 @@ import {
   supplierService,
   type SupplierHardDeletePreview,
 } from "@/services/supplier.service";
+import { countSuppliers } from "./supplierCounts";
 import { HardDeleteSupplierDialog } from "./components/HardDeleteSupplierDialog";
 import { SupplierSummary } from "./components/SupplierSummary";
 import { Button } from "@/components/ui/button";
@@ -275,16 +276,7 @@ export default function SuppliersPage() {
     });
   }, [keyword, statusFilter, suppliers]);
 
-  const archivedCount = suppliers.filter(
-    (supplier) => supplier.isActive === false,
-  ).length;
-  const liveSuppliers = suppliers.filter(
-    (supplier) => supplier.isActive !== false,
-  );
-  const normalCount = liveSuppliers.filter(
-    (supplier) => !supplier.hasQualityIssue,
-  ).length;
-  const issueCount = liveSuppliers.length - normalCount;
+  const counts = countSuppliers(suppliers);
   const isAdmin = useAuthStore((state) => state.user?.role === "ADMIN");
   // Archive (DELETE /suppliers/:id) is ADMIN/PURCHASE only on the server.
   const canArchive = useAuthStore((state) =>
@@ -501,8 +493,8 @@ export default function SuppliersPage() {
             <div>
               <p className="text-sm font-semibold">供应商索引</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                共 {liveSuppliers.length} 家，正常 {normalCount} 家，质量问题{" "}
-                {issueCount} 家，已归档 {archivedCount} 家。
+                共 {counts.total} 家，正常 {counts.normal} 家，质量问题{" "}
+                {counts.issue} 家，已归档 {counts.archived} 家。
               </p>
             </div>
 

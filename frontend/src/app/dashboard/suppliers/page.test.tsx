@@ -565,6 +565,25 @@ describe("supplier catalog identity and deletion sessions", () => {
   });
 });
 
+it("供应商索引摘要的合计包含已归档，三类相加等于总数 (B20)", async () => {
+  useAuthStore.setState({
+    user: { id: "synthetic-admin", role: Role.ADMIN } as never,
+  });
+  mockGetAll.mockReset().mockResolvedValue({
+    data: {
+      items: [
+        { id: "s1", name: "合成甲", isActive: true, hasQualityIssue: false },
+        { id: "s2", name: "合成乙", isActive: true, hasQualityIssue: true },
+        { id: "s3", name: "合成丙", isActive: false, hasQualityIssue: false },
+      ],
+    },
+  });
+  render(<SuppliersPage />);
+  expect(
+    await screen.findByText(/共 3 家，正常 1 家，质量问题\s*1 家，已归档 1 家/),
+  ).toBeInTheDocument();
+});
+
 describe("supplier click lands on a read-only summary (B17)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
