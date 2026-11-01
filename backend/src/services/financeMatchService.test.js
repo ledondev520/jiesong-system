@@ -76,3 +76,19 @@ test('合同选择器按用途划分：付款匹配不含草稿，发票关联�
  assert.equal(Object.hasOwn(wheres[2],'status'),false);
  assert.deepEqual(wheres[3].NOT,{status:'CANCELLED'});
 });
+
+test('待匹配发票/流水不设条数上限：旧 take 500 会让更早的未达阈值记录永远排不进窗口',async(t)=>{
+ const bank=prisma.bankTransaction.findMany;
+ const invoice=prisma.invoiceRecord.findMany;
+ t.after(()=>{prisma.bankTransaction.findMany=bank;prisma.invoiceRecord.findMany=invoice;});
+ const calls=[];
+ prisma.bankTransaction.findMany=async(args)=>{calls.push(args);return[];};
+ prisma.invoiceRecord.findMany=async(args)=>{calls.push(args);return[];};
+ await service.loadPendingBankTxns();
+ await service.loadPendingInvoices();
+ assert.equal(calls.length,2);
+ for(const args of calls){
+  assert.equal(args.take,undefined);
+  assert.deepEqual(args.where,{matchStatus:'PENDING'});
+ }
+});

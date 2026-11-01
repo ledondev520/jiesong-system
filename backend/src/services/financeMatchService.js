@@ -148,24 +148,24 @@ function scoreSummary(summary) {
 // ==================== 数据加载 ====================
 
 /**
- * 职责：批量加载待匹配银行流水
+ * 职责：加载全部待匹配银行流水
+ * 不设条数上限：旧的 take 500 每次只取最新 500 条，未达阈值的行永远留在窗口里，更早的记录从未被评估。
+ * shortcut: 一次读入内存，待匹配量到数万条时改为游标分批。
  */
-async function loadPendingBankTxns(limit = 500) {
+async function loadPendingBankTxns() {
   return prisma.bankTransaction.findMany({
     where: { matchStatus: MATCH_STATUS.PENDING },
     orderBy: { txnDate: 'desc' },
-    take: limit,
   });
 }
 
 /**
- * 职责：批量加载待匹配发票
+ * 职责：加载全部待匹配发票（理由与上限说明同 loadPendingBankTxns）
  */
-async function loadPendingInvoices(limit = 500) {
+async function loadPendingInvoices() {
   return prisma.invoiceRecord.findMany({
     where: { matchStatus: MATCH_STATUS.PENDING },
     orderBy: { invDate: 'desc' },
-    take: limit,
   });
 }
 
@@ -655,6 +655,8 @@ async function listContractsForMatch(contractType, search = '', purpose = MATCH_
 module.exports = {
   MATCH_PURPOSE,
   loadPurchaseContracts,
+  loadPendingBankTxns,
+  loadPendingInvoices,
   runAutoMatch,
   getUnmatchedItems,
   manualMatch,
