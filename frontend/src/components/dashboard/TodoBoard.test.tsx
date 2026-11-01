@@ -45,6 +45,7 @@ describe("TodoBoard", () => {
     render(<TodoBoard todos={todos} />);
     expect(screen.getByText("CG250123456").className).not.toContain("truncate");
     expect(screen.getByText("供应商").className).toContain("truncate");
+    expect(screen.getByText("供应商").className).not.toContain("shrink-0");
   });
 
   it("0 金额显示「—」而非 $0", () => {
