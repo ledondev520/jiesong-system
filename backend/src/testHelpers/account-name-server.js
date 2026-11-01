@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { copyTemplate } = require('./sqlite-template');
 
 const directory = process.env.ACCOUNT_NAME_TEST_DIR;
 if (process.env.NODE_ENV !== 'test' || !process.send
@@ -28,15 +28,7 @@ process.env.JWT_SECRET = 'test-only-account-name-fixture-never-production';
  * @throws 私有目录、已提交迁移、预置身份或 HTTP 服务启动失败
  */
 async function start() {
-  fs.closeSync(fs.openSync(database, 'wx', 0o600));
-  // Prisma child executables need normal execute bits; the database/root stay private.
-  const previousUmask = process.umask(0o022);
-  try {
-    execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
-      cwd: path.resolve(__dirname, '../..'), stdio: 'ignore', timeout: 30000,
-    });
-  } finally { process.umask(previousUmask); }
-  fs.chmodSync(database, 0o600);
+  copyTemplate('deploy', database);
   const db = require('../utils/prisma');
   const select = { id: true, username: true, name: true, role: true, isActive: true };
   // Deliberately unusable placeholders, never bcrypt credentials or real access.

@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { copyTemplate } = require('./sqlite-template');
 
 const directory = process.env.ROLE_BROWSER_TEST_DIR;
 const scenario = process.env.ROLE_BROWSER_TEST_SCENARIO;
@@ -33,18 +33,10 @@ process.env.JWT_SECRET = 'test-only-role-browser-jwt-secret-never-production';
 async function start() {
   if (['tax-record-forms', 'menu-export-documents', 'sales-header', 'dashboard-sources'].includes(scenario)) {
     // These form/document/dashboard scenarios use committed migrations, never db push or
-    // client generation. Prisma's executable children need normal execute bits;
-    // the database is created 0600 first inside the already-private 0700 root.
-    fs.closeSync(fs.openSync(path.join(directory, 'synthetic.db'), 'wx', 0o600));
-    const previousUmask = process.umask(0o022);
-    try {
-      execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
-        cwd: path.resolve(__dirname, '../..'), stdio: 'ignore', timeout: 30000,
-      });
-    } finally { process.umask(previousUmask); }
+    // client generation: a copy of the once-built migrated template (sqlite-template.js).
+    copyTemplate('deploy', path.join(directory, 'synthetic.db'));
   } else {
-    const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 30000 });
-    execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', path.join(directory, 'synthetic.db')], { input: `${ddl}\nINSERT INTO password_reset_lock (id) VALUES (1);` });
+    copyTemplate('diff', path.join(directory, 'synthetic.db'));
   }
   fs.chmodSync(path.join(directory, 'synthetic.db'), 0o600);
   const db = require('../utils/prisma');
