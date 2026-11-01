@@ -138,4 +138,20 @@ async function groupBySeller({ dateFrom, dateTo, limit = 50 } = {}) {
   }));
 }
 
-module.exports = { VALID_INVOICE_WHERE, listInvoices, findByExactNumbers, getStats, groupBySeller };
+/**
+ * 职责：采购合同中「已有有效关联发票」的合同 id 集合（看板待办与催票提醒共用）
+ * 口径：MATCHED/PURCHASE 且 status='正常'、isPositive='是'；已红冲/作废/负数发票不算已开票（保守，宁可多提醒）
+ * @param {object} db Prisma 客户端或事务
+ * @param {string[]} contractIds
+ * @returns {Promise<Set<string>>}
+ */
+async function findInvoicedPurchaseContractIds(db, contractIds) {
+  if (!contractIds.length) return new Set();
+  const rows = await db.invoiceRecord.findMany({
+    where: { matchStatus: 'MATCHED', matchedContractType: 'PURCHASE', matchedContractId: { in: contractIds }, ...VALID_INVOICE_WHERE },
+    select: { matchedContractId: true },
+  });
+  return new Set(rows.map((r) => r.matchedContractId));
+}
+
+module.exports = { VALID_INVOICE_WHERE, listInvoices, findByExactNumbers, getStats, groupBySeller, findInvoicedPurchaseContractIds };

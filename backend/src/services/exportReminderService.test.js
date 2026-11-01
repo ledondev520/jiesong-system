@@ -31,6 +31,9 @@ const buildFakeTx = (data = {}) => {
     purchaseContract: {
       findMany: async () => data.missingInvoiceContracts ?? [],
     },
+    invoiceRecord: {
+      findMany: async () => data.matchedInvoices ?? [],
+    },
     notification: {
       findMany: async () => data.existingNotifications ?? [],
       createMany: async ({ data: rows }) => {
@@ -86,6 +89,20 @@ test('runMonthlyTaxRefundReminder: 上月无发运合同时跳过', async () => 
   const result = await runMonthlyTaxRefundReminder(tx, { now: new Date('2026-07-05T09:00:00') });
   assert.equal(result.skipped, true);
   assert.equal(result.reason, 'no-shipped-contracts');
+});
+
+test('runInvoiceMissingReminder: 已有有效关联发票记录的合同不催票', async () => {
+  const tx = buildFakeTx({
+    missingInvoiceContracts: [
+      { id: 'pc1', contractNo: 'PO-001', supplier: { name: '供应商A' } },
+      { id: 'pc2', contractNo: 'PO-002', supplier: { name: '供应商B' } },
+    ],
+    matchedInvoices: [{ matchedContractId: 'pc1' }],
+  });
+  const result = await runInvoiceMissingReminder(tx, { now: new Date('2026-07-04T09:00:00') });
+  assert.equal(result.contracts, 1);
+  assert.match(tx.created[0].title, /1 份采购合同待催开发票/);
+  assert.doesNotMatch(tx.created[0].content, /PO-001/);
 });
 
 test('runInvoiceMissingReminder: 已出货缺发票合同生成催票提醒', async () => {
