@@ -1,17 +1,18 @@
 // Weighted E2E sharding (BL-4-FIX): Playwright's --shard splits by file count, which left one
 // shard 1.84x slower than another. Prints the spec files of shard <i> of <n>, one per line.
-// Weights = seconds per spec from CI run 41269387437; specs not listed get DEFAULT_WEIGHT.
+// Weights = seconds per spec from CI run 41274550136; specs not listed get DEFAULT_WEIGHT.
 // shortcut: weights are hand-copied, refresh them when a shard drifts past ~1.3x the fastest.
 const fs = require("node:fs");
 const path = require("node:path");
 
 const DEFAULT_WEIGHT = 5;
 const WEIGHTS = {
-  "mobile.spec.ts": 129, "button-coverage.spec.ts": 55, "real-export-3d.spec.ts": 44,
-  "real-role-lifecycle.spec.ts": 35, "real-menu-export-documents.spec.ts": 27,
-  "real-financial-library.spec.ts": 20, "real-sales-header.spec.ts": 17,
-  "profile-preference-lifecycle.spec.ts": 14, "product-editor.spec.ts": 12,
-  "real-hs-catalog.spec.ts": 12, "smoke.spec.ts": 9,
+  "mobile.spec.ts": 132, "button-coverage.spec.ts": 51, "real-role-lifecycle.spec.ts": 49,
+  "real-export-3d.spec.ts": 43, "real-menu-export-documents.spec.ts": 34,
+  "real-financial-library.spec.ts": 27, "profile-preference-lifecycle.spec.ts": 19,
+  "product-editor.spec.ts": 12, "real-hs-catalog.spec.ts": 12, "real-sales-header.spec.ts": 11,
+  "smoke.spec.ts": 8, "real-receipt-pool.spec.ts": 7, "contract-attachment-auth.spec.ts": 7,
+  "tax-navigation.spec.ts": 7, "supplier-editor.spec.ts": 6,
 };
 
 function shardFiles(files, index, count) {

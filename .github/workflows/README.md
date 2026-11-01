@@ -18,7 +18,7 @@ GitHub Actions 工作流配置，实现完整的自动化开发循环。
 | **Weekly Retro** | `weekly-retro.yml` | Weekly | 每周工程回顾 |
 | **Deploy** | `deploy.yml` | main Push / Tag / Manual | 部署并核对 PM2 运行目录与公网构建 |
 
-E2E 分片：`e2e-shard` 为 4 片，不再用 `--shard`（按文件数切分，实测最慢/最快 1.84×，`mobile.spec.ts` 单文件约 129 s）；改由 `scripts/e2e-shard-files.cjs` 按各 spec 秒数权重（取自 run 41269387437）贪心装箱，未登记的新 spec 取默认权重自动并入，`scripts/e2e-shard-files.test.cjs` 在每片开头校验“每个 spec 恰在一片”。每片固定开销约 105 s（安装、`next build`、启动），故按权重预测 4 片约 234/217/212/200 s（≤1.3×）；权重漂移时手工更新脚本内表。曾评估“单独 build job + 产物下载”：额外 job 约 100 s 且在关键路径上，未采用。无 `--shard` 时 blob 文件同名，故用 `PLAYWRIGHT_BLOB_OUTPUT_NAME=report-<job-index>.zip` 区分。必过检查名 `Frontend E2E Acceptance` 由汇总 job 提供，分片数变化不影响 ruleset 上下文。
+E2E 分片：`e2e-shard` 为 4 片，不再用 `--shard`（按文件数切分，实测最慢/最快 1.84×，`mobile.spec.ts` 单文件约 129 s）；改由 `scripts/e2e-shard-files.cjs` 按各 spec 秒数权重（取自 run 41274550136）贪心装箱，未登记的新 spec 取默认权重自动并入，`scripts/e2e-shard-files.test.cjs` 在每片开头校验“每个 spec 恰在一片”。每片固定开销约 105 s（安装、`next build`、启动），故按权重预测各片测试段 132/114/114/115 s（单文件 `mobile.spec.ts` 为下限）；权重漂移时手工更新脚本内表。曾评估“单独 build job + 产物下载”：额外 job 约 100 s 且在关键路径上，未采用。无 `--shard` 时 blob 文件同名，故用 `PLAYWRIGHT_BLOB_OUTPUT_NAME=report-<job-index>.zip` 区分。必过检查名 `Frontend E2E Acceptance` 由汇总 job 提供，分片数变化不影响 ruleset 上下文。
 
 ## 🔄 流程图
 
