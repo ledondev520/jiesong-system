@@ -242,19 +242,29 @@ test("SALES 3D canvas renders estimated cargo, controls and resize survive tab r
       await exerciseControl(page, canvas, gesture);
     expect(readExportDocuments(fixture)).toEqual(before);
 
-    // 2. Observe ResizeObserver/camera output across the existing height breakpoint.
-    for (const width of [390, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
-      await canvas.scrollIntoViewIfNeeded();
-      const frame = await waitForRenderedFrame(canvas);
-      expect(frame.cssHeight).toBe(width < 768 ? 420 : 520);
-      expect(frame.left).toBeGreaterThanOrEqual(0);
-      expect(frame.right).toBeLessThanOrEqual(frame.viewportWidth + 1);
-      await exerciseControl(page, canvas, "rotate");
-    }
+    // 2. Below 768px the WebGL scene is replaced by the static 2D plan (no canvas);
+    // back at 1440 the scene mounts again at the desktop height and stays interactive.
+    await page.setViewportSize({ width: 390, height: 900 });
+    await expect(canvas).toHaveCount(0);
+    const topView = page.getByRole("img", { name: "装柜俯视图", exact: true });
+    await expect(topView).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "装柜侧视图", exact: true }),
+    ).toBeVisible();
+    const plan = await topView.boundingBox();
+    expect(plan!.x).toBeGreaterThanOrEqual(0);
+    expect(plan!.x + plan!.width).toBeLessThanOrEqual(391);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(canvas).toHaveCount(1);
+    await canvas.scrollIntoViewIfNeeded();
+    const frame = await waitForRenderedFrame(canvas);
+    expect(frame.cssHeight).toBe(520);
+    expect(frame.left).toBeGreaterThanOrEqual(0);
+    expect(frame.right).toBeLessThanOrEqual(frame.viewportWidth + 1);
+    await exerciseControl(page, canvas, "rotate");
 
     // 3. The ordinary tab return remounts the scene; reload reads unchanged cargo.
-    await page.getByRole("tab", { name: "装箱明细", exact: true }).click();
+    await page.getByRole("tab", { name: "明细", exact: true }).click();
     await expect(canvas).toHaveCount(0);
     canvas = await openVisualization(page);
     await exerciseControl(page, canvas, "zoom");

@@ -112,13 +112,15 @@ for (const width of [390, 1440]) {
     const initialReads = periods.length;
     await start.fill("2026-10-05");
     await end.fill("2026-10-05");
-    await expect(page).toHaveURL(/\/dashboard\/reports\?source=qa#report$/);
+    await expect(page).toHaveURL(
+      /\/dashboard\/finance\/analysis\?source=qa#report$/,
+    );
     expect(periods).toHaveLength(initialReads);
     await expect(summary).toContainText("共 46 笔");
     await page.getByRole("button", { name: "应用期间", exact: true }).click();
     await expect(summary).toContainText("2026-10-05 至 2026-10-05，共 1 笔");
     await expect(page).toHaveURL(
-      /\/dashboard\/reports\?source=qa&startDate=2026-10-05&endDate=2026-10-05#report$/,
+      /\/dashboard\/finance\/analysis\?source=qa&startDate=2026-10-05&endDate=2026-10-05#report$/,
     );
     const detail = page.getByRole("link", {
       name: "查看发运销售明细",
@@ -130,14 +132,14 @@ for (const width of [390, 1440]) {
     );
     await detail.click();
     await expect(page).toHaveURL(
-      /\/dashboard\/sales\?shipped=true&shippedFrom=2026-10-05&shippedTo=2026-10-05$/,
+      /\/dashboard\/orders\?shipped=true&shippedFrom=2026-10-05&shippedTo=2026-10-05$/,
     );
     await page.goBack();
     await expect(start).toHaveValue("2026-10-05");
     await expect(end).toHaveValue("2026-10-05");
     await expect(summary).toContainText("共 1 笔");
     await page.goForward();
-    await expect(page).toHaveURL(/\/dashboard\/sales\?/);
+    await expect(page).toHaveURL(/\/dashboard\/orders\?/);
     await page.goBack();
     await expect(start).toHaveValue("2026-10-05");
     await page.reload();
@@ -151,7 +153,9 @@ for (const width of [390, 1440]) {
     await expect(start).toHaveValue("");
     await expect(end).toHaveValue("");
     await expect(summary).toContainText("最早 至 当前，共 46 笔");
-    await expect(page).toHaveURL(/\/dashboard\/reports\?source=qa#report$/);
+    await expect(page).toHaveURL(
+      /\/dashboard\/finance\/analysis\?source=qa#report$/,
+    );
     expect(writes).toEqual([]);
     expect(errors).toEqual([]);
   });

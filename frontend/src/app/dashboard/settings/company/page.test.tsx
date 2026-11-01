@@ -4,7 +4,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CompanySettingsPage, { changedCompanyValues } from "./page";
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn(), identity: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  get: vi.fn(),
+  update: vi.fn(),
+  identity: vi.fn(),
+}));
 vi.mock("@/services/config.service", () => ({
   configService: {
     getSystemConfig: mocks.get,
@@ -26,7 +30,16 @@ const config = (data: Record<string, string>) => ({
 const identity = (data: Record<string, unknown> = {}) => ({
   code: 200,
   message: "ok",
-  data: { name: "", address: "", phone: "", taxId: "", bank: "", legacyFilled: [], invoiceTitleText: "", ...data },
+  data: {
+    name: "",
+    address: "",
+    phone: "",
+    taxId: "",
+    bank: "",
+    legacyFilled: [],
+    invoiceTitleText: "",
+    ...data,
+  },
 });
 
 beforeEach(() => {
@@ -115,30 +128,51 @@ describe("CompanySettingsPage", () => {
   it("旧开票抬头只带入尚为空的字段并提示；保存只写入这些 canonical 键（不写 invoiceTitleInfo）", async () => {
     const user = userEvent.setup();
     mocks.get.mockResolvedValue(config({ companyName: "Canon Co" }));
-    mocks.identity.mockResolvedValue(identity({
-      name: "Canon Co", taxId: "91-X1", address: "1 Legacy Road", phone: "555", bank: "Legacy Bank 000",
-      legacyFilled: ["taxId", "address", "phone", "bank"],
-    }));
+    mocks.identity.mockResolvedValue(
+      identity({
+        name: "Canon Co",
+        taxId: "91-X1",
+        address: "1 Legacy Road",
+        phone: "555",
+        bank: "Legacy Bank 000",
+        legacyFilled: ["taxId", "address", "phone", "bank"],
+      }),
+    );
     mocks.update.mockResolvedValue(config({}));
     render(<CompanySettingsPage />);
-    expect(await screen.findByRole("status")).toHaveTextContent("旧的「我方开票抬头信息」");
-    await waitFor(() => expect(screen.getByLabelText("纳税人识别号")).toHaveValue("91-X1"));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "旧的「我方开票抬头信息」",
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("纳税人识别号")).toHaveValue("91-X1"),
+    );
     expect(screen.getByLabelText("公司名称")).toHaveValue("Canon Co");
     expect(screen.getByLabelText("公司地址")).toHaveValue("1 Legacy Road");
     expect(screen.getByLabelText("公司电话")).toHaveValue("555");
-    expect(screen.getByLabelText("银行资料（每行一项）")).toHaveValue("Legacy Bank 000");
+    expect(screen.getByLabelText("银行资料（每行一项）")).toHaveValue(
+      "Legacy Bank 000",
+    );
     await user.click(screen.getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({
-      companyTaxId: "91-X1", companyAddress: "1 Legacy Road", companyPhone: "555", companyBankInfo: "Legacy Bank 000",
-    }));
-    expect(JSON.stringify(mocks.update.mock.calls)).not.toContain("invoiceTitleInfo");
+    await waitFor(() =>
+      expect(mocks.update).toHaveBeenCalledWith({
+        companyTaxId: "91-X1",
+        companyAddress: "1 Legacy Road",
+        companyPhone: "555",
+        companyBankInfo: "Legacy Bank 000",
+      }),
+    );
+    expect(JSON.stringify(mocks.update.mock.calls)).not.toContain(
+      "invoiceTitleInfo",
+    );
   });
 
   it("别名读取失败时仍显示已保存的值", async () => {
     mocks.get.mockResolvedValue(config({ companyName: "Canon Co" }));
     mocks.identity.mockRejectedValue(new Error("boom"));
     render(<CompanySettingsPage />);
-    await waitFor(() => expect(screen.getByLabelText("公司名称")).toHaveValue("Canon Co"));
+    await waitFor(() =>
+      expect(screen.getByLabelText("公司名称")).toHaveValue("Canon Co"),
+    );
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -152,7 +186,9 @@ describe("CompanySettingsPage", () => {
     await user.type(field, "合成未保存草稿");
     page.unmount();
     render(<CompanySettingsPage />);
-    await waitFor(() => expect(screen.getByLabelText("公司名称")).toHaveValue("合成普通设置公司"));
+    await waitFor(() =>
+      expect(screen.getByLabelText("公司名称")).toHaveValue("合成普通设置公司"),
+    );
     expect(mocks.update).not.toHaveBeenCalled();
   });
 });

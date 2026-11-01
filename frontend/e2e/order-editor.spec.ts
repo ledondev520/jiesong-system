@@ -57,7 +57,7 @@ test.describe("order editor", () => {
     await expect(page.getByLabel("付款条件")).toHaveValue("30% 定金");
     await expect(page.getByLabel("装货港")).toHaveValue("Shanghai");
 
-    // Line 1 → Sacramento, ¥10,000 → $1,995 (integer, multiple of 5).
+    // Line 1 → Sacramento, ¥10,000 → $1,994 (ceil to a whole dollar, no rounding to 5).
     await page.getByLabel("第 1 行搜索商品").fill("不锈钢");
     await page.getByRole("option", { name: /不锈钢门/ }).click();
     await page.getByLabel("第 1 行门店").selectOption("s1");
@@ -75,10 +75,10 @@ test.describe("order editor", () => {
     await page.getByLabel("第 2 行采购成本").fill("100");
     await page.getByLabel("第 2 行单价").fill("30");
     await expect(page.getByText("手动价")).toBeVisible();
-    await expect(page.getByText("订单合计 $20,010.00")).toBeVisible();
+    await expect(page.getByText("订单合计 $20,000.00")).toBeVisible();
 
     await page.getByRole("button", { name: "创建订单" }).click();
-    await expect(page).toHaveURL(/\/dashboard\/sales\/o-new$/);
+    await expect(page).toHaveURL(/\/dashboard\/orders\/o-new$/);
     expect(created).toHaveLength(1);
     const { body, key } = created[0] as { body: Record<string, unknown> & { items: Record<string, unknown>[] }; key: string };
     expect(key).toBeTruthy();
