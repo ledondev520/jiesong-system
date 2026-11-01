@@ -122,7 +122,27 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
             return (
               <Card key={key} className="border-border/70">
                 <CardHeader className="flex-row items-center justify-between space-y-0">
-                  <CardTitle className="text-base">{list.label}</CardTitle>
+                  <div className="min-w-0">
+                    <CardTitle className="text-base">{list.label}</CardTitle>
+                    {list.historical && list.historical.count > 0 && (
+                      <p
+                        className="mt-0.5 text-xs text-muted-foreground"
+                        data-testid={`${key}-scope`}
+                      >
+                        仅含 {list.historical.before} 起签约，不含{" "}
+                        {list.historical.count} 条历史
+                      </p>
+                    )}
+                    {list.pending && (
+                      <p
+                        className="mt-0.5 text-xs text-muted-foreground"
+                        data-testid={`${key}-scope`}
+                      >
+                        材料核验通过；工作台共 {list.pending.count} 个
+                        {list.pending.label}
+                      </p>
+                    )}
+                  </div>
                   <Badge variant={list.count > 0 ? "default" : "outline"}>
                     {list.count}
                   </Badge>

@@ -93,3 +93,38 @@ describe("TodoBoard historical note", () => {
     expect(screen.getByText(/另有 88 条/)).toBeInTheDocument();
   });
 });
+
+describe("TodoBoard scope labels at the number (B13)", () => {
+  it("states the historical exclusion next to the count itself", () => {
+    render(<TodoBoard todos={historicalTodos(88)} />);
+    expect(screen.getByTestId("paymentsDue-scope")).toHaveTextContent(
+      "仅含 2026-01-01 起签约，不含 88 条历史",
+    );
+  });
+
+  it("shows no scope label when nothing is excluded", () => {
+    render(<TodoBoard todos={historicalTodos(0)} />);
+    expect(screen.queryByTestId("paymentsDue-scope")).toBeNull();
+  });
+
+  it("shows the rebate workbench pending total beside the ready count", () => {
+    render(
+      <TodoBoard
+        todos={{
+          role: "FINANCE",
+          lists: {
+            refundable: {
+              label: "可申报退税",
+              count: 0,
+              items: [],
+              pending: { count: 46, label: "待处理出口" },
+            },
+          },
+        }}
+      />,
+    );
+    expect(screen.getByTestId("refundable-scope")).toHaveTextContent(
+      "材料核验通过；工作台共 46 个待处理出口",
+    );
+  });
+});
