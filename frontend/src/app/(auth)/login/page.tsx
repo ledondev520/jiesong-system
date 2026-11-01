@@ -259,16 +259,10 @@ function LoginFormClient() {
 
   return (
     <div className="auth-shell">
-      {/* 装饰性背景元素 */}
-      <div className="pointer-events-none absolute left-[10%] top-[15%] h-72 w-72 rounded-full bg-primary/[0.04] blur-3xl" />
-      <div className="pointer-events-none absolute right-[15%] bottom-[10%] h-64 w-64 rounded-full bg-primary/[0.03] blur-3xl" />
-
       <div className="flex w-full max-w-md flex-col items-center">
         {/* 品牌标识 */}
         <div className="mb-8 flex flex-col items-center gap-3">
           <div className="relative">
-            <div className="absolute -inset-3 rounded-3xl bg-primary/15 blur-2xl" />
-            <div className="absolute -inset-1 rounded-2xl bg-primary/10 blur-lg" />
             <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20">
               <Ship className="h-8 w-8" strokeWidth={1.5} />
             </div>
@@ -451,7 +445,6 @@ export default function LoginPage() {
           <div className="flex w-full max-w-md flex-col items-center">
             <div className="mb-8 flex flex-col items-center gap-3">
               <div className="relative">
-                <div className="absolute -inset-3 rounded-3xl bg-primary/15 blur-2xl" />
                 <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
                   <Ship className="h-8 w-8" strokeWidth={1.5} />
                 </div>

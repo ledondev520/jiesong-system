@@ -692,6 +692,7 @@ All of it is built on shadcn/ui (mandatory per `AGENTS.md`). Tokens live in `fro
 - **Document numbers** (EXP…, CG…, QT…) use the existing mono font (`--font-ui-mono`).
 
 ### 8.3 Colour
+> **Superseded 2026-11-01** by redesign direction D "Ink & Seal" (owner pick; tokens in `frontend/src/app/globals.css`, rationale in `handoff/DESIGN-REDESIGN-PROPOSAL.md` R2.1): warm paper canvas, ink text, single oxblood primary `oklch(0.38 0.12 15)`, light warm sidebar. The green-teal bullets below describe the previous identity and are kept for history.
 - **Neutral base:** shadcn `zinc` scale for surfaces and borders.
 - **One brand accent:** a calmer, deeper green-teal than today's highly saturated green (proposal: `--primary: oklch(0.50 0.11 165)`). It is used only for primary buttons, links and the active nav item.
 - **Semantic colours:**
