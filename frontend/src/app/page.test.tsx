@@ -131,4 +131,19 @@ describe("RootPage 公开落地页", () => {
     }
     expect(container.querySelectorAll("script, iframe, link")).toHaveLength(0);
   });
+
+  it("权限卡片只声称后端真实做到的：账簿明细与凭证仅财务/管理员，不声称整个财务数据", () => {
+    render(<RootPage />);
+    expect(
+      screen.getByText(/账簿明细与财务凭证仅财务和管理员可见/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/财务数据只对财务和管理员可见/)).toBeNull();
+  });
+
+  it("功能卡的 h3 在一个 h2 之下（屏幕阅读器标题层级不跳级）", () => {
+    render(<RootPage />);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "系统特点" }),
+    ).toBeInTheDocument();
+  });
 });

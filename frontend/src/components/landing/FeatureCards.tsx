@@ -11,7 +11,7 @@ const FEATURES = [
   },
   {
     title: "权限分明",
-    body: "按角色开放功能；财务数据只对财务和管理员可见。",
+    body: "按角色开放功能；账簿明细与财务凭证仅财务和管理员可见。",
   },
   {
     title: "AI 助手随页可用",
@@ -21,7 +21,10 @@ const FEATURES = [
 
 export function FeatureCards() {
   return (
-    <section className="bg-background" aria-label="系统特点">
+    <section className="bg-background" aria-labelledby="features-heading">
+      <h2 id="features-heading" className="sr-only">
+        系统特点
+      </h2>
       <div className="mx-auto grid max-w-[1200px] gap-6 px-4 pb-16 md:px-6 md:pb-24 lg:grid-cols-3">
         {FEATURES.map((feature) => (
           <article

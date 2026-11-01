@@ -167,6 +167,8 @@
     --sidebar-ring: oklch(0.78 0.02 70);
     --brand-emphasis: var(--primary);
     --brand-emphasis-soft: var(--muted-foreground);
+    /* 深色下金色文字要更亮：浅色那条在深色卡片上只有 3.15:1 */
+    --brand-gold-text: oklch(0.73 0.1 85);
 
     --status-gray: oklch(0.8 0.01 286);
     --status-gray-soft: oklch(0.274 0.006 286.033);
