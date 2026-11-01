@@ -24,6 +24,7 @@
 | smoke.spec.ts | 冒烟验收 | 主要页面与业务入口 |
 | visual.spec.ts / snapshots | 可选视觉验收 | 平台相关截图，仅在 VISUAL_REGRESSION=1 时运行 |
 | real-export-3d.spec.ts | 真实 SALES 场景验收 | 既有缺尺寸货物的实际绘制、旋转/缩放/平移、响应式尺寸与页签/重载返回，独立 SQLite 零业务写入核对 |
+| real-export-pdf.spec.ts | 真实 SALES 装柜图 PDF 导出验收 | 点击导出 PDF 并取得下载：%PDF 头、<5 MB、每页 MediaBox 为 A4 竖版（595×842±1）、页数≥柜数；真实 DOM 上每个 h3 标题块是断点而其首个表体行不是（引用 containerExport 导出的 PDF_BREAK_SELECTOR，collectBreaks 自身也用它）；再用测试专用 CSS 把单元格撑高到强制分页，断言每个打印页高于一页 A4 且页数>柜数（<caption> 回归只由「找不到 h3」间接拦截，无法读取 JPEG 页内容） |
 | real-dashboard-sources.spec.ts | 真实工作台验收 | 独立 SQL KPI/资金来源、六笔以外的历史风险、PURCHASE 下一采购任务与 BOSS 只读销售详情、重载和完整业务零写入 |
 
 运行：`CI=1 npm run test:e2e -- --reporter=list,html`（先 `npx playwright install chromium`）。注册验收验证合成发送请求、冷却按钮、待审核提示及无自动登录令牌；后端 `emailRegistration.test.js` 验证真实校验和限流。采购夹具保持 SIGNED/无到货事实，汇总与明细不得伪造已验收库存。
