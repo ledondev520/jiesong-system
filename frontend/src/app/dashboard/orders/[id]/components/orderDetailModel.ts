@@ -116,6 +116,9 @@ export interface StoreFulfilmentRow {
   purchased: number;
   received: number;
   packed: number;
+  packedBoxes: number;
+  /** 无下单/采购/入库行（历史导入装箱）：数量口径不可比，页面显示「历史数据」 */
+  historical: boolean;
 }
 
 const UNASSIGNED = "";
@@ -147,6 +150,8 @@ export const buildStoreFulfilment = (
         purchased: 0,
         received: 0,
         packed: 0,
+        packedBoxes: 0,
+        historical: false,
       };
       rows.set(key, existing);
     }
@@ -176,7 +181,13 @@ export const buildStoreFulfilment = (
     const storeId =
       item.storeId ||
       (item.purchaseItemId ? purchaseItemStore.get(item.purchaseItemId) : null);
-    row(storeId).packed += item.quantity || 0;
+    const target = row(storeId);
+    target.packed += item.quantity || 0;
+    target.packedBoxes += Math.max(0, Math.trunc(Number(item.boxes) || 0));
+  }
+  for (const target of rows.values()) {
+    target.historical =
+      target.ordered === 0 && target.purchased === 0 && target.received === 0;
   }
 
   return [...rows.values()].sort((a, b) => {

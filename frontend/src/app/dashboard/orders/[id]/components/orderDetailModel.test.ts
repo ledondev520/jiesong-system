@@ -142,6 +142,8 @@ describe("buildStoreFulfilment", () => {
         purchased: 0,
         received: 0,
         packed: 0,
+        packedBoxes: 0,
+        historical: false,
       },
       {
         storeId: "st1",
@@ -150,6 +152,8 @@ describe("buildStoreFulfilment", () => {
         purchased: 10,
         received: 8,
         packed: 4,
+        packedBoxes: 0,
+        historical: false,
       },
     ]);
   });
@@ -167,6 +171,26 @@ describe("buildStoreFulfilment", () => {
       storeName: "未分门店",
       packed: 3,
     });
+  });
+  it("门店仅有装箱行（无下单/采购/入库）标为历史数据并给出箱数", () => {
+    const rows = buildStoreFulfilment(
+      order({
+        items: [],
+        purchaseContracts: [],
+        packingItems: [
+          {
+            id: "k1",
+            productId: "p1",
+            storeId: "st9",
+            quantity: 30984.1,
+            boxes: 12,
+          },
+          { id: "k2", productId: "p2", storeId: "st9", quantity: 5, boxes: 3 },
+        ] as SalesContract["packingItems"],
+      }),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ historical: true, packedBoxes: 15 });
   });
   it("导入自采购明细但缺 storeId 的装箱行按来源采购明细回填门店（含部分导入），真正无来源的仍未分门店", () => {
     const rows = buildStoreFulfilment(
