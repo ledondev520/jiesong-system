@@ -83,7 +83,7 @@ export function HsCodeSearchCard({
                 HS
               </span>
               <Input
-                placeholder="编码前缀（4–10位）"
+                placeholder="编码前缀（4–12位）"
                 value={hsCodeInput}
                 onChange={(e) => {
                   const v = e.target.value.replace(/\D/g, "").slice(0, 12);
