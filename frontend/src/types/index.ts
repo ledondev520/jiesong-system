@@ -484,6 +484,8 @@ export interface SalesItem {
   sellingPrice: number;
   specification?: string;
   note?: string;
+  /** 库存已分配到该明细的数量（订单详情 API；用于不再重复生成采购单） */
+  allocatedQuantity?: number;
   createdAt: string;
   updatedAt: string;
   product?: Product;

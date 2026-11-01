@@ -151,4 +151,26 @@ test('HTTP/SQLite: generating purchase drafts is per-supplier, DRAFT-only, guard
   }), /synthetic write failure/);
   assert.equal(itemWrites, 2, 'the first supplier group was written before the failure');
   assert.deepEqual(await counts(), before, 'no contract or item survives the failed transaction');
+
+  // DASH-STOCK: lines fully covered by allocated inventory are skipped; partial allocation still generates.
+  const stockOrder = await makeOrder('EXP-SYN-005', 'CONFIRMED', [[p1.id, storeA.id, 5], [p1.id, storeB.id, 5], [p2.id, storeA.id, 5]]);
+  const [full, partial, none] = stockOrder.items;
+  await db.inventory.createMany({ data: [
+    ...[3, 2].map((quantity) => ({ productId: p1.id, quantity, salesItemId: full.id })),
+    { productId: p1.id, quantity: 2, salesItemId: partial.id },
+  ] });
+  const detail = await (await fetch(`${base}/sales/${stockOrder.id}`, { headers: { authorization: `Bearer ${tokens.ADMIN}` } })).json();
+  const allocatedOf = (id) => detail.data.items.find((item) => item.id === id).allocatedQuantity;
+  assert.deepEqual([full, partial, none].map((item) => allocatedOf(item.id)), [5, 2, 0]);
+  assert.ok(detail.data.items.every((item) => item.inventories === undefined), 'inventory rows are not exposed');
+  // Nothing left after skipping -> 409, nothing written.
+  const beforeStock = await counts();
+  assert.equal((await post(stockOrder.id, { lines: [line(full, supA.id)] })).status, 409);
+  assert.deepEqual(await counts(), beforeStock);
+  // Mixed: the fully covered line is skipped and reported, partial + unallocated are generated.
+  const mixed = await post(stockOrder.id, { lines: [line(full, supA.id), line(partial, supA.id), line(none, supB.id)] });
+  assert.equal(mixed.status, 201);
+  assert.deepEqual(mixed.data.skippedStockCovered, [full.id]);
+  assert.equal(mixed.data.contracts.reduce((sum, contract) => sum + contract.itemCount, 0), 2);
+  assert.equal(await db.purchaseItem.count({ where: { purchaseContract: { salesContractId: stockOrder.id }, storeId: storeA.id, productId: p1.id } }), 0);
 });

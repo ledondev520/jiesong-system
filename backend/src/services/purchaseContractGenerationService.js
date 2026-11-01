@@ -8,6 +8,7 @@ const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { SALES_STATUS, PURCHASE_STATUS } = require('../config/constants');
 const { generateNextPurchaseContractNo, isPurchaseNumberConflict } = require('./purchaseContractNumberService');
+const { isStockCovered } = require('../utils/stockAllocation');
 const { normalizeItem } = require('../agent/commands/purchase/createPurchaseWithItems');
 
 const DEFAULT_TAX_RATE = 13;
@@ -27,18 +28,22 @@ const parseLines = (lines) => {
   });
 };
 
-const generateInTransaction = async (tx, salesContractId, lines) => {
+const generateInTransaction = async (tx, salesContractId, allLines) => {
   const order = await tx.salesContract.findUnique({
     where: { id: salesContractId },
-    include: { items: { select: { id: true, productId: true, storeId: true, quantity: true, unit: true, specification: true } } },
+    include: { items: { select: { id: true, productId: true, storeId: true, quantity: true, unit: true, specification: true, inventories: { select: { quantity: true } } } } },
   });
   if (!order) throw createError('出口订单不存在', 404);
   if (String(order.status).toUpperCase() !== SALES_STATUS.CONFIRMED) throw createError('仅已确认的订单可以生成采购单', 400);
 
   const itemsById = new Map(order.items.map((item) => [item.id, item]));
-  for (const line of lines) {
+  for (const line of allLines) {
     if (!itemsById.has(line.salesItemId)) throw createError('销售明细不属于该订单', 400);
   }
+  // 库存已全额分配的明细无需采购：跳过；全部被跳过则 409（与首页待采购口径一致，部分分配仍生成）。
+  const lines = allLines.filter((line) => !isStockCovered(itemsById.get(line.salesItemId)));
+  const skipped = allLines.filter((line) => !lines.includes(line)).map((line) => line.salesItemId);
+  if (!lines.length) throw createError('所选明细已由库存全额覆盖，无需生成采购单', 409);
   const supplierIds = [...new Set(lines.map((line) => line.supplierId))];
   const suppliers = await tx.supplier.findMany({ where: { id: { in: supplierIds } }, select: { id: true, isActive: true } });
   const activeSuppliers = new Set(suppliers.filter((supplier) => supplier.isActive).map((supplier) => supplier.id));
@@ -88,7 +93,7 @@ const generateInTransaction = async (tx, salesContractId, lines) => {
     await tx.purchaseItem.createMany({ data: items.map((item) => ({ purchaseContractId: contract.id, ...item })) });
     created.push({ id: contract.id, contractNo: contract.contractNo, supplierId, itemCount: items.length, totalAmount: contract.totalAmount });
   }
-  return { contracts: created };
+  return { contracts: created, skippedStockCovered: skipped };
 };
 
 /** 事务整体回滚；编号竞争只重试可恢复的并发冲突，最多 3 次。 */

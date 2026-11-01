@@ -19,6 +19,7 @@ const inventorySnapshot = require('./inventorySnapshot');
 const { defaultSpotRate, orderMargin, orderRateInput, priceFor } = require('./exportPricing');
 const { categoryIdsByProduct, withCategoryChains } = require('./productCategoryChain');
 const { lastConfirmedPrices } = require('./lastConfirmedPrice');
+const { allocatedQuantity } = require('../utils/stockAllocation');
 const { buildLoadingPlan, checkUtilisation, evaluateShipmentReadiness } = require('./shipmentReadinessService');
 const { getContainerSpec } = require('./containerSpecs');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
@@ -129,6 +130,7 @@ const getSalesContractById = async (id) => {
         include: {
           product: true,
           store: { include: { port: true } },
+          inventories: { select: { quantity: true } }, // 仅用于 allocatedQuantity，不外泄库存行
         },
       },
       packingItems: {
@@ -171,6 +173,8 @@ const getSalesContractById = async (id) => {
   const { quote, ...rest } = contract;
   return {
     ...rest,
+    // 库存已分配到明细的数量（DASH-STOCK）：订单详情据此不再把全额覆盖的明细算作待生成采购单
+    items: (contract.items || []).map(({ inventories, ...item }) => ({ ...item, allocatedQuantity: allocatedQuantity({ inventories }) })),
     // 汇率口径（评审 R1-1）：报价转换的订单 exchangeRate 存的是计价汇率，spotRate 给出现汇供页面预填。
     rateBasis: contract.quoteId ? 'effective' : 'spot',
     spotRate: contract.quoteId ? (quote?.spotRate ?? null) : contract.exchangeRate,

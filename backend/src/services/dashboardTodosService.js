@@ -18,6 +18,7 @@ const prisma = require('../utils/prisma');
 const { ROLES, PURCHASE_STATUS, SALES_STATUS } = require('../config/constants');
 const { PAYABLE_SELECT, payableWhere, outstandingOf, getPayablesSummary } = require('./payablesService');
 const { roundMoney } = require('../utils/money');
+const { isStockCovered } = require('../utils/stockAllocation');
 
 const TOP = 5;
 // shortcut: CONFIRMED orders are scanned oldest-first up to this cap (count undercounts beyond it); upgrade to SQL NOT EXISTS if volumes reach it.
@@ -56,8 +57,7 @@ const LISTS = {
       });
       const covered = new Set(purchased.map((p) => `${p.purchaseContract.salesContractId}/${p.productId}/${p.storeId}`));
       // shortcut: list shows the whole order, not the uncovered remainder per line; upgrade if purchasers need remaining quantities.
-      const stockCovers = (i) => i.inventories.reduce((sum, inv) => sum + inv.quantity, 0) + 1e-9 >= i.quantity;
-      const rows = orders.filter((o) => o.items.some((i) => !covered.has(`${o.id}/${i.productId}/${i.storeId}`) && !stockCovers(i)));
+      const rows = orders.filter((o) => o.items.some((i) => !covered.has(`${o.id}/${i.productId}/${i.storeId}`) && !isStockCovered(i)));
       return asList(rows.length, rows.map((r) => item(r.id, r.contractNo, null, r.totalAmount, r.signedAt)));
     },
   },

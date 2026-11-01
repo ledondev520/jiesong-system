@@ -94,7 +94,7 @@ const livePurchaseContracts = (contract: SalesContract) =>
     (purchase) => purchase.status !== PurchaseStatus.CANCELLED,
   );
 
-/** 职责：尚未在未取消的采购单中出现的 (商品, 门店) 明细；与后端 409 判定同口径 */
+/** 职责：尚未在未取消的采购单中出现、且未被库存全额分配覆盖的 (商品, 门店) 明细；与后端 409/跳过判定同口径 */
 export const pendingPurchaseItems = (contract: SalesContract): SalesItem[] => {
   const generated = new Set(
     livePurchaseContracts(contract).flatMap((purchase) =>
@@ -104,6 +104,7 @@ export const pendingPurchaseItems = (contract: SalesContract): SalesItem[] => {
   return (contract.items ?? []).filter(
     (item) =>
       item.quantity > 0 &&
+      (item.allocatedQuantity ?? 0) + 1e-9 < item.quantity &&
       !generated.has(pairKey(item.productId, item.storeId)),
   );
 };

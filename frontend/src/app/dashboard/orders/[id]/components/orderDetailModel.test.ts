@@ -77,6 +77,25 @@ describe("pendingPurchaseItems", () => {
       "i2",
     ]);
   });
+
+  it("库存全额分配的明细不再待生成；部分分配仍待生成", () => {
+    const items = order().items!.map((item) => ({ ...item, quantity: 10 }));
+    const withAllocation = (a1: number, a2: number) =>
+      order({
+        purchaseContracts: [],
+        items: [
+          { ...items[0], allocatedQuantity: a1 },
+          { ...items[1], allocatedQuantity: a2 },
+        ],
+      });
+    expect(
+      pendingPurchaseItems(withAllocation(10, 4)).map((item) => item.id),
+    ).toEqual(["i2"]);
+    expect(pendingPurchaseItems(withAllocation(10, 10))).toEqual([]);
+    expect(
+      getNextStep(withAllocation(10, 10), { canGeneratePurchase: true }),
+    ).toMatchObject({ kind: "importPurchase" });
+  });
 });
 
 describe("getNextStep", () => {
