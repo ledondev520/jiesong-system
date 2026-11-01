@@ -37,8 +37,11 @@ export function splitRemark(note: unknown): SplitRemark {
     const ids = head.match(INTERNAL_ID) ?? [];
     if (traces.length || ids.length) source.push([...traces, ...ids].join(" "));
 
-    const kept = head.replace(TRACE_PAIR, "").replace(INTERNAL_ID, "")
-      .replace(/\s{2,}/g, " ").trim();
+    const kept = head
+      .replace(TRACE_PAIR, "")
+      .replace(INTERNAL_ID, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
     if (kept) text.push(kept);
   }
 

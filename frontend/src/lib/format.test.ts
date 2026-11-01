@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatAmount, formatMoney, formatStat, formatUnitPrice } from "./format";
+import {
+  formatAmount,
+  formatMoney,
+  formatStat,
+  formatUnitPrice,
+} from "./format";
 
 describe("formatMoney", () => {
   it("固定 2 位小数、千分位和币种符号", () => {

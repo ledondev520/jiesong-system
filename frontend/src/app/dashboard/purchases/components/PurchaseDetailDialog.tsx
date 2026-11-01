@@ -142,7 +142,8 @@ export function PurchaseDetailDialog({
               {detail.note && (
                 <div className="rounded bg-muted p-3">
                   <div className="text-sm text-muted-foreground">
-                    备注：<RemarkText note={detail.note} />
+                    备注：
+                    <RemarkText note={detail.note} />
                   </div>
                 </div>
               )}

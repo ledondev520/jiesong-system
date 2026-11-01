@@ -163,38 +163,40 @@ export function UnallocatedReceiptsPanel({
           <CardContent
             className={cn("space-y-2", expanded && "max-h-96 overflow-y-auto")}
           >
-            {(expanded ? payments : payments.slice(0, PREVIEW_COUNT)).map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center justify-between rounded-lg border border-orange-200 bg-background px-3 py-2 dark:border-orange-900"
-              >
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-sm">
-                      {p.customerName || "未标注客户"}
+            {(expanded ? payments : payments.slice(0, PREVIEW_COUNT)).map(
+              (p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between rounded-lg border border-orange-200 bg-background px-3 py-2 dark:border-orange-900"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-sm">
+                        {p.customerName || "未标注客户"}
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        剩余待分配 {p.currency}{" "}
+                        {(p.remainingAmount ?? p.amount).toLocaleString()}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(p.paymentDate).toLocaleDateString("zh-CN")}
+                      {p.note && ` · ${p.note}`}
                     </span>
-                    <Badge variant="outline" className="text-[10px]">
-                      剩余待分配 {p.currency}{" "}
-                      {(p.remainingAmount ?? p.amount).toLocaleString()}
-                    </Badge>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(p.paymentDate).toLocaleDateString("zh-CN")}
-                    {p.note && ` · ${p.note}`}
-                  </span>
+                  <BusinessWrite>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => setAllocateTarget(p)}
+                    >
+                      <Split className="mr-1 h-3 w-3" /> 分配
+                    </Button>
+                  </BusinessWrite>
                 </div>
-                <BusinessWrite>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={() => setAllocateTarget(p)}
-                  >
-                    <Split className="mr-1 h-3 w-3" /> 分配
-                  </Button>
-                </BusinessWrite>
-              </div>
-            ))}
+              ),
+            )}
             {payments.length > PREVIEW_COUNT && (
               <Button
                 variant="ghost"

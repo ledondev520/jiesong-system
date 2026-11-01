@@ -13,7 +13,11 @@ interface LoadingValueProps {
   className?: string;
 }
 
-export function LoadingValue({ loading, children, className }: LoadingValueProps) {
+export function LoadingValue({
+  loading,
+  children,
+  className,
+}: LoadingValueProps) {
   if (!loading) return <>{children}</>;
   // 用 span 而非 Skeleton(div)：常嵌在 <p>/<span> 行内文字里，div 在 p 内是非法嵌套。
   return (

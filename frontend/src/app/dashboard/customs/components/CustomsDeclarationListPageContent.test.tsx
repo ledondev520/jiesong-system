@@ -46,7 +46,9 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     let resolve!: (value: unknown) => void;
     mocks.getAll.mockReturnValue(new Promise((r) => (resolve = r)));
     render(<CustomsDeclarationListPageContent embedded />);
-    expect(screen.getAllByRole("status", { name: "加载中" }).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("status", { name: "加载中" }).length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByText(/共\s*0\s*条/)).toBeNull();
     resolve({ data: { items: [], pagination: { total: 0 } } });
     await waitFor(() => expect(screen.getByText(/共\s*0\s*条/)).toBeTruthy());

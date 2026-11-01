@@ -426,8 +426,11 @@ export default function CategoriesPage() {
       {/* 分页控制 */}
       <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>
-          共 <LoadingValue loading={loading}>{filteredCategories.length}</LoadingValue> 条
-          {totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ""}
+          共{" "}
+          <LoadingValue loading={loading}>
+            {filteredCategories.length}
+          </LoadingValue>{" "}
+          条{totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ""}
         </span>
         <div className="flex flex-wrap items-center gap-2">
           <PageSizeSelect

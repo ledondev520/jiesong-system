@@ -15,7 +15,11 @@ interface RemarkTextProps {
   className?: string;
 }
 
-export function RemarkText({ note, fallback = "-", className }: RemarkTextProps) {
+export function RemarkText({
+  note,
+  fallback = "-",
+  className,
+}: RemarkTextProps) {
   const { text, source } = splitRemark(note);
   return (
     <span className={cn("whitespace-pre-wrap break-words", className)}>

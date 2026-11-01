@@ -490,7 +490,8 @@ export function CustomsDeclarationListPageContent({
 
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>
-          共 <LoadingValue loading={loading}>{total}</LoadingValue> 条，第 {page} 页；本页已放行{" "}
+          共 <LoadingValue loading={loading}>{total}</LoadingValue> 条，第{" "}
+          {page} 页；本页已放行{" "}
           <LoadingValue loading={loading}>{releasedCount}</LoadingValue> 条
         </span>
         <Button

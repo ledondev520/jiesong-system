@@ -407,7 +407,10 @@ export function TaxRefundListPageContent() {
                       value: `¥${taxRefund.refundableAmount.toLocaleString()}`,
                       emphasis: "primary",
                     },
-                    { label: "备注", value: <RemarkText note={taxRefund.note} /> },
+                    {
+                      label: "备注",
+                      value: <RemarkText note={taxRefund.note} />,
+                    },
                   ]}
                   amount={{
                     label: "已退",
@@ -576,7 +579,8 @@ export function TaxRefundListPageContent() {
           )}
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span>
-              共 <LoadingValue loading={loading}>{total}</LoadingValue> 条，第 {page} 页
+              共 <LoadingValue loading={loading}>{total}</LoadingValue> 条，第{" "}
+              {page} 页
             </span>
             <Button
               variant="outline"

@@ -16,7 +16,8 @@ describe("splitRemark", () => {
   });
 
   it("标记行整行归入来源，保留标记之前的真实备注", () => {
-    const note = "先付定金\n[WPS_PURCHASE_EVIDENCE] a/b/CG2500013.pdf#瓷砖/100件";
+    const note =
+      "先付定金\n[WPS_PURCHASE_EVIDENCE] a/b/CG2500013.pdf#瓷砖/100件";
     expect(splitRemark(note)).toEqual({
       text: "先付定金",
       source: ["[WPS_PURCHASE_EVIDENCE] a/b/CG2500013.pdf#瓷砖/100件"],
@@ -40,7 +41,9 @@ describe("splitRemark", () => {
 
   it("换行写入的纯键值痕迹归入来源，不泄露哈希", () => {
     const hash = "b".repeat(64);
-    const result = splitRemark(`补充说明\nsha256=${hash}\ntarget_contract=EXP26001`);
+    const result = splitRemark(
+      `补充说明\nsha256=${hash}\ntarget_contract=EXP26001`,
+    );
     expect(result.text).toBe("补充说明");
     expect(result.source.join(" ")).toContain(`sha256=${hash}`);
   });

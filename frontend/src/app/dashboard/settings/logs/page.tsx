@@ -353,7 +353,10 @@ export default function SystemLogsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base">日志列表</CardTitle>
-                <CardDescription>共 <LoadingValue loading={loading}>{total}</LoadingValue> 条记录</CardDescription>
+                <CardDescription>
+                  共 <LoadingValue loading={loading}>{total}</LoadingValue>{" "}
+                  条记录
+                </CardDescription>
               </div>
             </div>
 

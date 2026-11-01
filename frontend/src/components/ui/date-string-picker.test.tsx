@@ -29,7 +29,13 @@ describe("DateStringPicker", () => {
   });
 
   it("无法解析的值当作未选择", () => {
-    render(<DateStringPicker value="not-a-date" onChange={vi.fn()} placeholder="结束日期" />);
+    render(
+      <DateStringPicker
+        value="not-a-date"
+        onChange={vi.fn()}
+        placeholder="结束日期"
+      />,
+    );
     expect(screen.getByRole("button", { name: /结束日期/ })).toBeTruthy();
   });
 });

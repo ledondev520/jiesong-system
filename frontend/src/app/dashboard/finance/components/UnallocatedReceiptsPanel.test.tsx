@@ -87,7 +87,9 @@ describe("UnallocatedReceiptsPanel", () => {
     expect(screen.getByText("客户4")).toBeInTheDocument();
     expect(screen.queryByText("客户5")).toBeNull();
     expect(screen.getByText(/待分配款项（26 笔）/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /显示全部 26 笔/ }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /显示全部 26 笔/ }),
+    );
     expect(screen.getByText("客户25")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "收起" }));
     expect(screen.queryByText("客户25")).toBeNull();

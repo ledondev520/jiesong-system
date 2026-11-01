@@ -5,7 +5,9 @@ import { RemarkText } from "./remark-text";
 describe("RemarkText", () => {
   it("只显示真实备注，内部标记收进折叠的导入来源", () => {
     const { container } = render(
-      <RemarkText note={"先付定金\n[CUSTOMS_XML] d.xml sha256=" + "c".repeat(64)} />,
+      <RemarkText
+        note={"先付定金\n[CUSTOMS_XML] d.xml sha256=" + "c".repeat(64)}
+      />,
     );
     expect(screen.getByText(/先付定金/)).toBeTruthy();
     const details = container.querySelector("details");
