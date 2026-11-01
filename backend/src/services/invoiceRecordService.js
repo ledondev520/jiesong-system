@@ -8,6 +8,9 @@
 
 const prisma = require('../utils/prisma');
 
+// 「有效发票」口径：正常且为正数；已红冲/作废/负数发票不参与自动关联（与 BL-1 的 findInvoicedPurchaseContractIds 同一口径）。
+const VALID_INVOICE_WHERE = Object.freeze({ status: '正常', isPositive: '是' });
+
 /**
  * 职责：分页查询发票记录
  * @param {object} filters - 筛选条件
@@ -145,10 +148,10 @@ async function groupBySeller({ dateFrom, dateTo, limit = 50 } = {}) {
 async function findInvoicedPurchaseContractIds(db, contractIds) {
   if (!contractIds.length) return new Set();
   const rows = await db.invoiceRecord.findMany({
-    where: { matchStatus: 'MATCHED', matchedContractType: 'PURCHASE', matchedContractId: { in: contractIds }, status: '正常', isPositive: '是' },
+    where: { matchStatus: 'MATCHED', matchedContractType: 'PURCHASE', matchedContractId: { in: contractIds }, ...VALID_INVOICE_WHERE },
     select: { matchedContractId: true },
   });
   return new Set(rows.map((r) => r.matchedContractId));
 }
 
-module.exports = { listInvoices, findByExactNumbers, getStats, groupBySeller, findInvoicedPurchaseContractIds };
+module.exports = { VALID_INVOICE_WHERE, listInvoices, findByExactNumbers, getStats, groupBySeller, findInvoicedPurchaseContractIds };
