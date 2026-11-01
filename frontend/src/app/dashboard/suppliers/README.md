@@ -10,3 +10,4 @@ Quality flags, notes, and aliases are saved by the existing backend supplier com
 Archive: 删除 is a soft archive (`isActive=false`); the page loads `status=all` and hides archived suppliers unless the 「已归档」 filter is chosen. ADMIN sees 「恢复当前」 for an archived supplier. Rules and the production plan: `docs/operations/archive-test-data.md`.
 
 Permanent delete (ADMIN only, 「永久删除」): `components/HardDeleteSupplierDialog.tsx` shows the server preview (counts per record type, or the blocking reasons when money/customs records exist) and requires typing the supplier name; the page then sends the preview's `confirmToken` to `POST /suppliers/:id/hard-delete`. Archive (「归档当前」, ADMIN/PURCHASE) has no contract check.
+- `supplierCounts.ts`: index summary counts; total = normal + quality issue + archived (mutually exclusive), regression in `supplierCounts.test.ts` and `page.test.tsx` (B20).
