@@ -138,6 +138,11 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  /* 仅 CI 的 E2E webServer 构建置 E2E_SKIP_BUILD_TYPECHECK=1 跳过重复类型检查；部署构建不得设置（scripts/check-build-typecheck-flag.test.cjs 守卫）。 */
+  typescript: {
+    ignoreBuildErrors: process.env.E2E_SKIP_BUILD_TYPECHECK === '1',
+  },
+
   turbopack: {
     /* 指定 turbopack 工作区根目录，消除多 lockfile 警告 */
     root: __dirname,
