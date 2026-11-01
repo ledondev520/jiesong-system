@@ -78,8 +78,18 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   const purchase = (contractNo, status, totalAmount, paidAmount) =>
     db.purchaseContract.create({ data: { contractNo, supplierId: supplier.id, status, totalAmount, paidAmount } });
   await purchase("SYN-P-DRAFT", "DRAFT", 1000, 0);
+  // Decision A: pre-2026 contracts stay out of the dashboard counts (only a historical count); the payables page is unchanged.
+  const historicalAt = new Date("2025-06-01T00:00:00.000Z");
+  await db.purchaseContract.create({ data: { contractNo: "SYN-P-HIST-UNPAID", supplierId: supplier.id, status: "SIGNED", totalAmount: 700, paidAmount: 0, signedAt: historicalAt } });
+  await db.purchaseContract.create({ data: { contractNo: "SYN-P-HIST-NOINV", supplierId: supplier.id, status: "COMPLETED", totalAmount: 300, paidAmount: 300, signedAt: historicalAt } });
   const signed = await purchase("SYN-P-SIGNED", "SIGNED", 1000, 400);
   await purchase("SYN-P-SHIPPED", "SHIPPED", 500, 500);
+  // Invoice rule: a valid matched invoice counts as invoiced; a red-flushed (已红冲) one does not.
+  const invoicedBatch = await db.financeDataBatch.create({ data: { type: "INVOICE", fileName: "synthetic.xlsx", recordCount: 2 } });
+  const invoiceRow = (status, matchedContractId) =>
+    db.invoiceRecord.create({ data: { batchId: invoicedBatch.id, seller: "s", invDate: "2026-01-01", amount: 1, tax: 0, total: 1, status, isPositive: "是", matchStatus: "MATCHED", matchedContractType: "PURCHASE", matchedContractId } });
+  await invoiceRow("正常", (await purchase("SYN-P-INVOICED", "RECEIVED", 500, 500)).id);
+  await invoiceRow("已红冲-全额", (await purchase("SYN-P-REVERSED", "RECEIVED", 500, 500)).id);
   const sale = (contractNo, status, extra = {}) =>
     db.salesContract.create({ data: { contractNo, status, exchangeRate: 7, totalAmount: 1000, ...extra } });
   const line = (salesContractId) =>
@@ -156,11 +166,13 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   assert.equal(admin.lists.paymentsDue.count, 1);
   assert.equal(admin.lists.paymentsDue.items[0].contractNo, "SYN-P-SIGNED");
   assert.equal(admin.lists.paymentsDue.items[0].amount, 600);
+  assert.deepEqual(admin.lists.paymentsDue.historical, { count: 1, before: "2026-01-01" });
   assert.equal(admin.lists.receiptsToInspect.count, 1);
   assert.equal(admin.lists.toLoad.count, 7);
   assert.equal(admin.lists.toShip.count, 1);
-  assert.equal(admin.lists.missingInvoice.count, 1);
-  assert.equal(admin.lists.missingInvoice.items[0].contractNo, "SYN-P-SHIPPED");
+  assert.equal(admin.lists.missingInvoice.count, 2);
+  assert.deepEqual(admin.lists.missingInvoice.items.map((i) => i.contractNo).sort(), ["SYN-P-REVERSED", "SYN-P-SHIPPED"]);
+  assert.equal(admin.lists.missingInvoice.historical.count, 1);
   assert.equal(admin.lists.overdueReceivables.count, 1);
   assert.equal(admin.lists.overdueReceivables.items[0].amount, 1000);
   assert.equal(admin.lists.refundable.count, 1);
@@ -173,7 +185,7 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
 
   const boss = await todos("BOSS");
   assert.deepEqual(keys(boss), ["overdueReceivables"]);
-  assert.equal(boss.figures.payable, 600, "BOSS payable uses the shared in-effect basis");
+  assert.equal(boss.figures.payable, 1300, "BOSS payable uses the shared in-effect basis and is not date-cut (600 current + 700 historical)");
   // Nine non-cancelled export contracts of 1000 each, nothing received: finance-overview basis.
   assert.equal(boss.figures.receivable, 9000, "BOSS receivable equals the finance overview unreceived total");
   assert.ok("monthGrossProfit" in boss.figures);
@@ -186,6 +198,6 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   assert.deepEqual(emptied.lists.quotesAwaitingCustomer.items, []);
 
   // Read-only: the reads above changed no business rows.
-  assert.equal(await db.purchaseContract.count(), 6);
+  assert.equal(await db.purchaseContract.count(), 10);
   assert.equal((await db.purchaseContract.findUnique({ where: { id: signed.id } })).paidAmount, 400);
 });

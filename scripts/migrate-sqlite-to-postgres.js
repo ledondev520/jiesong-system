@@ -13,7 +13,7 @@
  */
 
 const { PrismaClient: PrismaClientSQLite } = require('../backend/node_modules/@prisma/client');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -58,9 +58,12 @@ fs.writeFileSync(tempSchemaPath, pgSchema);
 // ========== 步骤 3: 在 PostgreSQL 中创建表 ==========
 console.log('\n🏗️  在 PostgreSQL 中创建表结构...');
 try {
-  execSync(
-    `cd ${path.resolve(__dirname, '../backend')} && npx prisma db push --schema=${tempSchemaPath} --accept-data-loss`,
+  // Args array, no shell: paths are never interpreted by a shell.
+  execFileSync(
+    'npx',
+    ['prisma', 'db', 'push', `--schema=${tempSchemaPath}`, '--accept-data-loss'],
     {
+      cwd: path.resolve(__dirname, '../backend'),
       env: { ...process.env, DATABASE_URL: TARGET_DB_URL },
       stdio: 'inherit',
     }
