@@ -20,7 +20,8 @@ test.describe("落地页", () => {
     await expect(
       page.getByRole("heading", {
         level: 1,
-        name: "从报价到退税，出口业务一站走完",
+        // 两个 inline-block 短语之间浏览器会补一个空格
+        name: /从报价到退税，\s*出口业务一站走完/,
       }),
     ).toBeVisible();
     await expect(page).toHaveTitle("捷淞国际物流 · 进出口业务管理系统");
