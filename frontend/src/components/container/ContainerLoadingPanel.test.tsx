@@ -51,6 +51,39 @@ describe("ContainerLoadingPanel", () => {
     mockExportPdf.mockReset();
   });
 
+  it("已发运订单的模拟告警为中性折叠块，横幅与数字保留；非历史仍为红/琥珀", () => {
+    const { rerender } = render(
+      <ContainerLoadingPanel
+        plan={twoContainerPlan()}
+        salesContractId="s-1"
+        contractNo="EXP001"
+        historical
+      />,
+    );
+    const summary = screen.getByTestId("container-summary");
+    expect(
+      within(summary).getByText(/仍有 2 箱装不下/, { selector: "span" }),
+    ).toBeInTheDocument();
+    expect(within(summary).getByText("待核对")).toBeInTheDocument();
+    expect(within(summary).queryByText("不可出货")).not.toBeInTheDocument();
+    const details = summary.querySelector("details")!;
+    expect(details).not.toHaveAttribute("open");
+    expect(
+      within(details).getByText(/模拟结果（历史数据）/),
+    ).toBeInTheDocument();
+    expect(summary.querySelector(".text-red-700, .text-amber-700")).toBeNull();
+
+    rerender(
+      <ContainerLoadingPanel
+        plan={twoContainerPlan()}
+        salesContractId="s-1"
+        contractNo="EXP001"
+      />,
+    );
+    expect(summary.querySelector("details")).toBeNull();
+    expect(summary.querySelector(".text-red-700")).not.toBeNull();
+  });
+
   it("摘要显示柜数、每柜体积/毛重利用率、检查状态与警告", () => {
     renderPanel();
     const summary = screen.getByTestId("container-summary");

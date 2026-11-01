@@ -884,6 +884,11 @@ describe("OrderDetailPage 交互逻辑", () => {
     expect(
       await screen.findByText("不可出货：1 行装箱明细未填写箱数"),
     ).toBeInTheDocument();
+    // 未发运的同类数据仍是红色告警框。
+    expect(
+      screen.getByText("不可出货：1 行装箱明细未填写箱数").parentElement!
+        .parentElement!.className,
+    ).toMatch(/red-/);
     expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled();
   });
 
@@ -926,6 +931,11 @@ describe("OrderDetailPage 交互逻辑", () => {
         screen.getByText("当前资料的模拟结果，不代表实际发运结果"),
       ).toBeInTheDocument();
       expect(screen.queryByText(/不可出货/)).not.toBeInTheDocument();
+      // 历史订单：出柜条件框为中性色，不带红色告警。
+      const banner = screen
+        .getByText(/^历史装箱数据待核对：/)
+        .closest("div")!.parentElement!;
+      expect(banner.className).not.toMatch(/red-/);
       expect(
         screen.queryByRole("button", { name: "登记发运" }),
       ).not.toBeInTheDocument();

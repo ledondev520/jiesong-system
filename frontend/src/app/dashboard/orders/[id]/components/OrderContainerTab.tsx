@@ -45,6 +45,11 @@ const TONE = {
     box: "border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/40",
     text: "text-amber-700 dark:text-amber-400",
   },
+  // 已发运订单：排柜结果只是对当前资料的模拟，不用红/琥珀告警色。
+  historical: {
+    box: "border-border bg-muted/40",
+    text: "text-muted-foreground",
+  },
 };
 
 export function OrderContainerTab({
@@ -77,11 +82,13 @@ export function OrderContainerTab({
   const maxWeight = spec?.safeGrossKg ?? 0;
   const maxCbm = spec?.safeVolumeCbm ?? 0;
   const thresholdPct = summary.thresholdPct ?? Infinity;
-  const tone = isBlocking
-    ? TONE.blocking
-    : readiness.ready
-      ? TONE.ready
-      : TONE.pending;
+  const tone = hasShipped
+    ? TONE.historical
+    : isBlocking
+      ? TONE.blocking
+      : readiness.ready
+        ? TONE.ready
+        : TONE.pending;
   const weightPercent = maxWeight
     ? Math.min((totals.grossKg / maxWeight) * 100, 100)
     : 0;
@@ -118,7 +125,9 @@ export function OrderContainerTab({
           className={`flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border px-4 py-3 ${tone.box}`}
         >
           <div className="flex flex-wrap items-center gap-2">
-            {isBlocking ? (
+            {hasShipped ? (
+              <CircleDashed className="h-5 w-5 text-muted-foreground" />
+            ) : isBlocking ? (
               <AlertTriangle className="h-5 w-5 text-red-600" />
             ) : readiness.ready ? (
               <CheckCircle2 className="h-5 w-5 text-emerald-600" />
@@ -167,14 +176,16 @@ export function OrderContainerTab({
             <Container className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="text-muted-foreground">3D排柜</span>
             <span
-              className={`font-semibold ${readiness.physicalFit ? TONE.ready.text : TONE.blocking.text}`}
+              className={`font-semibold ${hasShipped ? TONE.historical.text : readiness.physicalFit ? TONE.ready.text : TONE.blocking.text}`}
             >
               已装 {summary.placedBoxCount} 箱 / 未装 {summary.unplacedBoxCount}{" "}
               箱
             </span>
           </div>
           {result.estimatedDimensionCount > 0 && (
-            <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <div
+              className={`flex items-center gap-2 text-xs ${hasShipped ? TONE.historical.text : "text-amber-700 dark:text-amber-400"}`}
+            >
               <AlertTriangle className="h-3.5 w-3.5" />
               {result.estimatedDimensionCount} 项尺寸由体积推算，
               {hasShipped ? "需核对历史装箱资料" : "出货前需复核"}
