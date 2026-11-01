@@ -57,6 +57,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { BlockerGroups } from "@/components/tax-refund/BlockerGroups";
 
 interface TaxRefundPreparationDialogProps {
   open: boolean;
@@ -333,11 +334,18 @@ export function TaxRefundPreparationDialog({
               <AlertDescription
                 className={ready ? "text-emerald-800" : "text-red-800"}
               >
-                {ready
-                  ? preparation.confirmationStatus === "CONFIRMED"
-                    ? "本次资料已确认并归档。"
-                    : "自动核验通过，可以确认并生成清单。"
-                  : `仍有 ${blockers.length} 项材料准备阻塞：${blockers.join("；")}`}
+                {ready ? (
+                  preparation.confirmationStatus === "CONFIRMED" ? (
+                    "本次资料已确认并归档。"
+                  ) : (
+                    "自动核验通过，可以确认并生成清单。"
+                  )
+                ) : (
+                  <div className="space-y-2">
+                    <p>{`仍有 ${blockers.length} 项材料准备阻塞：`}</p>
+                    <BlockerGroups blockers={blockers} />
+                  </div>
+                )}
               </AlertDescription>
             </Alert>
 
