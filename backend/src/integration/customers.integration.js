@@ -81,6 +81,13 @@ test('HTTP/SQLite: customers API roles, archive-not-delete, USD/incoterm rules a
     assert.deepEqual(list.items.map((row) => row.id), [seapot.id], role);
     assert.equal((await call('GET', `/customers/${seapot.id}`, undefined, role)).id, seapot.id);
     assert.deepEqual((await call('GET', `/customers/${seapot.id}/stores`, undefined, role)).items, []);
+    // Contact fields are Confidential: WAREHOUSE keeps name/id but never sees contact data (LR-FIX-1).
+    const detail = await call('GET', `/customers/${seapot.id}`, undefined, role);
+    for (const row of [list.items[0], detail]) {
+      assert.equal(row.name, 'Synthetic Seapot');
+      for (const field of ['contactName', 'contactEmail', 'contactPhone']) assert.equal(field in row, role !== 'WAREHOUSE', `${role} ${field}`);
+    }
+    if (role !== 'WAREHOUSE') assert.equal(detail.contactEmail, 'buyer@example.invalid');
   }
   await call('PUT', `/customers/${seapot.id}`, { note: '老板不可改' }, 'BOSS', 403);
   await call('DELETE', `/customers/${seapot.id}`, undefined, 'ADMIN', 404); // no hard delete route exists

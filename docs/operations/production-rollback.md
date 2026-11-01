@@ -55,6 +55,8 @@ OBSERVE_SECONDS=180
 
 定价只采用这一条规则：**默认以回滚时服务器上的现行版为权威**。发布流程本身就跨部署保留运行时 `pricing.json`，管理员上线后的修改不能被回滚覆盖。先把现行版另存到备份目录，不要放临时目录，并记录现行版和部署前版的两份 SHA-256。只有事故原因就是定价文件本身时，才显式选择 `$B/pricing.json`，同时在回滚记录写明原因。
 
+> **回滚到本次上线之前的提交时必须选 `PRICING_AUTHORITY="$B/pricing.json"`（旧格式）。** 本次上线把线上 `pricing.json` 转成新格式（`exchangeRate`/`exchangeAdjustment`/`defaultMarkup`/`categoryMarkups`），旧代码会拒绝这些新键，沿用现行版会让旧版本无法启动或读不到定价。选旧格式后，上线后管理员在设置里做过的定价修改会丢失，须在回滚完成后人工重新录入（先留存 `$CURRENT_PRICING` 作对照）。
+
 ```bash
 test -f "$DB"
 test -f "$B/dev.db"
