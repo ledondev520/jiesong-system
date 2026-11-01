@@ -61,7 +61,9 @@ export function SupplierSummary({
           </Button>
         </BusinessWrite>
         <Button asChild variant="outline" className="h-9 rounded-lg">
-          <Link href={`/dashboard/suppliers/${supplier.id}`}>
+          <Link
+            href={`/dashboard/suppliers/${encodeURIComponent(supplier.id)}`}
+          >
             查看供货商品与价格
           </Link>
         </Button>
