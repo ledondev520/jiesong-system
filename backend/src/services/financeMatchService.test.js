@@ -150,11 +150,12 @@ test('同一合同多张同额发票：累计额上限只放行一张（CG240000
  const{writes}=invoiceFixture(t,{contracts:[contract()],invoices:[invoice('a',{invDate:'2025-02-24'}),invoice('b',{invDate:'2025-07-08'}),invoice('c',{invDate:'2025-07-08'}),invoice('d',{invDate:'2026-05-18'})]});
  const result=await service.runAutoMatch();
  assert.deepEqual(writes.map(w=>w.id),['a']);
+ assert.equal(writes[0].matchSource,'AUTO','自动关联写入来源标记');
  assert.equal(result.invoiceMatched,1);
 });
 
 test('已有人工关联发票也计入累计额：合同已满则新发票不再自动关联',async(t)=>{
- const{writes}=invoiceFixture(t,{contracts:[contract()],invoices:[invoice('manual',{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:100}),invoice('new')]});
+ const{writes}=invoiceFixture(t,{contracts:[contract()],invoices:[invoice('manual',{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:100,matchSource:'MANUAL'}),invoice('new')]});
  await service.runAutoMatch();
  assert.deepEqual(writes,[]);
 });
@@ -193,14 +194,14 @@ test('开票日早于签约超过 30 天不关联（CG2500060、CG2600007 型）
  assert.deepEqual(near.writes.map(w=>w.id),['early-25d']);
 });
 
-test('重配：只动自动采购关联（分数<100），人工/100 分/销售/待匹配不动；先试跑不写，应用后再跑为空（幂等）',async(t)=>{
- const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:82,...over});
+test('重配：只动自动采购关联（matchSource=AUTO），人工/100 分/销售/待匹配不动；先试跑不写，应用后再跑为空（幂等）',async(t)=>{
+ const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:82,matchSource:'AUTO',...over});
  const{rows,writes}=invoiceFixture(t,{contracts:[contract()],invoices:[
   link('auto-keep',{invDate:'2025-02-24'}),
   link('auto-dup-1',{invDate:'2025-07-08'}),
   link('auto-dup-2',{invDate:'2026-05-18'}),
   link('auto-wrong-tax',{sellerTaxId:'91OTHER000000000009',total:1000}),
-  link('manual',{matchScore:100,invDate:'2026-06-01'}),
+  link('manual',{matchScore:100,matchSource:'MANUAL',invDate:'2026-06-01'}),
   link('sales-link',{matchedContractType:'SALES',matchedContractId:'s1'}),
   invoice('pending'),
  ]});
@@ -223,40 +224,40 @@ test('重配：只动自动采购关联（分数<100），人工/100 分/销售/
 
 test('重配：无冲突时保留原关联；乐观条件让并发被人工改动的行跳过而不是覆盖',async(t)=>{
  const fixture=invoiceFixture(t,{contracts:[contract({totalAmount:60000})],invoices:[
-  invoice('ok',{total:60000,matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:90}),
-  invoice('bad',{total:600,sellerTaxId:'91OTHER000000000009',matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:90}),
+  invoice('ok',{total:60000,matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:90,matchSource:'AUTO'}),
+  invoice('bad',{total:600,sellerTaxId:'91OTHER000000000009',matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:90,matchSource:'AUTO'}),
  ]});
  const realFind=prisma.invoiceRecord.findMany;
- prisma.invoiceRecord.findMany=async(args)=>{const found=await realFind(args);fixture.rows.find(r=>r.id==='bad').matchScore=100;return found.map(r=>({...r,matchScore:r.id==='bad'?90:r.matchScore}));};
+ prisma.invoiceRecord.findMany=async(args)=>{const found=await realFind(args);Object.assign(fixture.rows.find(r=>r.id==='bad'),{matchScore:100,matchSource:'MANUAL'});return found.map(r=>({...r,matchScore:r.id==='bad'?90:r.matchScore,matchSource:'AUTO'}));};
  const result=await service.rematchAutoInvoiceLinks({apply:true});
  assert.deepEqual(result.changes.map(c=>c.id),['bad']);
  assert.equal(result.kept,1);assert.equal(result.applied,0);assert.equal(result.skipped,1);
- assert.equal(fixture.rows.find(r=>r.id==='bad').matchStatus,'MATCHED','读后被改成人工 100 分：不覆盖');
+ assert.equal(fixture.rows.find(r=>r.id==='bad').matchStatus,'MATCHED','读后被改成人工关联：不覆盖');
 });
 
 test('重配 MOVE：最优合同已被人工发票占满时，自动关联移到次优合同并写入新合同与新分数',async(t)=>{
- const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',...over});
+ const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchSource:'AUTO',...over});
  const fixture=invoiceFixture(t,{contracts:[contract(),contract({id:'c2',contractNo:'CG-SYN-2',totalAmount:40000})],invoices:[
-  link('manual',{matchScore:100}),
+  link('manual',{matchScore:100,matchSource:'MANUAL'}),
   link('mover',{matchScore:90}),
  ]});
  const dry=await service.rematchAutoInvoiceLinks();
  assert.equal(dry.changes.length,1);
  const[change]=dry.changes;
  assert.deepEqual({id:change.id,action:change.action,from:change.fromContractId,fromScore:change.fromScore,to:change.toContractId},{id:'mover',action:'MOVE',from:'c1',fromScore:90,to:'c2'});
- assert.ok(change.toScore>=70&&change.toScore<100,'次优合同分数达阈值但不到 100（否则会被当成人工锁定）');
+ assert.ok(change.toScore>=70,'次优合同分数达阈值');
  assert.equal(fixture.writes.length,0);
  const applied=await service.rematchAutoInvoiceLinks({apply:true});
  assert.equal(applied.applied,1);
  const row=fixture.rows.find(r=>r.id==='mover');
- assert.equal(row.matchedContractId,'c2');assert.equal(row.matchScore,change.toScore);
+ assert.equal(row.matchedContractId,'c2');assert.equal(row.matchScore,change.toScore);assert.equal(row.matchSource,'AUTO','MOVE 后仍是自动关联');
  assert.equal(row.matchStatus,'MATCHED');assert.equal(row.matchedContractType,'PURCHASE');
  assert.equal(fixture.rows.find(r=>r.id==='manual').matchedContractId,'c1','人工关联不动');
  assert.deepEqual((await service.rematchAutoInvoiceLinks({apply:true})).changes,[]);
 });
 
 test('重配 P3-1：销售分更高而保持原采购关联的发票，仍占原采购合同的累计额度',async(t)=>{
- const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:85,...over});
+ const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:85,matchSource:'AUTO',...over});
  const fixture=invoiceFixture(t,{contracts:[contract({totalAmount:40000})],invoices:[link('salesy',{buyer:'合成买家'}),link('other')]});
  prisma.salesContract.findMany=async()=>[{id:'s1',contractNo:'XS-SYN-1',status:'SIGNED',totalAmount:38000,receivedAmount:0,signedAt:new Date('2024-05-21'),packingItems:[{store:{name:'合成买家'}}]}];
  const result=await service.rematchAutoInvoiceLinks({apply:true});
@@ -269,4 +270,33 @@ test('同分排队 P3-3：金额更贴近合同额者先占额度，而不是开
  const{writes}=invoiceFixture(t,{contracts:[contract()],invoices:[invoice('far-early',{total:38030,invDate:'2024-05-25'}),invoice('near-late',{total:38000,invDate:'2024-06-10'})]});
  await service.runAutoMatch();
  assert.deepEqual(writes.map(w=>w.id),['near-late']);
+});
+
+// ---- INVMATCH-5：显式关联来源（matchSource），替代「分数<100 即自动」的推断 ----
+test('重配 INVMATCH-5：以来源而非分数判断——AUTO 满分可重配，MANUAL 低分与来源为空的遗留行都不动',async(t)=>{
+ const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',total:600,sellerTaxId:'91OTHER000000000009',...over});
+ const{rows}=invoiceFixture(t,{contracts:[contract()],invoices:[
+  link('auto-100',{matchScore:100,matchSource:'AUTO'}),
+  link('manual-low',{matchScore:80,matchSource:'MANUAL'}),
+  link('legacy-null',{matchScore:80,matchSource:null}),
+ ]});
+ const result=await service.rematchAutoInvoiceLinks({apply:true});
+ assert.deepEqual(result.changes.map(c=>c.id),['auto-100'],'错税号的自动 100 分关联被解除；人工与遗留行即使同样错也不动');
+ assert.equal(result.autoLinks,1);assert.equal(result.lockedLinks,2);
+ const byId=Object.fromEntries(rows.map(r=>[r.id,r]));
+ assert.equal(byId['auto-100'].matchStatus,'PENDING');assert.equal(byId['auto-100'].matchSource,null);
+ for(const id of['manual-low','legacy-null'])assert.equal(byId[id].matchStatus,'MATCHED');
+});
+
+test('INVMATCH-5：人工关联写 MANUAL；取消关联/忽略清除来源',async(t)=>{
+ const saved={u:prisma.invoiceRecord.update,tx:prisma.$transaction,pc:prisma.purchaseContract.findUnique};
+ t.after(()=>{prisma.invoiceRecord.update=saved.u;prisma.$transaction=saved.tx;prisma.purchaseContract.findUnique=saved.pc;});
+ const writes=[];
+ prisma.invoiceRecord.update=async({data})=>{writes.push(data);return data;};
+ prisma.purchaseContract.findUnique=async()=>({status:'DRAFT'});
+ prisma.$transaction=async(fn)=>fn(prisma);
+ await service.manualMatch('INVOICE','i1','c1','PURCHASE');
+ await service.unmatch('INVOICE','i1');
+ await service.ignore('INVOICE','i1');
+ assert.deepEqual(writes.map(w=>w.matchSource),['MANUAL',null,null]);
 });
