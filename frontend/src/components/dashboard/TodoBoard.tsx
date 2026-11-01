@@ -129,7 +129,9 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   {list.items.length === 0 ? (
-                    <p className="text-muted-foreground">全部处理完毕</p>
+                    !list.historical?.count && (
+                      <p className="text-muted-foreground">全部处理完毕</p>
+                    )
                   ) : (
                     <ul className="space-y-1.5">
                       {list.items.map((item) => (
@@ -169,6 +171,18 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                   >
                     查看全部
                   </Link>
+                  {list.historical && list.historical.count > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      另有 {list.historical.count} 条签约早于{" "}
+                      {list.historical.before} 的历史记录未计入，
+                      <Link
+                        href={meta.all}
+                        className="text-primary hover:underline"
+                      >
+                        查看完整列表
+                      </Link>
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             );
