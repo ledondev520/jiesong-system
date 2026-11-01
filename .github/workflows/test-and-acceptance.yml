@@ -49,9 +49,14 @@ jobs:
         if: steps.gate.outputs.backend_changed == 'false'
         run: node scripts/check-lifecycle.cjs
 
-  frontend-unit:
-    name: Frontend Unit And Coverage
+  # BL-8: 4 片并行跑测试（保持文件隔离），再合并 blob 报告并在合并结果上执行覆盖率门禁。
+  frontend-unit-shard:
+    name: Frontend Unit Shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1/4, 2/4, 3/4, 4/4]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -71,12 +76,57 @@ jobs:
           test ! -L .env
           npm ci
           npm run db:generate
-      # 前端单测每次 push 只跑一遍（带覆盖率）；原 CI 的 Unit Tests 现为下方别名 job。
-      - name: Run frontend unit tests with coverage
-        run: npm run test:coverage
+      # 单片覆盖率不完整，阈值只在合并后的 frontend-unit 判定（此处置 0 避免误报）。
+      - name: Run frontend unit shard
+        working-directory: frontend
+        run: >
+          npx vitest run --coverage --reporter=default --reporter=blob --shard=${{ matrix.shard }}
+          --coverage.reporter=text-summary
+          --coverage.thresholds.statements=0 --coverage.thresholds.lines=0
+          --coverage.thresholds.functions=0 --coverage.thresholds.branches=0
+      - name: Upload shard report
+        uses: actions/upload-artifact@v7
+        with:
+          name: vitest-blob-${{ strategy.job-index }}
+          path: frontend/.vitest-reports/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  # 必过检查名保持 Frontend Unit And Coverage：任一分片失败/取消则本 job 失败（skipped 会被 ruleset 当作通过，故 always()）。
+  frontend-unit:
+    name: Frontend Unit And Coverage
+    runs-on: ubuntu-latest
+    needs: [frontend-unit-shard]
+    if: always()
+    steps:
+      - name: Require all unit shards
+        env:
+          SHARDS_RESULT: ${{ needs.frontend-unit-shard.result }}
+        run: |
+          echo "shards=$SHARDS_RESULT"
+          [ "$SHARDS_RESULT" = success ]
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22.23.4'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Download shard reports
+        uses: actions/download-artifact@v7
+        with:
+          pattern: vitest-blob-*
+          merge-multiple: true
+          path: frontend/.vitest-reports
+      # 合并各片结果与覆盖率，覆盖率阈值（vitest.config.ts）在合并结果上执行。
+      - name: Merge reports and enforce coverage thresholds
+        run: npx vitest --merge-reports --coverage
         working-directory: frontend
       - name: Upload coverage report
-        if: always()
+        if: ${{ !cancelled() && needs.frontend-unit-shard.result == 'success' }}
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
