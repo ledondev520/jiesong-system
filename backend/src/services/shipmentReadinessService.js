@@ -6,6 +6,7 @@
 
 const { getContainerSpec, listContainerTypes, loadContainerConfig } = require('./containerSpecs');
 const { toCartonLines, packContainers, usableMm } = require('./containerPacking');
+const { packContainersAsync } = require('./containerPackingPool');
 
 const toNumber = (value) => {
   const parsed = Number(value);
@@ -149,15 +150,17 @@ const sumTotals = (packingItems) => ({
  * @param {{ packingItems?: object[] }} salesContract
  * @param {{ containerType?: string, utilisationOnly?: boolean }} options
  */
-const buildLoadingPlan = (salesContract, { containerType, utilisationOnly = false } = {}) => {
+const prepareLoadingPlan = (salesContract, { containerType, utilisationOnly = false } = {}) => {
   const config = loadContainerConfig();
   const spec = getContainerSpec(containerType);
   const packingItems = salesContract.packingItems || [];
+  const lines = utilisationOnly ? [] : toCartonLines(packingItems, spec, config);
+  return { config, spec, packingItems, lines };
+};
+
+const assembleLoadingPlan = ({ config, spec, packingItems, lines }, packed) => {
   const totals = sumTotals(packingItems);
   const linesMissingBoxes = packingItems.filter((item) => toNumber(item.boxes) <= 0).length;
-
-  const lines = utilisationOnly ? [] : toCartonLines(packingItems, spec, config);
-  const packed = packContainers(lines, spec, config);
   const plan = {
     algorithm: 'block-ep-v1',
     containerType: spec.code,
@@ -175,12 +178,29 @@ const buildLoadingPlan = (salesContract, { containerType, utilisationOnly = fals
   return { plan: { ...plan, check }, spec, linesMissingBoxes };
 };
 
+const buildLoadingPlan = (salesContract, options = {}) => {
+  const prepared = prepareLoadingPlan(salesContract, options);
+  return assembleLoadingPlan(prepared, packContainers(prepared.lines, prepared.spec, prepared.config));
+};
+
+/** 同 buildLoadingPlan，但排柜在 worker 线程执行；失败/超时 reject（503），调用方不得当作可发运。 */
+const buildLoadingPlanAsync = async (salesContract, options = {}) => {
+  const prepared = prepareLoadingPlan(salesContract, options);
+  const packed = prepared.lines.length === 0
+    ? packContainers(prepared.lines, prepared.spec, prepared.config)
+    : await packContainersAsync(prepared.lines, prepared.spec, prepared.config);
+  return assembleLoadingPlan(prepared, packed);
+};
+
 /**
  * 兼容 salesService / tradeWorkflowService：返回旧字段并附带 check 与 plan。
  * 门槛按单个柜判定：首柜之外的箱都算“没装下”。
  */
-const evaluateShipmentReadiness = (salesContract, options = {}) => {
-  const { plan, spec, linesMissingBoxes } = buildLoadingPlan(salesContract, options);
+const evaluateShipmentReadiness = (salesContract, options = {}) => readinessFromPlan(buildLoadingPlan(salesContract, options));
+const evaluateShipmentReadinessAsync = async (salesContract, options = {}) => (
+  readinessFromPlan(await buildLoadingPlanAsync(salesContract, options))
+);
+function readinessFromPlan({ plan, spec, linesMissingBoxes }) {
   const { check, totals, lines } = plan;
   const util = checkUtilisation(totals, spec, check.thresholdPct);
   const placedBoxCount = plan.containers.reduce((sum, container) => sum + container.cartons, 0);
@@ -205,11 +225,13 @@ const evaluateShipmentReadiness = (salesContract, options = {}) => {
     check,
     plan,
   };
-};
+}
 
 module.exports = {
   checkUtilisation,
   evaluateLoadingCheck,
   buildLoadingPlan,
+  buildLoadingPlanAsync,
   evaluateShipmentReadiness,
+  evaluateShipmentReadinessAsync,
 };
