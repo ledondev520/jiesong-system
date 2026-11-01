@@ -95,11 +95,21 @@ test('registered resource lifecycle matrix over HTTP, private SQLite and singlet
     { userId: user.id },
     process.env.JWT_SECRET,
   );
-  const app = require('../app');
-  server = await new Promise((resolve) => {
-    const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
-  });
-  const base = `http://127.0.0.1:${server.address().port}`;
+  let base;
+  // A fresh app (and so a fresh real 100/min limiter) per resource avoids waiting out one shared window;
+  // routers and the Prisma singleton stay cached. The pacing in `call` remains the fallback.
+  const startFreshApp = async () => {
+    if (server) {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+    delete require.cache[require.resolve('../app')];
+    const app = require('../app');
+    server = await new Promise((resolve) => {
+      const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
+    });
+    base = `http://127.0.0.1:${server.address().port}`;
+  };
   const call = async (method, route, body) => {
     const requestId = `synthetic-catalogue-${++sequence}`;
     const response = await fetch(base + route, {
@@ -183,6 +193,7 @@ test('registered resource lifecycle matrix over HTTP, private SQLite and singlet
   } = require('../lifecycle/runSingletonConfigMatrix');
   for (const resource of resources.filter((entry) => entry.kind !== 'action')) {
     await t.test(resource.id, async (t) => {
+      await startFreshApp();
       const singleton = resource.kind === 'singleton-config';
       if (singleton) {
         assert.equal(resource.matrix.adapter, 'pricing-config-file');
