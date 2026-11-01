@@ -9,8 +9,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const vm = require('node:vm');
-const { execFileSync } = require('node:child_process');
 const { PrismaClient } = require('@prisma/client');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 test('历史CSV导入遵守当前唯一键并按行回滚失败写入', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-import-'));
@@ -20,10 +20,7 @@ test('历史CSV导入遵守当前唯一键并按行回滚失败写入', async (t
   const root = path.resolve(__dirname, '../..');
   let db;
   try {
-    const ddl = execFileSync(path.join(root, 'node_modules/.bin/prisma'), [
-      'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.join(root, 'prisma/schema.prisma'), '--script',
-    ], { env: { ...process.env, DATABASE_URL: databaseUrl }, encoding: 'utf8' });
-    execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbPath], { input: ddl });
+    copyTemplate('schema', dbPath);
     db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
     const module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(require.resolve('./importService'), 'utf8'), {

@@ -9,9 +9,10 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
-const { execFileSync, spawn } = require('node:child_process');
+const { spawn } = require('node:child_process');
 const { PrismaClient } = require('@prisma/client');
 const { ensureWalJournal } = require('../utils/sqliteConcurrency');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 const BACKEND_ROOT = path.resolve(__dirname, '../..');
 const SCHEMA_PATH = path.join(BACKEND_ROOT, 'prisma', 'schema.prisma');
@@ -21,10 +22,7 @@ const createTempDatabase = (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-wal-'));
   fs.chmodSync(dir, 0o700);
   const dbPath = path.join(dir, 'test.db');
-  const ddl = execFileSync(PRISMA_BIN, ['migrate', 'diff', '--from-empty', '--to-schema-datamodel', SCHEMA_PATH, '--script'], {
-    cwd: BACKEND_ROOT, env: { ...process.env, DATABASE_URL: `file:${dbPath}` }, encoding: 'utf8',
-  });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbPath], { input: ddl });
+  copyTemplate('schema', dbPath);
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return { dbPath, url: `file:${dbPath}` };
 };

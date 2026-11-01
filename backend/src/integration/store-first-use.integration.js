@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 test('HTTP/SQLite: SALES creates the first store and uses it on a contract without widening RBAC', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-store-first-use-'));
@@ -20,11 +20,7 @@ test('HTTP/SQLite: SALES creates the first store and uses it on a contract witho
     if (db) await db.$disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
   });
-  const ddl = execFileSync(process.execPath, [
-    require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty',
-    '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script',
-  ], { encoding: 'utf8', timeout: 30000 });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', database], { input: ddl });
+  copyTemplate('schema', database);
   fs.chmodSync(database, 0o600);
   db = require('../utils/prisma');
   const jwt = require('jsonwebtoken');

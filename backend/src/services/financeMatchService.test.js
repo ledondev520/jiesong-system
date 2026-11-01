@@ -2,6 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const prisma=require('../utils/prisma');
 const service=require('./financeMatchService');
+const {VALID_INVOICE_WHERE}=require('./invoiceRecordService');
 test('未匹配分页与总数共享搜索条件，可达第二页历史记录',async(t)=>{
  const bank={findMany:prisma.bankTransaction.findMany,count:prisma.bankTransaction.count};
  const invoice={findMany:prisma.invoiceRecord.findMany,count:prisma.invoiceRecord.count};
@@ -75,4 +76,50 @@ test('合同选择器按用途划分：付款匹配不含草稿，发票关联�
  assert.deepEqual(wheres[2].NOT,{status:'CANCELLED'});
  assert.equal(Object.hasOwn(wheres[2],'status'),false);
  assert.deepEqual(wheres[3].NOT,{status:'CANCELLED'});
+});
+
+test('待匹配发票/流水不设条数上限：旧 take 500 会让更早的未达阈值记录永远排不进窗口',async(t)=>{
+ const bank=prisma.bankTransaction.findMany;
+ const invoice=prisma.invoiceRecord.findMany;
+ t.after(()=>{prisma.bankTransaction.findMany=bank;prisma.invoiceRecord.findMany=invoice;});
+ const calls=[];
+ prisma.bankTransaction.findMany=async(args)=>{calls.push(args);return[];};
+ prisma.invoiceRecord.findMany=async(args)=>{calls.push(args);return[];};
+ await service.loadPendingBankTxns();
+ await service.loadPendingInvoices();
+ assert.equal(calls.length,2);
+ for(const args of calls){
+  assert.equal(args.take,undefined);
+  assert.equal(args.where.matchStatus,'PENDING');
+ }
+});
+
+test('自动关联只取有效发票：已红冲与负数发票不是候选，条件与共享口径一致',async(t)=>{
+ const invoice=prisma.invoiceRecord.findMany;
+ t.after(()=>{prisma.invoiceRecord.findMany=invoice;});
+ let where;
+ prisma.invoiceRecord.findMany=async(args)=>{where=args.where;return[];};
+ await service.loadPendingInvoices();
+ assert.deepEqual(where,{matchStatus:'PENDING',status:'正常',isPositive:'是'});
+ assert.deepEqual({...VALID_INVOICE_WHERE},{status:'正常',isPositive:'是'});
+});
+
+test('自动匹配写银行流水时只改仍为 PENDING 的行；运行后相似度缓存已释放，重复运行结果一致',async(t)=>{
+ const saved={bf:prisma.bankTransaction.findMany,bu:prisma.bankTransaction.updateMany,i:prisma.invoiceRecord.findMany,p:prisma.purchaseContract.findMany,s:prisma.salesContract.findMany};
+ t.after(()=>{prisma.bankTransaction.findMany=saved.bf;prisma.bankTransaction.updateMany=saved.bu;prisma.invoiceRecord.findMany=saved.i;prisma.purchaseContract.findMany=saved.p;prisma.salesContract.findMany=saved.s;});
+ const txn={id:'t1',counterpart:'合成供应商甲',direction:'OUT',amount:100,currency:'CNY',summary:'货款',txnDate:'2026-01-05'};
+ prisma.bankTransaction.findMany=async()=>[txn];
+ prisma.invoiceRecord.findMany=async()=>[];
+ prisma.salesContract.findMany=async()=>[];
+ prisma.purchaseContract.findMany=async()=>[{id:'c1',status:'SIGNED',totalAmount:100,paidAmount:0,signedAt:new Date('2026-01-01'),supplier:{name:'合成供应商甲'}}];
+ const wheres=[];
+ let count=0;
+ prisma.bankTransaction.updateMany=async(args)=>{wheres.push(args.where);return{count};};
+ const lost=await service.runAutoMatch();
+ assert.equal(lost.bankMatched,0,'被人工处理过的行（updateMany 命中 0）不算自动关联');
+ assert.deepEqual(wheres[0],{id:'t1',matchStatus:'PENDING'});
+ count=1;
+ const won=await service.runAutoMatch();
+ assert.equal(won.bankMatched,1);
+ assert.equal(won.details.bank[0].score,lost.details.bank[0].score);
 });

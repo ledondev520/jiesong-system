@@ -14,6 +14,7 @@ const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 const BACKEND_ROOT = path.resolve(__dirname, '../..');
 const SCHEMA_PATH = path.join(BACKEND_ROOT, 'prisma', 'schema.prisma');
@@ -30,12 +31,7 @@ function createTempDatabase(t, prefix) {
   const dbPath = path.join(tempDir, 'test.db');
   const databaseUrl = `file:${dbPath}`;
   // 仅从 schema 生成空结构，绝不运行 db push 或连接已有业务库。
-  const ddl = execFileSync(PRISMA_BIN, ['migrate', 'diff', '--from-empty', '--to-schema-datamodel', SCHEMA_PATH, '--script'], {
-    cwd: BACKEND_ROOT,
-    env: { ...process.env, DATABASE_URL: databaseUrl },
-    encoding: 'utf8',
-  });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbPath], { input: ddl });
+  copyTemplate('schema', dbPath);
   fs.chmodSync(dbPath, 0o600);
 
   t.after(() => {

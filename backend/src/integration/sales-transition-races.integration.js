@@ -8,9 +8,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { fork, execFileSync } = require('node:child_process');
+const { fork } = require('node:child_process');
 const { PrismaClient } = require('@prisma/client');
 const jwt = require('jsonwebtoken');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invariants', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-sales-transition-races-'));
@@ -18,8 +19,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
   const dbFile = path.join(directory, 'synthetic.db');
   const secret = 'test-only-sales-races-secret-never-production';
   const env = { ...process.env, DATABASE_URL: `file:${dbFile}`, UPLOAD_DIR: path.join(directory, 'uploads'), NODE_ENV: 'test', JWT_SECRET: secret };
-  const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { env, encoding: 'utf8', timeout: 30000 });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbFile], { input: ddl });
+  copyTemplate('schema', dbFile);
   fs.chmodSync(dbFile, 0o600);
   const db = new PrismaClient({ datasources: { db: { url: env.DATABASE_URL } } });
   const workers = [];

@@ -51,6 +51,7 @@ describe('patrolService', () => {
 });
 
 const vm = require('node:vm');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 const loadPatrol = (prisma, finance = {}) => {
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync(require.resolve('./patrolService'), 'utf8'), {
@@ -116,7 +117,6 @@ it('业务查询失败仍产生独立巡检失败告警，不掩盖故障', asyn
 });
 
 it('真实Prisma空库验证销售巡检与通知去重，不触碰业务数据库', async () => {
-  const { execFileSync } = require('node:child_process');
   const { PrismaClient } = require('@prisma/client');
   const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'jiesong-patrol-'));
   fs.chmodSync(dir, 0o700);
@@ -125,10 +125,7 @@ it('真实Prisma空库验证销售巡检与通知去重，不触碰业务数据�
   const root = path.resolve(__dirname, '../..');
   let db;
   try {
-    const ddl = execFileSync(path.join(root, 'node_modules/.bin/prisma'), [
-      'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.join(root, 'prisma/schema.prisma'), '--script',
-    ], { env: { ...process.env, DATABASE_URL: databaseUrl }, encoding: 'utf8' });
-    execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbPath], { input: ddl });
+    copyTemplate('schema', dbPath);
     db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
     const finance = { exports: {} };
     vm.runInNewContext(fs.readFileSync(require.resolve('./financeService'), 'utf8'), {

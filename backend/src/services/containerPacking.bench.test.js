@@ -1,7 +1,7 @@
 /**
  * Input: 确定性种子基准（300 / 1000 种互不相同箱规）
  * Output: 全部箱装下（correctness）+ 宽松耗时上限；CI 环境放宽，避免共享 runner 抖动
- * Pos: 排柜性能回归；数值基线与对比见 handoff/CONTAINER-PERF-*.md，本地跑 scripts/bench-container-packing.js
+ * Pos: 排柜性能回归（300 行用例；1000 行用例在 containerPacking.bench.js，opt-in）；数值基线与对比见 handoff/CONTAINER-PERF-*.md，本地跑 scripts/bench-container-packing.js
  */
 
 const test = require('node:test');
@@ -35,23 +35,11 @@ test('300 种箱规、1327 箱：全部装下（2 柜），不再耗尽预算', 
   assert.ok(ms < LIMIT_MS, `took ${ms} ms`);
 });
 
-for (const maxQty of [2, 3]) {
-  test(`1000 种箱规（每行最多 ${maxQty} 箱）：全部装下，不触发 compute-budget`, (t) => {
-    const { plan, ms } = timed(makeBenchContract(1000, { maxQty }));
-    t.diagnostic(JSON.stringify({ case: `1000:${maxQty}`, ms: Math.round(ms), placed: placedOf(plan), containers: plan.containers.length }));
-    assert.equal(placedOf(plan), plan.totals.cartons);
-    assert.deepEqual(plan.unplaced, []);
-    assert.ok(ms < 4000 * CI_FACTOR, `took ${ms} ms`);
-  });
-}
-
-// 直接对 packContainers：随机大箱（多柜）与缩放到约 46 CBM（单柜量级）两类，行数越多越考验候选剪枝。
+// 直接对 packContainers：300 行用例；1000 行用例见 containerPacking.bench.js（npm run test:bench）。
 const spec = getContainerSpec();
 const config = loadContainerConfig();
 const CASES = [
   { name: '300×2 over', lines: () => makeOrderLines(300, 2), limitMs: 1500 },
-  { name: '1000×2 over', lines: () => makeOrderLines(1000, 2), limitMs: 4000 },
-  { name: '1000×2 fit', lines: () => makeOrderLines(1000, 2, { fitCbm: 46 }), limitMs: 6000 },
 ];
 for (const { name, lines, limitMs } of CASES) {
   test(`${name}：全部箱装下且不触发 compute-budget`, (t) => {
