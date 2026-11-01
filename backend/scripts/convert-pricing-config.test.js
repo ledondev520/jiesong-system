@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { convertPricingConfig } = require('./convert-pricing-config');
+const { convertPricingConfig, roundSpotRate } = require('./convert-pricing-config');
 const { priceFor } = require('../src/services/exportPricing');
 
 const oldTiered = { mode: 'tiered', exchangeAdjustment: -0.2, refundableMarkup: 0.3, noRefundMarkup: 0.1, multiplier: 1.3 };
@@ -65,4 +65,16 @@ test('CLI：dry-run 不写文件；--confirm 先备份(0600)再原子替换，�
   assert.equal(fs.statSync(path.join(backups, backup)).mode & 0o777, 0o600);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(backups, backup))), oldTiered);
   assert.match(run('--confirm', '--backup-dir', backups).stdout, /无需转换/);
+});
+
+test('--spot-rate 与 FX 同步一样四舍五入到 2 位小数后写入', (t) => {
+  assert.equal(roundSpotRate(6.7249), 6.72);
+  assert.equal(roundSpotRate(6.725), 6.73);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pricing-convert-'));
+  t.after(() => fs.rmSync(dir, { recursive: true }));
+  const file = path.join(dir, 'pricing.json');
+  fs.writeFileSync(file, JSON.stringify(oldTiered), { mode: 0o600 });
+  const dry = spawnSync('node', [script, '--file', file, '--spot-rate', '6.7249'], { encoding: 'utf8' });
+  assert.equal(dry.status, 0);
+  assert.match(dry.stdout, /"exchangeRate": 6\.72,/);
 });
