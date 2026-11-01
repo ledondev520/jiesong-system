@@ -11,6 +11,8 @@
  *   toLoad / toShip   出口合同 CONFIRMED（待装柜）/ PACKING（待发运）
  *   missingInvoice    货已出（SHIPPED/RECEIVED/COMPLETED）、未登记发票号且没有有效的已关联（MATCHED/PURCHASE，正常且非红冲）发票记录的采购合同
  *   overdueReceivables 沿用 financeService.getOverdueReceivables
+ *   paymentsDue / missingInvoice 仅首页口径：只计 signedAt 不早于 DASHBOARD_TODO_CUTOFF 的合同（signedAt 为空视为当前，不隐藏），
+ *                     更早的历史合同只给出 historical.count；不写库，应付页面（payablesService）口径不变
  *   refundable        退税单 DRAFT 且单证匹配 passed
  *   quotesToSend      报价 DRAFT（待发送）；quotesAwaitingCustomer 报价 SENT（待客户确认）；仅 SALES/ADMIN
  */
@@ -22,6 +24,17 @@ const { roundMoney } = require('../utils/money');
 const { isStockCovered } = require('../utils/stockAllocation');
 
 const TOP = 5;
+// 决策 A（BL-1d）：首页「待付款/缺进项发票」只计该日期（UTC 零点）及之后签约的合同；改日期只改这一处。
+const DASHBOARD_TODO_CUTOFF = new Date('2026-01-01T00:00:00.000Z');
+const isCurrent = (r) => !r.signedAt || r.signedAt >= DASHBOARD_TODO_CUTOFF;
+// 把候选拆成「计入」与「历史未计入」，历史只返回条数和截止日期，让首页能链到完整列表。
+const withHistorical = (rows, build) => {
+  const current = rows.filter(isCurrent);
+  return {
+    ...asList(current.length, build(current)),
+    historical: { count: rows.length - current.length, before: DASHBOARD_TODO_CUTOFF.toISOString().slice(0, 10) },
+  };
+};
 // shortcut: CONFIRMED orders are scanned oldest-first up to this cap (count undercounts beyond it); upgrade to SQL NOT EXISTS if volumes reach it.
 const CONFIRMED_SCAN_CAP = 500;
 const { ADMIN, BOSS, PURCHASE, SALES, FINANCE, WAREHOUSE } = ROLES;
@@ -69,12 +82,11 @@ const LISTS = {
     async load(db) {
       const rows = (await db.purchaseContract.findMany({
         where: payableWhere(),
-        select: { ...PAYABLE_SELECT, contractNo: true, supplier: { select: { name: true } } },
+        select: { ...PAYABLE_SELECT, contractNo: true, signedAt: true, supplier: { select: { name: true } } },
       }))
         .map((r) => ({ ...r, outstanding: outstandingOf(r) }))
         .filter((r) => r.outstanding > 0);
-      const mapped = rows.map((r) => item(r.id, r.contractNo, r.supplier?.name, r.outstanding, r.expectedDate)).sort(byDateAsc);
-      return asList(mapped.length, mapped);
+      return withHistorical(rows, (list) => list.map((r) => item(r.id, r.contractNo, r.supplier?.name, r.outstanding, r.expectedDate)).sort(byDateAsc));
     },
   },
   receiptsToInspect: {
@@ -99,12 +111,12 @@ const LISTS = {
       const candidates = (await db.purchaseContract.findMany({
         where: { status: { in: [PURCHASE_STATUS.SHIPPED, PURCHASE_STATUS.RECEIVED, PURCHASE_STATUS.COMPLETED] } },
         orderBy: { updatedAt: 'desc' },
-        select: { id: true, contractNo: true, invoiceNo: true, totalAmount: true, supplier: { select: { name: true } } },
+        select: { id: true, contractNo: true, invoiceNo: true, totalAmount: true, signedAt: true, supplier: { select: { name: true } } },
       })).filter((r) => !String(r.invoiceNo || '').trim());
       // 发票关联引擎已把有效发票记录对上合同时，同样算已开票（invoiceNo 只在手工登记时才有）。
       const matched = await findInvoicedPurchaseContractIds(db, candidates.map((r) => r.id));
       const rows = candidates.filter((r) => !matched.has(r.id));
-      return asList(rows.length, rows.map((r) => item(r.id, r.contractNo, r.supplier?.name, r.totalAmount, null)));
+      return withHistorical(rows, (list) => list.map((r) => item(r.id, r.contractNo, r.supplier?.name, r.totalAmount, null)));
     },
   },
   overdueReceivables: {
@@ -176,4 +188,4 @@ async function getDashboardTodos(role, { db = prisma, now = new Date() } = {}) {
   return { role, lists, ...(role === BOSS ? { figures: await loadBossFigures(db, now) } : {}) };
 }
 
-module.exports = { getDashboardTodos, LISTS };
+module.exports = { getDashboardTodos, LISTS, DASHBOARD_TODO_CUTOFF };
