@@ -91,7 +91,7 @@ router.get('/', async (req, res, next) => {
     const { keyword, code, page, pageSize } = req.query;
     const useFuzzy = req.query.fuzzy === 'true' && (keyword || code);
     const results = useFuzzy
-      ? await hsCodeService.fuzzySearchHsCodes({ keyword, code, page, pageSize })
+      ? await hsCodeService.fuzzySearchHsCodes({ keyword, code, page, pageSize, expandAliases: true })
       : await hsCodeService.listHsCodes({ keyword, code, page, pageSize });
     success(res, results);
   } catch (error) {
