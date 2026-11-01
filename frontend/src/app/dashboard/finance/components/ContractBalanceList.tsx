@@ -14,11 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { PurchaseSubStatus } from "@/components/purchase/PurchaseSubStatus";
 import { describeFailure } from "@/lib/error-reason";
 import { formatMoney } from "@/lib/format";
 import { useLatestRequest } from "@/lib/hooks/useLatestRequest";
 import { financeService } from "@/services/finance.service";
-import { PaymentType } from "@/types";
+import { PaymentType, type PurchaseSubStatus as SubStatus } from "@/types";
 import { PaymentDialog, type PaymentSubmitData } from "./PaymentDialog";
 
 export interface BalanceRow {
@@ -32,6 +33,8 @@ export interface BalanceRow {
   unreceiveAmount?: number;
   supplier?: { id: string; name: string };
   stores?: string[];
+  /** 仅应付行：后端派生的付款/到货/生产资料子状态 */
+  subStatus?: SubStatus;
 }
 
 const KIND = {
@@ -181,7 +184,15 @@ export function ContractBalanceList({
     {
       key: "status",
       header: "状态",
-      cell: (row) => <StatusBadge status={row.status} />,
+      cell: (row) =>
+        kind === "payable" ? (
+          <div className="flex flex-col items-start gap-1">
+            <StatusBadge status={row.status} domain="purchaseContract" />
+            <PurchaseSubStatus status={row.status} subStatus={row.subStatus} />
+          </div>
+        ) : (
+          <StatusBadge status={row.status} />
+        ),
     },
     {
       key: "total",

@@ -175,8 +175,11 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   assert.equal(admin.lists.missingInvoice.historical.count, 1);
   assert.equal(admin.lists.overdueReceivables.count, 1);
   assert.equal(admin.lists.overdueReceivables.items[0].amount, 1000);
-  assert.equal(admin.lists.refundable.count, 1);
-  assert.equal(admin.lists.refundable.items[0].contractNo, "SYN-R-1");
+  // 与退税工作台同源：首页两个数字必须逐项等于工作台汇总（本夹具无自有装箱行，工作台为 0/0）。
+  const workbench = await require("../services/taxRefundWorkbenchService").getTaxRefundWorkbench({ filingMonth: new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 7), pageSize: 100 }, db);
+  assert.equal(admin.lists.refundable.count, workbench.summary.materialReadyCount);
+  assert.equal(admin.lists.refundable.count, 0);
+  assert.deepEqual(admin.lists.refundable.pending, { count: workbench.summary.contracts, label: "待处理出口" });
 
   assert.deepEqual(keys(await todos("PURCHASE")), ["ordersToPurchase", "paymentsDue", "receiptsToInspect"]);
   assert.deepEqual(keys(await todos("SALES")), ["overdueReceivables", "quotesAwaitingCustomer", "quotesToSend", "toLoad", "toShip"]);

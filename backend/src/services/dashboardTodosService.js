@@ -13,7 +13,7 @@
  *   overdueReceivables 沿用 financeService.getOverdueReceivables
  *   paymentsDue / missingInvoice 仅首页口径：只计 signedAt 不早于 DASHBOARD_TODO_CUTOFF 的合同（signedAt 为空视为当前，不隐藏），
  *                     更早的历史合同只给出 historical.count；不写库，应付页面（payablesService）口径不变
- *   refundable        退税单 DRAFT 且单证匹配 passed
+ *   refundable        退税工作台（上海当月申报月份）里材料核验通过的出口；pending 为工作台「待处理出口」总数，两个数字都取自工作台同一次汇总
  *   quotesToSend      报价 DRAFT（待发送）；quotesAwaitingCustomer 报价 SENT（待客户确认）；仅 SALES/ADMIN
  */
 const prisma = require('../utils/prisma');
@@ -131,16 +131,17 @@ const LISTS = {
   },
   refundable: {
     label: '可申报退税', roles: [FINANCE, ADMIN],
-    async load(db) {
-      const where = { status: 'DRAFT', match_status: 'passed' };
-      const [count, rows] = await Promise.all([
-        db.taxRefund.count({ where }),
-        db.taxRefund.findMany({
-          where, take: TOP, orderBy: { createdAt: 'asc' },
-          select: { id: true, refundNo: true, refundableAmount: true, createdAt: true },
-        }),
-      ]);
-      return asList(count, rows.map((r) => item(r.id, r.refundNo, null, r.refundableAmount, r.createdAt)));
+    async load(db, now) {
+      // 与退税工作台同源：同一服务、同一申报月份（上海当月，页面默认值）。count = 材料核验通过的出口，pending = 工作台「待处理出口」。
+      // shortcut: 每次打开首页都会跑一遍工作台汇总（含发票核验）；慢了就缓存或拆出只数不核验的汇总。
+      const { getTaxRefundWorkbench } = require('./taxRefundWorkbenchService');
+      const filingMonth = new Date(now.getTime() + 8 * 3600000).toISOString().slice(0, 7);
+      const workbench = await getTaxRefundWorkbench({ filingMonth, pageSize: 100 }, db);
+      const ready = workbench.items.filter((r) => r.materialReady);
+      return {
+        ...asList(workbench.summary.materialReadyCount, ready.map((r) => item(r.salesContractId, r.contractNo, null, null, r.shippedAt))),
+        pending: { count: workbench.summary.contracts, label: '待处理出口' },
+      };
     },
   },
 };
