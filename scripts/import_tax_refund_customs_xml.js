@@ -147,9 +147,20 @@ function xmlBlocks(xml, tagName) {
   return Array.from(String(xml).matchAll(pattern), (match) => match[1]);
 }
 
+// Repeat until stable so nested fragments like "<<b>script>" cannot reassemble into a tag.
+function stripTags(value) {
+  let previous;
+  let current = value;
+  do {
+    previous = current;
+    current = current.replace(/<[^>]+>/g, '');
+  } while (current !== previous);
+  return current;
+}
+
 function xmlText(xml, tagName) {
   const full = new RegExp(`<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)</${tagName}>`, 'i').exec(xml);
-  if (full) return decodeXmlEntities(full[1].replace(/<[^>]+>/g, ''));
+  if (full) return decodeXmlEntities(stripTags(full[1]));
   const empty = new RegExp(`<${tagName}(?:\\s[^>]*)?\\s*/>`, 'i').exec(xml);
   return empty ? '' : null;
 }

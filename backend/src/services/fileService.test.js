@@ -531,3 +531,40 @@ test('deleteFileRecord: 已关联核对历史的船司原件禁止删除', async
   });
   assert.equal(deleteCalls, 0);
 });
+
+test('createFile: description/category 为数组或对象时 400，不写库且清理当前上传', async () => {
+  for (const [field, bad] of [['description', ['a', 'b']], ['description', { x: 1 }], ['category', ['OTHER']], ['category', { x: 1 }]]) {
+    const directory = fs.mkdtempSync(path.join(testUploadRoot, 'upload-type-'));
+    const current = path.join(directory, 'current.pdf');
+    fs.writeFileSync(current, '%PDF synthetic new upload');
+    let persisted = 0;
+    try {
+      await withMockDelegates({
+        purchaseContract: { findUnique: async () => ({ id: 'purchase-1' }) },
+        contractFile: { create: async () => { persisted++; return {}; } },
+      }, async () => {
+        await assert.rejects(() => fileService.createFile('purchase-1', 'PURCHASE', {
+          originalname: 'current.pdf', path: current, mimetype: 'application/pdf', size: 25,
+        }, field === 'description' ? bad : null, field === 'category' ? bad : 'OTHER'), error => error.statusCode === 400);
+      });
+      assert.equal(persisted, 0);
+      assert.equal(fs.existsSync(current), false);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
+
+test('archiveBufferFile: description 为数组时 400 且不落盘', async () => {
+  let persisted = 0;
+  await assert.rejects(() => fileService.archiveBufferFile({
+    contractId: 'sales-1',
+    contractType: 'SALES',
+    buffer: Buffer.from('%PDF x'),
+    fileName: 'a.pdf',
+    mimeType: 'application/pdf',
+    description: ['a'],
+    prismaClient: { salesContractFile: { findFirst: async () => null, create: async () => { persisted++; } } },
+  }), error => error.statusCode === 400);
+  assert.equal(persisted, 0);
+});
