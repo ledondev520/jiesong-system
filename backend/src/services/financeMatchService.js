@@ -34,8 +34,8 @@ const DATE_MATCH_WINDOW_DAYS = 30; // 日期匹配窗口
 // 发票→采购合同的硬性护栏（INVMATCH-4，修复 prod 回填后审计出的错链）：
 const INVOICE_EARLY_DAYS = 30; // 发票早于签约超过 30 天不关联，与 scoreDate「早于 30 天基本不可能」同口径
 const INVOICE_CAP_TOLERANCE = AMOUNT_LOOSE_TOLERANCE; // 关联发票累计额（含本张）上限 = 合同额 × (1+1%) + 0.01，容忍税差/凑整
-// manualMatch 固定写 100；自动也可能打满 100，二者无法区分，批量重配一律视为人工锁定、不动。
-const LOCKED_SCORE = 100;
+// 发票关联来源（InvoiceRecord.matchSource）：批量重配只动 AUTO；MANUAL 与 null（迁移前遗留）一律锁定不动。
+const MATCH_SOURCE = { AUTO: 'AUTO', MANUAL: 'MANUAL' };
 const PURCHASE_KEYWORDS = ['货款', '采购', '购货', '材料款', '设备款', '商品款'];
 
 // ==================== 字符串工具 ====================
@@ -521,6 +521,7 @@ async function runAutoMatchOnce() {
           matchedContractId: best.contract.id,
           matchedContractType: contractType,
           matchScore: best.score,
+          matchSource: MATCH_SOURCE.AUTO,
           matchStatus: MATCH_STATUS.MATCHED,
           matchedAt: new Date(),
         },
@@ -561,9 +562,9 @@ async function runAutoMatchOnce() {
 
 /**
  * 职责：按当前规则重配「自动」采购发票关联（默认只出报告；apply 才写库）
- * 范围：MATCHED + PURCHASE + 有效 + matchScore<100 的发票。人工关联（固定 100）、100 分、销售、已忽略、待匹配行一律不动，
+ * 范围：MATCHED + PURCHASE + 有效 + matchSource=AUTO 的发票。MANUAL、来源为空、销售、已忽略、待匹配行一律不动，
  *       但已锁定行的金额计入合同累计额基线。结果是纯函数式的：自动关联集合和锁定集合不变时，再跑一次计划为空（幂等）。
- * 写入：逐行带乐观条件（仍 MATCHED、同合同、同分数），期间被人工改动的行跳过；解除的行回到 PENDING，与 unmatch 一致。
+ * 写入：逐行带乐观条件（仍 MATCHED、AUTO、同合同、同分数），期间被人工改动的行跳过；解除的行回到 PENDING，与 unmatch 一致。
  */
 async function rematchAutoInvoiceLinks({ apply = false } = {}) {
   similarityCache = new Map();
@@ -576,7 +577,7 @@ async function rematchAutoInvoiceLinks({ apply = false } = {}) {
       loadPurchaseContracts(MATCH_PURPOSE.INVOICE),
       loadSalesContracts(),
     ]);
-    const isAuto = (r) => r.matchScore != null && r.matchScore < LOCKED_SCORE;
+    const isAuto = (r) => r.matchSource === MATCH_SOURCE.AUTO;
     const auto = rows.filter(isAuto);
     const lockedTotals = new Map();
     for (const r of rows.filter((x) => !isAuto(x))) {
@@ -610,9 +611,9 @@ async function rematchAutoInvoiceLinks({ apply = false } = {}) {
         for (const change of changes) {
           const data = change.toContractId
             ? { matchedContractId: change.toContractId, matchScore: change.toScore, matchedAt: new Date() }
-            : { matchedContractId: null, matchedContractType: null, matchScore: null, matchStatus: MATCH_STATUS.PENDING, matchedAt: null };
+            : { matchedContractId: null, matchedContractType: null, matchScore: null, matchSource: null, matchStatus: MATCH_STATUS.PENDING, matchedAt: null };
           const result = await tx.invoiceRecord.updateMany({
-            where: { id: change.id, matchStatus: MATCH_STATUS.MATCHED, matchedContractId: change.fromContractId, matchScore: change.fromScore },
+            where: { id: change.id, matchStatus: MATCH_STATUS.MATCHED, matchSource: MATCH_SOURCE.AUTO, matchedContractId: change.fromContractId, matchScore: change.fromScore },
             data,
           });
           if (result.count === 1) applied += 1; else skipped += 1;
@@ -694,6 +695,7 @@ async function manualMatch(entityType, entityId, contractId, contractType) {
           matchedContractId: contractId,
           matchedContractType: contractType,
           matchScore: 100,
+          matchSource: MATCH_SOURCE.MANUAL,
           matchStatus: MATCH_STATUS.MATCHED,
           matchedAt: new Date(),
         },
@@ -729,6 +731,7 @@ async function unmatch(entityType, entityId) {
       matchedContractId: null,
       matchedContractType: null,
       matchScore: null,
+      ...(entityType === 'BANK' ? {} : { matchSource: null }),
       matchStatus: MATCH_STATUS.PENDING,
       matchedAt: null,
     },
@@ -749,6 +752,7 @@ async function ignore(entityType, entityId) {
       matchedContractId: null,
       matchedContractType: null,
       matchScore: null,
+      ...(entityType === 'BANK' ? {} : { matchSource: null }),
       matchStatus: MATCH_STATUS.IGNORED,
       matchedAt: null,
     },

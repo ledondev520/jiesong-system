@@ -1513,6 +1513,7 @@ model InvoiceRecord {
   matchedContractId   String?
   matchedContractType String? // PURCHASE / SALES
   matchScore          Float?
+  matchSource         String? // AUTO / MANUAL；仅 MATCHED 时有值，批量重配只动 AUTO
   matchStatus         String    @default("PENDING") // PENDING / MATCHED / IGNORED
   matchedAt           DateTime?
   createdAt           DateTime  @default(now())

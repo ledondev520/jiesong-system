@@ -6,7 +6,7 @@
  * Prerequisite: private SQLite, and for --apply a private backup directory + Python3 online backup. Dry-run (default) changes no business rows (Prisma still opens the SQLite file read-write, so -wal/-shm may be touched).
  * If the summary shows skipped > 0 (rows changed concurrently), run the dry run again: the plan assumed those rows moved, so kept rows may sit over the cap until then.
  * Capacity is counted at planning time, so a row lost at write still used its share this run (safe: under-links; the next run corrects it).
- * Never reads .env: DATABASE_URL comes only from --database. Manual links (score 100) are never touched; running twice gives the same result.
+ * Never reads .env: DATABASE_URL comes only from --database. Only matchSource=AUTO links are re-matched (MANUAL and unset sources are never touched); running twice gives the same result.
  */
 const fs = require('node:fs');
 const path = require('node:path');
