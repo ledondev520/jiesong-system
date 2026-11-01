@@ -56,6 +56,19 @@ describe("splitRemark", () => {
     expect(result.source).toEqual([id]);
   });
 
+  it("系统生成的退税备注：关联单据句整体移走，不留「关联报关单 、」残句", () => {
+    const a = "cmvxvuhwm000lx4qjdfunecqm";
+    const b = "cmvxvurlt000legdprr0zqq38";
+    const note = `预计值：按采购含税成本还原，最终以供应商发票、报关单和税务系统确认为准。关联报关单 ${a}、核销单 ${b}`;
+    const result = splitRemark(note);
+    expect(result.text).toBe(
+      "预计值：按采购含税成本还原，最终以供应商发票、报关单和税务系统确认为准。",
+    );
+    expect(result.text).not.toContain(a);
+    expect(result.source.join(" ")).toContain(a);
+    expect(result.source.join(" ")).toContain(b);
+  });
+
   it("正常文字里的 a=b、小写方括号不误伤", () => {
     const note = "单价 a=b，见[附件]与 [note_1]";
     expect(splitRemark(note)).toEqual({ text: note, source: [] });

@@ -13,6 +13,9 @@ const TRACE_PAIR =
   /\b(?:sha256|xml_ht_no|target_contract|business_confirmed_mapping)=\S*/g;
 // Prisma cuid（c + 24 位小写字母数字）是内部单据 ID，用户看不懂也无需看到。
 const INTERNAL_ID = /\bc[a-z0-9]{24}\b/g;
+// 系统生成备注里的「关联报关单 <id>、核销单 <id>」整句移走，避免剩下「关联报关单 、」的残句。
+const INTERNAL_REF =
+  /(?:关联)?[\u4e00-\u9fa5]{1,6}单\s*c[a-z0-9]{24}(?:\s*[、，,]\s*(?=[\u4e00-\u9fa5]{1,6}单\s*c[a-z0-9]{24}))?/g;
 
 export interface SplitRemark {
   text: string;
@@ -33,11 +36,18 @@ export function splitRemark(note: unknown): SplitRemark {
     const head = cut >= 0 ? line.slice(0, cut) : line;
     if (cut >= 0) source.push(line.slice(cut).trim());
 
-    const traces = head.match(TRACE_PAIR) ?? [];
-    const ids = head.match(INTERNAL_ID) ?? [];
-    if (traces.length || ids.length) source.push([...traces, ...ids].join(" "));
+    const refs = head.match(INTERNAL_REF) ?? [];
+    const rest = head.replace(INTERNAL_REF, "");
+    const traces = rest.match(TRACE_PAIR) ?? [];
+    const ids = rest.match(INTERNAL_ID) ?? [];
+    const moved = [
+      ...refs.map((r) => r.replace(/[、，,]\s*$/, "")),
+      ...traces,
+      ...ids,
+    ];
+    if (moved.length) source.push(moved.join(" "));
 
-    const kept = head
+    const kept = rest
       .replace(TRACE_PAIR, "")
       .replace(INTERNAL_ID, "")
       .replace(/\s{2,}/g, " ")
