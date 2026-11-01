@@ -1,7 +1,8 @@
 name: npm ci with node_modules cache
 description: >
-  Restore node_modules keyed on runner.os + node version + lockfile hash and skip `npm ci` on a hit.
-  Post-install artifacts that live outside node_modules do not exist; callers still run `prisma generate`.
+  Restore node_modules keyed on runner.os + node version + hash of package.json, package-lock.json and any .npmrc and skip `npm ci` on a hit.
+  A package.json-only edit therefore misses the cache and `npm ci` rejects a manifest/lock mismatch.
+  Callers that need a Prisma client still run `prisma generate` themselves.
 inputs:
   working-directory:
     description: Directory holding package.json and package-lock.json (frontend or backend)
@@ -18,7 +19,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ inputs.working-directory }}/node_modules
-        key: node-modules-${{ runner.os }}-${{ steps.node.outputs.version }}-${{ inputs.working-directory }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+        key: node-modules-${{ runner.os }}-${{ steps.node.outputs.version }}-${{ inputs.working-directory }}-${{ hashFiles(format('{0}/package.json', inputs.working-directory), format('{0}/package-lock.json', inputs.working-directory), format('{0}/.npmrc', inputs.working-directory), '.npmrc') }}
     - name: Install dependencies (cache miss)
       if: steps.nm.outputs.cache-hit != 'true'
       shell: bash

@@ -41,3 +41,32 @@ test('next.config.ts enables ignoreBuildErrors only when the flag is exactly "1"
   assert.match(cfg, new RegExp(`ignoreBuildErrors:\\s*process\\.env\\.${FLAG}\\s*===\\s*'1'`));
   assert.strictEqual((cfg.match(/ignoreBuildErrors/g) || []).length, 1);
 });
+
+// --- npm-ci-cached key must cover the manifest, so a package.json-only edit cannot hit a stale tree ---
+test('npm-ci-cached cache key hashes package.json, package-lock.json and .npmrc', () => {
+  const key = read('.github/actions/npm-ci-cached/action.yml').match(/key:.*hashFiles\((.*)\) \}\}/)[1];
+  for (const f of ['package.json', 'package-lock.json', '.npmrc']) assert.ok(key.includes(f), `${f} missing from cache key`);
+  assert.doesNotMatch(key, /restore-keys/);
+});
+
+test('manifest-only dependency edit changes the cache key inputs', () => {
+  const crypto = require('node:crypto');
+  const os = require('node:os');
+  const action = read('.github/actions/npm-ci-cached/action.yml');
+  const files = [...action.match(/hashFiles\((.*)\) \}\}/)[1].matchAll(/format\('\{0\}\/([^']+)'/g)].map((m) => m[1]);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'npm-ci-key-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'package.json'), '{"dependencies":{"a":"1.0.0"}}');
+    fs.writeFileSync(path.join(dir, 'package-lock.json'), '{"lockfileVersion":3}');
+    const keyHash = () => {
+      const h = crypto.createHash('sha256');
+      for (const f of files) if (fs.existsSync(path.join(dir, f))) h.update(fs.readFileSync(path.join(dir, f)));
+      return h.digest('hex');
+    };
+    const before = keyHash();
+    fs.writeFileSync(path.join(dir, 'package.json'), '{"dependencies":{"a":"1.0.0","b":"file:../b"}}'); // lockfile untouched
+    assert.notStrictEqual(keyHash(), before);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
