@@ -1,6 +1,6 @@
 /**
  * Input: Prisma client、BankTransaction / InvoiceRecord / PurchaseContract / SalesContract 模型
- * Output: 智能关联引擎；发票自动写入重验待匹配状态，人工关联验证有效购销目标
+ * Output: 智能关联引擎；发票自动写入重验待匹配状态，仅有效发票（正常且正数）可被自动关联、红冲/负数留待人工，人工关联验证有效购销目标
  * Pos: 财务模块-智能关联业务逻辑层
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -73,7 +73,21 @@ function levenshteinDistance(a, b) {
  * 职责：计算字符串相似度（0-100）
  * 思路：优先包含匹配，其次 Levenshtein 距离
  */
+// 一次 runAutoMatch 内按 (a,b) 记忆相似度：销方/往来方名重复很多，Levenshtein 同步计算会长时间占住事件循环。
+let similarityCache = null;
+
 function stringSimilarity(a, b) {
+  if (!similarityCache) return computeSimilarity(a, b);
+  const key = `${a}\u0000${b}`;
+  let value = similarityCache.get(key);
+  if (value === undefined) {
+    value = computeSimilarity(a, b);
+    similarityCache.set(key, value);
+  }
+  return value;
+}
+
+function computeSimilarity(a, b) {
   const na = normalizeName(a);
   const nb = normalizeName(b);
   if (!na || !nb) return 0;
@@ -180,7 +194,7 @@ async function loadPurchaseContracts(purpose = MATCH_PURPOSE.PAYMENT) {
   const forPayment = purpose !== MATCH_PURPOSE.INVOICE;
   const contracts = await prisma.purchaseContract.findMany({
     where: forPayment ? payableWhere() : { NOT: { status: 'CANCELLED' } },
-    take: 1000,
+    take: 1000, // shortcut: 超过 1000 份合同会静默截断候选，现 195 份采购；接近时改为分页
     include: { supplier: true },
   });
   return contracts.map((c) => ({
@@ -349,9 +363,18 @@ function matchInvoiceToSales(inv, contracts) {
  *   2. 对每条银行流水分别尝试采购/销售合同匹配
  *   3. 对每张发票分别尝试采购/销售合同匹配
  *   4. 总分 ≥ 70 的自动写入 MATCHED，其余保持 PENDING
- *   5. 更新关联合同的已付/已收金额
+ *   不改动合同的已付/已收金额，所以重复运行幂等（但经「取消关联」回到 PENDING 的行会再次关联到同一合同）
  */
 async function runAutoMatch() {
+  similarityCache = new Map();
+  try {
+    return await runAutoMatchOnce();
+  } finally {
+    similarityCache = null;
+  }
+}
+
+async function runAutoMatchOnce() {
   const [bankTxns, invoices, purchaseContracts, invoicePurchaseContracts, salesContracts] = await Promise.all([
     loadPendingBankTxns(),
     loadPendingInvoices(),
@@ -377,8 +400,9 @@ async function runAutoMatch() {
     }
 
     if (best.score >= SCORE_THRESHOLD) {
-      await prisma.bankTransaction.update({
-        where: { id: txn.id },
+      // 与发票写入一致：只改仍为 PENDING 的行，较长的运行期间被人工确认/忽略的流水不被覆盖。
+      const updated = await prisma.bankTransaction.updateMany({
+        where: { id: txn.id, matchStatus: MATCH_STATUS.PENDING },
         data: {
           matchedContractId: best.contract.id,
           matchedContractType: contractType,
@@ -387,6 +411,11 @@ async function runAutoMatch() {
           matchedAt: new Date(),
         },
       });
+
+      if (updated.count === 0) {
+        bankResults.push({ id: txn.id, matched: false, score: best.score });
+        continue;
+      }
 
       bankResults.push({
         id: txn.id,

@@ -103,3 +103,23 @@ test('自动关联只取有效发票：已红冲与负数发票不是候选，�
  assert.deepEqual(where,{matchStatus:'PENDING',status:'正常',isPositive:'是'});
  assert.deepEqual({...VALID_INVOICE_WHERE},{status:'正常',isPositive:'是'});
 });
+
+test('自动匹配写银行流水时只改仍为 PENDING 的行；运行后相似度缓存已释放，重复运行结果一致',async(t)=>{
+ const saved={bf:prisma.bankTransaction.findMany,bu:prisma.bankTransaction.updateMany,i:prisma.invoiceRecord.findMany,p:prisma.purchaseContract.findMany,s:prisma.salesContract.findMany};
+ t.after(()=>{prisma.bankTransaction.findMany=saved.bf;prisma.bankTransaction.updateMany=saved.bu;prisma.invoiceRecord.findMany=saved.i;prisma.purchaseContract.findMany=saved.p;prisma.salesContract.findMany=saved.s;});
+ const txn={id:'t1',counterpart:'合成供应商甲',direction:'OUT',amount:100,currency:'CNY',summary:'货款',txnDate:'2026-01-05'};
+ prisma.bankTransaction.findMany=async()=>[txn];
+ prisma.invoiceRecord.findMany=async()=>[];
+ prisma.salesContract.findMany=async()=>[];
+ prisma.purchaseContract.findMany=async()=>[{id:'c1',status:'SIGNED',totalAmount:100,paidAmount:0,signedAt:new Date('2026-01-01'),supplier:{name:'合成供应商甲'}}];
+ const wheres=[];
+ let count=0;
+ prisma.bankTransaction.updateMany=async(args)=>{wheres.push(args.where);return{count};};
+ const lost=await service.runAutoMatch();
+ assert.equal(lost.bankMatched,0,'被人工处理过的行（updateMany 命中 0）不算自动关联');
+ assert.deepEqual(wheres[0],{id:'t1',matchStatus:'PENDING'});
+ count=1;
+ const won=await service.runAutoMatch();
+ assert.equal(won.bankMatched,1);
+ assert.equal(won.details.bank[0].score,lost.details.bank[0].score);
+});
