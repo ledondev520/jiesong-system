@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync, existsSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, rmSync, existsSync, readdirSync, statSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
@@ -12,7 +12,7 @@ const step = workflow.match(/^      - name: Deploy to Production via SSH\n[\s\S]
 assert.ok(step, 'cannot extract the production SSH run block');
 const runBlock = step[1].replace(/^          /gm, '');
 
-function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxTestStatus = 0, verifierStatus = 0, migrateStatus = 'ok', migrateDeployStatus = 0 } = {}) {
+function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxTestStatus = 0, verifierStatus = 0, migrateStatus = 'ok', migrateDeployStatus = 0, databaseUrl = null, integrity = 'ok' } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'deploy-ssh-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const checkout = path.join(root, 'checkout');
@@ -25,6 +25,10 @@ function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxT
   const pricing = '{"syntheticRuntimePricing":true}\n';
   writeFileSync(path.join(checkout, 'config/pricing.json'), pricing, { mode: 0o600 });
   writeFileSync(path.join(root, 'events'), '');
+  // Synthetic prod DB + .env so the pre-migrate snapshot step can resolve it.
+  writeFileSync(path.join(root, 'prod.db'), 'synthetic-sqlite', { mode: 0o600 });
+  const envUrl = databaseUrl === null ? `file:${path.join(root, 'prod.db')}` : databaseUrl;
+  if (envUrl !== '') writeFileSync(path.join(checkout, 'backend/.env'), `DATABASE_URL="${envUrl}"\n`, { mode: 0o600 });
   mkdirSync(path.join(root, 'scripts'), { mode: 0o700 });
   copyFileSync(path.join(repo, 'scripts/require-node-runtime.sh'), path.join(root, 'scripts/require-node-runtime.sh'));
   if (!missingGuard) copyFileSync(path.join(repo, 'scripts/require-node-runtime.sh'), path.join(checkout, 'scripts/require-node-runtime.sh'));
@@ -52,6 +56,12 @@ exec /bin/bash -c "$4"`);
 printf 'npm\\n' >> "$TEST_EVENTS"
 cat >> "$TEST_NPM_STDIN"`);
   executable(path.join(bin, 'git'), `printf 'git\\n' >> "$TEST_EVENTS"`);
+  executable(path.join(bin, 'sqlite3'), `
+case "\${2-}" in
+  .backup*) printf 'sqlite3 backup\\n' >> "$TEST_EVENTS"; cp "$1" "\${2#.backup }" ;;
+  PRAGMA*) printf 'sqlite3 integrity\\n' >> "$TEST_EVENTS"; echo "$TEST_INTEGRITY" ;;
+  *) exit 99 ;;
+esac`);
   // Log subcommands so tests can assert migrate/stop/start ordering.
   executable(path.join(bin, 'pm2'), `printf 'pm2 %s %s\\n' "$1" "\${2-}" >> "$TEST_EVENTS"`);
   executable(path.join(bin, 'npx'), `
@@ -64,6 +74,7 @@ if [ "$1 \${2-}" = 'prisma migrate' ]; then
         pending) echo 'Following migration have not yet been applied:'; exit 1 ;;
         failed) echo 'Following migration have failed:'; echo 'Following migration have not yet been applied:'; exit 1 ;;
         error) echo 'Error: P1003: Database does not exist'; exit 1 ;;
+        diverged) echo 'Your local migration history and the migrations table from your database are different:'; echo 'Following migration have not yet been applied:'; exit 1 ;;
       esac ;;
     deploy) exit "$TEST_MIGRATE_DEPLOY_STATUS" ;;
   esac
@@ -121,6 +132,8 @@ exit "$TEST_VERIFIER_STATUS"`);
       TEST_NGINX_STATUS: String(nginxTestStatus),
       TEST_MIGRATE_STATUS: migrateStatus,
       TEST_MIGRATE_DEPLOY_STATUS: String(migrateDeployStatus),
+      TEST_INTEGRITY: integrity,
+      DEPLOY_BACKUP_ROOT: path.join(root, 'backups'),
       TMPDIR: root,
     },
     input: '',
@@ -226,21 +239,52 @@ test('pending migration stops the backend only around migrate deploy, then resta
   assert.equal(e.at(-1), 'verifier');
 });
 
-test('a failing migrate deploy restarts the stopped backend and fails the step', t => {
+test('pending migration takes a private, integrity-checked snapshot after the stop and before migrate deploy', t => {
+  const result = runDeployment(t, { migrateStatus: 'pending' });
+  assert.equal(result.status, 0, result.stderr);
+  const e = result.events;
+  assert.ok(e.indexOf('pm2 stop jiesong-backend') < e.indexOf('sqlite3 backup'));
+  assert.ok(e.indexOf('sqlite3 backup') < e.indexOf('sqlite3 integrity'));
+  assert.ok(e.indexOf('sqlite3 integrity') < e.lastIndexOf('npx prisma migrate'), 'snapshot before migrate deploy');
+  const backups = path.join(result.root, 'backups');
+  const [dir] = readdirSync(backups);
+  assert.match(dir, /^auto-premigrate-test-sh-\d{8}T\d{6}Z$/);
+  assert.equal(statSync(path.join(backups, dir)).mode & 0o777, 0o700);
+  assert.equal(statSync(path.join(backups, dir, 'premigrate.db')).mode & 0o777, 0o600);
+  assert.match(result.stdout, /pre-migrate snapshot: .*auto-premigrate-test-sh-/);
+});
+
+test('a failing migrate deploy restarts the backend, reports the snapshot and fails the step', t => {
   const result = runDeployment(t, { migrateStatus: 'pending', migrateDeployStatus: 5 });
   assert.equal(result.status, 5, result.stderr);
   const e = result.events;
   assert.ok(e.indexOf('pm2 stop jiesong-backend') > -1);
   assert.ok(e.indexOf('pm2 start jiesong-backend') > e.indexOf('pm2 stop jiesong-backend'), 'backend must be started again');
   assert.ok(!e.includes('verifier'));
+  assert.match(result.stderr, /MIGRATION FAILED: backend restarted on partially migrated DB; snapshot at \S+auto-premigrate-test-sh-\S+; follow docs\/operations\/production-rollback\.md/);
+});
+
+test('an unresolvable prod DB or a bad snapshot never leaves the backend stopped without a migration', t => {
+  for (const options of [{ databaseUrl: '' }, { databaseUrl: 'postgresql://x' }, { databaseUrl: 'file:/nonexistent/prod.db' }]) {
+    const result = runDeployment(t, { migrateStatus: 'pending', ...options });
+    assert.notEqual(result.status, 0, JSON.stringify(options));
+    assert.ok(!result.events.some(e => e.startsWith('pm2 ')), `no pm2 call: ${JSON.stringify(options)}`);
+    assert.ok(!result.events.includes('sqlite3 backup'));
+    assert.match(result.stderr, /aborting before stopping the backend/);
+  }
+  const bad = runDeployment(t, { migrateStatus: 'pending', integrity: 'corrupt' });
+  assert.notEqual(bad.status, 0);
+  assert.ok(bad.events.includes('pm2 start jiesong-backend'), 'backend restarted');
+  assert.equal(bad.events.filter(e => e === 'npx prisma migrate').length, 1, 'migrate deploy must not run');
+  assert.doesNotMatch(bad.stderr, /MIGRATION FAILED/);
 });
 
 test('failed or errored migrate status aborts without stopping the backend', t => {
-  for (const migrateStatus of ['failed', 'error']) {
+  for (const migrateStatus of ['failed', 'error', 'diverged']) {
     const result = runDeployment(t, { migrateStatus });
     assert.notEqual(result.status, 0, migrateStatus);
     assert.ok(!result.events.includes('pm2 stop jiesong-backend'), migrateStatus);
     assert.equal(result.events.filter(e => e === 'npm').length, 1, 'abort before the frontend build');
-    assert.ok(!result.events.includes('pm2 restart jiesong-backend'), 'no restart');
+    assert.ok(!result.events.some(e => e.startsWith('pm2 ')), 'no pm2 call at all');
   }
 });

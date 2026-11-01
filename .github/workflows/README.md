@@ -72,7 +72,7 @@ CLI 分页获取全部 issue 评论、读取实时 PR head 和 base 分支 tip�
 
 进入 Actions 标签页，选择工作流，点击 "Run workflow"。
 
-生产 SQLite 为 WAL 模式，运行中的 `jiesong-backend` 会使 `prisma migrate deploy` 报 "database is locked"。`deploy.yml` 的 SSH 发布脚本因此先用只读的 `npx prisma migrate status` 判断：已是最新则跳过 `migrate deploy`，仅构建并重启；仅当输出为"有待应用迁移"时，在前后端构建完成后才 `pm2 stop jiesong-backend` → `migrate deploy` → 重启，并以 EXIT trap 保证失败时先重新启动后端再以非零退出。迁移失败/历史不一致/其他错误一律硬失败，且不停止后端。未假定 `pm2 reload`（仓库无 ecosystem 配置），仍用 `pm2 restart`。待应用迁移的发布仍须先按既有要求完成真实库的在线快照。
+生产 SQLite 为 WAL 模式，运行中的 `jiesong-backend` 会使 `prisma migrate deploy` 报 "database is locked"。`deploy.yml` 的 SSH 发布脚本因此先用只读的 `npx prisma migrate status` 判断：已是最新则跳过 `migrate deploy`，仅构建并重启；仅当输出为"有待应用迁移"时，在前后端构建完成后才 `pm2 stop jiesong-backend` → `migrate deploy` → 重启，并以 EXIT trap 保证失败时先重新启动后端再以非零退出。迁移失败/历史不一致/其他错误一律硬失败，且不停止后端。未假定 `pm2 reload`（仓库无 ecosystem 配置），仍用 `pm2 restart`。待应用迁移的发布现在在 `pm2 stop` 之后、`migrate deploy` 之前自动用 `sqlite3 "$DB" ".backup $SNAP"` 对生产库做在线快照（`DATABASE_URL` 取自 `backend/.env` 的 `file:` 路径，无法解析则在停后端前中止；目录 `/opt/jiesong_system/deploy-backups/auto-premigrate-<SHA前7位>-<UTC时间>/` 为 0700、文件 0600，并做 `PRAGMA integrity_check`，打印路径）。迁移失败时 trap 仍会重启后端（保持 API 不宕），随后打印 `MIGRATION FAILED: ... snapshot at <路径>` 并以非零退出，按 `docs/operations/production-rollback.md` 处理。注意：失败后重启的后端运行在部分迁移的库上，此后的写入不在快照内，回滚恢复快照会丢失这些写入；同一时间只允许一个生产发布（`deploy-production` concurrency 组，不取消进行中的发布）。自动快照不替代 AGENTS.md 要求的发布前人工在线快照。
 
 生产手动部署使用 `gh workflow run deploy.yml --ref main -f environment=production`。必须指定 `--ref main`：远端脚本执行 `git checkout <ref>`，其他分支会使服务器切换到该分支。生产回滚及回滚后再部署见 [VPS 生产回滚手册](../../docs/operations/production-rollback.md)。
 

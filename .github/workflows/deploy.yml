@@ -82,6 +82,10 @@ jobs:
     runs-on: ubuntu-latest
     # 生产只由 v* tag(非 rc)或手动选择 production 触发;不依赖 staging,避免手动选生产时被连带跳过
     needs: pre-deploy
+    # Serialize production deploys on the one host; never cancel a run mid stop/migrate/restart.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     if: >-
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production') ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'rc'))
@@ -170,12 +174,49 @@ jobs:
               npm ci
               npm run build
               BACKEND_STOPPED=0
+              MIGRATE_RUNNING=0
+              SNAP=""
               # Never leave the API down: any failure after the stop starts it again, then exits non-zero.
-              trap 'rc=$?; if [ "$BACKEND_STOPPED" = 1 ]; then echo "restoring jiesong-backend after failure" >&2; pm2 start jiesong-backend || pm2 restart jiesong-backend || true; fi; exit $rc' EXIT
+              # Caveat: after a failed migrate the restarted backend runs on a partially migrated DB;
+              # writes made from then on are NOT in the snapshot, so a rollback restore loses them.
+              restore_backend() {
+                rc=$?
+                if [ "$BACKEND_STOPPED" = 1 ]; then
+                  echo "restoring jiesong-backend after failure" >&2
+                  pm2 start jiesong-backend || pm2 restart jiesong-backend || true
+                  if [ "$MIGRATE_RUNNING" = 1 ]; then
+                    echo "MIGRATION FAILED: backend restarted on partially migrated DB; snapshot at $SNAP; follow docs/operations/production-rollback.md" >&2
+                  fi
+                fi
+                exit $rc
+              }
+              trap restore_backend EXIT
               if [ "$MIGRATE_PENDING" = 1 ]; then
+                # Resolve the prod SQLite file and snapshot target BEFORE stopping; abort here if impossible.
+                DB_URL=$(sed -n 's/^DATABASE_URL=//p' ../backend/.env | tail -n 1 | tr -d "\"'\r" || true)
+                case "$DB_URL" in file:*) DB_PATH=${DB_URL#file:}; DB_PATH=${DB_PATH%%\?*} ;; *) DB_PATH="" ;; esac
+                # Relative Prisma SQLite paths are relative to backend/prisma.
+                case "$DB_PATH" in /*|"") ;; *) DB_PATH="$PWD/../backend/prisma/$DB_PATH" ;; esac
+                if [ -z "$DB_PATH" ] || [ ! -f "$DB_PATH" ] || ! command -v sqlite3 >/dev/null; then
+                  echo "cannot resolve prod SQLite file from backend/.env DATABASE_URL (or sqlite3 missing); aborting before stopping the backend" >&2
+                  exit 1
+                fi
+                SNAP_DIR="${DEPLOY_BACKUP_ROOT:-/opt/jiesong_system/deploy-backups}/auto-premigrate-$(printf '%.7s' "$DEPLOY_SHA")-$(date -u +%Y%m%dT%H%M%SZ)"
+                SNAP="$SNAP_DIR/premigrate.db"
+                (umask 077 && mkdir -p "$SNAP_DIR")
                 BACKEND_STOPPED=1
                 pm2 stop jiesong-backend
+                # Taken with the API stopped so the snapshot is exactly the pre-migration state.
+                sqlite3 "$DB_PATH" ".backup $SNAP"
+                chmod 600 "$SNAP"
+                if [ "$(sqlite3 "$SNAP" 'PRAGMA integrity_check;')" != ok ]; then
+                  echo "pre-migrate snapshot failed integrity_check: $SNAP; not migrating" >&2
+                  exit 1
+                fi
+                echo "pre-migrate snapshot: $SNAP"
+                MIGRATE_RUNNING=1
                 (cd ../backend && npx prisma migrate deploy)
+                MIGRATE_RUNNING=0
               fi
               # No ecosystem.config.js in the repo, so zero-downtime `pm2 reload` is not assumed.
               pm2 restart jiesong-backend || pm2 start ecosystem.config.js --only jiesong-backend
