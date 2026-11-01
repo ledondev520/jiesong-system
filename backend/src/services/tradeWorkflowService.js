@@ -7,7 +7,7 @@
 const prisma = require('../utils/prisma');
 const { roundMoney } = require('../utils/money');
 const { createError } = require('../middleware/errorHandler');
-const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
+const { evaluateShipmentReadiness, evaluateShipmentReadinessAsync } = require('./shipmentReadinessService');
 const { normalizePurchaseStatus, PURCHASE_STATUS } = require('./purchaseStateMachine');
 const { normalizeSalesStatus, SALES_STATUS } = require('./salesStateMachine');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
@@ -76,7 +76,11 @@ const LOADING_ACTIONS = {
 const blockersWithPrefix = (check, prefix) => check.blockers.filter((item) => item.code.startsWith(prefix));
 
 // utilisationOnly：非 recent 范围对已发运历史合同只看汇总利用率，不逐柜排箱。
-const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisationOnly = false } = {}) => {
+// readiness：调用方已在 worker 中算好的 evaluateShipmentReadiness 结果；缺省时同步计算（仅小数据/测试）。
+const isShippedContract = (salesContract) => (
+  (SALES_RANK[normalizeSalesStatus(salesContract.status)] ?? 0) >= SALES_RANK[SALES_STATUS.SHIPPED]
+);
+const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisationOnly = false, readiness: given } = {}) => {
   const packingItems = salesContract.packingItems || [];
   const purchaseContractNos = unique(packingItems.map((item) => item.purchaseContractNo));
   const linkedPurchases = purchaseContractNos
@@ -115,7 +119,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisatio
   const salesStatus = normalizeSalesStatus(salesContract.status);
   const salesRank = SALES_RANK[salesStatus] ?? 0;
   const shipped = salesRank >= SALES_RANK[SALES_STATUS.SHIPPED];
-  const readiness = evaluateShipmentReadiness(salesContract, { utilisationOnly: utilisationOnly && shipped });
+  const readiness = given || evaluateShipmentReadiness(salesContract, { utilisationOnly: utilisationOnly && shipped });
   const { check } = readiness;
   const packingListChecks = [...(salesContract.packingListChecks || [])].sort((left, right) => (
     new Date(right.checkedAt || right.createdAt || 0).getTime()
@@ -378,7 +382,13 @@ const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
     purchaseMap.set(contract.contractNo.replace(/^CG/, 'PO'), contract);
   });
 
-  let workflows = salesContracts.map((contract) => buildTradeWorkflow(contract, purchaseMap, { utilisationOnly: scope !== 'recent' }));
+  // 排柜在 worker 线程；逐个等待，使单次请求最多占一个 worker，失败即整体失败（不返回部分/可发运假象）。
+  let workflows = [];
+  for (const contract of salesContracts) {
+    const utilisationOnly = scope !== 'recent';
+    const readiness = await evaluateShipmentReadinessAsync(contract, { utilisationOnly: utilisationOnly && isShippedContract(contract) });
+    workflows.push(buildTradeWorkflow(contract, purchaseMap, { utilisationOnly, readiness }));
+  }
   if (scope === 'pending') workflows = workflows.filter((item) => item.completedStageCount < item.stageCount);
   if (scope === 'blocked') workflows = workflows.filter((item) => item.stages.some((stage) => stage.status === 'blocked'));
   if (scope === 'risk') workflows.sort((a, b) => {

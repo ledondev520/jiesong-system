@@ -20,7 +20,7 @@ const { defaultSpotRate, orderMargin, orderRateInput, priceFor } = require('./ex
 const { categoryIdsByProduct, withCategoryChains } = require('./productCategoryChain');
 const { lastConfirmedPrices } = require('./lastConfirmedPrice');
 const { allocatedQuantity } = require('../utils/stockAllocation');
-const { buildLoadingPlan, checkUtilisation, evaluateShipmentReadiness } = require('./shipmentReadinessService');
+const { buildLoadingPlanAsync, checkUtilisation, evaluateShipmentReadinessAsync } = require('./shipmentReadinessService');
 const { getContainerSpec } = require('./containerSpecs');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
@@ -206,7 +206,7 @@ const getLoadingPlan = async (id, containerType) => {
     },
   });
   if (!contract) throw createError('出口合同不存在', 404);
-  return buildLoadingPlan(contract, { containerType }).plan;
+  return (await buildLoadingPlanAsync(contract, { containerType })).plan;
 };
 
 // 完整明细及带请求键的创建走原子服务；既有仅建表头的调用保持兼容。
@@ -371,7 +371,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
       && existingContract.packingItems.some(item => Number(item.boxes) > 0) ? SALES_STATUS.PACKING : settledStatus;
     if (isTransition && targetStatus === SALES_STATUS.SHIPPED) {
       // 门槛固定按默认柜型（40HQ）；柜型是否落库待业主决定。
-      const { check } = evaluateShipmentReadiness(existingContract);
+      const { check } = await evaluateShipmentReadinessAsync(existingContract, {}, { priority: true });
       if (!check.ready) throw createError(check.headline, 400);
     }
     const contract = await tx.salesContract.update({

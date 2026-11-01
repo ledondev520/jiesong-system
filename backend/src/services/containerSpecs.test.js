@@ -59,6 +59,8 @@ test('非法配置一律抛错', () => {
     '阈值超过 100': (c) => { c.readyThresholdPct = 101; },
     '缺少 default 画像': (c) => { delete c.profiles.default; },
     '缺少 types': (c) => { delete c.types; },
+    '支撑比例低于 0.5': (c) => { c.minSupportRatio = 0.49; },
+    '支撑比例高于 1': (c) => { c.minSupportRatio = 1.01; },
   };
   for (const [name, mutate] of Object.entries(mutations)) {
     const config = real();

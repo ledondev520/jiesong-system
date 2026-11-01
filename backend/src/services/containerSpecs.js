@@ -16,6 +16,10 @@ const positive = (value, label) => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) fail(`${label} 必须是大于 0 的有限数字`);
   return value;
 };
+const supportRatio = (value) => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0.5 || value > 1) fail('minSupportRatio 必须在 0.5 到 1 之间');
+  return value;
+};
 const dims = (value, keys, label) => {
   if (!value || typeof value !== 'object') fail(`${label} 缺失`);
   return Object.freeze(Object.fromEntries(keys.map((key) => [key, positive(value[key], `${label}.${key}`)])));
@@ -61,7 +65,8 @@ const validateContainerConfig = (raw) => {
   return Object.freeze({
     default: raw.default,
     readyThresholdPct: thresholdPct,
-    minSupportRatio: positive(raw.minSupportRatio, 'minSupportRatio'),
+    // 每箱底面承托比例；0.75 = 单箱最多悬出 25%（C5-02，分析见 handoff CONTAINER-PERF-plan §5）。仅允许 [0.5, 1]。
+    minSupportRatio: supportRatio(raw.minSupportRatio),
     clearanceMm: dims(raw.clearanceMm, AXES3, 'clearanceMm'),
     types: Object.freeze(types),
     profiles: Object.freeze(profiles),

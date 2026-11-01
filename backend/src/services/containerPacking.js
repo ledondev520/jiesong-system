@@ -1,7 +1,7 @@
 /**
  * Input: 装箱明细（PackingItem + product）、柜型规格与装柜画像（containerSpecs / config/containers.json）
  * Output: toCartonLines（按行归一化箱型）、packContainers（多柜块状极值点装柜计划）
- * Pos: 排柜唯一实现；纯同步、无 I/O、无随机，同输入必得同输出。shipmentReadinessService 在其上做出货检查
+ * Pos: 排柜唯一实现；纯同步、无 I/O、无随机，同输入必得同输出；由 containerPackingWorker 在工作线程中调用，shipmentReadinessService 在其上做出货检查
  *
  * 规则：箱规来源 line > 估算 > 商品（仅一件一箱）；重货在底、重货只能压在地面或重货上；
  * 竖放箱仅允许水平旋转；每箱最大承压 maxStackKg（含向下传递）；累计毛重不超过安全上限；必须能过柜门。
@@ -12,10 +12,15 @@ const { loadContainerConfig } = require('./containerSpecs');
 
 const EPS = 1e-9;
 const MAX_CONTAINERS = 20;
-const MAX_BLOCKS_PER_CONTAINER = 600;
-// 计算预算（候选块内层迭代 × 已放块数）：畸形/超大数据耗尽后 fail-closed（剩余箱进 unplaced，阻塞出货），不卡死 API 进程。
-// shortcut: 5e8 ≈ 2–3 s 同步上限，约为 300 个互不相同箱规行所需的 3 倍；更大订单需改为分片/异步排柜再调高。
+// 40HQ 最多几千箱；上限只用于限制 2D/3D/PDF 视图的输出体量（每行至少一块，1000 行订单需要 ≥1000 块）。
+const MAX_BLOCKS_PER_CONTAINER = 3000;
+// 计算预算（每个候选块内层迭代 × 极值点附近块数）：畸形/超大数据耗尽后 fail-closed（剩余箱进 unplaced，阻塞出货）。
+// 内层安全网；硬性墙钟上限是 containerPackingPool 的 worker 超时。
 const COMPUTE_BUDGET = 500_000_000;
+// 第二遍按 50 mm 高度带排序，使同层顶面更齐；仅 ≤400 行的订单跑，避免 1000 行订单再加 ~1 s。
+const HEIGHT_BAND_MM = 50;
+// shortcut: 第二遍仅 ≤400 行，避免 1000 行订单再加 ~1 s；更快实现后可放开
+const SECOND_PASS_MAX_LINES = 400;
 const PALETTE = [
   '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
   '#BB8FCE', '#85C1E9', '#F8B500', '#00CED1', '#FF69B4', '#32CD32', '#FF4500', '#7FB069',
@@ -148,35 +153,37 @@ const overlaps = (a, b) => (
   && a.z < b.z + b.dz && a.z + a.dz > b.z
 );
 
+const overLimit = (block, pressure) => (
+  (block.nz - 1) * block.kgEach + (block.pTop + pressure) * block.cartonArea > block.maxStackKg + EPS
+);
 /**
  * 承压向下传递（压强模型）：新块总重 W 均摊到支撑面积上，得到压强 p = W / supportArea；
  * 支撑块每个底层纸箱承受 p × 箱底面积 + 自身 (nz−1) 层重量，不得超过 maxStackKg。
  * 落到支撑块上的重量再按其自身支撑面积继续向下传递。
- * @returns {Map<object, number>|null} 各祖先块新增的顶部压强；任一超限返回 null
+ * check=true：累计压强只增不减，任一祖先块一旦超限最终必超限，故立即返回 null（与事后整体检查等价，但绝大多数失败候选只走第一层）。
+ * @returns {Map<object, number>|null} 各祖先块新增的顶部压强；check 时任一超限返回 null
  */
-const collectLoad = (refs, supportArea, weightKg, acc = new Map()) => {
+const collectLoad = (refs, supportArea, weightKg, acc = new Map(), check = false) => {
   if (weightKg <= 0 || supportArea <= 0) return acc;
   const pressure = weightKg / supportArea;
   for (const { block, overlap } of refs) {
-    acc.set(block, (acc.get(block) || 0) + pressure);
-    collectLoad(block.supportRefs, block.supportArea, pressure * overlap, acc);
+    const total = (acc.get(block) || 0) + pressure;
+    acc.set(block, total);
+    if (check && overLimit(block, total)) return null;
+    if (!collectLoad(block.supportRefs, block.supportArea, pressure * overlap, acc, check)) return null;
   }
   return acc;
 };
-
-const loadWithinLimits = (acc) => [...acc].every(([block, pressure]) => (
-  (block.nz - 1) * block.kgEach + (block.pTop + pressure) * block.cartonArea <= block.maxStackKg + EPS
-));
 
 /**
  * 每个底层纸箱（nx×ny 网格的一格）的底面都须有 ≥ minRatio 的面积落在下方块顶面；块平均支撑会漏掉悬空的单箱。
  * @returns {number} 沿 x 满足条件的最长列前缀（0 表示首列即不合格）
  */
-const supportedColumns = (blocks, ep, o, nx, ny, minRatio) => {
+const supportedColumns = (tops, ep, o, nx, ny, minRatio) => {
   const cols = new Float64Array(nx * ny);
   const x1 = ep.x + nx * o.l;
   const y1 = ep.y + ny * o.w;
-  for (const b of blocks) {
+  for (const b of tops) {
     if (b.z + b.dz !== ep.z || b.x >= x1 || b.x + b.dx <= ep.x || b.y >= y1 || b.y + b.dy <= ep.y) continue;
     const iLo = Math.max(0, Math.floor((b.x - ep.x) / o.l));
     const iHi = Math.min(nx - 1, Math.ceil((b.x + b.dx - ep.x) / o.l) - 1);
@@ -199,12 +206,15 @@ const supportedColumns = (blocks, ep, o, nx, ny, minRatio) => {
 
 /** 在极值点 ep 用朝向 o 为 line 造最大的合法块；无合法块返回 null。 */
 const formBlock = (ctx, ep, o, work) => {
-  const { usable, blocks, minSupportRatio, payloadCap } = ctx;
+  const { usable, minSupportRatio, payloadCap } = ctx;
   const { line } = work;
+  const tops = ctx.tops.get(ep.z) || [];
   const nxMax = Math.floor((usable.length - ep.x) / o.l);
   const nyMax = Math.floor((usable.width - ep.y) / o.w);
   const nzFit = Math.floor((usable.height - ep.z) / o.h);
   if (nxMax < 1 || nyMax < 1 || nzFit < 1 || ctx.budget <= 0) return null;
+  // 块内每个候选都含 (0,0) 角上那一箱：它支撑不够，此极值点 + 朝向不可能成块（与逐列检查等价，只是提前）。
+  if (ep.z > 0 && supportedColumns(tops, ep, o, 1, 1, minSupportRatio) < 1) return null;
 
   const kg = line.kgPerCarton;
   const byWeight = kg > 0 ? Math.floor((payloadCap - ctx.weight + EPS) / kg) : Infinity;
@@ -218,13 +228,13 @@ const formBlock = (ctx, ep, o, work) => {
   for (let nz = nzTarget; nz >= 1; nz -= 1) {
     let best = null;
     for (let ny = Math.min(nyMax, Math.ceil(limit / nz)); ny >= 1; ny -= 1) {
-      ctx.budget -= blocks.length + 1;
+      ctx.budget -= ep.near.length + 1;
       if (ctx.budget <= 0) return best;
       const yEnd = ep.y + ny * o.w;
       const zEnd = ep.z + nz * o.h;
       let xLimit = usable.length;
       let blocked = false;
-      for (const b of blocks) {
+      for (const b of ep.near) {
         if (b.y < yEnd && b.y + b.dy > ep.y && b.z < zEnd && b.z + b.dz > ep.z && b.x + b.dx > ep.x) {
           if (b.x <= ep.x) { blocked = true; break; }
           xLimit = Math.min(xLimit, b.x);
@@ -247,7 +257,7 @@ const formBlock = (ctx, ep, o, work) => {
       let supportArea = 0;
       if (ep.z > 0) {
         // 逐箱支撑：沿 x 取每个底层纸箱都够支撑的最长前缀，其余列留给后续块。
-        nx = supportedColumns(blocks, ep, o, nx, shapeNy, minSupportRatio);
+        nx = supportedColumns(tops, ep, o, nx, shapeNy, minSupportRatio);
         if (nx < 1) continue;
         cartons = nx * shapeNy * shapeNz;
         if (best && cartons <= best.cartons) continue;
@@ -256,14 +266,14 @@ const formBlock = (ctx, ep, o, work) => {
       const dx = nx * o.l;
       const dy = shapeNy * o.w;
       if (ep.z > 0) {
-        for (const b of blocks) {
+        for (const b of tops) {
           if (b.z + b.dz !== ep.z) continue;
           const ox = Math.min(ep.x + dx, b.x + b.dx) - Math.max(ep.x, b.x);
           const oy = Math.min(ep.y + dy, b.y + b.dy) - Math.max(ep.y, b.y);
           if (ox > 0 && oy > 0) { supportArea += ox * oy; supportRefs.push({ block: b, overlap: ox * oy }); }
         }
         if (line.heavy && supportRefs.some(({ block }) => !block.heavy)) continue;
-        if (kg > 0 && !loadWithinLimits(collectLoad(supportRefs, supportArea, cartons * kg))) continue;
+        if (kg > 0 && !collectLoad(supportRefs, supportArea, cartons * kg, new Map(), true)) continue;
       }
       best = { ...candidate, cartons, supportRefs, supportArea };
     }
@@ -282,9 +292,35 @@ const byXzy = (a, b) => a.x - b.x || a.z - b.z || a.y - b.y;
 
 const packOne = (works, ctx) => {
   const blocks = [];
-  let eps = [{ x: 0, y: 0, z: 0 }];
-  ctx.blocks = blocks;
+  const { usable } = ctx;
+  ctx.tops = new Map();
   ctx.weight = 0;
+  // 仍有箱待装的行的最小朝向边长：极值点的自由射线短于它则永远放不下任何箱（空间只会缩小、行只会装完）。
+  const live = works.filter((work) => work.left > 0).flatMap((work) => work.orients);
+  const minL = Math.min(...live.map((o) => o.l));
+  const minW = Math.min(...live.map((o) => o.w));
+  const minH = Math.min(...live.map((o) => o.h));
+
+  // 只有在极值点 +x/+y/+z 象限内的块可能与其上的块碰撞；三条轴向射线的自由长度是“放得下”的必要条件。
+  const relate = (ep, b) => {
+    if (b.x + b.dx <= ep.x || b.y + b.dy <= ep.y || b.z + b.dz <= ep.z) return;
+    ep.near.push(b);
+    const inX = b.x <= ep.x;
+    const inY = b.y <= ep.y;
+    const inZ = b.z <= ep.z;
+    if (inY && inZ) ep.rx = Math.min(ep.rx, Math.max(0, b.x - ep.x));
+    if (inX && inZ) ep.ry = Math.min(ep.ry, Math.max(0, b.y - ep.y));
+    if (inX && inY) ep.rz = Math.min(ep.rz, Math.max(0, b.z - ep.z));
+  };
+  const mkEp = (point) => {
+    const ep = {
+      x: point.x, y: point.y, z: point.z, near: [],
+      rx: usable.length - point.x, ry: usable.width - point.y, rz: usable.height - point.z,
+    };
+    for (const b of blocks) relate(ep, b);
+    return ep;
+  };
+  let eps = [mkEp({ x: 0, y: 0, z: 0 })];
 
   const place = (work, found) => {
     const { o } = found;
@@ -301,6 +337,10 @@ const packOne = (works, ctx) => {
       ancestor.pTop += pressure;
     }
     blocks.push(block);
+    const topZ = block.z + block.dz;
+    if (!ctx.tops.has(topZ)) ctx.tops.set(topZ, []);
+    ctx.tops.get(topZ).push(block);
+    for (const point of eps) relate(point, block);
     ctx.weight += block.kg;
     work.left -= found.cartons;
 
@@ -320,20 +360,23 @@ const packOne = (works, ctx) => {
       { x: block.x + block.dx, y: block.y, z: block.z },
       { x: block.x, y: block.y + block.dy, z: block.z },
     ];
-    const next = [
-      ...eps.filter((point) => !covered(point)),
+    const fresh = [
       ...sides,
       ...(block.z > 0 ? sides.map(dropped).filter((point) => point.z < block.z) : []),
       { x: block.x, y: block.y, z: block.z + block.dz },
-    ].filter((point) => point.x < ctx.usable.length && point.y < ctx.usable.width && point.z < ctx.usable.height)
-      .sort(byXzy);
-    eps = next.filter((point, index) => index === 0 || byXzy(point, next[index - 1]) !== 0);
+    ].filter((point) => point.x < usable.length && point.y < usable.width && point.z < usable.height);
+    // 存活的极值点沿用原对象（保留 near/射线），新点现算；排序/去重规则不变，去重保留先出现者（存活者）。
+    const next = [...eps.filter((point) => !covered(point)), ...fresh.map(mkEp)].sort(byXzy);
+    eps = next
+      .filter((point, index) => index === 0 || byXzy(point, next[index - 1]) !== 0)
+      .filter((point) => point.rx >= minL && point.ry >= minW && point.rz >= minH);
   };
 
   const findBlock = (work) => {
     for (const ep of eps) {
       let best = null;
       for (const o of work.orients) {
+        if (o.l > ep.rx || o.w > ep.ry || o.h > ep.rz) continue;
         const candidate = formBlock(ctx, ep, o, work);
         if (candidate && betterBlock(candidate, best)) best = candidate;
       }
@@ -358,52 +401,35 @@ const packOne = (works, ctx) => {
   return blocks;
 };
 
+const compareLineId = (a, b) => (a.line.lineId < b.line.lineId ? -1 : a.line.lineId > b.line.lineId ? 1 : 0);
 const priority = (a, b) => (
   (b.line.heavy - a.line.heavy)
   || (a.line.heavy ? b.density - a.density : 0)
   || b.baseArea - a.baseArea
   || b.height - a.height
-  || (a.line.lineId < b.line.lineId ? -1 : a.line.lineId > b.line.lineId ? 1 : 0)
+  || compareLineId(a, b)
+);
+// 与 priority 相同，只在重货/密度之后、底面积之前插入 50 mm 高度带（同带的箱顶面更易齐平）。
+const bandOf = (work) => Math.floor(work.height / HEIGHT_BAND_MM);
+const priorityBanded = (a, b) => (
+  (b.line.heavy - a.line.heavy)
+  || (a.line.heavy ? b.density - a.density : 0)
+  || bandOf(b) - bandOf(a)
+  || b.baseArea - a.baseArea
+  || b.height - a.height
+  || compareLineId(a, b)
 );
 
 const unplacedEntry = (line, cartons, reason) => ({
   lineId: line.lineId, name: line.name, cartons, reason, cartonMm: line.cartonMm,
 });
 
-/**
- * 多柜装柜计划：一次一柜，放不下的转入下一个同型柜；无法进任何空柜的箱进入 unplaced。
- * @returns {{ containers: object[], unplaced: Array<{ lineId, name, cartons, reason, cartonMm }> }}
- */
-const packContainers = (lines, spec, config = loadContainerConfig(), { budget = COMPUTE_BUDGET } = {}) => {
-  const usable = usableMm(spec, config);
-  const payloadCap = Math.min(spec.safeGrossKg, spec.maxPayloadKg);
-  const unplaced = [];
-  const works = [];
-
-  for (const line of lines) {
-    // 入口再校验一次：直接传入的归一化行同样不得带 0/小数/非有限边长。
-    const dims = line.cartonMm;
-    if (!dims || !isValidMm(dims.length) || !isValidMm(dims.width) || !isValidMm(dims.height)) {
-      unplaced.push(unplacedEntry(line, line.cartons, 'missing-dimensions'));
-      continue;
-    }
-    const fits = orientationsFor(line)
-      .filter((o) => o.l <= usable.length && o.w <= usable.width && o.h <= usable.height);
-    if (fits.length === 0) { unplaced.push(unplacedEntry(line, line.cartons, 'oversize')); continue; }
-    const orients = fits.filter((o) => o.w <= spec.doorMm.width && o.h <= spec.doorMm.height);
-    if (orients.length === 0) { unplaced.push(unplacedEntry(line, line.cartons, 'door')); continue; }
-    const first = orients[0];
-    works.push({
-      line, orients, left: line.cartons,
-      density: (line.kgPerCarton * 1e9) / (first.l * first.w * first.h),
-      baseArea: first.l * first.w, height: first.h,
-    });
-  }
-  works.sort(priority);
-
-  const ctx = { usable, minSupportRatio: config.minSupportRatio, payloadCap, blocks: [], weight: 0, budget };
+/** 以 comparator 排序的全新 works 副本跑一遍多柜装柜；返回各柜、装不下的行与剩余预算。 */
+const runPass = (baseWorks, comparator, budget, env) => {
+  const { usable, config, payloadCap, spec } = env;
+  const works = baseWorks.map((work) => ({ ...work, left: work.line.cartons })).sort(comparator);
+  const ctx = { usable, minSupportRatio: config.minSupportRatio, payloadCap, blocks: [], tops: new Map(), weight: 0, budget };
   const containers = [];
-  const lineById = new Map(lines.map((line) => [line.lineId, line]));
   while (works.some((work) => work.left > 0) && containers.length < MAX_CONTAINERS && ctx.budget > 0) {
     const blocks = packOne(works, ctx);
     if (blocks.length === 0) break;
@@ -432,11 +458,65 @@ const packContainers = (lines, spec, config = loadContainerConfig(), { budget = 
       cogXmm: Math.round(grossKg > 0 ? moment / grossKg : usable.length / 2),
     });
   }
+  const unplaced = [];
   for (const work of works) {
     // Budget exhausted = the search stopped, not proof the cargo does not fit: report it distinctly (INT6-02).
-    if (work.left > 0) unplaced.push(unplacedEntry(lineById.get(work.line.lineId), work.left, ctx.budget <= 0 ? 'compute-budget' : 'no-space'));
+    if (work.left > 0) unplaced.push(unplacedEntry(work.line, work.left, ctx.budget <= 0 ? 'compute-budget' : 'no-space'));
   }
-  return { containers, unplaced };
+  return { containers, unplaced, budgetLeft: ctx.budget };
 };
 
-module.exports = { usableMm, toCartonLines, packContainers, orientationsFor };
+const unplacedCartons = (pass) => pass.unplaced.reduce((sum, entry) => sum + entry.cartons, 0);
+// 第二遍只在：更少未装箱 → 更少柜 → 首柜更多箱 时胜出；平局取第一遍（确定性、绝不更差）。
+const secondBeatsFirst = (first, second) => (
+  unplacedCartons(second) - unplacedCartons(first)
+  || second.containers.length - first.containers.length
+  || (first.containers[0]?.cartons ?? 0) - (second.containers[0]?.cartons ?? 0)
+) < 0;
+
+/**
+ * 多柜装柜计划：一次一柜，放不下的转入下一个同型柜；无法进任何空柜的箱进入 unplaced。
+ * 第一遍按 priority；若未能单柜装下而总重/总体积理论上可装进一柜（且行数 ≤400），再试一遍高度带排序，取更好者。
+ * @returns {{ containers: object[], unplaced: Array<{ lineId, name, cartons, reason, cartonMm }> }}
+ */
+const packContainers = (lines, spec, config = loadContainerConfig(), { budget = COMPUTE_BUDGET, passes = 2 } = {}) => {
+  const usable = usableMm(spec, config);
+  const payloadCap = Math.min(spec.safeGrossKg, spec.maxPayloadKg);
+  const rejected = [];
+  const works = [];
+
+  for (const line of lines) {
+    // 入口再校验一次：直接传入的归一化行同样不得带 0/小数/非有限边长。
+    const dims = line.cartonMm;
+    if (!dims || !isValidMm(dims.length) || !isValidMm(dims.width) || !isValidMm(dims.height)) {
+      rejected.push(unplacedEntry(line, line.cartons, 'missing-dimensions'));
+      continue;
+    }
+    const fits = orientationsFor(line)
+      .filter((o) => o.l <= usable.length && o.w <= usable.width && o.h <= usable.height);
+    if (fits.length === 0) { rejected.push(unplacedEntry(line, line.cartons, 'oversize')); continue; }
+    const orients = fits.filter((o) => o.w <= spec.doorMm.width && o.h <= spec.doorMm.height);
+    if (orients.length === 0) { rejected.push(unplacedEntry(line, line.cartons, 'door')); continue; }
+    const first = orients[0];
+    works.push({
+      line, orients, left: line.cartons,
+      density: (line.kgPerCarton * 1e9) / (first.l * first.w * first.h),
+      baseArea: first.l * first.w, height: first.h,
+    });
+  }
+
+  const env = { usable, config, payloadCap, spec };
+  let result = runPass(works, priority, budget, env);
+  const totalKg = works.reduce((sum, work) => sum + work.line.cartons * work.line.kgPerCarton, 0);
+  const totalMm3 = works.reduce((sum, work) => sum + work.line.cartons * work.baseArea * work.height, 0);
+  const couldFitOne = totalKg <= payloadCap && totalMm3 <= usable.length * usable.width * usable.height;
+  if (passes > 1 && (result.unplaced.length > 0 || result.containers.length > 1) && result.budgetLeft > 0
+    && couldFitOne && works.length <= SECOND_PASS_MAX_LINES) {
+    const second = runPass(works, priorityBanded, result.budgetLeft, env);
+    // 第二遍耗尽预算就丢弃：可选重试不得把完整方案变成 compute-budget。
+    if (second.budgetLeft > 0 && secondBeatsFirst(result, second)) result = second;
+  }
+  return { containers: result.containers, unplaced: [...rejected, ...result.unplaced] };
+};
+
+module.exports = { usableMm, toCartonLines, packContainers, orientationsFor, supportedColumns };
