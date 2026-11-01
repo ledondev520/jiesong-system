@@ -313,10 +313,7 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
     .getByRole("navigation", { name: "侧边导航" })
     .getByRole("link", { name: "单证与退税", exact: true })
     .click();
-  await page
-    .getByRole("navigation", { name: "侧边导航" })
-    .getByRole("link", { name: "出口退税", exact: true })
-    .click();
+  // 报关单 / 出口退税是该页内页签，侧边栏只有「单证与退税」一个入口。
   await page.getByRole("tab", { name: "报关单", exact: true }).click();
   await page
     .getByRole("button", {
@@ -516,6 +513,8 @@ test("SALES commercial confirmation downloads three accurate sheets and archived
   expect(saved.sales_contract_files).toHaveLength(1);
   expect(saved.sales_contract_files[0].id).toBe(generated.file.id);
   await page.reload();
+  // 已归档文件列在订单详情的「单证」页签；重载后默认回到概览。
+  await page.getByRole("tab", { name: "单证", exact: true }).click();
   const again = page.waitForEvent("download");
   await page
     .getByRole("button", {

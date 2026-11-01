@@ -220,9 +220,14 @@ export async function startRoleFixture(
   }
 }
 
+// Fixtures whose teardown has begun; the page may still hold in-flight API requests (e.g. the order
+// detail's loading-plan fetch) that hit the closed port. Only those are dropped, never live-backend errors.
+const stoppingFixtures = new WeakSet<object>();
+
 export async function stopRoleFixture(
   fixture: Pick<RoleFixture, "server" | "directory">,
 ) {
+  stoppingFixtures.add(fixture);
   if (fixture.server.exitCode === null && fixture.server.signalCode === null) {
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => fixture.server.kill("SIGKILL"), 5000);
@@ -407,10 +412,17 @@ export async function forwardRealApi(page: Page, fixture: RoleFixture) {
     if (original.origin !== "http://127.0.0.1:3004") {
       throw new Error("Role acceptance refuses a non-fixture API origin");
     }
-    const response = await route.fetch({
-      url: `${fixture.baseURL}${original.pathname}${original.search}`,
-      maxRedirects: 0,
-    });
+    let response;
+    try {
+      response = await route.fetch({
+        url: `${fixture.baseURL}${original.pathname}${original.search}`,
+        maxRedirects: 0,
+      });
+    } catch (error) {
+      if (!stoppingFixtures.has(fixture)) throw error;
+      await route.abort().catch(() => {});
+      return;
+    }
     await route.fulfill({ response });
   });
 }
