@@ -19,7 +19,8 @@
 | pricing-settings.spec.ts | 报价设置验收 | 390/1440px 合成配置加载、保存/重载、异常加载隔离及异常保存保留草稿后明确重试 |
 | profile-preference-fixture.ts | 本地设置辅助 | 复用真实合成 SALES 登录/迁移夹具，透传 HTTP、只读安全用户字段与明确偏好键，注入单次本地写失败 |
 | profile-preference-lifecycle.spec.ts | 个人设置验收定义 | 1440px Header 菜单下完整草稿取消、保存/重开/整页重载、偏好与资料持久化失败后的明确重试 |
-| mobile.spec.ts | 移动验收 | 320/390/430px 页面及延迟财务明细滚动、邮箱验证码注册申请、登录退出、表单及错误恢复 |
+| mobile-320/390/430.spec.ts | 移动验收（按视口拆分） | 各视口主页面遍历、导航搜索长表单、延迟财务明细滚动；共用逻辑在 mobile-shared.ts（非 spec，不参与分片） |
+| mobile.spec.ts | 移动验收 | 邮箱验证码注册申请、登录退出、平板桌面、设置菜单及错误恢复 |
 | button-coverage.spec.ts | 交互验收 | 主要页面按钮、弹窗与无运行时异常检查 |
 | smoke.spec.ts | 冒烟验收 | 主要页面与业务入口 |
 | visual.spec.ts / snapshots | 可选视觉验收 | 平台相关截图，仅在 VISUAL_REGRESSION=1 时运行 |
