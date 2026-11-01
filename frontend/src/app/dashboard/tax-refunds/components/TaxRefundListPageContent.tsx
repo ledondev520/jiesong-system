@@ -8,6 +8,8 @@
 
 "use client";
 
+import { LoadingValue } from "@/components/ui/loading-value";
+import { RemarkText } from "@/components/ui/remark-text";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import {
   lazy,
@@ -405,7 +407,10 @@ export function TaxRefundListPageContent() {
                       value: `¥${taxRefund.refundableAmount.toLocaleString()}`,
                       emphasis: "primary",
                     },
-                    { label: "备注", value: taxRefund.note || "-" },
+                    {
+                      label: "备注",
+                      value: <RemarkText note={taxRefund.note} />,
+                    },
                   ]}
                   amount={{
                     label: "已退",
@@ -534,7 +539,9 @@ export function TaxRefundListPageContent() {
                           {taxRefund.refundedAmount.toLocaleString()}
                         </TableCell>
                         <TableCell>{taxRefund.appliedAt}</TableCell>
-                        <TableCell>{taxRefund.note || "-"}</TableCell>
+                        <TableCell>
+                          <RemarkText note={taxRefund.note} />
+                        </TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="outline"
@@ -572,7 +579,8 @@ export function TaxRefundListPageContent() {
           )}
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span>
-              共 {total} 条，第 {page} 页
+              共 <LoadingValue loading={loading}>{total}</LoadingValue> 条，第{" "}
+              {page} 页
             </span>
             <Button
               variant="outline"

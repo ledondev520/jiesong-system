@@ -14,6 +14,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import { DateStringPicker } from "@/components/ui/date-picker";
 import {
   Select,
   SelectContent,
@@ -348,23 +349,23 @@ export default function BankFlowPage() {
               <SelectItem value="OUT">支出</SelectItem>
             </SelectContent>
           </Select>
-          <Input
-            type="date"
+          <DateStringPicker
             value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
+            onChange={(value) => {
+              setDateFrom(value);
               setPage(1);
             }}
+            placeholder="开始日期"
             className="w-[140px] h-9"
           />
           <span className="text-muted-foreground text-sm">~</span>
-          <Input
-            type="date"
+          <DateStringPicker
             value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
+            onChange={(value) => {
+              setDateTo(value);
               setPage(1);
             }}
+            placeholder="结束日期"
             className="w-[140px] h-9"
           />
           <Input

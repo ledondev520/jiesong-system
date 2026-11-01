@@ -6,6 +6,7 @@
 
 "use client";
 
+import { LoadingValue } from "@/components/ui/loading-value";
 import {
   useEffect,
   useCallback,
@@ -352,7 +353,10 @@ export default function SystemLogsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base">日志列表</CardTitle>
-                <CardDescription>共 {total} 条记录</CardDescription>
+                <CardDescription>
+                  共 <LoadingValue loading={loading}>{total}</LoadingValue>{" "}
+                  条记录
+                </CardDescription>
               </div>
             </div>
 
@@ -635,7 +639,8 @@ export default function SystemLogsPage() {
           {/* 分页控制 */}
           <div className="mt-4 flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             <span>
-              第 {currentPage}/{Math.max(1, totalPages)} 页，共 {total} 条
+              第 {currentPage}/{Math.max(1, totalPages)} 页，共{" "}
+              <LoadingValue loading={loading}>{total}</LoadingValue> 条
             </span>
             <div className="flex flex-wrap items-center gap-2">
               <PageSizeSelect

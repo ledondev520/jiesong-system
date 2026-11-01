@@ -8,6 +8,7 @@
 
 "use client";
 
+import { LoadingValue } from "@/components/ui/loading-value";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import {
@@ -934,7 +935,8 @@ export function InventoryTab() {
       {/* 分页控制 */}
       <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>
-          共 {total} 条（表列排序仅当前页）
+          共 <LoadingValue loading={loading}>{total}</LoadingValue>{" "}
+          条（表列排序仅当前页）
           {totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ""}
         </span>
         <div className="flex items-center gap-2">

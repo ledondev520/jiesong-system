@@ -1,5 +1,6 @@
 "use client";
 
+import { formatUnitPrice } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -87,7 +88,7 @@ function buildConfig(
 }
 
 const fmt = (value: number | null | undefined) =>
-  typeof value === "number" ? `$${value}` : "—";
+  typeof value === "number" ? formatUnitPrice(value, "USD") : "—";
 
 function AdminPricingConfigCard() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
