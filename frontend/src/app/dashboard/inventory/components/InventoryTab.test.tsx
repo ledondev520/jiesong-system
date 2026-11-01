@@ -168,3 +168,40 @@ it("批量变更确认弹窗的条数与实际提交的库存一致", async () =
     ),
   );
 });
+
+it("「详情」打开只读库存详情，不触发任何状态变更 (B17)", async () => {
+  batchUpdateStatus.mockClear();
+  getAll.mockResolvedValueOnce({
+    data: {
+      items: [
+        {
+          id: "synthetic-stock",
+          productId: "synthetic-product",
+          quantity: 10,
+          status: InventoryStatus.INBOUND,
+          note: "合成备注",
+          inboundAt: "2026-10-02T08:00:00.000Z",
+          createdAt: "2026-10-01",
+          updatedAt: "2026-10-01",
+          product: {
+            id: "synthetic-product",
+            customsName: "合成瓷砖",
+            unit: "箱",
+          } as Inventory["product"],
+        },
+      ],
+      pagination: { total: 1, totalPages: 1 },
+    },
+  });
+  const user = userEvent.setup();
+  render(<InventoryTab />);
+  await user.click(
+    (await screen.findAllByRole("button", { name: "查看 合成瓷砖 详情" }))[0],
+  );
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent("合成瓷砖");
+  expect(dialog).toHaveTextContent("合成备注");
+  expect(dialog).toHaveTextContent("2026-10-02");
+  expect(dialog).toHaveTextContent("手工流转");
+  expect(batchUpdateStatus).not.toHaveBeenCalled();
+});

@@ -62,6 +62,25 @@ export default function ProductDetailPage() {
     ["单位", product.unit],
     ["HS 编码", product.hsCode],
     ["包装规格", product.packingSpec],
+    [
+      "毛重",
+      product.grossWeight != null ? `${product.grossWeight} kg` : undefined,
+    ],
+    ["净重", product.netWeight != null ? `${product.netWeight} kg` : undefined],
+    ["体积", product.volume != null ? `${product.volume} CBM` : undefined],
+    [
+      "可用库存",
+      product.availableStock != null
+        ? String(product.availableStock)
+        : undefined,
+    ],
+    [
+      "低库存阈值",
+      product.lowStockThreshold != null
+        ? String(product.lowStockThreshold)
+        : undefined,
+    ],
+    ["申报要素", product.declaration],
   ];
 
   return (
