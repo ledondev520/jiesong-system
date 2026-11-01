@@ -9,7 +9,7 @@
  *   paymentsDue       已生效采购合同应付>0（payablesService 同一口径，草稿不计）
  *   receiptsToInspect 采购合同已发货、尚未收货
  *   toLoad / toShip   出口合同 CONFIRMED（待装柜）/ PACKING（待发运）
- *   missingInvoice    货已出（SHIPPED/RECEIVED/COMPLETED）但未登记发票号的采购合同（同催票提醒）
+ *   missingInvoice    货已出（SHIPPED/RECEIVED/COMPLETED）、未登记发票号且没有已关联（MATCHED/PURCHASE）发票记录的采购合同
  *   overdueReceivables 沿用 financeService.getOverdueReceivables
  *   refundable        退税单 DRAFT 且单证匹配 passed
  *   quotesToSend      报价 DRAFT（待发送）；quotesAwaitingCustomer 报价 SENT（待客户确认）；仅 SALES/ADMIN
@@ -95,11 +95,17 @@ const LISTS = {
   missingInvoice: {
     label: '缺进项发票', roles: [FINANCE, ADMIN],
     async load(db) {
-      const rows = (await db.purchaseContract.findMany({
+      const candidates = (await db.purchaseContract.findMany({
         where: { status: { in: [PURCHASE_STATUS.SHIPPED, PURCHASE_STATUS.RECEIVED, PURCHASE_STATUS.COMPLETED] } },
         orderBy: { updatedAt: 'desc' },
         select: { id: true, contractNo: true, invoiceNo: true, totalAmount: true, supplier: { select: { name: true } } },
       })).filter((r) => !String(r.invoiceNo || '').trim());
+      // 发票关联引擎已把发票记录对上合同时，同样算已开票（invoiceNo 只在手工登记时才有）。
+      const matched = new Set((await db.invoiceRecord.findMany({
+        where: { matchStatus: 'MATCHED', matchedContractType: 'PURCHASE', matchedContractId: { in: candidates.map((r) => r.id) } },
+        select: { matchedContractId: true },
+      })).map((r) => r.matchedContractId));
+      const rows = candidates.filter((r) => !matched.has(r.id));
       return asList(rows.length, rows.map((r) => item(r.id, r.contractNo, r.supplier?.name, r.totalAmount, null)));
     },
   },
