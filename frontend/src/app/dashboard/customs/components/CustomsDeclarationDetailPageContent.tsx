@@ -8,6 +8,7 @@
 
 "use client";
 
+import { RemarkText } from "@/components/ui/remark-text";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -209,7 +210,7 @@ export function CustomsDeclarationDetailPageContent({
           <div className="space-y-1 md:col-span-2 xl:col-span-3">
             <div className="text-sm text-muted-foreground">备注</div>
             <div className="whitespace-pre-wrap break-words font-medium">
-              {declaration.note || "-"}
+              <RemarkText note={declaration.note} />
             </div>
           </div>
         </CardContent>

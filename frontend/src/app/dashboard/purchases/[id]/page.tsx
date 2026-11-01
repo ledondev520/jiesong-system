@@ -8,6 +8,7 @@
 
 "use client";
 
+import { RemarkText } from "@/components/ui/remark-text";
 import {
   BusinessWrite,
   useBusinessReadOnly,
@@ -1024,7 +1025,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
             {contract.note && (
               <div className="rounded-lg bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground">备注</p>
-                <p className="mt-1 text-sm">{contract.note}</p>
+                <div className="mt-1 text-sm">
+                  <RemarkText note={contract.note} />
+                </div>
               </div>
             )}
           </CardContent>
