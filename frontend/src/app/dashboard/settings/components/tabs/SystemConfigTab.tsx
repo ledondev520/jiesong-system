@@ -735,7 +735,7 @@ export function SystemConfigTab({
                     />
                     <p className="text-xs text-muted-foreground">
                       {isOpenAI
-                        ? `OpenAI 请求仍会按此处显示的已保存值限制回复长度（作为 max_completion_tokens 发送），并受服务器上限${openaiMaxOutput ? ` ${openaiMaxOutput.toLocaleString()}` : ""}约束；OpenAI 模式下页面不保存此项。`
+                        ? `OpenAI 普通问答按此处显示的已保存值限制回复长度（作为 max_completion_tokens 发送）；思考模式和 Agent 不使用此值；均受服务器上限${openaiMaxOutput ? ` ${openaiMaxOutput.toLocaleString()}` : ""}约束。OpenAI 模式下页面不保存此项。`
                         : "影响 AI 回复的最大长度。"}
                     </p>
                   </div>

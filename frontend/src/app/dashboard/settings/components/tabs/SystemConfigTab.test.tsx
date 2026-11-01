@@ -239,9 +239,10 @@ describe("SystemConfigTab", () => {
       screen.getByText(/OpenAI 请求会丢弃温度参数，此处的值不生效/),
     ).toBeInTheDocument();
     expect(screen.queryByText(/温度与长度参数/)).toBeNull();
-    expect(screen.getByText(/max_completion_tokens/)).toHaveTextContent(
-      "服务器上限 16,000",
-    );
+    const lengthHint = screen.getByText(/max_completion_tokens/);
+    expect(lengthHint).toHaveTextContent("OpenAI 普通问答按此处显示的已保存值");
+    expect(lengthHint).toHaveTextContent("思考模式和 Agent 不使用此值");
+    expect(lengthHint).toHaveTextContent("服务器上限 16,000");
     expect(screen.getByLabelText(/最大输出长度/)).toBeDisabled();
   });
 
