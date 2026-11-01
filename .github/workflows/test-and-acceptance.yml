@@ -89,6 +89,8 @@ jobs:
         with:
           name: vitest-blob-${{ strategy.job-index }}
           path: frontend/.vitest-reports/
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 1
 
   # 必过检查名保持 Frontend Unit And Coverage：任一分片失败/取消则本 job 失败（skipped 会被 ruleset 当作通过，故 always()）。
