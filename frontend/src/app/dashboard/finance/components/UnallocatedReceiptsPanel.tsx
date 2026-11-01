@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { invalidateCache } from "@/lib/api-cache";
 import { buildReceiptNote } from "@/lib/finance-note";
@@ -18,6 +19,9 @@ import { financeService } from "@/services/finance.service";
 import { PaymentType, type Payment } from "@/types";
 import { AllocateDialog } from "./AllocateDialog";
 import { ReceiptDialog, type ReceiptSubmitData } from "./ReceiptDialog";
+
+// 待分配款项很多时只先展示前几笔，主表（合同未收余额）才是页面主体。
+const PREVIEW_COUNT = 5;
 
 export function UnallocatedReceiptsPanel({
   onChanged,
@@ -29,6 +33,7 @@ export function UnallocatedReceiptsPanel({
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [allocateTarget, setAllocateTarget] = useState<Payment | null>(null);
   const [autoMatching, setAutoMatching] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -155,8 +160,10 @@ export function UnallocatedReceiptsPanel({
               </Button>
             </BusinessWrite>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {payments.map((p) => (
+          <CardContent
+            className={cn("space-y-2", expanded && "max-h-96 overflow-y-auto")}
+          >
+            {(expanded ? payments : payments.slice(0, PREVIEW_COUNT)).map((p) => (
               <div
                 key={p.id}
                 className="flex items-center justify-between rounded-lg border border-orange-200 bg-background px-3 py-2 dark:border-orange-900"
@@ -188,6 +195,19 @@ export function UnallocatedReceiptsPanel({
                 </BusinessWrite>
               </div>
             ))}
+            {payments.length > PREVIEW_COUNT && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-full text-xs text-orange-700 dark:text-orange-300"
+                aria-expanded={expanded}
+                onClick={() => setExpanded((value) => !value)}
+              >
+                {expanded
+                  ? "收起"
+                  : `显示全部 ${payments.length} 笔（当前显示前 ${PREVIEW_COUNT} 笔）`}
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

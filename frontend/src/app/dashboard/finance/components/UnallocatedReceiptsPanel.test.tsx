@@ -75,6 +75,24 @@ describe("UnallocatedReceiptsPanel", () => {
     expect(screen.getByText(/待分配款项（1 笔）/)).toBeInTheDocument();
   });
 
+  it("long pending lists show only the first 5 until expanded, so the main table stays primary", async () => {
+    const many = Array.from({ length: 26 }, (_, i) => ({
+      ...receipt,
+      id: `receipt-${i}`,
+      customerName: `客户${i}`,
+    }));
+    mocks.getUnallocatedPayments.mockResolvedValue({ data: many });
+    render(<UnallocatedReceiptsPanel onChanged={vi.fn()} />);
+    expect(await screen.findByText("客户0")).toBeInTheDocument();
+    expect(screen.getByText("客户4")).toBeInTheDocument();
+    expect(screen.queryByText("客户5")).toBeNull();
+    expect(screen.getByText(/待分配款项（26 笔）/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /显示全部 26 笔/ }));
+    expect(screen.getByText("客户25")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "收起" }));
+    expect(screen.queryByText("客户25")).toBeNull();
+  });
+
   it("a failed pool read is reported and retry reloads it", async () => {
     mocks.getUnallocatedPayments.mockRejectedValueOnce(new Error("down"));
     render(<UnallocatedReceiptsPanel onChanged={vi.fn()} />);
