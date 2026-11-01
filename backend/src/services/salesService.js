@@ -367,7 +367,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
       && existingContract.packingItems.some(item => Number(item.boxes) > 0) ? SALES_STATUS.PACKING : settledStatus;
     if (isTransition && targetStatus === SALES_STATUS.SHIPPED) {
       // 门槛固定按默认柜型（40HQ）；柜型是否落库待业主决定。
-      const { check } = await evaluateShipmentReadinessAsync(existingContract);
+      const { check } = await evaluateShipmentReadinessAsync(existingContract, {}, { priority: true });
       if (!check.ready) throw createError(check.headline, 400);
     }
     const contract = await tx.salesContract.update({

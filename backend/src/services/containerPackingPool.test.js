@@ -70,3 +70,25 @@ test('并发有界：超出 worker+队列上限的请求立即 503', async () =>
   assert.ok(outcomes.some((message) => message.includes('请求过多')), '超过上限的请求被拒绝');
   assert.ok(!outcomes.includes('ok'));
 });
+
+test('结果缓存：相同输入第二次命中且返回独立副本', async () => {
+  const lines = linesOf(40, 3);
+  const first = await packContainersAsync(lines, spec, config);
+  const started = Date.now();
+  const second = await packContainersAsync(lines, spec, config);
+  assert.deepEqual(second, first);
+  assert.notEqual(second, first);
+  second.containers.length = 0;
+  assert.ok(Date.now() - started < 20, '命中不应再起 worker');
+  assert.equal((await packContainersAsync(lines, spec, config)).containers.length, first.containers.length);
+});
+
+test('priority 任务插队到排队任务之前', async () => {
+  const finished = [];
+  const run = (name, sizes, options) => packContainersAsync(linesOf(sizes, 5), spec, config, options).then(() => finished.push(name));
+  // 先占满两个 worker，再排队 A、B，最后 priority 的 P 应先于 A、B 完成。
+  const busy = [run('busy1', 300, {}), run('busy2', 301, {})];
+  const queued = [run('A', 302, {}), run('B', 303, {}), run('P', 304, { priority: true })];
+  await Promise.all([...busy, ...queued]);
+  assert.ok(finished.indexOf('P') < finished.indexOf('A') && finished.indexOf('P') < finished.indexOf('B'), finished.join());
+});
