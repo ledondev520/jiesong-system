@@ -9,6 +9,7 @@
 const prisma = require('../utils/prisma');
 const { isInEffect, payableWhere, outstandingOf } = require('./payablesService');
 const { createError } = require('../middleware/errorHandler');
+const { VALID_INVOICE_WHERE } = require('./invoiceRecordService');
 
 // ==================== 常量配置 ====================
 
@@ -161,10 +162,11 @@ async function loadPendingBankTxns() {
 
 /**
  * 职责：加载全部待匹配发票（理由与上限说明同 loadPendingBankTxns）
+ * 仅有效发票（正常且为正数）可自动关联；红冲/负数发票保持 PENDING，只能人工关联或忽略。
  */
 async function loadPendingInvoices() {
   return prisma.invoiceRecord.findMany({
-    where: { matchStatus: MATCH_STATUS.PENDING },
+    where: { matchStatus: MATCH_STATUS.PENDING, ...VALID_INVOICE_WHERE },
     orderBy: { invDate: 'desc' },
   });
 }

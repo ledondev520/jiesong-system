@@ -2,6 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const prisma=require('../utils/prisma');
 const service=require('./financeMatchService');
+const {VALID_INVOICE_WHERE}=require('./invoiceRecordService');
 test('未匹配分页与总数共享搜索条件，可达第二页历史记录',async(t)=>{
  const bank={findMany:prisma.bankTransaction.findMany,count:prisma.bankTransaction.count};
  const invoice={findMany:prisma.invoiceRecord.findMany,count:prisma.invoiceRecord.count};
@@ -89,6 +90,16 @@ test('待匹配发票/流水不设条数上限：旧 take 500 会让更早的未
  assert.equal(calls.length,2);
  for(const args of calls){
   assert.equal(args.take,undefined);
-  assert.deepEqual(args.where,{matchStatus:'PENDING'});
+  assert.equal(args.where.matchStatus,'PENDING');
  }
+});
+
+test('自动关联只取有效发票：已红冲与负数发票不是候选，条件与共享口径一致',async(t)=>{
+ const invoice=prisma.invoiceRecord.findMany;
+ t.after(()=>{prisma.invoiceRecord.findMany=invoice;});
+ let where;
+ prisma.invoiceRecord.findMany=async(args)=>{where=args.where;return[];};
+ await service.loadPendingInvoices();
+ assert.deepEqual(where,{matchStatus:'PENDING',status:'正常',isPositive:'是'});
+ assert.deepEqual({...VALID_INVOICE_WHERE},{status:'正常',isPositive:'是'});
 });
