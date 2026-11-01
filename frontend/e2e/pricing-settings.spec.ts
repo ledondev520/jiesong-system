@@ -6,7 +6,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { mockApiRoutes, signInAsAdmin } from "./helpers";
-import defaults from "../../config/pricing.json";
+import { pricingConfigFixture as defaults } from "../src/test/fixtures/pricing-config";
 
 const pricingUrl = "**/api/v1/system/pricing-config";
 const malformedLoads = [
@@ -37,7 +37,9 @@ for (const width of [390, 1440]) {
       await expect(
         page.getByRole("heading", { name: "系统配置" }),
       ).toBeVisible();
-      await expect(page.getByLabel("默认加价 (%)", { exact: true })).toHaveValue("30");
+      await expect(
+        page.getByLabel("默认加价 (%)", { exact: true }),
+      ).toHaveValue("30");
       await page.getByLabel("默认加价 (%)", { exact: true }).fill("40");
       const saved = page.waitForRequest(
         (request) =>
@@ -54,7 +56,9 @@ for (const width of [390, 1440]) {
         page.getByText("报价配置已保存", { exact: true }),
       ).toBeVisible();
       await page.reload();
-      await expect(page.getByLabel("默认加价 (%)", { exact: true })).toHaveValue("40");
+      await expect(
+        page.getByLabel("默认加价 (%)", { exact: true }),
+      ).toHaveValue("40");
       await expect(
         page.getByRole("heading", { name: "页面出现异常" }),
       ).toHaveCount(0);
@@ -86,7 +90,9 @@ for (const width of [390, 1440]) {
             ? page.getByRole("navigation", { name: "主导航", exact: true })
             : page.getByRole("link", { name: "捷淞国际物流" }).first(),
         ).toBeVisible();
-        await expect(page.getByLabel("默认加价 (%)", { exact: true })).toHaveCount(0);
+        await expect(
+          page.getByLabel("默认加价 (%)", { exact: true }),
+        ).toHaveCount(0);
         await expect(
           page.getByRole("button", { name: "保存报价配置", exact: true }),
         ).toHaveCount(0);
@@ -124,7 +130,9 @@ for (const width of [390, 1440]) {
       await expect(
         page.getByRole("alert").filter({ hasText: "报价配置" }),
       ).toHaveText("报价配置响应无效，请重新加载后重试");
-      await expect(page.getByLabel("默认加价 (%)", { exact: true })).toHaveValue("40");
+      await expect(
+        page.getByLabel("默认加价 (%)", { exact: true }),
+      ).toHaveValue("40");
       await expect(
         page.getByText("报价配置已保存", { exact: true }),
       ).toHaveCount(0);
@@ -138,7 +146,9 @@ for (const width of [390, 1440]) {
       expect(writes).toHaveLength(2);
       expect(writes[1]).toEqual(writes[0]);
       await page.reload();
-      await expect(page.getByLabel("默认加价 (%)", { exact: true })).toHaveValue("40");
+      await expect(
+        page.getByLabel("默认加价 (%)", { exact: true }),
+      ).toHaveValue("40");
       await expect(
         page.getByRole("heading", { name: "页面出现异常" }),
       ).toHaveCount(0);

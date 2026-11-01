@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import api, { clearApiGetCache } from "@/lib/axios";
 import { pricingService } from "@/services/pricing.service";
 import { PricingConfigCard } from "./PricingConfigCard";
-import defaults from "../../../../../../config/pricing.json";
+import { pricingConfigFixture as defaults } from "@/test/fixtures/pricing-config";
 
 vi.mock("@/store/auth.store", () => ({
   useAuthStore: (selector: (state: unknown) => unknown) =>
