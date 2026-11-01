@@ -12,6 +12,37 @@ const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { normalizePagination, parsePositiveInt } = require('../utils/pagination');
 
+// 请求体字段只接受标量，数组/对象不得进入 Prisma data（CodeQL type-confusion）。
+const bodyText = (value, label) => {
+  if (value === undefined || value === null) return value;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  throw createError(`${label} 必须是文本`, 400);
+};
+const bodyNumber = (value, label) => {
+  if (value === undefined || value === null) return value;
+  if (value === '') return null;
+  const parsed = typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+  if (!Number.isFinite(parsed)) throw createError(`${label} 必须是数字`, 400);
+  return parsed;
+};
+const productFields = (data) => ({
+  customsName: bodyText(data.customsName, 'customsName'),
+  description: bodyText(data.description, 'description'),
+  specification: bodyText(data.specification, 'specification'),
+  unit: bodyText(data.unit, 'unit'),
+  hsCode: bodyText(data.hsCode, 'hsCode'),
+  declaration: bodyText(data.declaration, 'declaration'),
+  categoryId: bodyText(data.categoryId, 'categoryId'),
+  grossWeight: bodyNumber(data.grossWeight, 'grossWeight'),
+  netWeight: bodyNumber(data.netWeight, 'netWeight'),
+  volume: bodyNumber(data.volume, 'volume'),
+  packingSpec: bodyText(data.packingSpec, 'packingSpec'),
+  length: bodyNumber(data.length, 'length'),
+  width: bodyNumber(data.width, 'width'),
+  height: bodyNumber(data.height, 'height'),
+});
+
 const parseLowStockThreshold = (value, options = {}) => {
   if (value === undefined) {
     return options.allowUndefined ? undefined : 0;
@@ -144,21 +175,8 @@ const create = async (req, res, next) => {
     const data = req.body;
     const product = await prisma.product.create({
       data: {
-        customsName: data.customsName,
-        description: data.description,
-        specification: data.specification,
-        unit: data.unit,
-        hsCode: data.hsCode,
-        declaration: data.declaration,
+        ...productFields(data),
         lowStockThreshold: parseLowStockThreshold(data.lowStockThreshold),
-        categoryId: data.categoryId,
-        grossWeight: data.grossWeight,
-        netWeight: data.netWeight,
-        volume: data.volume,
-        packingSpec: data.packingSpec,
-        length: data.length,
-        width: data.width,
-        height: data.height,
       },
     });
     
@@ -180,21 +198,8 @@ const update = async (req, res, next) => {
     const product = await prisma.product.update({
       where: { id },
       data: {
-        customsName: data.customsName,
-        description: data.description,
-        specification: data.specification,
-        unit: data.unit,
-        hsCode: data.hsCode,
-        declaration: data.declaration,
+        ...productFields(data),
         lowStockThreshold: parseLowStockThreshold(data.lowStockThreshold, { allowUndefined: true }),
-        categoryId: data.categoryId,
-        grossWeight: data.grossWeight,
-        netWeight: data.netWeight,
-        volume: data.volume,
-        packingSpec: data.packingSpec,
-        length: data.length,
-        width: data.width,
-        height: data.height,
       },
     });
     
