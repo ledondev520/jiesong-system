@@ -12,7 +12,7 @@ const step = workflow.match(/^      - name: Deploy to Production via SSH\n[\s\S]
 assert.ok(step, 'cannot extract the production SSH run block');
 const runBlock = step[1].replace(/^          /gm, '');
 
-function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxTestStatus = 0, verifierStatus = 0 } = {}) {
+function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxTestStatus = 0, verifierStatus = 0, migrateStatus = 'ok', migrateDeployStatus = 0 } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'deploy-ssh-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const checkout = path.join(root, 'checkout');
@@ -51,9 +51,23 @@ exec /bin/bash -c "$4"`);
   executable(path.join(bin, 'npm'), `
 printf 'npm\\n' >> "$TEST_EVENTS"
 cat >> "$TEST_NPM_STDIN"`);
-  for (const command of ['git', 'npx', 'pm2']) {
-    executable(path.join(bin, command), `printf '${command}\\n' >> "$TEST_EVENTS"`);
-  }
+  executable(path.join(bin, 'git'), `printf 'git\\n' >> "$TEST_EVENTS"`);
+  // Log subcommands so tests can assert migrate/stop/start ordering.
+  executable(path.join(bin, 'pm2'), `printf 'pm2 %s %s\\n' "$1" "\${2-}" >> "$TEST_EVENTS"`);
+  executable(path.join(bin, 'npx'), `
+printf 'npx %s %s\\n' "$1" "\${2-}" >> "$TEST_EVENTS"
+if [ "$1 \${2-}" = 'prisma migrate' ]; then
+  case "$3" in
+    status)
+      case "$TEST_MIGRATE_STATUS" in
+        ok) echo 'Database schema is up to date!' ;;
+        pending) echo 'Following migration have not yet been applied:'; exit 1 ;;
+        failed) echo 'Following migration have failed:'; echo 'Following migration have not yet been applied:'; exit 1 ;;
+        error) echo 'Error: P1003: Database does not exist'; exit 1 ;;
+      esac ;;
+    deploy) exit "$TEST_MIGRATE_DEPLOY_STATUS" ;;
+  esac
+fi`);
   // Trace pricing backup/copies as well as git; no real checkout is mutated.
   for (const command of ['mktemp', 'cp']) {
     // macOS keeps cp in /bin; Ubuntu usually provides it in /usr/bin.
@@ -105,6 +119,8 @@ exit "$TEST_VERIFIER_STATUS"`);
       TEST_VERIFIER_URL: path.join(root, 'verifier-url'),
       TEST_VERIFIER_STATUS: String(verifierStatus),
       TEST_NGINX_STATUS: String(nginxTestStatus),
+      TEST_MIGRATE_STATUS: migrateStatus,
+      TEST_MIGRATE_DEPLOY_STATUS: String(migrateDeployStatus),
       TMPDIR: root,
     },
     input: '',
@@ -187,4 +203,44 @@ test('a missing runtime aborts before git or any pricing backup/change when the 
   assert.ok(!result.events.includes('mktemp'), 'pricing backup must not be created');
   assert.ok(!result.events.includes('cp'), 'pricing must not be copied or restored');
   assert.equal(readFileSync(path.join(result.root, 'checkout/config/pricing.json'), 'utf8'), result.pricing);
+});
+
+test('no pending migration skips migrate deploy and never stops the backend', t => {
+  const result = runDeployment(t);
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.events.includes('npx prisma migrate'), 'status check must run');
+  assert.ok(!result.events.includes('pm2 stop jiesong-backend'));
+  assert.equal(result.events.filter(e => e === 'npx prisma migrate').length, 1, 'only status, no deploy');
+  assert.ok(result.events.includes('pm2 restart jiesong-backend'));
+});
+
+test('pending migration stops the backend only around migrate deploy, then restarts it', t => {
+  const result = runDeployment(t, { migrateStatus: 'pending' });
+  assert.equal(result.status, 0, result.stderr);
+  const e = result.events;
+  const stop = e.indexOf('pm2 stop jiesong-backend');
+  const restart = e.indexOf('pm2 restart jiesong-backend');
+  assert.equal(e.filter(x => x === 'npm').length, 3, 'backend install, frontend install, build');
+  assert.ok(e.lastIndexOf('npm') < stop, 'build before stop');
+  assert.ok(stop > -1 && stop < e.lastIndexOf('npx prisma migrate') && e.lastIndexOf('npx prisma migrate') < restart);
+  assert.equal(e.at(-1), 'verifier');
+});
+
+test('a failing migrate deploy restarts the stopped backend and fails the step', t => {
+  const result = runDeployment(t, { migrateStatus: 'pending', migrateDeployStatus: 5 });
+  assert.equal(result.status, 5, result.stderr);
+  const e = result.events;
+  assert.ok(e.indexOf('pm2 stop jiesong-backend') > -1);
+  assert.ok(e.indexOf('pm2 start jiesong-backend') > e.indexOf('pm2 stop jiesong-backend'), 'backend must be started again');
+  assert.ok(!e.includes('verifier'));
+});
+
+test('failed or errored migrate status aborts without stopping the backend', t => {
+  for (const migrateStatus of ['failed', 'error']) {
+    const result = runDeployment(t, { migrateStatus });
+    assert.notEqual(result.status, 0, migrateStatus);
+    assert.ok(!result.events.includes('pm2 stop jiesong-backend'), migrateStatus);
+    assert.equal(result.events.filter(e => e === 'npm').length, 1, 'abort before the frontend build');
+    assert.ok(!result.events.includes('pm2 restart jiesong-backend'), 'no restart');
+  }
 });

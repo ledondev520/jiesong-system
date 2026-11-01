@@ -151,11 +151,35 @@ jobs:
               cd backend
               npm ci --production
               npx prisma generate
-              npx prisma migrate deploy
+              # Prod SQLite is WAL: migrate deploy cannot get its write lock while the API runs.
+              # `migrate status` is read-only: exit 0 = up to date; exit 1 + "not yet been applied"
+              # = pending. Failed/diverged history or any other error is a hard failure.
+              if STATUS_OUT=$(npx prisma migrate status 2>&1); then
+                MIGRATE_PENDING=0
+                echo "migrate status: schema up to date; skipping prisma migrate deploy"
+              elif printf '%s' "$STATUS_OUT" | grep -q 'have not yet been applied' \
+                && ! printf '%s' "$STATUS_OUT" | grep -Eq 'have failed|are different|Error:'; then
+                MIGRATE_PENDING=1
+                echo "migrate status: pending migrations; backend will be stopped around prisma migrate deploy"
+              else
+                printf '%s\n' "$STATUS_OUT" | sed 's/^/migrate status: /' >&2
+                echo "migrate status failed (not a plain pending state); aborting before any stop/restart" >&2
+                exit 1
+              fi
               cd ../frontend
               npm ci
               npm run build
+              BACKEND_STOPPED=0
+              # Never leave the API down: any failure after the stop starts it again, then exits non-zero.
+              trap 'rc=$?; if [ "$BACKEND_STOPPED" = 1 ]; then echo "restoring jiesong-backend after failure" >&2; pm2 start jiesong-backend || pm2 restart jiesong-backend || true; fi; exit $rc' EXIT
+              if [ "$MIGRATE_PENDING" = 1 ]; then
+                BACKEND_STOPPED=1
+                pm2 stop jiesong-backend
+                (cd ../backend && npx prisma migrate deploy)
+              fi
+              # No ecosystem.config.js in the repo, so zero-downtime `pm2 reload` is not assumed.
               pm2 restart jiesong-backend || pm2 start ecosystem.config.js --only jiesong-backend
+              BACKEND_STOPPED=0
               pm2 restart jiesong-frontend || pm2 start ecosystem.config.js --only jiesong-frontend
               pm2 save
               sudo nginx -t || exit 1

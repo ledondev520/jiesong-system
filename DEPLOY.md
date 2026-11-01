@@ -16,6 +16,8 @@ Git 构建目录为 `/opt/jiesong-system`。PM2 的 `jiesong-backend` 和 `jieso
 
 GitHub Actions 在 `sudo nginx -t` 成功并重载 Nginx 后才调用此检查；配置测试失败会显式以非零退出，跳过重载和发布验证。
 
+生产 SQLite 为 WAL 模式，运行中的 `jiesong-backend` 会使 `prisma migrate deploy` 报 "database is locked"。SSH 发布脚本因此先用只读的 `npx prisma migrate status` 判断：已是最新则跳过 `migrate deploy`，仅构建并重启；仅当输出为"有待应用迁移"时，在前后端构建完成后才 `pm2 stop jiesong-backend` → `migrate deploy` → 重启，并以 EXIT trap 保证失败时先重新启动后端再以非零退出。迁移失败/历史不一致/其他错误一律硬失败，且不停止后端。未假定 `pm2 reload`（仓库无 ecosystem 配置），仍用 `pm2 restart`。待应用迁移的发布仍须先按既有要求完成真实库的在线快照。
+
 手动部署使用 `gh workflow run deploy.yml --ref main -f environment=production`；必须指定 `--ref main`，因为远端脚本执行 `git checkout <ref>`，使用其他分支会切换到该分支。服务器必须预装 `/opt/jiesong_system/runtime/node-v22.23.4-linux-x64` 专用运行时目录；#104 解决了运行时守卫来源问题，不负责安装运行时。
 
 生产回滚见 [VPS 生产回滚手册](docs/operations/production-rollback.md)。
