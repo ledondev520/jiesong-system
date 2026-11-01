@@ -73,8 +73,10 @@ export default function ContainerSummary({
               {check.blockers.length + check.warnings.length} 项
             </summary>
             <ul className="mt-1 space-y-1">
-              {[...check.blockers, ...check.warnings].map((item) => (
-                <li key={`${item.code}-${item.message}`}>{item.message}</li>
+              {[...check.blockers, ...check.warnings].map((item, index) => (
+                <li key={`${index}-${item.code}-${item.message}`}>
+                  {item.message}
+                </li>
               ))}
             </ul>
           </details>

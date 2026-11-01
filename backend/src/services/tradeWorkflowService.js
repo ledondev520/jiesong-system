@@ -407,7 +407,8 @@ const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
         readiness = await evaluateShipmentReadinessAsync(contract, options);
       } catch (error) {
         if (error?.statusCode !== 503) throw error;
-        if (!options.utilisationOnly) packingPoolDown = true;
+        // utilisationOnly 不排柜（lines 为空，不进 worker 池），故不会走到这里；503 只来自完整排柜。
+        packingPoolDown = true;
         readiness = planUnavailableReadiness(contract);
       }
     }

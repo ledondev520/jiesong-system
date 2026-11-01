@@ -184,6 +184,11 @@ test('请求体校验：数组/对象/非十进制数值 400，空串为 null，
   assert.equal(ok.args.data.grossWeight, 1.5);
   assert.equal(ok.args.data.netWeight, null);
   assert.equal(ok.args.data.volume, null);
+  // 旧 Number() 写法的小数字符串继续接受（.5 / 1. / +1），只拒绝非十进制写法
+  for (const [raw, want] of [['.5', 0.5], ['1.', 1], ['+1', 1]]) {
+    const res = await run('create', { customsName: 'n', grossWeight: raw });
+    assert.equal(res.args.data.grossWeight, want, raw);
+  }
   const partial = await run('update', { customsName: 'n' });
   assert.equal(partial.args.data.grossWeight, undefined);
 });

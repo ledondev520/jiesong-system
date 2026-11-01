@@ -171,7 +171,11 @@ export function OrderOverviewTab({
           value={`${readiness.totals.cargoCbm.toFixed(2)} CBM`}
         >
           <p
-            className={`mt-2 text-xs ${readiness.isBlocking ? "text-destructive" : "text-muted-foreground"}`}
+            className={`mt-2 text-xs ${
+              readiness.isBlocking && !readiness.hasShipped
+                ? "text-destructive"
+                : "text-muted-foreground"
+            }`}
           >
             {readiness.headline}
           </p>

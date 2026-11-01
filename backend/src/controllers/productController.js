@@ -28,7 +28,7 @@ const bodyNumber = (value, label) => {
     const text = value.trim();
     if (text === '') return null;
     // 拒绝十六进制/Infinity 等 Number() 能解析的非十进制写法
-    if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(text)) parsed = Number(text);
+    if (/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(text)) parsed = Number(text);
   }
   if (!Number.isFinite(parsed)) throw createError(`${label} 必须是数字`, 400);
   return parsed;
