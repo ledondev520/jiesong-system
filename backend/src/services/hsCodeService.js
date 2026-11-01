@@ -48,6 +48,32 @@ const getAiService = () => {
 
 const normalizeKeyword = (value) => String(value || '').trim();
 
+// 订单/发票里的品名常是英文或俗称，而库内 productName 是中文，原样 contains 永远搜不到。
+// shortcut: 手工维护的别名表，只覆盖常见出口品类；真实搜索漏了哪类品名再补，不接翻译服务。
+// 只收多字别名：单字（盘/砖/碗）用 contains 会过宽。仅 HS 查询页路径启用（见 fuzzySearchHsCodes 的 expandAliases）。
+const SEARCH_ALIASES = {
+  melamine: ['密胺', '三聚氰胺', '塑料制餐具', '塑料餐具'],
+  tableware: ['餐具'],
+  dinnerware: ['餐具'],
+  plastic: ['塑料'],
+  ceramic: ['陶瓷'],
+  porcelain: ['陶瓷'],
+  tile: ['瓷砖'],
+  glass: ['玻璃'],
+  stainless: ['不锈钢'],
+  plate: ['餐具'],
+};
+
+/** 职责：把检索词扩展成 [原词, ...中文别名]；英文词按单词（容忍复数 s）查别名表 */
+const expandSearchTerms = (q) => {
+  const terms = [q];
+  for (const word of q.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)) {
+    const aliases = SEARCH_ALIASES[word] || SEARCH_ALIASES[word.replace(/s$/, '')] || [];
+    for (const alias of aliases) if (!terms.includes(alias)) terms.push(alias);
+  }
+  return terms;
+};
+
 /** 职责：判断是否像 HS 编码检索（仅数字、4–12 位，已 trim） */
 const isHsCodeLikeQuery = (s) => /^\d{4,12}$/.test(s);
 
@@ -450,12 +476,18 @@ ${productList}
  *   2. 非数字关键词：用关键词各 bigram 追加候选（OR LIKE 查询）
  *   3. 对未预置 similarity 的候选用 Dice 计算相似度；组合查询保留名称交集，过滤 < 0.2 的噪声
  *   4. 降序排列后分页返回
- * @param {{ keyword: string, code: string, page: number, pageSize: number }} params
+ * @param {{ keyword: string, code: string, page: number, pageSize: number, expandAliases?: boolean }} params
  */
-const fuzzySearchHsCodes = async ({ keyword = '', code = '', page = 1, pageSize = 20 } = {}) => {
+const fuzzySearchHsCodes = async ({ keyword = '', code = '', page = 1, pageSize = 20, expandAliases = false } = {}) => {
   const q = normalizeKeyword(keyword);
   const codePrefix = normalizeKeyword(code).replace(/\D/g, '');
   if (!q && !codePrefix) return listHsCodes({ page, pageSize });
+  // 别名和标题命中只给 HS 查询页用；批量自动匹配、AI 推荐也调用本函数，会按相似度直接采纳/抬高置信度，
+  // 它们必须保持只按品名匹配，否则英文品名会被宽松别名误判成本地命中。
+  const terms = expandAliases ? expandSearchTerms(q) : [q];
+  const nameOr = (term) => (expandAliases
+    ? [{ productName: { contains: term } }, { title: { contains: term } }]
+    : [{ productName: { contains: term } }]);
 
   const safePage = Math.max(parseInt(page, 10) || 1, 1);
   const safePageSize = Math.min(Math.max(parseInt(pageSize, 10) || 20, 1), 200);
@@ -534,7 +566,7 @@ const fuzzySearchHsCodes = async ({ keyword = '', code = '', page = 1, pageSize 
   if (!isNumericQuery && !codePrefix) {
     // 1. 精确包含匹配（限量 300 条，用于快速召回）
     const exactItems = await prisma.hsCode.findMany({
-      where: { productName: { contains: q } },
+      where: { OR: terms.flatMap(nameOr) },
       take: 300,
     });
     for (const row of exactItems) {
@@ -546,7 +578,11 @@ const fuzzySearchHsCodes = async ({ keyword = '', code = '', page = 1, pageSize 
     // 2. Bigram 候选召回：合并为单次 OR 查询，减少 DB 往返次数
     if (q.length >= 2) {
       const bigrams = [];
-      for (let i = 0; i < q.length - 1; i++) bigrams.push(q.slice(i, i + 2));
+      // 别名词（中文）也参与 bigram 召回；英文原词的 bigram 仍保留原行为。
+      // 别名放前面：下面最多取 6 个 bigram，英文原词的无意义 bigram 不能把中文别名挤掉。
+      for (const term of [...terms.slice(1), terms[0]]) {
+        for (let i = 0; i < term.length - 1; i++) bigrams.push(term.slice(i, i + 2));
+      }
       const uniqueBigrams = [...new Set(bigrams)].slice(0, 6);
 
       const bigramRows = await prisma.hsCode.findMany({
@@ -569,7 +605,7 @@ const fuzzySearchHsCodes = async ({ keyword = '', code = '', page = 1, pageSize 
       where: {
         AND: [
           { id: { in: candidates.map((item) => item.id) } },
-          { productName: { contains: q } },
+          { OR: terms.flatMap(nameOr) },
         ],
       },
       take: candidates.length,
@@ -581,7 +617,10 @@ const fuzzySearchHsCodes = async ({ keyword = '', code = '', page = 1, pageSize 
   const scored = candidates
     .map((item) => {
       if (typeof item.similarity === 'number') return item;
-      return { ...item, similarity: diceSimilarity(q || codePrefix, item.productName) };
+      // 取原词与各别名里最像的一个；仅标题命中的行给一个较高的固定分，避免被阈值滤掉。
+      const best = Math.max(...(q ? terms : [codePrefix]).map((term) => diceSimilarity(term, item.productName)));
+      const titleHit = expandAliases && q && item.title && terms.some((term) => item.title.includes(term)) ? 0.8 : 0;
+      return { ...item, similarity: Math.max(best, titleHit) };
     })
     .filter((item) => item.similarity >= THRESHOLD)
     .sort((a, b) => b.similarity - a.similarity);

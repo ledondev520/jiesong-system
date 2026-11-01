@@ -82,6 +82,15 @@ describe("HsCodesPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("编码位数提示一致：占位符、帮助文案与输入上限都是 4–12 位", async () => {
+    render(<HsCodesPage />);
+
+    const codeInput = await screen.findByPlaceholderText("编码前缀（4–12位）");
+    expect(screen.getByText(/4–12 位纯数字 HS 编码/)).toBeInTheDocument();
+    fireEvent.change(codeInput, { target: { value: "1234567890123456" } });
+    expect(codeInput).toHaveValue("123456789012");
+  });
+
   it("输入关键字后按关键字重新加载列表", async () => {
     render(<HsCodesPage />);
 
