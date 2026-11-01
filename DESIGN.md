@@ -17,14 +17,25 @@
 
 Token 单一来源：`frontend/src/app/globals.css`（`:root` 与 `.dark`）。依据 `docs/redesign/UX-REDESIGN-2026.md` §8.3。
 
-### 中性色（shadcn zinc）
-`--background` / `--card` / `--secondary` / `--muted` / `--accent` / `--border` / `--input` / `--sidebar*` 均取自 zinc 色阶（色相 ≈ 286，近乎无彩），不再带绿色底色。
+### 中性色（Ink & Seal 暖纸）
+重设计方向 D「Ink & Seal 墨朱」（负责人 2026-11-01 选定，来源 `handoff/DESIGN-REDESIGN-PROPOSAL.md` R2.1）。
+`--background` `oklch(0.972 0.006 80)` #f8f5f1（暖纸画布）、`--card` / `--popover` `oklch(0.995 0.004 85)` #fffdfa、`--foreground` `oklch(0.23 0.004 60)`（墨色，仅作文字）；`--secondary` / `--muted` `oklch(0.95 0.007 75)`、`--accent`（悬停/选中行）`oklch(0.935 0.008 75)`，刻意不用粉色，避免被当成红色软底徽章；`--border` / `--input` `oklch(0.89 0.008 75)` / `oklch(0.85 0.01 75)`。
+侧栏是浅暖纸色（`--sidebar` `oklch(0.955 0.008 78)`），不是深色。页面背景是纯色，不再有光晕或网格。
 
-### 主色（唯一品牌强调色：深青绿）
+### 主色（唯一品牌强调色：深朱砂 oxblood）
 | Token | 浅色 | 深色 | 用途 |
 |---|---|---|---|
-| `--primary` / `--ring` / `--sidebar-primary` | `oklch(0.5 0.11 165)` | `oklch(0.62 0.12 165)` | 仅用于主按钮、链接、当前导航项 |
-| `--primary-foreground` | `oklch(0.985 0 0)` | `oklch(0.141 0.005 285.823)` | 主色背景上的文字 |
+| `--primary` / `--sidebar-primary` / `--chart-1` | `oklch(0.38 0.12 15)` #751e2d | `oklch(0.74 0.09 355)` / `0.80 0.08 355`（侧栏） | 仅用于主按钮、链接、当前导航项 |
+| `--primary-foreground` | `oklch(0.99 0.005 85)` | `oklch(0.2 0.02 15)` | 主色背景上的文字 |
+| `--ring` / `--sidebar-ring` | `oklch(0.42 0.02 60)` | `oklch(0.78 0.02 70)` | 焦点环，**刻意中性不用红**，避免与 `aria-invalid` 红环混淆 |
+
+文字对比度（由 `app/design-tokens.test.ts` 按 oklch 实算，浅/深色均 ≥ 4.5:1）。
+
+### 品牌色（仅公开页，禁止出现在 /dashboard 内）
+`--brand-mark` #B91C2B（标志圆点专用，与状态红几乎同色）、`--brand-ink` #1C1C1C（标志笔画）、`--brand-gold` #C8A24A（发丝线/装饰，不作文字，近琥珀）、`--brand-gold-text` #846324（金色文字 5.5:1）。Tailwind 类：`text-brand-*` / `bg-brand-*`。`design-tokens.test.ts` 会检查 /dashboard 源码不得使用。
+
+### 已知风险（方向 D 的护栏，尚未在本阶段落地）
+主色与状态红/危险红同属红系，方案要求另做 1.1b：`Button` 的 `destructive` 变体改描边、红色状态徽章补图标、链接朱砂色悬停下划线。本阶段（令牌替换）不改组件，状态徽章色不变。
 
 ### 语义色
 - `--destructive`：删除/错误（红色仅用于阻塞、逾期、破坏性操作）
