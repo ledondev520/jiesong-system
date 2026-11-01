@@ -836,7 +836,7 @@ const buildImagePrompt = () => `请识别这张图片的内容，如果是报价
 
 const buildInputContent = (content, type, imageUrl) => {
   if (!imageUrl) {
-    return parseInputPromptMap[type]?.(content) || content;
+    return (Object.hasOwn(parseInputPromptMap, type) ? parseInputPromptMap[type](content) : content);
   }
 
   return [

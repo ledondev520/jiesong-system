@@ -88,7 +88,7 @@ const planUnavailableReadiness = (salesContract) => {
     ...base.check, ready: false, status: 'blocked', headline: PLAN_UNAVAILABLE,
     blockers: [{ code: 'plan-unavailable', message: PLAN_UNAVAILABLE }, ...base.check.blockers],
   };
-  return { ...base, ready: false, check, blockers: check.blockers.map((item) => item.code), planUnavailable: true };
+  return { ...base, physicalFit: false, placedBoxCount: 0, ready: false, check, blockers: check.blockers.map((item) => item.code), planUnavailable: true };
 };
 const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisationOnly = false, readiness: given } = {}) => {
   const packingItems = salesContract.packingItems || [];
@@ -393,16 +393,23 @@ const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
   });
 
   // 排柜在 worker 线程；逐个等待，使单次请求最多占一个 worker。单行排柜失败（503）只降级该行为「装柜计划不可用」（不可发运，绝不显示 ready），其余行照常。
+  // 一次 503 后本请求其余需真实排柜的行直接降级，避免池异常时 N × 4s。
   let workflows = [];
+  let packingPoolDown = false;
   for (const contract of salesContracts) {
     const utilisationOnly = scope !== 'recent';
     const options = { utilisationOnly: utilisationOnly && isShippedContract(contract) };
     let readiness;
-    try {
-      readiness = await evaluateShipmentReadinessAsync(contract, options);
-    } catch (error) {
-      if (error?.statusCode !== 503) throw error;
+    if (packingPoolDown && !options.utilisationOnly) {
       readiness = planUnavailableReadiness(contract);
+    } else {
+      try {
+        readiness = await evaluateShipmentReadinessAsync(contract, options);
+      } catch (error) {
+        if (error?.statusCode !== 503) throw error;
+        if (!options.utilisationOnly) packingPoolDown = true;
+        readiness = planUnavailableReadiness(contract);
+      }
     }
     workflows.push(buildTradeWorkflow(contract, purchaseMap, { utilisationOnly, readiness }));
   }

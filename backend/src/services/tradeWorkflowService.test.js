@@ -267,19 +267,19 @@ test('采购备注不是丢失合同；已有合同仍需明确采购明细分�
   assert(!assigned.issues.some(x => x.startsWith('采购明细待分配')));
 });
 
-test('列表：单行排柜 503 只降级该行为「装柜计划不可用」（不可发运），其余行照常', async () => {
+test('列表：排柜 503 降级为「装柜计划不可用」（不可发运），同请求其余行不再排柜直接降级', async () => {
   const prisma = require('../utils/prisma');
   const pool = require('./containerPackingPool');
   const { listTradeWorkflows } = require('./tradeWorkflowService');
   const originalSales = prisma.salesContract.findMany;
   const originalPurchase = prisma.purchaseContract.findMany;
   const originalPack = pool.packContainersAsync;
-  prisma.salesContract.findMany = async () => [{ ...baseSales, id: 'fails' }, { ...baseSales, id: 'ok' }];
+  prisma.salesContract.findMany = async () => [{ ...baseSales, id: 'fails' }, { ...baseSales, id: 'skipped' }];
   prisma.purchaseContract.findMany = async () => [basePurchase];
   let calls = 0;
-  pool.packContainersAsync = (...args) => {
+  pool.packContainersAsync = () => {
     calls += 1;
-    return calls === 1 ? Promise.reject(Object.assign(new Error('x'), { statusCode: 503 })) : originalPack(...args);
+    return Promise.reject(Object.assign(new Error('x'), { statusCode: 503 }));
   };
   try {
     const rows = await listTradeWorkflows({ limit: 6, scope: 'recent' });
@@ -289,7 +289,13 @@ test('列表：单行排柜 503 只降级该行为「装柜计划不可用」（
     assert.equal(failed.readiness.check.ready, false);
     assert.equal(failed.stages.find((stage) => stage.key === 'loading').status, 'blocked');
     assert.match(failed.stages.find((stage) => stage.key === 'loading').reason, /装柜计划暂不可用/);
-    assert.equal(rows.find((row) => row.id === 'ok').readiness.planUnavailable, undefined);
+    assert.equal(failed.readiness.physicalFit, false);
+    assert.equal(failed.readiness.placedBoxCount, 0);
+    // 熔断：首次 503 后其余行不再请求排柜，但同样降级为不可发运
+    assert.equal(calls, 1);
+    const skipped = rows.find((row) => row.id === 'skipped');
+    assert.equal(skipped.readiness.planUnavailable, true);
+    assert.equal(skipped.readiness.ready, false);
     // 非 503 的真实错误不被吞掉
     pool.packContainersAsync = () => Promise.reject(new Error('bug'));
     await assert.rejects(() => listTradeWorkflows({ limit: 6, scope: 'recent' }), /bug/);

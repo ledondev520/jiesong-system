@@ -84,13 +84,21 @@ test('结果缓存：相同输入第二次命中且返回独立副本', async ()
 });
 
 test('priority 任务插队到排队任务之前', async () => {
-  const finished = [];
-  const run = (name, sizes, options) => packContainersAsync(linesOf(sizes, 5), spec, config, options).then(() => finished.push(name));
-  // 先占满两个 worker，再排队 A、B，最后 priority 的 P 应先于 A、B 完成。
-  const busy = [run('busy1', 300, {}), run('busy2', 301, {})];
-  const queued = [run('A', 302, {}), run('B', 303, {}), run('P', 304, { priority: true })];
-  await Promise.all([...busy, ...queued]);
-  assert.ok(finished.indexOf('P') < finished.indexOf('A') && finished.indexOf('P') < finished.indexOf('B'), finished.join());
+  // 池只保证启动顺序：busy2 长期占住一个 worker，busy1 先空出后 P、A、B 在同一 worker 上串行启动，日志顺序即出队顺序（无线程竞争）。
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pack-pool-'));
+  try {
+    const logFile = path.join(dir, 'started.log');
+    const workerFile = path.join(dir, 'record.js');
+    fs.writeFileSync(workerFile, `const { parentPort, workerData } = require('node:worker_threads');
+require('node:fs').appendFileSync(${JSON.stringify(logFile)}, workerData.lines[0].tag + '\\n');
+setTimeout(() => parentPort.postMessage({ ok: true, result: { containers: [], unplaced: [] } }), { busy1: 100, busy2: 800 }[workerData.lines[0].tag] ?? 20);`);
+    const run = (tag, options) => packContainersAsync([{ tag }], spec, config, { ...options, workerFile, timeoutMs: 5000 });
+    // 同一 tick 内先占满两个 worker 再排队，排队顺序为 A、B、P。
+    await Promise.all([run('busy1'), run('busy2'), run('A'), run('B'), run('P', { priority: true })]);
+    const started = fs.readFileSync(logFile, 'utf8').trim().split('\n');
+    assert.deepEqual(started.slice(0, 2).sort(), ['busy1', 'busy2']);
+    assert.deepEqual(started.slice(2), ['P', 'A', 'B']);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('排队等待计入总时限：worker 全忙时到点即 503，不等 worker 空出', async () => {
