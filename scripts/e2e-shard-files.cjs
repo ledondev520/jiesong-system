@@ -1,13 +1,14 @@
 // Weighted E2E sharding (BL-4-FIX): Playwright's --shard splits by file count, which left one
 // shard 1.84x slower than another. Prints the spec files of shard <i> of <n>, one per line.
-// Weights = seconds per spec from CI run 41274550136; specs not listed get DEFAULT_WEIGHT.
+// Weights = seconds per spec from CI run 41274550136 (mobile.spec.ts 132s split into per-viewport files, ~39s each + 15s rest); specs not listed get DEFAULT_WEIGHT.
 // shortcut: weights are hand-copied, refresh them when a shard drifts past ~1.3x the fastest.
 const fs = require("node:fs");
 const path = require("node:path");
 
 const DEFAULT_WEIGHT = 5;
 const WEIGHTS = {
-  "mobile.spec.ts": 132, "button-coverage.spec.ts": 51, "real-role-lifecycle.spec.ts": 49,
+  "mobile-320.spec.ts": 39, "mobile-390.spec.ts": 39, "mobile-430.spec.ts": 39,
+  "mobile.spec.ts": 15, "button-coverage.spec.ts": 51, "real-role-lifecycle.spec.ts": 49,
   "real-export-3d.spec.ts": 43, "real-menu-export-documents.spec.ts": 34,
   "real-financial-library.spec.ts": 27, "profile-preference-lifecycle.spec.ts": 19,
   "product-editor.spec.ts": 12, "real-hs-catalog.spec.ts": 12, "real-sales-header.spec.ts": 11,
@@ -26,7 +27,7 @@ function shardFiles(files, index, count) {
   return bins[index - 1].files.sort();
 }
 
-module.exports = { shardFiles };
+module.exports = { shardFiles, WEIGHTS, DEFAULT_WEIGHT };
 
 if (require.main === module) {
   const [index, count] = process.argv.slice(2).map(Number);
