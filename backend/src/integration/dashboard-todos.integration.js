@@ -97,6 +97,12 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   await purchase("SYN-P-DRAFT", "DRAFT", 1000, 0);
   const signed = await purchase("SYN-P-SIGNED", "SIGNED", 1000, 400);
   await purchase("SYN-P-SHIPPED", "SHIPPED", 500, 500);
+  // Invoice rule: a valid matched invoice counts as invoiced; a red-flushed (已红冲) one does not.
+  const invoicedBatch = await db.financeDataBatch.create({ data: { type: "INVOICE", fileName: "synthetic.xlsx", recordCount: 2 } });
+  const invoiceRow = (status, matchedContractId) =>
+    db.invoiceRecord.create({ data: { batchId: invoicedBatch.id, seller: "s", invDate: "2026-01-01", amount: 1, tax: 0, total: 1, status, isPositive: "是", matchStatus: "MATCHED", matchedContractType: "PURCHASE", matchedContractId } });
+  await invoiceRow("正常", (await purchase("SYN-P-INVOICED", "RECEIVED", 500, 500)).id);
+  await invoiceRow("已红冲-全额", (await purchase("SYN-P-REVERSED", "RECEIVED", 500, 500)).id);
   const sale = (contractNo, status, extra = {}) =>
     db.salesContract.create({ data: { contractNo, status, exchangeRate: 7, totalAmount: 1000, ...extra } });
   const line = (salesContractId) =>
@@ -176,8 +182,8 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   assert.equal(admin.lists.receiptsToInspect.count, 1);
   assert.equal(admin.lists.toLoad.count, 7);
   assert.equal(admin.lists.toShip.count, 1);
-  assert.equal(admin.lists.missingInvoice.count, 1);
-  assert.equal(admin.lists.missingInvoice.items[0].contractNo, "SYN-P-SHIPPED");
+  assert.equal(admin.lists.missingInvoice.count, 2);
+  assert.deepEqual(admin.lists.missingInvoice.items.map((i) => i.contractNo).sort(), ["SYN-P-REVERSED", "SYN-P-SHIPPED"]);
   assert.equal(admin.lists.overdueReceivables.count, 1);
   assert.equal(admin.lists.overdueReceivables.items[0].amount, 1000);
   assert.equal(admin.lists.refundable.count, 1);
@@ -203,6 +209,6 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   assert.deepEqual(emptied.lists.quotesAwaitingCustomer.items, []);
 
   // Read-only: the reads above changed no business rows.
-  assert.equal(await db.purchaseContract.count(), 6);
+  assert.equal(await db.purchaseContract.count(), 8);
   assert.equal((await db.purchaseContract.findUnique({ where: { id: signed.id } })).paidAmount, 400);
 });

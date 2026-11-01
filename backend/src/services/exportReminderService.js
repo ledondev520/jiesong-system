@@ -8,6 +8,7 @@
 
 const prisma = require('../utils/prisma');
 const { NOTIFICATION_TYPE, ROLES } = require('../config/constants');
+const { findInvoicedPurchaseContractIds } = require('./invoiceRecordService');
 const { OFFICIAL_RULES } = require('./taxRefundPreparationService');
 
 // 5号仅是内部材料准备节点，不代表法定申报截止日。
@@ -127,7 +128,7 @@ const runMonthlyTaxRefundReminder = async (tx = prisma, options = {}) => {
 /**
  * 职责：生成「货已出但未登记发票号」的催票提醒（幂等：同一用户每天一条）
  * 思路：
- *   1. 找出已发货/已收货/已完成但 invoiceNo 为空的采购合同
+ *   1. 找出已发货/已收货/已完成、invoiceNo 为空且无有效关联发票记录的采购合同
  *   2. 拼接合同号+供应商摘要，对管理员/财务/采购角色创建当日通知
  * @param {object} tx Prisma 客户端（默认全局实例）
  * @param {object} options { now?: Date }
@@ -151,7 +152,10 @@ const runInvoiceMissingReminder = async (tx = prisma, options = {}) => {
     },
     orderBy: { updatedAt: 'desc' },
   });
-  const missingContracts = candidates.filter((contract) => !String(contract.invoiceNo || '').trim());
+  const noNumber = candidates.filter((contract) => !String(contract.invoiceNo || '').trim());
+  // 与看板「缺进项发票」同一口径：已有有效关联发票记录的合同不催票。
+  const invoiced = await findInvoicedPurchaseContractIds(tx, noNumber.map((c) => c.id));
+  const missingContracts = noNumber.filter((c) => !invoiced.has(c.id));
 
   if (missingContracts.length === 0) {
     return { skipped: true, reason: 'no-missing-invoice', created: 0, contracts: 0 };

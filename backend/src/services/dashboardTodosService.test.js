@@ -23,5 +23,8 @@ test('missingInvoice: 已关联发票记录的合同即使 invoiceNo 为空也�
   assert.equal(result.count, 1);
   assert.equal(invoiceWhere.matchStatus, 'MATCHED');
   assert.equal(invoiceWhere.matchedContractType, 'PURCHASE');
+  // 已红冲/作废/负数发票不算已开票（保守口径）
+  assert.equal(invoiceWhere.status, '正常');
+  assert.equal(invoiceWhere.isPositive, '是');
   assert.deepEqual(invoiceWhere.matchedContractId.in, ['matched', 'missing']);
 });
