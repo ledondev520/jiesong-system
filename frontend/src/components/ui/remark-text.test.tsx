@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import { RemarkText } from "./remark-text";
 
 describe("RemarkText", () => {
@@ -36,5 +37,16 @@ describe("RemarkText", () => {
     const { container } = render(<RemarkText note="客户自提" />);
     expect(container.textContent).toBe("客户自提");
     expect(container.querySelector("details")).toBeNull();
+  });
+
+  it("点开「导入来源」不会冒泡触发外层可点击卡片", async () => {
+    const onCard = vi.fn();
+    render(
+      <div onClick={onCard}>
+        <RemarkText note={"[WPS_EVIDENCE] a.xlsx"} />
+      </div>,
+    );
+    await userEvent.click(screen.getByText("导入来源"));
+    expect(onCard).not.toHaveBeenCalled();
   });
 });

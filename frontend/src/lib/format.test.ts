@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatAmount,
+  formatDeclaredPrice,
   formatMoney,
   formatStat,
   formatUnitPrice,
@@ -66,5 +67,19 @@ describe("formatAmount", () => {
     expect(formatAmount(-5)).toBe("-5.00");
     expect(formatAmount(null)).toBe("—");
     expect(formatAmount("abc")).toBe("—");
+  });
+});
+
+describe("formatDeclaredPrice", () => {
+  it("报关单价保留到 4 位小数、至少 2 位，长浮点被截成可读值", () => {
+    expect(formatDeclaredPrice(146.0007440476191)).toBe("146.0007");
+    expect(formatDeclaredPrice(0.0345)).toBe("0.0345");
+    expect(formatDeclaredPrice(12)).toBe("12.00");
+    expect(formatDeclaredPrice(1234.5)).toBe("1,234.50");
+  });
+
+  it("无效值显示占位，极小负数无负号", () => {
+    expect(formatDeclaredPrice(null)).toBe("—");
+    expect(formatDeclaredPrice(-0.00001)).toBe("0.00");
   });
 });

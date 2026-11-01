@@ -26,7 +26,13 @@ export function RemarkText({
       {text || fallback}
       {source.length > 0 && (
         <details className="mt-1 text-xs text-muted-foreground">
-          <summary className="cursor-pointer select-none">导入来源</summary>
+          {/* 可点击的卡片（如手机列表卡）里点开折叠区不应触发卡片本身的点击。 */}
+          <summary
+            className="cursor-pointer select-none"
+            onClick={(event) => event.stopPropagation()}
+          >
+            导入来源
+          </summary>
           <span className="mt-1 block space-y-0.5 break-all font-mono">
             {source.map((line, index) => (
               <span key={index} className="block">

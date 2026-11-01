@@ -74,6 +74,11 @@ describe("splitRemark", () => {
     expect(splitRemark(note)).toEqual({ text: note, source: [] });
   });
 
+  it("没有可移走内容时原样返回，不改写空白和空行", () => {
+    const note = "第一行  有两个空格\n\n第三行 ";
+    expect(splitRemark(note)).toEqual({ text: note, source: [] });
+  });
+
   it("不改动输入（存储数据保持不变）", () => {
     const note = "x\n[WPS_SOURCE] y";
     splitRemark(note);

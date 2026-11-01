@@ -24,7 +24,7 @@ export interface SplitRemark {
 
 /**
  * 职责：逐行拆分。标记行从标记起到行尾归入 source，标记前的正常文字保留；
- * 其余行只抽出已知痕迹键值和内部 ID。无标记的普通备注原样返回。
+ * 其余行只抽出已知痕迹键值和内部 ID。没有任何内容被移走时，备注原样返回（含空白与空行）。
  */
 export function splitRemark(note: unknown): SplitRemark {
   const raw = typeof note === "string" ? note : "";
@@ -55,5 +55,7 @@ export function splitRemark(note: unknown): SplitRemark {
     if (kept) text.push(kept);
   }
 
+  // 普通备注不做任何改写，只有真的拆出了来源才用整理后的正文。
+  if (source.length === 0) return { text: raw.trim() ? raw : "", source };
   return { text: text.join("\n"), source };
 }

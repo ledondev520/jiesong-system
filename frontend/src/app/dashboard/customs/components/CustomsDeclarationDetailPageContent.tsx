@@ -8,7 +8,7 @@
 
 "use client";
 
-import { formatAmount } from "@/lib/format";
+import { formatAmount, formatDeclaredPrice } from "@/lib/format";
 import { RemarkText } from "@/components/ui/remark-text";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
@@ -49,9 +49,11 @@ const detailFields = (declaration: CustomsDeclaration) => [
   { label: "成交币种", value: declaration.currency },
 ];
 
-// 报关单价/总价后端可能存长浮点（如 XML 换算），统一 2 位小数显示；缺失仍显示「-」。
-const priceText = (value: number | null | undefined) =>
-  value === null || value === undefined ? "-" : formatAmount(value);
+// 报关单价/总价后端可能存长浮点（如 XML 换算）：总价 2 位小数，单价保留申报常用的 4 位；缺失仍显示「-」。
+const priceText = (
+  value: number | null | undefined,
+  format: (value: number) => string = formatAmount,
+) => (value === null || value === undefined ? "-" : format(value));
 
 export function CustomsDeclarationDetailPageContent({
   params,
@@ -241,7 +243,7 @@ export function CustomsDeclarationDetailPageContent({
                       label: "数量",
                       value: `${item.quantity.toLocaleString()} ${item.unit || ""}`,
                     },
-                    { label: "单价", value: priceText(item.unitPrice) },
+                    { label: "单价", value: priceText(item.unitPrice, formatDeclaredPrice) },
                   ]}
                   amount={{
                     label: "总价",
@@ -330,7 +332,7 @@ export function CustomsDeclarationDetailPageContent({
                       </TableCell>
                       <TableCell>{item.unit || "-"}</TableCell>
                       <TableCell className="text-right">
-                        {priceText(item.unitPrice)}
+                        {priceText(item.unitPrice, formatDeclaredPrice)}
                       </TableCell>
                       <TableCell className="text-right">
                         {priceText(item.totalPrice)}
