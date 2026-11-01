@@ -49,8 +49,9 @@ function build(kind, target) {
         });
       } finally { process.umask(previousUmask); }
     } else {
+      // 'diff' = role-fixture schema + lock row; 'schema' = bare schema DDL for tests that seed their own rows.
       const ddl = execFileSync(process.execPath, [prismaCli(), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.join(backendRoot, 'prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 60000 });
-      execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', database], { input: `${ddl}\nINSERT INTO password_reset_lock (id) VALUES (1);` });
+      execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', database], { input: kind === 'diff' ? `${ddl}\nINSERT INTO password_reset_lock (id) VALUES (1);` : ddl });
     }
     fs.chmodSync(database, 0o600);
     fs.renameSync(database, target);
@@ -59,7 +60,7 @@ function build(kind, target) {
 
 /**
  * 职责：把模板复制为独占新库（已存在则失败），权限 0600
- * @param kind 'deploy'=已提交迁移结果；'diff'=schema DDL + password_reset_lock 行
+ * @param kind 'deploy'=已提交迁移结果；'diff'=schema DDL + password_reset_lock 行；'schema'=仅 schema DDL
  * @param destination 尚不存在的数据库路径
  * @throws 缓存不安全、构建失败或目标已存在
  */

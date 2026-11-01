@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync, fork } = require('node:child_process');
+const { fork } = require('node:child_process');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 test('HTTP/SQLite：采购并发到货、累计复验、整批回滚及采购角色边界', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-purchase-exceptions-'));
@@ -25,8 +26,7 @@ test('HTTP/SQLite：采购并发到货、累计复验、整批回滚及采购角
     if (db) await db.$disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
   });
-  const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 30000 });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbFile], { input: ddl });
+  copyTemplate('schema', dbFile);
   fs.chmodSync(dbFile, 0o600);
   db = require('../utils/prisma');
   const jwt = require('jsonwebtoken');
