@@ -52,3 +52,22 @@ test('hsCodes: 已缓存的推荐立即返回，不再模拟 AI 等待', async (
   assert.deepEqual(res.payload.data, cached);
   assert.equal(delayCalls, 0);
 });
+
+test('hsCodes: GET / 的模糊检索（HS 查询页）开启别名展开，其它调用方默认不开', async (t) => {
+  const hsCodeService = require('../services/hsCodeService');
+  let received = null;
+  t.mock.method(hsCodeService, 'fuzzySearchHsCodes', async (args) => {
+    received = args;
+    return { items: [], pagination: {} };
+  });
+  const layer = hsCodesRouter.stack.find(
+    (item) => item.route && item.route.path === '/' && item.route.methods.get,
+  );
+  const handler = layer.route.stack[layer.route.stack.length - 1].handle;
+  const res = { status() { return this; }, json() { return this; } };
+
+  await handler({ query: { keyword: 'melamine', fuzzy: 'true' } }, res, (error) => { throw error; });
+
+  assert.equal(received.keyword, 'melamine');
+  assert.equal(received.expandAliases, true);
+});

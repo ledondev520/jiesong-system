@@ -8,6 +8,7 @@
 
 "use client";
 
+import { RemarkText } from "@/components/ui/remark-text";
 import {
   BusinessWrite,
   useBusinessReadOnly,
@@ -97,7 +98,9 @@ import { PurchaseReceiptPanel } from "./components/PurchaseReceiptPanel";
 import { PurchaseFlowPanel } from "./components/PurchaseFlowPanel";
 import { PurchaseProductionPanel } from "./components/PurchaseProductionPanel";
 import { configService } from "@/services/config.service";
+import { PurchaseSubStatus } from "@/components/purchase/PurchaseSubStatus";
 import { cn } from "@/lib/utils";
+import { PURCHASE_STATUS_LABELS } from "@/components/ui/status-badge";
 import { useAuthStore } from "@/store/auth.store";
 import {
   calculatePurchaseLineAmounts,
@@ -144,7 +147,7 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
         "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800",
     },
     [PurchaseStatus.SIGNED]: {
-      label: "已确认",
+      label: PURCHASE_STATUS_LABELS.SIGNED,
       icon: <CheckCircle2 className="h-3 w-3" />,
       className:
         "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
@@ -204,7 +207,11 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
 
 const PURCHASE_TIMELINE_STEPS = [
   { status: PurchaseStatus.DRAFT, label: "草稿", icon: FileText },
-  { status: PurchaseStatus.SIGNED, label: "已确认", icon: CheckCircle2 },
+  {
+    status: PurchaseStatus.SIGNED,
+    label: PURCHASE_STATUS_LABELS.SIGNED,
+    icon: CheckCircle2,
+  },
   { status: PurchaseStatus.PRODUCING, label: "生产中", icon: Loader2 },
   { status: PurchaseStatus.READY, label: "生产完成", icon: PackageCheck },
   { status: PurchaseStatus.SHIPPED, label: "已发货", icon: Truck },
@@ -706,6 +713,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill status={contract.status} />
+            <PurchaseSubStatus
+              status={contract.status}
+              subStatus={contract.subStatus}
+            />
             {contract.status === PurchaseStatus.DRAFT &&
               contract.paidAmount === 0 &&
               !contract.payments?.length &&
@@ -1024,7 +1035,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
             {contract.note && (
               <div className="rounded-lg bg-muted/50 p-3">
                 <p className="text-xs text-muted-foreground">备注</p>
-                <p className="mt-1 text-sm">{contract.note}</p>
+                <div className="mt-1 text-sm">
+                  <RemarkText note={contract.note} />
+                </div>
               </div>
             )}
           </CardContent>

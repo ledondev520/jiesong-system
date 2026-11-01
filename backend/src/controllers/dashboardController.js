@@ -18,6 +18,7 @@ const { listLowStockAlerts } = require('../services/inventoryAlertService');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { listTradeWorkflows } = require('../services/tradeWorkflowService');
 const { roundMoney } = require('../utils/money');
+const { marginBlockers, cashOnlyBlockers, tallyReasons } = require('../services/marginReadiness');
 
 /**
  * 职责：返回按出口合同聚合的专项单主线路，供工作台展示唯一下一动作。
@@ -446,6 +447,14 @@ const getBusinessOverview = async (req, res, next) => {
     });
     const unavailable = sold.filter(({ contract, summary }) => !summary.marginReady || !contract.packingItems?.length);
     const marginReady = unavailable.length === 0;
+    const unavailableDetails = unavailable.map(({ contract, summary }) => ({ contract, blockers: marginBlockers(contract, summary) }));
+    const unavailableIds = new Set(unavailable.map(({ contract }) => contract.id));
+    const verifiedSold = sold.filter(({ contract }) => !unavailableIds.has(contract.id));
+    // 净现金不可用：毛利不可用的合同 + 毛利可用但资金侧有缺口的合同
+    const cashBlocked = sold.map(({ contract, summary }) => ({
+      contract,
+      blockers: [...(unavailableIds.has(contract.id) ? marginBlockers(contract, summary) : []), ...cashOnlyBlockers(summary)],
+    })).filter(({ blockers }) => blockers.length > 0);
     const revenueReady = sold.every(({ summary }) => summary.currencyPolicy.conversionRate !== null);
     const totalSales = revenueReady ? sum(sold, ({ summary }) => summary.profit.expectedRevenueCny) : null;
     const totalPurchases = marginReady ? sum(sold, ({ summary }) => summary.cost.purchaseCostCny) : null;
@@ -471,10 +480,23 @@ const getBusinessOverview = async (req, res, next) => {
         marginReady, cashReady, currency: 'CNY', contractCount: sold.length,
         netCashCny: cashReady ? sum(sold, ({ summary }) => summary.cashFlow.netCashCny) : null,
         scope: '发运商品口径：自有美元收入按各合同汇率折算 − 对应装箱明细含税采购成本；不含预计退税、海运、报关、银行及管理费用。资金/库存风险为当前全量快照。',
-        unavailableContracts: unavailable.map(({ contract, summary }) => ({
+        unavailableContracts: unavailableDetails.map(({ contract, blockers }) => ({
           id: contract.id,
-          reasons: contract.packingItems?.length ? summary.issues.filter((issue) => issue.severity === 'error').map((issue) => issue.message) : ['缺少装箱明细，无法匹配已售成本'],
+          contractNo: contract.contractNo,
+          reasons: blockers.map((blocker) => blocker.message),
+          reasonCodes: blockers.map((blocker) => blocker.code),
         })),
+        // 按原因的笔数（一笔可同时缺多项，合计可大于不可用笔数）
+        marginReasonSummary: tallyReasons(unavailableDetails.map(({ blockers }) => blockers)),
+        cashReasonSummary: tallyReasons(cashBlocked.map(({ blockers }) => blockers)),
+        // 已核实的出货单独汇总，不替代整体口径（整体仍须全部核实才给出）
+        verified: {
+          contractCount: verifiedSold.length,
+          totalPurchases: sum(verifiedSold, ({ summary }) => summary.cost.purchaseCostCny),
+          grossProfit: sum(verifiedSold, ({ summary }) => summary.profit.estimatedGrossProfitCny),
+        },
+        // 状态为已发运/到港/完成但没有发运日期的出货：不在任何期间内，因此不计入上面的笔数
+        shippedWithoutDate: sales.filter((contract) => ['SHIPPED', 'ARRIVED', 'COMPLETED'].includes(contract.status) && !contract.shippedAt).length,
       },
       funds: {
         totalReceivable: sum(allSummaries, ({ summary }) => summary.revenue.outstandingUsd),

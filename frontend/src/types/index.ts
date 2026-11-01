@@ -332,6 +332,18 @@ export enum PurchaseStatus {
   CANCELLED = "CANCELLED",
 }
 
+/** 后端派生的付款/到货/生产资料子状态（purchaseSubStatusService），只读展示 */
+export interface PurchaseSubStatus {
+  payment: "NONE" | "UNPAID" | "PARTIAL" | "PAID";
+  arrival: {
+    state: "NONE" | "PARTIAL" | "FULL";
+    ordered: number;
+    arrived: number;
+    registered: boolean;
+  };
+  docsComplete: boolean;
+}
+
 export interface PurchaseContract {
   id: string;
   contractNo: string;
@@ -352,6 +364,7 @@ export interface PurchaseContract {
   items?: PurchaseItem[];
   payments?: Payment[];
   productionReadiness?: PurchaseProductionReadiness;
+  subStatus?: PurchaseSubStatus;
 }
 
 export interface PurchaseProductionIssue {

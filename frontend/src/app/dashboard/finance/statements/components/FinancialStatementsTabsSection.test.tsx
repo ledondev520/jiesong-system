@@ -172,4 +172,65 @@ describe("FinancialStatementsTabsSection", () => {
     expect(screen.getByText("来源校验（1 份）")).toBeInTheDocument();
     expect(screen.getByText("2026年6期-6期_明细账.xlsx")).toBeInTheDocument();
   });
+
+  it("最新账期没有费用数据时占比图回退到更早账期并说明，不再是空白卡片", () => {
+    const trend = analytics.trends[0];
+    render(
+      <FinancialStatementsTabsSection
+        analytics={{
+          ...analytics,
+          trends: [
+            { ...trend, label: "2026年6月" },
+            {
+              ...trend,
+              label: "2026年7月",
+              costOfSales: 0,
+              adminExpenses: 0,
+              financialExpenses: 0,
+              sellingExpenses: 0,
+              expenseReported: false,
+            },
+          ],
+        }}
+        periods={[]}
+        currentDetail={null}
+        detailLoading={false}
+      />,
+    );
+    expect(screen.getByTestId("expense-share-period")).toHaveTextContent(
+      "2026年6月各项费用占比分布（2026年7月没有可画的费用，已改用该账期）",
+    );
+    expect(screen.queryByTestId("expense-share-empty")).toBeNull();
+  });
+
+  it("所有账期都没有正数费用时写出具体原因并列出负数项", () => {
+    const trend = analytics.trends[0];
+    render(
+      <FinancialStatementsTabsSection
+        analytics={{
+          ...analytics,
+          trends: [
+            {
+              ...trend,
+              label: "2026年7月",
+              costOfSales: 0,
+              adminExpenses: 0,
+              financialExpenses: -5,
+              sellingExpenses: 0,
+              expenseReported: true,
+            },
+          ],
+        }}
+        periods={[]}
+        currentDetail={null}
+        detailLoading={false}
+      />,
+    );
+    expect(screen.getByTestId("expense-share-empty")).toHaveTextContent(
+      "2026年7月的营业成本、管理费用、财务费用、销售费用都是 0 或负数",
+    );
+    expect(screen.getByTestId("expense-share-negatives")).toHaveTextContent(
+      "财务费用为负",
+    );
+  });
 });

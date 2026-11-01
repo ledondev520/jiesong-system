@@ -18,6 +18,7 @@ const {
   PURCHASE_STATUS,
 } = require('../services/purchaseStateMachine');
 const { assertPurchaseReceiptComplete } = require('../services/purchaseReceiptService');
+const { attachPurchaseSubStatus } = require('../services/purchaseSubStatusService');
 const { normalizePagination } = require('../utils/pagination');
 const auditLog = require('../utils/auditLog');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
@@ -158,7 +159,7 @@ const list = async (req, res, next) => {
       prisma.purchaseContract.findMany({ where: { storeName: { not: null } }, select: { storeName: true }, distinct: ['storeName'] }),
     ]);
     
-    paginated(res, contracts, total, page, pageSize, {
+    paginated(res, lite ? contracts : await attachPurchaseSubStatus(contracts), total, page, pageSize, {
       summary: { statusCounts: Object.fromEntries(statusCounts.map((row) => [row.status, row._count._all])), stores: stores.map((row) => row.storeName).filter(Boolean) },
     });
   } catch (error) {
@@ -186,8 +187,9 @@ const getById = async (req, res, next) => {
       throw createError('采购合同不存在', 404);
     }
     
+    const [detail] = await attachPurchaseSubStatus([contract]);
     success(res, {
-      ...contract,
+      ...detail,
       productionReadiness: evaluatePurchaseProductionReadiness(contract.items),
     });
   } catch (error) {

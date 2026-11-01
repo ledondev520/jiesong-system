@@ -62,3 +62,27 @@ test('missingInvoice: 历史合同不计入但仍先经发票关联过滤', asyn
   assert.equal(result.count, 1);
   assert.equal(result.historical.count, 1); // oldMatched 已开票，不算「历史未计入」
 });
+
+test('refundable: 数字取自退税工作台同一次汇总（上海当月），并附带待处理出口总数', async (t) => {
+  const workbench = require('./taxRefundWorkbenchService');
+  let args;
+  t.mock.method(workbench, 'getTaxRefundWorkbench', async (query, client) => {
+    args = { query, client };
+    return {
+      summary: { materialReadyCount: 2, contracts: 46 },
+      items: [
+        { salesContractId: 's1', contractNo: 'S-1', shippedAt: '2026-10-01', materialReady: true },
+        { salesContractId: 's2', contractNo: 'S-2', shippedAt: '2026-10-02', materialReady: false },
+        { salesContractId: 's3', contractNo: 'S-3', shippedAt: '2026-10-03', materialReady: true },
+      ],
+    };
+  });
+  const db = {};
+  // UTC 2026-10-31 17:00 已是上海 11 月 1 日
+  const result = await LISTS.refundable.load(db, new Date('2026-10-31T17:00:00Z'));
+  assert.deepEqual(args.query, { filingMonth: '2026-11', pageSize: 100 });
+  assert.equal(args.client, db);
+  assert.equal(result.count, 2);
+  assert.deepEqual(result.items.map((i) => i.contractNo), ['S-1', 'S-3']);
+  assert.deepEqual(result.pending, { count: 46, label: '待处理出口' });
+});

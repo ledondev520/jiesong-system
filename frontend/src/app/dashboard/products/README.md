@@ -6,3 +6,4 @@
 - `page.same-round.test.tsx`：同一轮完成的防抖列表与删除请求，列表失败提示不被删除后的重新加载吞掉、提示顺序与原 async try/await 一致
 - `components/`：商品编辑组件，生命周期边界与回归见该目录 README；库存已迁至 `/dashboard/inventory`（`app/dashboard/inventory/`）
 - `[id]/page.tsx`：商品详情（概览 + 只读「采购价格」页签，各供应商比价）；`[id]/page.test.tsx` 覆盖页签与加载失败重试
+B17: card click and the new 「详情」 button open the read-only `[id]` detail page (now also weights, volume, stock, declaration); editing/deleting stay explicit buttons.

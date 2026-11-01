@@ -1,0 +1,43 @@
+{
+ "horn_cup": {
+  "path_to_ref_mean_px": 1.14,
+  "path_to_ref_p95_px": 2.7,
+  "path_to_ref_max_px": 7.5,
+  "ref_to_path_mean_px": 1.51,
+  "ref_to_path_p95_px": 3.5,
+  "ref_to_path_max_px": 8.6
+ },
+ "wave": {
+  "path_to_ref_mean_px": 1.03,
+  "path_to_ref_p95_px": 2.3,
+  "path_to_ref_max_px": 4.1,
+  "ref_to_path_mean_px": 1.11,
+  "ref_to_path_p95_px": 2.3,
+  "ref_to_path_max_px": 4.6
+ },
+ "raster": {
+  "iou": 0.964,
+  "reference_dark_px": 140087,
+  "vector_dark_px": 138975,
+  "xor_px": 5112,
+  "xor_pct_of_reference": 3.65
+ },
+ "anchors": {
+  "horn_cup": 13,
+  "wave": 11,
+  "node": 4
+ },
+ "dot_fit": {
+  "cx": 514.4,
+  "cy": 540.2,
+  "r": 41.6,
+  "note": "least-squares circle on the reference dot, residual max 2.6px (pixel staircase)"
+ },
+ "geometry_units_on_1000_canvas": {
+  "stroke_width": 56.3,
+  "dot_diameter": 83.2,
+  "dot_to_stroke": 1.48,
+  "dot_to_cup_gap": 20.4,
+  "cup_to_wave_gap": 46.6
+ }
+}

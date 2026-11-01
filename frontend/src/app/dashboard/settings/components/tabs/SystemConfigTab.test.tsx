@@ -211,4 +211,80 @@ describe("SystemConfigTab", () => {
       ),
     ).toEqual([]);
   });
+
+  it("OpenAI：实际使用的模型只来自服务器，不再把库里残留的 Kimi 选择当成生效配置", async () => {
+    mockGetSystemConfig.mockResolvedValueOnce({
+      data: {
+        exchangeRate: 7.2,
+        profitRate: 1.3,
+        aiProvider: "openai",
+        openaiConfigured: true,
+        openaiModel: "gpt-6.1-terra",
+        openaiMaxOutputTokens: 16000,
+        aiChatModel: "kimi-k2-turbo-preview",
+        aiHsCodeModel: "kimi-k2-turbo-preview",
+        aiTemperature: 0.7,
+        aiMaxTokens: 4096,
+      },
+    });
+    render(<SystemConfigTab />);
+
+    const effective = await screen.findByTestId("effective-models");
+    await waitFor(() => expect(effective).toHaveTextContent("gpt-6.1-terra"));
+    expect(effective).toHaveTextContent("来源：服务器环境变量 OPENAI_MODEL");
+    expect(screen.queryByText(/kimi-k2-turbo-preview/)).toBeNull();
+    // 温度对 OpenAI 不适用；输出长度仍会发送，所以不再说「长度参数不生效」
+    expect(screen.getByText("不适用")).toBeInTheDocument();
+    expect(
+      screen.getByText(/OpenAI 请求会丢弃温度参数，此处的值不生效/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/温度与长度参数/)).toBeNull();
+    const lengthHint = screen.getByText(/max_completion_tokens/);
+    expect(lengthHint).toHaveTextContent("OpenAI 普通问答按此处显示的已保存值");
+    expect(lengthHint).toHaveTextContent("思考模式和 Agent 不使用此值");
+    expect(lengthHint).toHaveTextContent("服务器上限 16,000");
+    expect(screen.getByLabelText(/最大输出长度/)).toBeDisabled();
+  });
+
+  it("Kimi：实际使用的模型就是此页保存的设置，并标明来源", async () => {
+    mockGetSystemConfig.mockResolvedValueOnce({
+      data: {
+        exchangeRate: 7.2,
+        profitRate: 1.3,
+        aiProvider: "kimi",
+        aiChatModel: "kimi-k2-thinking-turbo",
+        aiHsCodeModel: "moonshot-v1-8k",
+        aiTemperature: 0.7,
+        aiMaxTokens: 4096,
+      },
+    });
+    render(<SystemConfigTab />);
+
+    const effective = await screen.findByTestId("effective-models");
+    await waitFor(() =>
+      expect(effective).toHaveTextContent("kimi-k2-thinking-turbo"),
+    );
+    expect(effective).toHaveTextContent("moonshot-v1-8k");
+    expect(effective).toHaveTextContent("来源：此页保存的设置");
+    expect(screen.getByLabelText(/最大输出长度/)).not.toBeDisabled();
+  });
+
+  it("DeepSeek：实际使用 deepseek-flash，来源是系统固定值", async () => {
+    mockGetSystemConfig.mockResolvedValueOnce({
+      data: {
+        exchangeRate: 7.2,
+        profitRate: 1.3,
+        aiProvider: "deepseek",
+        aiChatModel: "kimi-k2-turbo-preview",
+        aiTemperature: 0.7,
+        aiMaxTokens: 4096,
+      },
+    });
+    render(<SystemConfigTab />);
+
+    const effective = await screen.findByTestId("effective-models");
+    await waitFor(() => expect(effective).toHaveTextContent("deepseek-flash"));
+    expect(effective).toHaveTextContent("来源：系统固定为 deepseek-flash");
+    expect(screen.queryByText(/kimi-k2-turbo-preview/)).toBeNull();
+  });
 });

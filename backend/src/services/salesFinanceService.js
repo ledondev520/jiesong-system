@@ -27,7 +27,7 @@ const contractNoAliases = (value) => unique([
   normalizeContractNo(value).replace(/^CG/, 'PO'),
 ]);
 
-const makeIssue = (code, severity, message) => ({ code, severity, message });
+const makeIssue = (code, severity, message, meta) => (meta ? { code, severity, message, meta } : { code, severity, message });
 const dedupeIssues = (issues) => Array.from(new Map(
   issues.map((issue) => [`${issue.code}:${issue.message}`, issue]),
 ).values());
@@ -80,7 +80,10 @@ const buildSalesFinanceSummary = ({
       `已排除第三方拼柜收入：${sources.join('、')}`,
     ));
   }
-  if (packingItems.length > 0 && ownedRevenueUsd <= 0) {
+  if (packingItems.length > 0 && ownedItems.length === 0) {
+    // 全部装箱明细都是第三方拼柜：没有自有货物可算毛利，这不是缺数据（此前被误报成缺美元金额）。
+    issues.push(makeIssue('NO_OWNED_GOODS', 'info', '全部装箱明细为第三方拼柜/非捷淞报关，无自有货物，商品毛利不适用'));
+  } else if (packingItems.length > 0 && ownedRevenueUsd <= 0) {
     issues.push(makeIssue('MISSING_OWNED_REVENUE', 'error', '自有装箱明细缺少美元销售金额，无法计算商品毛利'));
   }
 
@@ -134,9 +137,13 @@ const buildSalesFinanceSummary = ({
   const purchaseMap = getPurchaseMap(purchases);
   const linkedCostMap = new Map();
   let hasMissingPurchaseCost = false;
+  let missingCostLines = 0;
+  let missingCostLinkedLines = 0;
   ownedItems.forEach((item) => {
     if (item.purchaseCost === null || item.purchaseCost === undefined) {
       hasMissingPurchaseCost = true;
+      missingCostLines += 1;
+      if (normalizeContractNo(item.purchaseContractNo)) missingCostLinkedLines += 1;
       return;
     }
     const cost = Number(item.purchaseCost || 0);
@@ -150,7 +157,9 @@ const buildSalesFinanceSummary = ({
     linkedCostMap.set(contractNo, roundMoney((linkedCostMap.get(contractNo) || 0) + cost));
   });
   if (hasMissingPurchaseCost) {
-    issues.push(makeIssue('MISSING_PURCHASE_COST', 'error', '存在自有装箱明细未录入人民币采购成本'));
+    issues.push(makeIssue('MISSING_PURCHASE_COST', 'error', '存在自有装箱明细未录入人民币采购成本', {
+      lineCount: missingCostLines, linkedLineCount: missingCostLinkedLines, ownedLineCount: ownedItems.length,
+    }));
   }
 
   const purchaseCostCny = roundMoney(ownedItems.reduce((sum, item) => (

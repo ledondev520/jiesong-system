@@ -27,6 +27,10 @@ const data = {
     netCashCny: -100,
     scope: "合成商品口径",
     unavailableContracts: [],
+    marginReasonSummary: [],
+    cashReasonSummary: [],
+    verified: { contractCount: 1, totalPurchases: 500, grossProfit: 200 },
+    shippedWithoutDate: 0,
   },
   funds: {
     totalReceivable: 100,
@@ -75,7 +79,7 @@ describe("经营报表范围与追溯", () => {
       "/dashboard/sales?shipped=true&shippedFrom=2026-09-01&shippedTo=2026-09-30",
     );
   });
-  it("未知利润显示待核验及单柜修正入口，不显示零", async () => {
+  it("未知利润显示待核验、每笔缺哪项输入、按原因笔数和已核实汇总，不显示零", async () => {
     overview.mockResolvedValue({
       data: {
         ...data,
@@ -85,19 +89,67 @@ describe("经营报表范围与追溯", () => {
           grossProfit: null,
           profitMargin: null,
           marginReady: false,
+          cashReady: false,
+          contractCount: 3,
           unavailableContracts: [
-            { id: "synthetic-sale", reasons: ["缺少汇率"] },
+            {
+              id: "synthetic-sale",
+              contractNo: "EXP-SYN-1",
+              reasons: ["缺汇率"],
+              reasonCodes: ["MISSING_EXCHANGE_RATE"],
+            },
+            {
+              id: "synthetic-sale-2",
+              contractNo: "EXP-SYN-2",
+              reasons: ["缺汇率", "缺已售成本（1/1 条自有明细未填成本）"],
+              reasonCodes: ["MISSING_EXCHANGE_RATE", "MISSING_PURCHASE_COST"],
+            },
           ],
+          marginReasonSummary: [
+            { code: "MISSING_EXCHANGE_RATE", label: "缺汇率", count: 2 },
+            { code: "MISSING_PURCHASE_COST", label: "缺已售成本", count: 1 },
+          ],
+          cashReasonSummary: [
+            { code: "MISSING_EXCHANGE_RATE", label: "缺汇率", count: 2 },
+            {
+              code: "UNSUPPORTED_RECEIPT_CURRENCY",
+              label: "含非美元收款",
+              count: 1,
+            },
+          ],
+          verified: { contractCount: 1, totalPurchases: 500, grossProfit: 200 },
+          shippedWithoutDate: 2,
         },
       },
     });
     render(<BusinessReportsPage />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("毛利待核验");
-    expect(screen.getByRole("alert")).toHaveTextContent("共 1 笔需要处理");
-    await userEvent.click(screen.getByText("查看清单（1 笔）"));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("毛利待核验");
+    expect(alert).toHaveTextContent("3 笔发运中有 2 笔缺少资料");
+    expect(screen.getByTestId("margin-reason-summary")).toHaveTextContent(
+      "缺汇率 2 笔、缺已售成本 1 笔",
+    );
+    expect(screen.getByTestId("margin-verified")).toHaveTextContent(
+      "另外 1 笔已核实：采购成本 ¥500.00，毛利 ¥200.00（仅这几笔，不是整体数字）",
+    );
+    expect(screen.getByTestId("shipped-without-date")).toHaveTextContent(
+      "另有 2 笔状态为已发运但没有发运日期",
+    );
+    // 不再是笼统的「缺少汇率或已售成本」
+    expect(alert).not.toHaveTextContent("缺少汇率或已售成本");
+    await userEvent.click(screen.getByText("查看清单（2 笔）"));
     expect(
-      screen.getByRole("link", { name: "核验第1笔：缺少汇率" }),
+      screen.getByRole("link", { name: "EXP-SYN-1：缺汇率" }),
     ).toHaveAttribute("href", "/dashboard/sales/synthetic-sale?tab=finance");
+    expect(
+      screen.getByRole("link", {
+        name: "EXP-SYN-2：缺汇率；缺已售成本（1/1 条自有明细未填成本）",
+      }),
+    ).toBeInTheDocument();
+    // 净现金待核验也点名原因
+    expect(
+      screen.getByText(/现金占用待核验：缺汇率 2 笔、含非美元收款 1 笔/),
+    ).toBeInTheDocument();
     expect(screen.queryByText("¥0.00")).not.toBeInTheDocument();
   });
 });

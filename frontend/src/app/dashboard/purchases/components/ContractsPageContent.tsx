@@ -18,7 +18,9 @@ import { PurchaseContract } from "@/types";
 import { purchaseService } from "@/services/purchase.service";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
 import { runAwait } from "@/lib/run-await";
+import { PurchaseSubStatus } from "@/components/purchase/PurchaseSubStatus";
 import { Button } from "@/components/ui/button";
+import { PURCHASE_STATUS_LABELS } from "@/components/ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuthStore } from "@/store/auth.store";
 import { ErrorState } from "@/components/ui/data-state";
@@ -538,7 +540,9 @@ export default function ContractsPageContent() {
             <SelectContent>
               <SelectItem value="ALL">全部状态</SelectItem>
               <SelectItem value="DRAFT">草稿</SelectItem>
-              <SelectItem value="SIGNED">已签约</SelectItem>
+              <SelectItem value="SIGNED">
+                {PURCHASE_STATUS_LABELS.SIGNED}
+              </SelectItem>
               <SelectItem value="PRODUCING">生产中</SelectItem>
               <SelectItem value="READY">生产完成</SelectItem>
               <SelectItem value="SHIPPED">已发货</SelectItem>
@@ -871,8 +875,12 @@ export default function ContractsPageContent() {
                           {productName}
                         </p>
                       </div>
-                      <div className="shrink-0">
+                      <div className="flex shrink-0 flex-col items-end gap-1">
                         <StatusPill status={contract.status} />
+                        <PurchaseSubStatus
+                          status={contract.status}
+                          subStatus={contract.subStatus}
+                        />
                       </div>
                     </div>
 
@@ -1117,7 +1125,13 @@ export default function ContractsPageContent() {
                           </AmountText>
                         </TableCell>
                         <TableCell>
-                          <StatusPill status={contract.status} />
+                          <div className="flex flex-col items-start gap-1">
+                            <StatusPill status={contract.status} />
+                            <PurchaseSubStatus
+                              status={contract.status}
+                              subStatus={contract.subStatus}
+                            />
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">

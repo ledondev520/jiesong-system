@@ -6,6 +6,7 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
+import { RemarkText } from "@/components/ui/remark-text";
 import { format } from "date-fns";
 import { Loader2, Package, ShoppingCart } from "lucide-react";
 import { AmountText } from "@/components/ui/amount-text";
@@ -140,9 +141,10 @@ export function PurchaseDetailDialog({
               {/* 备注 */}
               {detail.note && (
                 <div className="rounded bg-muted p-3">
-                  <p className="text-sm text-muted-foreground">
-                    备注：{detail.note}
-                  </p>
+                  <div className="text-sm text-muted-foreground">
+                    备注：
+                    <RemarkText note={detail.note} />
+                  </div>
                 </div>
               )}
             </div>

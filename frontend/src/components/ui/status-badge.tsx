@@ -54,12 +54,29 @@ export type StatusBadgeConfig = {
 
 type StatusMap = Record<string, StatusBadgeConfig>;
 
+/**
+ * 采购合同状态的唯一中文名（采购列表/详情/应付/订单采购页共用）。存储值不变，只在展示层映射：
+ * SIGNED 统一叫「已签订」，不再出现「已确认」「已签约」两种叫法。
+ */
+export const PURCHASE_STATUS_LABELS = {
+  DRAFT: "草稿",
+  SIGNED: "已签订",
+  PRODUCING: "生产中",
+  READY: "生产完成",
+  SHIPPED: "已发货",
+  RECEIVED: "已收货",
+  COMPLETED: "已完成",
+  CANCELLED: "已取消",
+} as const;
+
 const DEFAULT_STATUS_MAP: StatusMap = {
   DRAFT: { label: "草稿", tone: "neutral" },
   SIGNED: { label: "已签订", tone: "info" },
   PENDING: { label: "待装柜", tone: "neutral" },
   CONFIRMED: { label: "已确认", tone: "neutral" },
   PRODUCING: { label: "生产中", tone: "warning" },
+  READY: { label: PURCHASE_STATUS_LABELS.READY, tone: "warning" },
+  RECEIVED: { label: PURCHASE_STATUS_LABELS.RECEIVED, tone: "success" },
   PACKING: { label: "装箱中", tone: "warning" },
   LOADING: { label: "装柜中", tone: "warning" },
   SHIPPING: { label: "运输中", tone: "progress" },
@@ -95,14 +112,20 @@ export const DOMAIN_STATUS_MAPS = {
     CANCELLED: { label: "已取消", tone: "neutral" },
   },
   purchaseContract: {
-    DRAFT: { label: "草稿", tone: "neutral" },
-    SIGNED: { label: "已签订", tone: "info" },
-    PRODUCING: { label: "生产中", tone: "info" },
-    READY: { label: "待装柜", tone: "warning" },
-    SHIPPED: { label: "已发货", tone: "info" },
-    RECEIVED: { label: "已收货", tone: "success" },
-    COMPLETED: { label: "已完成", tone: "success" },
-    CANCELLED: { label: "已取消", tone: "neutral" },
+    DRAFT: { label: PURCHASE_STATUS_LABELS.DRAFT, tone: "neutral" },
+    SIGNED: { label: PURCHASE_STATUS_LABELS.SIGNED, tone: "info" },
+    PRODUCING: { label: PURCHASE_STATUS_LABELS.PRODUCING, tone: "info" },
+    READY: { label: PURCHASE_STATUS_LABELS.READY, tone: "warning" },
+    SHIPPED: { label: PURCHASE_STATUS_LABELS.SHIPPED, tone: "info" },
+    RECEIVED: { label: PURCHASE_STATUS_LABELS.RECEIVED, tone: "success" },
+    COMPLETED: { label: PURCHASE_STATUS_LABELS.COMPLETED, tone: "success" },
+    CANCELLED: { label: PURCHASE_STATUS_LABELS.CANCELLED, tone: "neutral" },
+    // 历史旧别名（后端 purchaseStateMachine 同样按此归一），不让英文原值露给用户
+    PENDING_INSPECTION: {
+      label: PURCHASE_STATUS_LABELS.PRODUCING,
+      tone: "info",
+    },
+    IN_STOCK: { label: PURCHASE_STATUS_LABELS.RECEIVED, tone: "success" },
   },
   inventory: {
     PRODUCING: { label: "生产中", tone: "info" },
@@ -139,8 +162,9 @@ export const getStatusBadgeConfig = (
     return DEFAULT_STATUS_MAP[normalized];
   }
 
+  // 未登记的状态值不把英文原文露给用户；原值放在 title 之外的日志里排查
   return {
-    label: String(status),
+    label: "未知状态",
     tone: "neutral",
   };
 };

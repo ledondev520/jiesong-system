@@ -169,6 +169,7 @@ const getConfigs = async (req, res, next) => {
       // OpenAI 密钥只来自进程环境，从不经 API 返回（连掩码后缀也不给）；仅暴露"已配置"与模型名。
       formatted.openaiConfigured = Boolean(activeAi.apiKey);
       formatted.openaiModel = activeAi.model;
+      formatted.openaiMaxOutputTokens = activeAi.maxOutputTokens; // 服务器对输出长度的硬上限，非密钥
     } else if (!formatted.apiKey && activeAi.apiKey) {
       formatted.apiKey = normalizeConfigValueForResponse('apiKey', activeAi.apiKey);
     }

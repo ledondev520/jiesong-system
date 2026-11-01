@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatMoney, formatStat, formatUnitPrice } from "./format";
+import {
+  formatAmount,
+  formatDeclaredPrice,
+  formatMoney,
+  formatStat,
+  formatUnitPrice,
+} from "./format";
 
 describe("formatMoney", () => {
   it("固定 2 位小数、千分位和币种符号", () => {
@@ -46,5 +52,34 @@ describe("formatStat", () => {
     expect(formatStat(0)).toBe("0");
     expect(formatStat(undefined)).toBe("—");
     expect(formatStat(1500, {}, (n) => formatMoney(n))).toBe("¥1,500.00");
+  });
+});
+
+describe("formatAmount", () => {
+  it("长浮点数固定 2 位小数，不带币种符号", () => {
+    expect(formatAmount(146.0007440476191)).toBe("146.00");
+    expect(formatAmount(1234.5)).toBe("1,234.50");
+    expect(formatAmount("12")).toBe("12.00");
+  });
+
+  it("极小负数不显示负号，无效值显示占位", () => {
+    expect(formatAmount(-0.001)).toBe("0.00");
+    expect(formatAmount(-5)).toBe("-5.00");
+    expect(formatAmount(null)).toBe("—");
+    expect(formatAmount("abc")).toBe("—");
+  });
+});
+
+describe("formatDeclaredPrice", () => {
+  it("报关单价保留到 4 位小数、至少 2 位，长浮点被截成可读值", () => {
+    expect(formatDeclaredPrice(146.0007440476191)).toBe("146.0007");
+    expect(formatDeclaredPrice(0.0345)).toBe("0.0345");
+    expect(formatDeclaredPrice(12)).toBe("12.00");
+    expect(formatDeclaredPrice(1234.5)).toBe("1,234.50");
+  });
+
+  it("无效值显示占位，极小负数无负号", () => {
+    expect(formatDeclaredPrice(null)).toBe("—");
+    expect(formatDeclaredPrice(-0.00001)).toBe("0.00");
   });
 });

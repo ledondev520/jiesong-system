@@ -13,6 +13,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ErrorState } from "@/components/ui/data-state";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
+import { ListPager, sliceByPager } from "@/components/ui/list-pager";
+import { usePagination } from "@/lib/hooks/usePagination";
 import { clearApiGetCache } from "@/lib/axios";
 import { runAwait } from "@/lib/run-await";
 import { toast } from "sonner";
@@ -805,6 +807,10 @@ function ReconciliationAnalysisView({
 }) {
   const [search, setSearch] = useState("");
   const q = search.toLowerCase().trim();
+  // 供应商表可达上百行，三张表各自客户端分页；搜索条件变化回到第 1 页。
+  const matchedPager = usePagination(data.matched.length);
+  const payPager = usePagination(data.unmatchedPayments.length);
+  const invPager = usePagination(data.unmatchedInvoices.length);
 
   const filteredMatched = data.matched.filter(
     (m) =>
@@ -826,7 +832,12 @@ function ReconciliationAnalysisView({
         <Input
           placeholder="搜索供应商名称"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            matchedPager.setPage(1);
+            payPager.setPage(1);
+            invPager.setPage(1);
+          }}
           className="pl-8 h-9"
         />
       </div>
@@ -862,7 +873,7 @@ function ReconciliationAnalysisView({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredMatched.map((m) => (
+                  sliceByPager(filteredMatched, matchedPager).map((m) => (
                     <TableRow
                       key={m.payName}
                       className={
@@ -947,6 +958,7 @@ function ReconciliationAnalysisView({
               </TableBody>
             </Table>
           </div>
+          <ListPager pager={matchedPager} total={filteredMatched.length} />
         </Card>
 
         {/* 无票付款 */}
@@ -980,7 +992,7 @@ function ReconciliationAnalysisView({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUnmatchedPay.map((p) => (
+                  sliceByPager(filteredUnmatchedPay, payPager).map((p) => (
                     <TableRow key={p.counterpart}>
                       <TableCell className="font-medium">
                         {p.counterpart}
@@ -1011,6 +1023,7 @@ function ReconciliationAnalysisView({
               </TableBody>
             </Table>
           </div>
+          <ListPager pager={payPager} total={filteredUnmatchedPay.length} />
         </Card>
 
         {/* 无流水发票 */}
@@ -1044,7 +1057,7 @@ function ReconciliationAnalysisView({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUnmatchedInv.map((i) => (
+                  sliceByPager(filteredUnmatchedInv, invPager).map((i) => (
                     <TableRow key={i.seller}>
                       <TableCell className="font-medium">{i.seller}</TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
@@ -1073,6 +1086,7 @@ function ReconciliationAnalysisView({
               </TableBody>
             </Table>
           </div>
+          <ListPager pager={invPager} total={filteredUnmatchedInv.length} />
         </Card>
       </div>
     </div>

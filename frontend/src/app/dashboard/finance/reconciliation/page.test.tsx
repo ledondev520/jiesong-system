@@ -92,3 +92,28 @@ it("没有选中银行流水时，合同选择器按发票关联用途读取（�
     expect(contractsFor).toHaveBeenCalledWith("PURCHASE", undefined, "INVOICE"),
   );
 });
+it("已匹配供应商上百行时按页显示，翻页和搜索都按筛选结果分页", async () => {
+  const matched = Array.from({ length: 120 }, (_, i) => ({
+    payName: `供应商${String(i).padStart(3, "0")}`,
+    invName: `供应商${String(i).padStart(3, "0")}`,
+    netPaid: 100,
+    totalInvoice: 100,
+    gap: 0,
+    category: "normal",
+  }));
+  recon.mockResolvedValue({ ...emptyRecon, matched });
+  render(<ReconciliationPage />);
+  expect(await screen.findByText("供应商000")).toBeInTheDocument();
+  expect(screen.getByText("供应商019")).toBeInTheDocument();
+  expect(screen.queryByText("供应商020")).toBeNull();
+  expect(screen.getByText(/共 120 条，第 1\/6 页/)).toBeInTheDocument();
+  const next = screen.getAllByRole("button", { name: "下一页" }).at(-1)!;
+  fireEvent.click(next);
+  expect(await screen.findByText("供应商020")).toBeInTheDocument();
+  expect(screen.queryByText("供应商000")).toBeNull();
+  fireEvent.change(screen.getByPlaceholderText("搜索供应商名称"), {
+    target: { value: "供应商11" },
+  });
+  expect(await screen.findByText("供应商110")).toBeInTheDocument();
+  expect(screen.queryByText(/共 120 条/)).toBeNull();
+});
