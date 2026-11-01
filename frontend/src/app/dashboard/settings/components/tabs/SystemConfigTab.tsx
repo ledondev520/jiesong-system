@@ -89,12 +89,22 @@ export function SystemConfigTab({
   // OpenAI 密钥与模型只来自服务器进程环境：页面不提供密钥输入，也不保存模型/采样参数。
   const isOpenAI = aiProvider === "openai";
   const [openaiModel, setOpenaiModel] = useState("");
+  // 服务器对 OpenAI 输出长度的硬上限（OPENAI_MAX_OUTPUT_TOKENS）；未返回时不声称具体数字
+  const [openaiMaxOutput, setOpenaiMaxOutput] = useState<number | null>(null);
   const providerLabel = isOpenAI ? "OpenAI" : isDeepSeek ? "DeepSeek" : "Kimi";
   // 场景化模型配置
   const [chatModel, setChatModel] = useState("kimi-k2-turbo-preview");
   const [hsCodeModel, setHsCodeModel] = useState("kimi-k2-turbo-preview");
   const [temperature, setTemperature] = useState<number>(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(4096);
+  // 页面展示「实际生效」的模型：OpenAI 只看服务器环境，库里残留的 Kimi 选择对它不生效
+  const effectiveChatModel = isOpenAI ? openaiModel : chatModel;
+  const effectiveHsCodeModel = isOpenAI ? openaiModel : hsCodeModel;
+  const modelSource = isOpenAI
+    ? "来源：服务器环境变量 OPENAI_MODEL"
+    : isDeepSeek
+      ? "来源：系统固定为 deepseek-flash"
+      : "来源：此页保存的设置";
   // HSCIQ 海关归类 API
   const [hsciqEnabled, setHsciqEnabled] = useState(false);
   const [hsciqUsage, setHsciqUsage] = useState<{
@@ -131,6 +141,11 @@ export function SystemConfigTab({
               typeof configs.openaiModel === "string"
                 ? configs.openaiModel
                 : "",
+            );
+            setOpenaiMaxOutput(
+              typeof configs.openaiMaxOutputTokens === "number"
+                ? configs.openaiMaxOutputTokens
+                : null,
             );
           } else {
             const configuredKey = deepseek
@@ -500,7 +515,7 @@ export function SystemConfigTab({
               </CardTitle>
               <CardDescription>
                 {isOpenAI
-                  ? "OpenAI 的密钥与模型由服务器环境配置（不在此保存）；问答、HS 推荐、视觉与 Agent 使用同一模型。"
+                  ? "OpenAI 的密钥与模型取自服务器环境（OPENAI_MODEL），不在此保存；问答、HS 推荐、视觉与 Agent 使用同一个模型。此前为其他供应商保存的模型选择对 OpenAI 不生效。"
                   : isDeepSeek
                     ? "DeepSeek Flash 思考模式已开启，推理强度 high；问答与 HS 推荐使用同一模型。"
                     : "为不同使用场景选择合适的模型，配置采样参数与 API 密钥。每个场景内置自动降级，无需手动配置备用模型。"}
@@ -546,7 +561,7 @@ export function SystemConfigTab({
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      用于 AI 聊天助手的日常问答。
+                      用于 AI 聊天助手的日常问答。{isOpenAI && modelSource}
                     </p>
                   </div>
                   <div className="space-y-1.5">
@@ -587,6 +602,7 @@ export function SystemConfigTab({
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       用于智能 HS 编码推荐与申报要素自动填写。
+                      {isOpenAI && modelSource}
                     </p>
                   </div>
                 </div>
@@ -672,8 +688,9 @@ export function SystemConfigTab({
                         采样温度（Temperature）
                       </label>
                       <span className="text-sm tabular-nums text-muted-foreground">
-                        {(temperature ?? 0.7).toFixed(1)} —{" "}
-                        {getTemperatureStyleLabel(temperature ?? 0.7)}
+                        {isOpenAI
+                          ? "不适用"
+                          : `${(temperature ?? 0.7).toFixed(1)} — ${getTemperatureStyleLabel(temperature ?? 0.7)}`}
                       </span>
                     </div>
                     <Slider
@@ -687,7 +704,7 @@ export function SystemConfigTab({
                     />
                     <p className="text-xs text-muted-foreground">
                       {isOpenAI
-                        ? "OpenAI 请求不使用此处的温度与长度参数（由服务器环境决定）。"
+                        ? "OpenAI 请求会丢弃温度参数，此处的值不生效。"
                         : isDeepSeek
                           ? "DeepSeek 思考模式不使用温度参数；保留原配置值。"
                           : "0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。"}
@@ -708,6 +725,7 @@ export function SystemConfigTab({
                       max={8192}
                       step={256}
                       value={maxTokens}
+                      disabled={isOpenAI}
                       onChange={(e) => {
                         const v = e.target.valueAsNumber;
                         if (!Number.isFinite(v)) return;
@@ -716,21 +734,27 @@ export function SystemConfigTab({
                       }}
                     />
                     <p className="text-xs text-muted-foreground">
-                      影响 AI 回复的最大长度。
+                      {isOpenAI
+                        ? `OpenAI 请求仍会按此处显示的已保存值限制回复长度（作为 max_completion_tokens 发送），并受服务器上限${openaiMaxOutput ? ` ${openaiMaxOutput.toLocaleString()}` : ""}约束；OpenAI 模式下页面不保存此项。`
+                        : "影响 AI 回复的最大长度。"}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground border-t pt-4">
-                <span>问答：</span>
+              <div
+                className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground border-t pt-4"
+                data-testid="effective-models"
+              >
+                <span>当前实际使用 · 问答：</span>
                 <Badge variant="outline" className="font-mono text-[10px]">
-                  {chatModel}
+                  {effectiveChatModel || "未读取到服务器模型"}
                 </Badge>
                 <span className="ml-2">HS推荐：</span>
                 <Badge variant="outline" className="font-mono text-[10px]">
-                  {hsCodeModel}
+                  {effectiveHsCodeModel || "未读取到服务器模型"}
                 </Badge>
+                <span className="ml-2">{modelSource}</span>
               </div>
             </CardContent>
           </Card>
