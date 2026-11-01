@@ -333,6 +333,7 @@ function matchBankToSales(txn, contracts) {
 /**
  * 职责：发票→采购合同匹配（进项）
  */
+// 合同额为 0 的合同上限为 0.01：任何发票都超限，未录入明细的草稿合同不会被自动关联（有意保守）。
 // linkedTotals：合同ID→已关联有效发票累计额；传 null 只排名、不做累计额上限（见 planInvoiceLinks）。
 function matchInvoiceToPurchase(inv, contracts, linkedTotals = null) {
   const best = { score: 0, contract: null, details: null };
@@ -390,15 +391,18 @@ function matchInvoiceToSales(inv, contracts) {
  * 职责：为一批发票规划关联（纯函数，不写库）
  * 思路：先按「无累计额上限」的最优分降序（同分按开票日、id）排队，让最贴合的发票先占合同额度；
  *       再逐张按累计额上限匹配，超额的合同被跳过并回落到次优候选。fixedTotals 为不参与重配的已关联发票累计额。
+ *       同分先比发票金额与合同额的接近程度（更贴合者先占额度），再比开票日、id。销售分更高而保持原采购关联的发票，仍占原采购合同的额度。
  */
 function planInvoiceLinks(invoices, purchaseContracts, salesContracts, fixedTotals = new Map()) {
   const totals = new Map(fixedTotals);
   const queue = invoices
-    .map((inv) => ({
-      inv,
-      rank: Math.max(matchInvoiceToPurchase(inv, purchaseContracts).score, matchInvoiceToSales(inv, salesContracts).score),
-    }))
-    .sort((a, b) => b.rank - a.rank || String(a.inv.invDate).localeCompare(String(b.inv.invDate)) || String(a.inv.id).localeCompare(String(b.inv.id)));
+    .map((inv) => {
+      const p = matchInvoiceToPurchase(inv, purchaseContracts);
+      const s = matchInvoiceToSales(inv, salesContracts);
+      const best = p.score >= s.score ? p : s;
+      return { inv, rank: best.score, gap: best.contract ? Math.abs(inv.total - best.contract.totalAmount) : Infinity };
+    })
+    .sort((a, b) => b.rank - a.rank || a.gap - b.gap || String(a.inv.invDate).localeCompare(String(b.inv.invDate)) || String(a.inv.id).localeCompare(String(b.inv.id)));
 
   return queue.map(({ inv }) => {
     const pBest = matchInvoiceToPurchase(inv, purchaseContracts, totals);
@@ -408,6 +412,10 @@ function planInvoiceLinks(invoices, purchaseContracts, salesContracts, fixedTota
     const contractType = usePurchase ? CONTRACT_TYPE.PURCHASE : CONTRACT_TYPE.SALES;
     const linked = best.score >= SCORE_THRESHOLD;
     if (linked && usePurchase) totals.set(best.contract.id, (totals.get(best.contract.id) || 0) + inv.total);
+    // 销售分更高时重配保持原采购关联不动，其金额仍占原合同额度（待匹配发票无原关联，不受影响）。
+    else if (linked && inv.matchedContractType === CONTRACT_TYPE.PURCHASE && inv.matchedContractId) {
+      totals.set(inv.matchedContractId, (totals.get(inv.matchedContractId) || 0) + inv.total);
+    }
     return { inv, best, contractType, linked };
   });
 }

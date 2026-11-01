@@ -254,3 +254,19 @@ test('重配 MOVE：最优合同已被人工发票占满时，自动关联移到
  assert.equal(fixture.rows.find(r=>r.id==='manual').matchedContractId,'c1','人工关联不动');
  assert.deepEqual((await service.rematchAutoInvoiceLinks({apply:true})).changes,[]);
 });
+
+test('重配 P3-1：销售分更高而保持原采购关联的发票，仍占原采购合同的累计额度',async(t)=>{
+ const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:85,...over});
+ const fixture=invoiceFixture(t,{contracts:[contract({totalAmount:40000})],invoices:[link('salesy',{buyer:'合成买家'}),link('other')]});
+ prisma.salesContract.findMany=async()=>[{id:'s1',contractNo:'XS-SYN-1',status:'SIGNED',totalAmount:38000,receivedAmount:0,signedAt:new Date('2024-05-21'),packingItems:[{store:{name:'合成买家'}}]}];
+ const result=await service.rematchAutoInvoiceLinks({apply:true});
+ assert.deepEqual(result.changes.map(c=>[c.id,c.action]),[['other','UNLINK']],'salesy 保持原样（算 kept），other 因合同额度被占而解除');
+ assert.equal(fixture.rows.find(r=>r.id==='salesy').matchedContractId,'c1');
+ assert.equal(fixture.rows.find(r=>r.id==='other').matchStatus,'PENDING');
+});
+
+test('同分排队 P3-3：金额更贴近合同额者先占额度，而不是开票日更早者',async(t)=>{
+ const{writes}=invoiceFixture(t,{contracts:[contract()],invoices:[invoice('far-early',{total:38030,invDate:'2024-05-25'}),invoice('near-late',{total:38000,invDate:'2024-06-10'})]});
+ await service.runAutoMatch();
+ assert.deepEqual(writes.map(w=>w.id),['near-late']);
+});
