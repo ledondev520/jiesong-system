@@ -61,6 +61,7 @@ const setSseHeaders = (res) => {
   res.flushHeaders();
 };
 
+// CodeQL #5/#6 false positive: Content-Type is text/event-stream (not HTML) and the payload is JSON.stringify'd.
 const sendSseMessage = (res, payload) => res.write(`data: ${JSON.stringify(payload)}\n\n`);
 
 const PENDING_ACTION_EVENT_STATUS = {

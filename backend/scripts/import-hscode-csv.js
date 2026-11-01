@@ -15,7 +15,7 @@ const parsePercent = (value) => {
   if (!value || typeof value !== 'string') return null;
   const trimmed = value.trim();
   if (!trimmed || trimmed === '无' || trimmed === '') return null;
-  const num = parseFloat(trimmed.replace('%', '').replace(' ', ''));
+  const num = parseFloat(trimmed.replace(/%/g, '').replace(/ /g, ''));
   return isNaN(num) ? null : num;
 };
 
