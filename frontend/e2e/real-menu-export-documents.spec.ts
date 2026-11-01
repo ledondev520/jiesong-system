@@ -392,9 +392,11 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   await expect(
     page.getByText(refundNote.split("关联报关单")[0].trim()),
   ).toBeVisible();
-  for (const id of refundIds) await expect(page.getByText(id)).toBeHidden();
-  await page.getByText("导入来源", { exact: true }).click();
-  for (const id of refundIds) await expect(page.getByText(id)).toBeVisible();
+  // 同一页面的其他字段也可能出现这些 ID，所以只在备注自己的折叠区里核对。
+  const source = page.locator("details").filter({ hasText: "导入来源" });
+  await expect(source).not.toHaveAttribute("open", "");
+  await source.getByText("导入来源", { exact: true }).click();
+  for (const id of refundIds) await expect(source).toContainText(id);
   expect(readExportDocuments(fixture)).toEqual(saved);
 });
 
