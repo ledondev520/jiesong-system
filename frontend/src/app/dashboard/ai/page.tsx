@@ -1,22 +1,11 @@
 /**
- * Input: AI 助手模块根路由
- * Output: 统一 AI 对话工作区
- * Pos: AI 助手模块主入口，直接承载日常问答；会话治理下沉到会话记录页
+ * Input: 无
+ * Output: 重定向到 /dashboard?ai=1，由停靠面板宿主打开 AI 助手面板
+ * Pos: 旧 AI 工作区入口兼容 stub；AI 现在是每个 dashboard 页面右侧的侧栏面板
  */
 
-import { AIAssistant } from '@/components/ai/AIAssistant';
-import { ModuleTabHeader, AI_TABS } from '@/components/layout/ModuleTabHeader';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { redirect } from "next/navigation";
 
 export default function AiAssistantModulePage() {
-  return (
-    <div className="space-y-6">
-      <ModuleTabHeader tabs={AI_TABS} moduleName="AI 助手" />
-      <PageHeader
-        title="AI 助手"
-        description="直接查询采购、出口、财务与系统数据；内部草稿按请求直接生成，付款、实物状态与异常操作确认一次。"
-      />
-      <AIAssistant presentation="workspace" />
-    </div>
-  );
+  redirect("/dashboard?ai=1");
 }

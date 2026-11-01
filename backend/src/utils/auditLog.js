@@ -26,7 +26,9 @@ const REDACTED_AUDIT_FIELDS = new Set([
 
 const CRITICAL_FIELDS_BY_ENTITY = {
   User: ['username', 'name', 'role', 'email', 'phone', 'isActive', 'avatar'],
-  Store: ['name', 'portId', 'contactName', 'contactPhone', 'contactEmail', 'address', 'isActive'],
+  Store: ['name', 'portId', 'customerId', 'code', 'legalName', 'contactName', 'contactPhone', 'contactEmail', 'address', 'isActive'],
+  // 客户联系人字段为 Confidential，不进入审计字段清单
+  Customer: ['name', 'legalName', 'country', 'defaultCurrency', 'defaultIncoterm', 'defaultPaymentTerms', 'defaultPortOfLoading', 'isActive'],
   Supplier: ['name', 'shortName', 'contactName', 'contactPhone', 'contactEmail', 'address', 'phone', 'taxId', 'bankAccountName', 'bankName', 'bankBranch', 'bankCode', 'bankAccount', 'isActive', 'hasQualityIssue', 'qualityNote'],
   Product: ['customsName', 'description', 'specification', 'unit', 'categoryId', 'grossWeight', 'netWeight', 'volume', 'packingSpec', 'length', 'width', 'height', 'isActive'],
   ProductCategory: ['name', 'parentId'],
@@ -79,12 +81,16 @@ const isSensitiveField = (key) => {
   return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(normalized));
 };
 
+// 公司银行资料（Restricted）：系统配置记录的 value 永不写入审计日志，只记录谁在何时改了该键。
+// 旧 invoiceTitleInfo 文本可能含开户行及账号，同样不记录内容。
+const REDACTED_CONFIG_KEYS = new Set(['companybankinfo', 'invoicetitleinfo']);
+
 const isSensitiveConfigRecord = (value) => {
   if (!isObject(value) || typeof value.key !== 'string') {
     return false;
   }
 
-  return isSensitiveField(value.key);
+  return isSensitiveField(value.key) || REDACTED_CONFIG_KEYS.has(value.key.toLowerCase());
 };
 
 const sanitizeValue = (value) => {
@@ -164,7 +170,8 @@ const buildCriticalComparison = (entity, oldValue = null, newValue = null) => {
       return;
     }
 
-    if (REDACTED_AUDIT_FIELDS.has(key)) {
+    const redactedConfigValue = key === 'value' && [oldRecord, newRecord].some((record) => isObject(record) && typeof record.key === 'string' && REDACTED_CONFIG_KEYS.has(record.key.toLowerCase()));
+    if (REDACTED_AUDIT_FIELDS.has(key) || redactedConfigValue) {
       before[key] = oldKeyValue === null || oldKeyValue === undefined ? null : '[REDACTED]';
       after[key] = newKeyValue === null || newKeyValue === undefined ? null : '[REDACTED]';
     } else {

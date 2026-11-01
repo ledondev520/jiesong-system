@@ -16,6 +16,7 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
+@unittest.skip("Python 公式副本已退役：parse_args 拒绝运行，报价见 backend exportPricing.priceFor")
 class PathConfigurationTests(unittest.TestCase):
     arguments = ["--contract", "SYNTHETIC", "--spot-rate", "7", "--refund-dbf", "synthetic.dbf"]
 
@@ -60,31 +61,14 @@ class ReadOnlySourceTests(unittest.TestCase):
         connection.close.assert_called_once()
 
 
-class PricingTests(unittest.TestCase):
-    def test_refundable_formula_uses_adjusted_rate(self):
-        unit, total, markup, method = MODULE.calculate_price(
-            cost_cny=20000,
-            quantity=10,
-            effective_rate=6.6,
-            markup=0.30,
-            strict_cap=False,
-        )
-        self.assertGreater(unit, 0)
-        self.assertGreater(total, 0)
-        self.assertLess(abs(markup - 0.30), 0.01)
-        self.assertIn(method, {"integer_unit", "total_ends_0_or_5"})
-
-    def test_no_refund_markup_never_exceeds_cap(self):
-        unit, total, markup, _ = MODULE.calculate_price(
-            cost_cny=20000,
-            quantity=7,
-            effective_rate=6.6,
-            markup=0.10,
-            strict_cap=True,
-        )
-        self.assertLessEqual(markup, 0.10 + 1e-9)
-        self.assertTrue(math.isfinite(unit))
-        self.assertTrue(math.isfinite(total))
+class RetiredPricingTests(unittest.TestCase):
+    def test_python_pricing_copy_is_gone_and_the_proposal_refuses_to_run(self):
+        for name in ('calculate_price', 'unit_for_rounded_total', 'realized_markup', 'historical_quote_allowed', 'nearest_multiple_of_five'):
+            self.assertFalse(hasattr(MODULE, name), name)
+        with self.assertRaises(RuntimeError):
+            MODULE.build_proposal(object())
+        with self.assertRaises(SystemExit):
+            MODULE.parse_args(['--contract', 'X', '--spot-rate', '6.72', '--refund-dbf', 'x.dbf'])
 
     def test_hs_normalization_preserves_leading_digits(self):
         self.assertEqual(MODULE.normalize_hs("7610100000"), "7610100000")
@@ -106,37 +90,8 @@ class PricingTests(unittest.TestCase):
             MODULE.choose_historical_quote([quote], "餐盘", "380*320*310"), quote
         )
 
-    def test_zero_refund_history_cannot_break_markup_cap(self):
-        allowed, markup = MODULE.historical_quote_allowed(
-            unit_price_usd=35,
-            quantity=100,
-            effective_rate=6.6,
-            cost_cny=20000,
-            refund_rate=0,
-            no_refund_markup_cap=0.10,
-        )
-        self.assertFalse(allowed)
-        self.assertGreater(markup, 0.10)
-
-    def test_refundable_loss_quote_is_rejected(self):
-        allowed, markup = MODULE.historical_quote_allowed(
-            unit_price_usd=70,
-            quantity=10.24,
-            effective_rate=6.6,
-            cost_cny=6005.54,
-            refund_rate=13,
-            no_refund_markup_cap=0.10,
-        )
-        self.assertFalse(allowed)
-        self.assertLess(markup, 0)
-
     def test_numeric_source_conflict_tolerance(self):
         self.assertGreater(abs(282 - 282.5), 1e-6)
-
-    def test_fractional_unit_reconciles_to_rounded_total(self):
-        unit = MODULE.unit_for_rounded_total(20680, 15000)
-        self.assertEqual(round(unit * 15000, 1), 20680)
-        self.assertEqual(math.ceil((unit * 15000 - 1e-10) * 10) / 10, 20680)
 
     def test_current_contract_is_not_its_own_history(self):
         quote = MODULE.HistoricalQuote(
@@ -151,18 +106,3 @@ class PricingTests(unittest.TestCase):
         )
         self.assertEqual(MODULE.exclude_current_contract([quote], "EXP260010"), [])
 
-    def test_no_refund_negative_history_is_rejected(self):
-        allowed, markup = MODULE.historical_quote_allowed(
-            unit_price_usd=10,
-            quantity=100,
-            effective_rate=6.6,
-            cost_cny=10000,
-            refund_rate=0,
-            no_refund_markup_cap=0.10,
-        )
-        self.assertFalse(allowed)
-        self.assertLess(markup, 0)
-
-
-if __name__ == "__main__":
-    unittest.main()

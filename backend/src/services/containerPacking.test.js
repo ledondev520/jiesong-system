@@ -1,0 +1,352 @@
+/**
+ * Input: 设计文档 §5.8 的参考装柜用例（瓷砖/家具，40HQ 配置）
+ * Output: 排柜不变量（不重叠、不越界、限重、承压、重货在底）、填充率下界、确定性与性能的契约测试
+ * Pos: containerPacking.js 的回归测试
+ */
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
+const crypto = require('node:crypto');
+const { toCartonLines, packContainers, usableMm, supportedColumns } = require('./containerPacking');
+const { makeOrderLines } = require('./containerPackingBench');
+const { getContainerSpec, loadContainerConfig } = require('./containerSpecs');
+
+const config = loadContainerConfig();
+const spec = getContainerSpec();
+const usable = usableMm(spec, config);
+const payloadCap = Math.min(spec.safeGrossKg, spec.maxPayloadKg);
+
+const CARTONS = {
+  tile: { name: '瓷砖', category: '瓷砖', dims: [620, 620, 50], kg: 31 },
+  sofa: { name: '沙发', category: '家具', dims: [2100, 950, 850], kg: 65 },
+  chair: { name: '餐椅', category: '家具', dims: [650, 600, 950], kg: 14 },
+  table: { name: '餐桌', category: '家具', dims: [1600, 900, 180], kg: 45, upright: false },
+  stool: { name: '凳子', category: '家具', dims: [450, 450, 480], kg: 6 },
+};
+
+// 直接构造归一化行，确保用例只测排柜规则；画像数值取自配置。
+const makeLine = (key, count, overrides = {}) => {
+  const def = CARTONS[key];
+  const profile = config.profiles[def.category === '瓷砖' ? 'tile' : 'furniture'];
+  const [length, width, height] = def.dims;
+  return {
+    lineId: `L-${key}${overrides.suffix || ''}`, productId: key, name: def.name, color: '#000',
+    cartons: count, kgPerCarton: def.kg,
+    cartonMm: { length, width, height }, dimsSource: 'line',
+    profile: def.category === '瓷砖' ? 'tile' : 'furniture',
+    heavy: profile.heavy, upright: def.upright ?? profile.upright, maxStackKg: profile.maxStackKg,
+    ...overrides,
+  };
+};
+
+const pack = (lines) => packContainers(lines, spec, config);
+const placed = (result, index = 0) => result.containers[index]?.cartons ?? 0;
+const totalPlaced = (result) => result.containers.reduce((sum, container) => sum + container.cartons, 0);
+
+const boxOf = (block) => ({
+  x: block.x, y: block.y, z: block.z,
+  dx: block.nx * block.cartonMm.length, dy: block.ny * block.cartonMm.width, dz: block.nz * block.cartonMm.height,
+});
+const intersect = (a, b) => a.x < b.x + b.dx && a.x + a.dx > b.x
+  && a.y < b.y + b.dy && a.y + a.dy > b.y && a.z < b.z + b.dz && a.z + a.dz > b.z;
+
+/** 每个用例都必须满足的物理不变量。 */
+const assertInvariants = (lines, result) => {
+  const byId = new Map(lines.map((line) => [line.lineId, line]));
+  const count = new Map();
+  for (const container of result.containers) {
+    const boxes = container.blocks.map(boxOf);
+    boxes.forEach((box, i) => {
+      assert.ok(box.x >= 0 && box.y >= 0 && box.z >= 0, '块在可用空间内（下界）');
+      assert.ok(box.x + box.dx <= usable.length && box.y + box.dy <= usable.width && box.z + box.dz <= usable.height,
+        '块在可用空间内（上界）');
+      for (let j = i + 1; j < boxes.length; j += 1) assert.equal(intersect(box, boxes[j]), false, `块 ${i}/${j} 重叠`);
+    });
+    assert.ok(container.grossKg <= payloadCap + 1e-6, `毛重 ${container.grossKg} 超过 ${payloadCap}`);
+    container.blocks.forEach((block, i) => {
+      count.set(block.lineId, (count.get(block.lineId) || 0) + block.cartons);
+      const line = byId.get(block.lineId);
+      assert.equal(block.cartons, block.nx * block.ny * block.nz);
+      if (line.upright) assert.ok(block.cartonMm.height === line.cartonMm.height, '竖放箱不得翻转');
+      if (block.z > 0) {
+        const own = boxes[i];
+        const supportArea = boxes
+          .filter((other) => other.z + other.dz === own.z)
+          .reduce((sum, other) => sum + Math.max(0, Math.min(own.x + own.dx, other.x + other.dx) - Math.max(own.x, other.x))
+            * Math.max(0, Math.min(own.y + own.dy, other.y + other.dy) - Math.max(own.y, other.y)), 0);
+        assert.ok(supportArea / (own.dx * own.dy) >= config.minSupportRatio - 1e-9, '悬空：支撑面积不足');
+        // 独立的逐箱支撑：块内每个底层纸箱自己的底面都要有 ≥ minSupportRatio 落在下方块上（块平均会漏掉悬空单箱）。
+        const { length: cl, width: cw } = block.cartonMm;
+        for (let ci = 0; ci < block.nx; ci += 1) {
+          for (let cj = 0; cj < block.ny; cj += 1) {
+            const carton = { x: own.x + ci * cl, y: own.y + cj * cw, dx: cl, dy: cw };
+            const under = boxes
+              .filter((other) => other.z + other.dz === own.z)
+              .reduce((sum, other) => sum + Math.max(0, Math.min(carton.x + cl, other.x + other.dx) - Math.max(carton.x, other.x))
+                * Math.max(0, Math.min(carton.y + cw, other.y + other.dy) - Math.max(carton.y, other.y)), 0);
+            assert.ok(under / (cl * cw) >= config.minSupportRatio - 1e-9,
+              `${byId.get(block.lineId).name} 第 ${ci},${cj} 箱悬空：支撑 ${(under / (cl * cw)).toFixed(3)}`);
+          }
+        }
+        if (line.heavy) {
+          const below = container.blocks.filter((other, j) => j !== i && boxes[j].z + boxes[j].dz === own.z
+            && Math.min(own.x + own.dx, boxes[j].x + boxes[j].dx) > Math.max(own.x, boxes[j].x)
+            && Math.min(own.y + own.dy, boxes[j].y + boxes[j].dy) > Math.max(own.y, boxes[j].y));
+          assert.ok(below.every((other) => byId.get(other.lineId).heavy), '重货只能压在重货上');
+        }
+      }
+    });
+    // 逐箱承压（独立的保守估算）：上方各块按其底面积均摊重量，落在本块上的部分平均分给本块各列。
+    container.blocks.forEach((block, i) => {
+      const line = byId.get(block.lineId);
+      const own = boxes[i];
+      const above = container.blocks.reduce((sum, other, j) => {
+        if (j === i || boxes[j].z < own.z + own.dz) return sum;
+        const overlap = Math.max(0, Math.min(own.x + own.dx, boxes[j].x + boxes[j].dx) - Math.max(own.x, boxes[j].x))
+          * Math.max(0, Math.min(own.y + own.dy, boxes[j].y + boxes[j].dy) - Math.max(own.y, boxes[j].y));
+        return sum + (other.kg * overlap) / (boxes[j].dx * boxes[j].dy);
+      }, 0);
+      assert.ok((block.nz - 1) * line.kgPerCarton + above / (block.nx * block.ny) <= line.maxStackKg + 1e-6,
+        `${line.name} 承压超限`);
+    });
+  }
+  for (const line of lines) {
+    const missing = result.unplaced.filter((entry) => entry.lineId === line.lineId).reduce((sum, entry) => sum + entry.cartons, 0);
+    assert.equal((count.get(line.lineId) || 0) + missing, line.cartons, `${line.name} 箱数守恒`);
+  }
+};
+
+const tileBlocksOnlyOnTiles = (lines, result) => {
+  const tileIds = new Set(lines.filter((line) => line.heavy).map((line) => line.lineId));
+  return result.containers.every((container) => container.blocks
+    .filter((block) => tileIds.has(block.lineId))
+    .every((block) => block.z === 0 || container.blocks.some((other) => tileIds.has(other.lineId)
+      && other.z + other.nz * other.cartonMm.height === block.z)));
+};
+
+test('A 瓷砖 700 箱：单柜装完，毛重 21700 kg，承压与重心合规', () => {
+  const lines = [makeLine('tile', 700)];
+  const result = pack(lines);
+  assertInvariants(lines, result);
+  assert.equal(result.containers.length, 1);
+  assert.equal(placed(result), 700);
+  assert.equal(result.containers[0].grossKg, 21700);
+  assert.equal(result.unplaced.length, 0);
+  assert.ok(Math.abs(result.containers[0].cogXmm - usable.length / 2) <= usable.length * 0.1, '重心偏离柜长中点超过 10%');
+  assert.ok(tileBlocksOnlyOnTiles(lines, result));
+});
+
+test('A+ 瓷砖 800 箱：首柜不超 22 t，其余转入第二柜', () => {
+  const lines = [makeLine('tile', 800)];
+  const result = pack(lines);
+  assertInvariants(lines, result);
+  assert.ok(result.containers[0].grossKg <= 22000);
+  assert.ok(placed(result, 0) >= 700, `首柜仅 ${placed(result, 0)} 箱`);
+  assert.equal(result.containers.length, 2);
+  assert.equal(totalPlaced(result), 800);
+});
+
+test('B2 餐椅 200 把：首柜至少 114 把且全部竖放，其余转入下一柜', () => {
+  const lines = [makeLine('chair', 200)];
+  const result = pack(lines);
+  assertInvariants(lines, result);
+  assert.ok(placed(result, 0) >= 114, `首柜仅 ${placed(result, 0)} 把`);
+  assert.equal(totalPlaced(result), 200);
+  assert.ok(result.containers.flatMap((container) => container.blocks).every((block) => block.cartonMm.height === 950));
+});
+
+test('B 家具混装：首柜至少装下 138/142 箱且不少于 46 CBM', () => {
+  const lines = [makeLine('sofa', 12), makeLine('chair', 60), makeLine('table', 20), makeLine('stool', 50)];
+  const result = pack(lines);
+  assertInvariants(lines, result);
+  assert.ok(placed(result, 0) >= 138, `首柜仅 ${placed(result, 0)} 箱`);
+  assert.ok(result.containers[0].cargoCbm >= 46, `首柜仅 ${result.containers[0].cargoCbm} CBM`);
+});
+
+test('C 混装：300 瓷砖在首柜地面或瓷砖上，首柜至少 440/452 箱，重货不压非重货', () => {
+  const lines = [makeLine('tile', 300), makeLine('sofa', 12), makeLine('chair', 80), makeLine('stool', 60)];
+  const result = pack(lines);
+  assertInvariants(lines, result);
+  const tileLine = lines[0].lineId;
+  const tilesInFirst = result.containers[0].blocks.filter((block) => block.lineId === tileLine)
+    .reduce((sum, block) => sum + block.cartons, 0);
+  assert.equal(tilesInFirst, 300);
+  assert.ok(tileBlocksOnlyOnTiles(lines, result));
+  assert.ok(placed(result, 0) >= 440, `首柜仅 ${placed(result, 0)} 箱`);
+});
+
+test('D 超门：高度在内尺寸内但超过柜门高度 → unplaced door', () => {
+  const lines = [makeLine('stool', 1, { cartonMm: { length: 1000, width: 1000, height: 2620 }, kgPerCarton: 50 })];
+  const result = pack(lines);
+  assert.deepEqual(result.unplaced.map((entry) => entry.reason), ['door']);
+  assert.equal(result.containers.length, 0);
+});
+
+test('E 超内尺寸：12100 mm 长的箱 → unplaced oversize', () => {
+  const lines = [makeLine('table', 1, { cartonMm: { length: 12100, width: 1000, height: 1000 }, upright: false })];
+  const result = pack(lines);
+  assert.deepEqual(result.unplaced.map((entry) => entry.reason), ['oversize']);
+});
+
+test('F 不可叠放：maxStackKg 为 0 的箱上面不放任何东西', () => {
+  const lines = [makeLine('stool', 40, { maxStackKg: 0, lineId: 'L-nostack' }), makeLine('chair', 40)];
+  const result = pack(lines);
+  assertInvariants(lines, result);
+  const bottoms = result.containers.flatMap((container) => container.blocks.filter((block) => block.lineId === 'L-nostack'));
+  assert.ok(bottoms.every((block) => block.nz === 1));
+  const blocks = result.containers[0].blocks.map(boxOf);
+  result.containers[0].blocks.forEach((block, i) => {
+    if (block.lineId !== 'L-nostack') return;
+    assert.ok(!blocks.some((other, j) => j !== i && other.z === blocks[i].z + blocks[i].dz
+      && other.x < blocks[i].x + blocks[i].dx && other.x + other.dx > blocks[i].x
+      && other.y < blocks[i].y + blocks[i].dy && other.y + other.dy > blocks[i].y));
+  });
+});
+
+test('毛重限制：超过安全毛重的货物拆到下一柜', () => {
+  const lines = [makeLine('stool', 400, { kgPerCarton: 100 })];
+  const result = pack(lines);
+  assertInvariants(lines, result);
+  assert.ok(result.containers.length >= 2);
+  assert.ok(result.containers.every((container) => container.grossKg <= payloadCap));
+});
+
+test('确定性：同输入逐字节相同；打乱输入行顺序结果不变', () => {
+  const lines = [makeLine('sofa', 12), makeLine('chair', 60), makeLine('table', 20), makeLine('stool', 50), makeLine('tile', 100)];
+  const first = JSON.stringify(pack(lines));
+  assert.equal(JSON.stringify(pack(lines)), first);
+  assert.equal(JSON.stringify(pack([...lines].reverse())), first);
+  assert.equal(JSON.stringify(pack([lines[2], lines[4], lines[0], lines[3], lines[1]])), first);
+});
+
+test('性能：30 个 SKU 共 600 箱在 200 ms 内排完', () => {
+  const lines = Array.from({ length: 30 }, (_, i) => makeLine(['chair', 'stool', 'table', 'sofa', 'tile'][i % 5], 20, { suffix: `-${i}` }));
+  // 取 3 次中最快的一次：排除并行测试抢 CPU 造成的偶发抖动，阈值与断言含义不变。
+  let best = Infinity;
+  let result;
+  for (let run = 0; run < 3 && best >= 200; run += 1) {
+    const started = process.hrtime.bigint();
+    result = pack(lines);
+    best = Math.min(best, Number(process.hrtime.bigint() - started) / 1e6);
+  }
+  assertInvariants(lines, result);
+  assert.ok(best < 200, `耗时 ${best.toFixed(1)} ms`);
+});
+
+test('toCartonLines：箱规优先级、估算标记、缺失不伪造、画像匹配', () => {
+  const items = [
+    { id: 'a', productId: 'p1', boxes: 10, quantity: 10, grossWeight: 100, volume: 2, length: 500, width: 400, height: 300,
+      product: { customsName: '瓷砖 600x600', category: { name: '瓷砖' } } },
+    { id: 'b', productId: 'p2', boxes: 4, quantity: 4, grossWeight: 40, volume: 1, product: { customsName: '椅子' } },
+    { id: 'c', productId: 'p3', boxes: 5, quantity: 5, grossWeight: 50, product: { customsName: '凳', length: 300, width: 300, height: 400 } },
+    { id: 'd', productId: 'p4', boxes: 5, quantity: 20, grossWeight: 50, product: { customsName: '杯', length: 300, width: 300, height: 400 } },
+    { id: 'e', productId: 'p5', boxes: 0, quantity: 1, product: { customsName: '无箱数' } },
+  ];
+  const lines = toCartonLines(items, spec, config);
+  assert.deepEqual(lines.map((line) => [line.lineId, line.dimsSource]), [['a', 'line'], ['b', 'estimated'], ['c', 'product'], ['d', 'missing']]);
+  assert.equal(lines[0].profile, 'tile');
+  assert.equal(lines[0].heavy, true);
+  assert.equal(lines[1].profile, 'furniture');
+  assert.equal(lines[3].cartonMm, null);
+  assert.equal(lines[1].kgPerCarton, 10);
+  const volume = lines[1].cartonMm.length * lines[1].cartonMm.width * lines[1].cartonMm.height;
+  assert.ok(Math.abs(volume / 1e9 - 0.25) < 0.01, '估算箱规体积≈ 体积÷箱数');
+});
+
+test('C5-01 归一化后边长为 0（0.1 mm）且无毛重：不再死循环，按缺少箱规阻塞', () => {
+  const [line] = toCartonLines([{ id: 'tiny', boxes: 1, quantity: 1, length: 500, width: 500, height: 0.1 }], spec, config);
+  assert.equal(line.cartonMm, null);
+  assert.equal(line.dimsSource, 'missing');
+  // 直接喂入未经 toCartonLines 的畸形行也必须被拒绝，且立即返回。
+  const result = pack([makeLine('stool', 1, { kgPerCarton: 0, cartonMm: { length: 500, width: 500, height: 0.1 } })]);
+  assert.equal(totalPlaced(result), 0);
+  assert.deepEqual(result.unplaced.map((entry) => entry.reason), ['missing-dimensions']);
+});
+
+test('C5-01 超时隔离：buildLoadingPlan 对 0.1 mm 高、无毛重的装箱行 5 s 内返回并阻塞出货', () => {
+  const script = `
+    const { buildLoadingPlan } = require('./shipmentReadinessService');
+    const { plan } = buildLoadingPlan({ packingItems: [{ id: 'tiny', boxes: 1, quantity: 1, volume: 0,
+      length: 500, width: 500, height: 0.1 }] });
+    console.log(JSON.stringify({ ready: plan.check.ready }));`;
+  const run = spawnSync(process.execPath, ['-e', script], { cwd: __dirname, timeout: 5000, encoding: 'utf8' });
+  assert.equal(run.error, undefined, `子进程超时或失败：${run.error}`);
+  assert.equal(run.status, 0, run.stderr);
+  assert.deepEqual(JSON.parse(run.stdout), { ready: false });
+});
+
+test('C5-01 计算预算耗尽时 fail-closed：剩余箱进入 unplaced，不挂起', () => {
+  const lines = [makeLine('stool', 50)];
+  const result = packContainers(lines, spec, config, { budget: 1 });
+  assert.equal(totalPlaced(result), 0);
+  assert.equal(result.unplaced.reduce((sum, entry) => sum + entry.cartons, 0), 50);
+  assert.deepEqual([...new Set(result.unplaced.map((entry) => entry.reason))], ['compute-budget']); // not no-space (INT6-02)
+});
+
+test('C5-02 底座块只托住上层块的一部分：悬出的单箱必须另放，不得凭块平均支撑通过', () => {
+  // 底座 9000×2000，上层 4 箱各 3000×2000（共 12000 长）：第 4 箱完全悬空，块平均支撑为 75%。
+  const lines = [
+    makeLine('tile', 1, { suffix: '-base', cartonMm: { length: 9000, width: 2000, height: 1500 }, kgPerCarton: 17600 }),
+    makeLine('tile', 4, { suffix: '-upper', cartonMm: { length: 3000, width: 2000, height: 1100 }, kgPerCarton: 40,
+      heavy: true }),
+  ];
+  const result = pack(lines);
+  assertInvariants(lines, result);
+  assert.equal(totalPlaced(result) + result.unplaced.reduce((sum, entry) => sum + entry.cartons, 0), 5);
+  const floating = result.containers.flatMap((container) => container.blocks)
+    .filter((block) => block.lineId === 'L-tile-upper' && block.z > 0 && block.x + block.nx * block.cartonMm.length > 9000);
+  assert.deepEqual(floating, [], '上层块不得伸出底座');
+});
+
+// 精确剪枝回归：这些多柜订单（总量 > 一柜，第二遍不会运行）的结果必须与优化前（ca021d7）的排柜逐字节一致。
+const GOLDEN_PASS1 = [
+  '00d27bc6e4703b58', '5363fba94148a079', '10acd0aa86641b7d', 'ee2a841b496665d2', '130154d17ce4b313',
+  '95a55f733984e08e', 'ec8258243bfc6422', '872ee159f42b8f74', 'a70b63d8ecab672a', '30ee871e5d2e17e5',
+  '4e51759ecd5e9a11', 'a750b143756f5481', 'd41c694dfe65652e', 'cf3346ffa4650281', '9c3d6cadb7fbd72f',
+  '662ac616675e7b59', '558f03a6dc487e04', 'e8c18aa3604f6124', 'a21bd970014bd94e', '180a67bb49873dc3',
+];
+test('剪枝后第一遍结果与优化前逐字节一致（20 个种子订单，含 20GP）', () => {
+  GOLDEN_PASS1.forEach((golden, k) => {
+    const orderSpec = getContainerSpec(k % 4 === 3 ? '20GP' : '40HQ');
+    const lines = makeOrderLines(5 + ((k * 13) % 76), 1, { seed: 1000 + k });
+    const volume = lines.reduce((sum, l) => sum + (l.cartonMm.length * l.cartonMm.width * l.cartonMm.height) / 1e9, 0);
+    lines.forEach((l) => { l.cartons = Math.ceil(100 / volume); });
+    const result = packContainers(lines, orderSpec, config);
+    assert.ok(!result.unplaced.some((entry) => entry.reason === 'compute-budget'));
+    assert.equal(crypto.createHash('sha256').update(JSON.stringify(result)).digest('hex').slice(0, 16), golden, `order ${k}`);
+  });
+});
+
+test('单柜块数上限 3000：700 行各 1 小箱装进 1 个柜', () => {
+  const lines = Array.from({ length: 700 }, (_, i) => makeLine('stool', 1, {
+    lineId: `S${i}`, cartonMm: { length: 200 + (i % 30), width: 200 + (i % 7), height: 150 + (i % 11) }, kgPerCarton: 1,
+  }));
+  const result = pack(lines);
+  assert.deepEqual(result.unplaced, []);
+  assert.equal(result.containers.length, 1);
+  assert.equal(totalPlaced(result), 700);
+});
+
+test('第二遍不会更差，也不会把完整方案变成 compute-budget', () => {
+  const lines = [makeLine('tile', 300), makeLine('sofa', 12), makeLine('chair', 80), makeLine('stool', 60)];
+  const unplacedCount = (r) => r.unplaced.reduce((sum, entry) => sum + entry.cartons, 0);
+  for (const budget of [3e6, 1e7, 3e7, 1e8, 5e8]) {
+    const first = packContainers(lines, spec, config, { budget, passes: 1 });
+    const final = packContainers(lines, spec, config, { budget });
+    assertInvariants(lines, final);
+    if (!first.unplaced.some((entry) => entry.reason === 'compute-budget')) {
+      assert.ok(!final.unplaced.some((entry) => entry.reason === 'compute-budget'), `budget ${budget}`);
+    }
+    assert.ok(unplacedCount(final) <= unplacedCount(first), `budget ${budget}`);
+    assert.ok(final.containers.length <= first.containers.length || unplacedCount(final) < unplacedCount(first), `budget ${budget}`);
+  }
+});
+
+test('逐箱支撑边界：支撑面积刚好 75% 通过，749/1000 不通过；悬出 250 mm 可接受', () => {
+  const base = { x: 0, y: 0, z: 0, dx: 750, dy: 1000, dz: 500 };
+  const ep = { x: 0, y: 0, z: 500 };
+  const o = { l: 1000, w: 1000 };
+  assert.equal(supportedColumns([base], ep, o, 1, 1, 0.75), 1);
+  assert.equal(supportedColumns([{ ...base, dx: 749 }], ep, o, 1, 1, 0.75), 0);
+});

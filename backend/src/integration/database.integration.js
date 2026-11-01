@@ -12,7 +12,7 @@ const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const { PrismaClient } = require('@prisma/client');
 
 const BACKEND_ROOT = path.resolve(__dirname, '../..');

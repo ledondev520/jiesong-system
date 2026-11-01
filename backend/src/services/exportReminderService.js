@@ -187,7 +187,7 @@ const runInvoiceMissingReminder = async (tx = prisma, options = {}) => {
       type: NOTIFICATION_TYPE.INVOICE_MISSING,
       title,
       content,
-      link: `/dashboard/purchase/${missingContracts[0].id}`,
+      link: `/dashboard/purchases/${missingContracts[0].id}`,
       metadata: JSON.stringify({
         missingCount: missingContracts.length,
         contractIds: missingContracts.slice(0, 20).map((c) => c.id),

@@ -9,8 +9,10 @@ const { authenticate } = require('../middleware/auth');
 const { hasCapabilities, parseCapability } = require('../middleware/roleAuth');
 const { searchEntities } = require('../agent/commands/query');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
-const { createSupplier, updateSupplier } = require('../agent/commands/supplier');
+const { createSupplier, updateSupplier, assertActiveChangeAllowed } = require('../agent/commands/supplier');
 const { createMcpServer } = require('../agent/mcp/server');
+const prisma = require('../utils/prisma');
+const { logOperation } = require('../utils/auditLog');
 
 const router = Router();
 
@@ -37,13 +39,31 @@ const TOOL_POLICIES = {
   },
 };
 
-const createLocalClient = () => ({
-  searchEntities,
-  createPurchase: (input) => createPurchaseWithItems({ input }),
-  updatePurchase: (id, input) => updatePurchase({ id, input }),
-  createSupplier: (input) => createSupplier({ input }),
-  updateSupplier: (id, input) => updateSupplier({ id, input }),
-});
+// Writes are attributed to the authenticated actor in operation_logs (commands themselves take no actor).
+const actorOf = (req) => (req.authActor?.actorType === 'AGENT'
+  ? { actorType: 'AGENT', agentAccountId: req.authActor.agentAccountId || req.agent?.id || null, agentCredentialId: req.authActor.agentCredentialId || req.agentCredential?.id || null }
+  : { actorType: 'USER', userId: req.user?.id || null });
+
+const createLocalClient = (req) => {
+  // loadBefore (updates only) captures oldValue so MCP audit rows carry the same diff as REST withAuditLog.
+  const audited = (entity, action, run, loadBefore) => async (...args) => {
+    const oldValue = loadBefore ? await loadBefore(...args) : null;
+    const result = await run(...args);
+    await logOperation({ ...actorOf(req), action, entity, entityId: result?.id || null, oldValue, newValue: result, req });
+    return result;
+  };
+  const actorRole = req.authActor?.actorType === 'AGENT' ? null : req.user?.role;
+  return {
+    searchEntities,
+    createPurchase: audited('PurchaseContract', 'CREATE', (input) => createPurchaseWithItems({ input })),
+    updatePurchase: audited('PurchaseContract', 'UPDATE', (id, input) => updatePurchase({ id, input }), (id) => prisma.purchaseContract.findUnique({ where: { id } })),
+    createSupplier: audited('Supplier', 'CREATE', (input) => createSupplier({ input })),
+    updateSupplier: audited('Supplier', 'UPDATE', (id, input) => {
+      assertActiveChangeAllowed(actorRole, input?.isActive);
+      return updateSupplier({ id, input });
+    }, (id) => prisma.supplier.findUnique({ where: { id } })),
+  };
+};
 
 const canInvokeTool = (req, toolName) => {
   const policy = TOOL_POLICIES[toolName];
@@ -69,7 +89,7 @@ router.get('/', authenticate, (req, res) => {
 });
 
 router.post('/', authenticate, async (req, res) => {
-  const server = createMcpServer(createLocalClient());
+  const server = createMcpServer(createLocalClient(req));
 
   if (req.body?.method === 'tools/call') {
     const toolName = req.body?.params?.name;
@@ -98,3 +118,4 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.TOOL_POLICIES = TOOL_POLICIES;

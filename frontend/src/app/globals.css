@@ -38,6 +38,22 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* 状态语义色（UX 重设计 §8.3/8.7）：gray 草稿 · blue 进行中 · amber 待处理 · green 完成 · red 阻塞/危险 */
+  --color-status-gray: var(--status-gray);
+  --color-status-gray-soft: var(--status-gray-soft);
+  --color-status-blue: var(--status-blue);
+  --color-status-blue-soft: var(--status-blue-soft);
+  --color-status-amber: var(--status-amber);
+  --color-status-amber-soft: var(--status-amber-soft);
+  --color-status-green: var(--status-green);
+  --color-status-green-soft: var(--status-green-soft);
+  --color-status-red: var(--status-red);
+  --color-status-red-soft: var(--status-red-soft);
+
+  /* 字号阶梯 12/13/14/16/20/24（§8.2）。仅新增 text-13，不覆盖 Tailwind 默认字号，避免改动现有布局 */
+  --text-13: 0.8125rem;
+  --text-13--line-height: 1.25rem;
+
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
@@ -52,41 +68,54 @@
 
 @layer base {
   :root {
-    --radius: 0.875rem;
-    --background: oklch(0.978 0.003 145);
-    --foreground: oklch(0.22 0.012 150);
-    --card: oklch(0.995 0.002 145);
-    --card-foreground: oklch(0.22 0.012 150);
-    --popover: oklch(0.995 0.002 145);
-    --popover-foreground: oklch(0.22 0.012 150);
-    --primary: oklch(0.42 0.165 152);
+    /* §8.4 圆角 6px；§8.3 zinc 中性色 + 单一深青绿主色 */
+    --radius: 0.375rem;
+    --background: oklch(0.985 0 0);
+    --foreground: oklch(0.141 0.005 285.823);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.141 0.005 285.823);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.141 0.005 285.823);
+    --primary: oklch(0.5 0.11 165);
     --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.955 0.005 145);
-    --secondary-foreground: oklch(0.32 0.03 150);
-    --muted: oklch(0.94 0.004 145);
-    --muted-foreground: oklch(0.52 0.015 150);
-    --accent: oklch(0.94 0.008 145);
-    --accent-foreground: oklch(0.32 0.03 150);
-    --destructive: oklch(0.58 0.2 25);
+    --secondary: oklch(0.967 0.001 286.375);
+    --secondary-foreground: oklch(0.21 0.006 285.885);
+    --muted: oklch(0.967 0.001 286.375);
+    --muted-foreground: oklch(0.552 0.016 285.938);
+    --accent: oklch(0.967 0.001 286.375);
+    --accent-foreground: oklch(0.21 0.006 285.885);
+    --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(0.91 0.005 145);
-    --input: oklch(0.91 0.005 145);
-    --ring: oklch(0.42 0.165 152);
-    --chart-1: oklch(0.42 0.165 152);
-    --chart-2: oklch(0.55 0.18 155);
-    --chart-3: oklch(0.65 0.14 148);
-    --chart-4: oklch(0.5 0.16 152);
-    --chart-5: oklch(0.38 0.17 154);
-    --sidebar: oklch(0.985 0.002 145);
-    --sidebar-foreground: oklch(0.28 0.015 150);
-    --sidebar-primary: oklch(0.42 0.165 152);
+    --border: oklch(0.92 0.004 286.32);
+    --input: oklch(0.92 0.004 286.32);
+    --ring: oklch(0.5 0.11 165);
+    --chart-1: oklch(0.5 0.11 165);
+    --chart-2: oklch(0.6 0.1 200);
+    --chart-3: oklch(0.7 0.1 150);
+    --chart-4: oklch(0.45 0.09 175);
+    --chart-5: oklch(0.38 0.08 165);
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.37 0.013 285.805);
+    --sidebar-primary: oklch(0.5 0.11 165);
     --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.95 0.006 145);
-    --sidebar-accent-foreground: oklch(0.28 0.015 150);
-    --sidebar-border: oklch(0.9 0.004 145);
-    --sidebar-ring: oklch(0.42 0.165 152);
+    --sidebar-accent: oklch(0.967 0.001 286.375);
+    --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
+    --sidebar-border: oklch(0.92 0.004 286.32);
+    --sidebar-ring: oklch(0.5 0.11 165);
     --brand-emphasis: var(--primary);
     --brand-emphasis-soft: var(--muted-foreground);
+
+    /* §8.7 状态徽章：前景 / 软底（文字对比度 ≥ 4.5:1） */
+    --status-gray: oklch(0.442 0.017 285.786);
+    --status-gray-soft: oklch(0.967 0.001 286.375);
+    --status-blue: oklch(0.45 0.15 255);
+    --status-blue-soft: oklch(0.95 0.025 255);
+    --status-amber: oklch(0.45 0.1 70);
+    --status-amber-soft: oklch(0.96 0.05 90);
+    --status-green: oklch(0.42 0.1 155);
+    --status-green-soft: oklch(0.95 0.04 155);
+    --status-red: oklch(0.5 0.2 27);
+    --status-red-soft: oklch(0.96 0.03 25);
 
     /* 精致阴影系统 */
     --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
@@ -98,40 +127,51 @@
   }
 
   .dark {
-    --background: oklch(0.18 0.018 145);
-    --foreground: oklch(0.92 0.012 145);
-    --card: oklch(0.26 0.022 145);
-    --card-foreground: oklch(0.92 0.012 145);
-    --popover: oklch(0.26 0.022 145);
-    --popover-foreground: oklch(0.92 0.012 145);
-    --primary: oklch(0.5 0.18 152);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.28 0.025 145);
-    --secondary-foreground: oklch(0.88 0.01 145);
-    --muted: oklch(0.28 0.025 145);
-    --muted-foreground: oklch(0.65 0.015 145);
-    --accent: oklch(0.3 0.03 145);
-    --accent-foreground: oklch(0.88 0.01 145);
-    --destructive: oklch(0.65 0.18 25);
+    --background: oklch(0.141 0.005 285.823);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.21 0.006 285.885);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.21 0.006 285.885);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.62 0.12 165);
+    --primary-foreground: oklch(0.141 0.005 285.823);
+    --secondary: oklch(0.274 0.006 286.033);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.274 0.006 286.033);
+    --muted-foreground: oklch(0.705 0.015 286.067);
+    --accent: oklch(0.274 0.006 286.033);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
     --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(1 0 0 / 0.14);
-    --input: oklch(1 0 0 / 0.14);
-    --ring: oklch(0.5 0.18 152);
-    --chart-1: oklch(0.5 0.18 152);
-    --chart-2: oklch(0.6 0.15 155);
-    --chart-3: oklch(0.7 0.12 148);
-    --chart-4: oklch(0.55 0.14 152);
-    --chart-5: oklch(0.45 0.16 154);
-    --sidebar: oklch(0.2 0.018 145);
-    --sidebar-foreground: oklch(0.85 0.012 145);
-    --sidebar-primary: oklch(0.5 0.18 152);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.28 0.025 145);
-    --sidebar-accent-foreground: oklch(0.85 0.012 145);
-    --sidebar-border: oklch(1 0 0 / 0.08);
-    --sidebar-ring: oklch(0.5 0.18 152);
+    --border: oklch(1 0 0 / 0.12);
+    --input: oklch(1 0 0 / 0.15);
+    --ring: oklch(0.62 0.12 165);
+    --chart-1: oklch(0.62 0.12 165);
+    --chart-2: oklch(0.7 0.1 200);
+    --chart-3: oklch(0.78 0.1 150);
+    --chart-4: oklch(0.55 0.1 175);
+    --chart-5: oklch(0.48 0.09 165);
+    --sidebar: oklch(0.21 0.006 285.885);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.62 0.12 165);
+    --sidebar-primary-foreground: oklch(0.141 0.005 285.823);
+    --sidebar-accent: oklch(0.274 0.006 286.033);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 0.1);
+    --sidebar-ring: oklch(0.62 0.12 165);
     --brand-emphasis: var(--primary);
     --brand-emphasis-soft: var(--muted-foreground);
+
+    --status-gray: oklch(0.8 0.01 286);
+    --status-gray-soft: oklch(0.274 0.006 286.033);
+    --status-blue: oklch(0.8 0.1 255);
+    --status-blue-soft: oklch(0.28 0.06 255);
+    --status-amber: oklch(0.85 0.12 85);
+    --status-amber-soft: oklch(0.3 0.05 80);
+    --status-green: oklch(0.82 0.12 155);
+    --status-green-soft: oklch(0.28 0.05 155);
+    --status-red: oklch(0.8 0.13 25);
+    --status-red-soft: oklch(0.3 0.07 25);
 
     --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.15);
     --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.2);
@@ -198,6 +238,13 @@
   textarea {
     font-family: var(--font-body-sans), sans-serif;
     text-wrap: pretty;
+  }
+
+  /* §8.2 数字等宽对齐（金额/数量列）；右对齐仍由各表格组件决定 */
+  td,
+  th,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 
   code,
@@ -356,6 +403,15 @@
     background-image:
       linear-gradient(180deg, color-mix(in oklch, var(--card) 90%, transparent), var(--card)),
       radial-gradient(ellipse 70% 40% at 50% 0%, color-mix(in oklch, var(--primary) 5%, transparent), transparent);
+  }
+
+  /* 注册/找回密码沿用登录页的圆角输入框与按钮 */
+  .auth-card [data-slot="input"],
+  .auth-card [data-slot="button"] {
+    @apply rounded-xl;
+  }
+  .auth-card [data-slot="input"] {
+    @apply h-11;
   }
 
   .text-brand-emphasis {

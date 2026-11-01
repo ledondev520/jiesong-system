@@ -8,6 +8,8 @@
 
 const prisma = require('../utils/prisma');
 const { getOverdueReceivables } = require('./financeService');
+const { pricingConfigStatus } = require('./pricingConfigService');
+const { currentRates } = require('./exportPricing');
 
 const PATROL_CATEGORIES = {
   BUSINESS: 'BUSINESS',
@@ -193,39 +195,30 @@ const runSystemPatrol = async () => {
     /* non-critical */
   }
 
-  // 3. 系统配置完整性检查
+  // 3. 报价配置检查：汇率/加价只来自唯一报价配置（config/pricing.json），不再检查 SystemConfig 的 exchangeRate/profitRate
   try {
-    const requiredKeys = ['exchangeRate', 'profitRate'];
-    const configs = await prisma.systemConfig.findMany({
-      where: { key: { in: requiredKeys } },
-      select: { key: true, value: true, updatedAt: true },
-    });
-    const configMap = Object.fromEntries(configs.map((c) => [c.key, c]));
-
-    for (const key of requiredKeys) {
-      if (!configMap[key]) {
-        findings.push({
-          category: PATROL_CATEGORIES.SYSTEM,
-          severity: SEVERITY.CRITICAL,
-          rule: 'MISSING_CONFIG',
-          title: `缺失系统配置：${key}`,
-          detail: `系统配置 ${key} 不存在，可能影响核心业务计算`,
-          autoFixPolicy: AUTO_FIX_POLICY.CONFIRM,
-        });
-      }
+    let status;
+    try {
+      status = pricingConfigStatus();
+    } catch (err) {
+      findings.push({
+        category: PATROL_CATEGORIES.SYSTEM,
+        severity: SEVERITY.CRITICAL,
+        rule: 'MISSING_CONFIG',
+        title: '报价配置不可用',
+        detail: `报价配置缺失或无效，可能影响核心业务计算：${err.message}`,
+        autoFixPolicy: AUTO_FIX_POLICY.CONFIRM,
+      });
     }
-
-    if (configMap.exchangeRate) {
-      const daysSinceUpdate = Math.floor(
-        (Date.now() - new Date(configMap.exchangeRate.updatedAt).getTime()) / (24 * 60 * 60 * 1000)
-      );
+    if (status) {
+      const daysSinceUpdate = Math.floor((Date.now() - status.modifiedAt.getTime()) / (24 * 60 * 60 * 1000));
       if (daysSinceUpdate > 7) {
         findings.push({
           category: PATROL_CATEGORIES.SYSTEM,
           severity: SEVERITY.WARNING,
           rule: 'STALE_EXCHANGE_RATE',
           title: '汇率配置过期',
-          detail: `系统汇率已 ${daysSinceUpdate} 天未更新，当前值：${configMap.exchangeRate.value}`,
+          detail: `报价配置已 ${daysSinceUpdate} 天未更新，当前现汇：${currentRates().spotRate}`,
           autoFixPolicy: AUTO_FIX_POLICY.CONFIRM,
         });
       }

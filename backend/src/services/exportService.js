@@ -7,11 +7,13 @@
  */
 
 const ExcelJS = require('exceljs');
-const { withUtf8Bom } = require('../utils/csvExport');
+const { withUtf8Bom, csvSafeText } = require('../utils/csvExport');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
+const { outstandingOf } = require('./payablesService');
 const { getExportReadiness } = require('./exportReadinessService');
+const { roundMoney } = require('../utils/money');
 
 /**
  * 职责：导出数据
@@ -52,7 +54,7 @@ const exportData = async (type, query = {}) => {
 const toCSV = (headers, rows) => {
   const headerLine = headers.map(h => `"${h}"`).join(',');
   const dataLines = rows.map(row => 
-    row.map(cell => `"${(cell ?? '').toString().replace(/"/g, '""')}"`).join(',')
+    row.map(cell => `"${csvSafeText(cell).replace(/"/g, '""')}"`).join(',')
   );
   return withUtf8Bom([headerLine, ...dataLines].join('\n'));
 };
@@ -158,7 +160,7 @@ const exportPurchases = async (query) => {
     c.supplier?.name || '',
     c.totalAmount,
     c.paidAmount,
-    c.totalAmount - c.paidAmount,
+    outstandingOf(c), // 与付款列表同口径：草稿/已取消为 0
     c.status,
     c.signedAt ? formatDate(c.signedAt) : '',
     c.expectedDate ? formatDate(c.expectedDate) : '',
@@ -525,7 +527,7 @@ const exportSalesContractExcel = async (contractId) => {
       quantity,
       unit: item.unit || '-',
       unitPrice,
-      amount: Math.round(amount * 100) / 100,
+      amount: roundMoney(amount),
       note: `${item.hsSource || 'missing'}${item.hsEvidence?.effectiveDate ? ` / 税则生效 ${formatDate(item.hsEvidence.effectiveDate)}` : ''}`,
     });
   });
@@ -541,7 +543,7 @@ const exportSalesContractExcel = async (contractId) => {
       quantity: '',
       unit: '',
       unitPrice: '',
-      amount: Math.round(invoiceTotal * 100) / 100,
+      amount: roundMoney(invoiceTotal),
       note: `合同金额 $${contract.totalAmount.toFixed(2)}${Math.abs(invoiceTotal - contract.totalAmount) > 0.01 ? '（与明细合计存在差异，请核对）' : ''}`,
     });
     totalRow.font = { bold: true };
@@ -599,5 +601,6 @@ const exportSalesContractExcel = async (contractId) => {
 
 module.exports = {
   exportData,
+  toCSV,
   exportSalesContractExcel,
 };

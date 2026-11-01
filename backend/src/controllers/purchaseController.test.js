@@ -212,6 +212,52 @@ test('getProductPriceHistory: 比价采用不含税单价', async (t) => {
   assert.equal(res.payload.data.history[0].price, 100);
 });
 
+test('getProductPriceHistory: bySupplier 按供应商汇总，排除草稿/已取消合同与已停用供应商', async (t) => {
+  const oldFind = prisma.purchaseItem.findMany; t.after(() => { prisma.purchaseItem.findMany = oldFind; });
+  let where;
+  const sup = (id, extra = {}) => ({ id, name: `${id}全称`, shortName: null, isActive: true, hasQualityIssue: false, ...extra });
+  const row = (supplier, unitPrice, day, contractNo, taxRate = 13) => ({ quantity: 1, unitPrice, purchaseContract: { contractNo, createdAt: new Date(Date.UTC(2026, 0, day)), taxRate, supplier } });
+  prisma.purchaseItem.findMany = async (args) => {
+    where = args.where;
+    return [
+      row(sup('s1', { shortName: '甲厂' }), 12, 20, 'C3'), row(sup('s1', { shortName: '甲厂' }), 10, 5, 'C1'), row(sup('s1', { shortName: '甲厂' }), 14, 10, 'C2'),
+      row(sup('s2', { hasQualityIssue: true }), 9, 15, 'C4', 1),
+      row(sup('s3', { isActive: false }), 1, 18, 'C5'),
+    ];
+  };
+  const res = { status() { return this; }, json(value) { this.payload = value; } };
+  await purchaseController.getProductPriceHistory({ params: { productId: 'product-1' } }, res, (error) => { throw error; });
+  assert.deepEqual(where.purchaseContract.status.notIn.sort(), ['CANCELLED', 'DRAFT']);
+  const { bySupplier } = res.payload.data;
+  assert.deepEqual(bySupplier.map((s) => s.supplierId), ['s2', 's1']); // 最近价低者在前，停用的 s3 不出现
+  assert.deepEqual(bySupplier[1], {
+    supplierId: 's1', supplierName: '甲厂', hasQualityIssue: false,
+    lastPrice: 12, lastDate: new Date(Date.UTC(2026, 0, 20)), lastContractNo: 'C3', lastTaxRate: 13,
+    minPrice: 10, averagePrice: 12, count: 3,
+  });
+  assert.equal(bySupplier[0].supplierName, 's2全称');
+  assert.equal(bySupplier[0].hasQualityIssue, true);
+  assert.equal(bySupplier[0].lastTaxRate, 1);
+});
+
+test('getProductPriceHistory: 无有效历史时 bySupplier 为空数组', async (t) => {
+  const oldFind = prisma.purchaseItem.findMany; t.after(() => { prisma.purchaseItem.findMany = oldFind; });
+  prisma.purchaseItem.findMany = async () => [];
+  const res = { status() { return this; }, json(value) { this.payload = value; } };
+  await purchaseController.getProductPriceHistory({ params: { productId: 'product-1' } }, res, (error) => { throw error; });
+  assert.deepEqual(res.payload.data.bySupplier, []);
+});
+
+test('price-history 路由: 角色清单不变，未登录401、无权限角色403', () => {
+  const layer = require('../routes/purchases').stack.find((l) => l.route?.path === '/price-history/:productId' && l.route.methods.get);
+  const guard = layer.route.stack.map((l) => l.handle).find((h) => h.isRoleAuth);
+  assert.deepEqual(guard.allowedRoles, ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']);
+  const run = (user) => { let err; guard({ user }, {}, (e) => { err = e; }); return err; };
+  assert.equal(run(undefined).statusCode, 401);
+  assert.equal(run({ role: 'GUEST' }).statusCode, 403);
+  assert.equal(run({ role: 'PURCHASE' }), undefined);
+});
+
 test('updateStatus: 仅未履行合同允许取消，已付款或已发货不得借取消回滚', async (t) => {
   const oldTransaction = prisma.$transaction; t.after(() => { prisma.$transaction = oldTransaction; });
   for (const existing of [

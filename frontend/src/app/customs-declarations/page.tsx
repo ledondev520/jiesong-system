@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import { redirect } from "next/navigation";
 
 export default function CustomsDeclarationsRedirectPage() {
-  redirect('/dashboard/customs-declarations');
+  redirect("/dashboard/customs?view=customs");
 }

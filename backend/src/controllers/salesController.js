@@ -19,10 +19,10 @@ const exportPacketService = require('../services/exportPacketService');
 const list = async (req, res, next) => {
   try {
     const { page, pageSize } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
-    const { status, storeId, keyword, shipped, shippedFrom, shippedTo } = req.query;
+    const { status, storeId, customerId, keyword, shipped, shippedFrom, shippedTo } = req.query;
     const lite = req.query.lite === 'true' || req.query.lite === true;
 
-    const result = await salesService.getSalesContracts({ page, pageSize, status, storeId, keyword, shipped, shippedFrom, shippedTo, lite });
+    const result = await salesService.getSalesContracts({ page, pageSize, status, storeId, customerId, keyword, shipped, shippedFrom, shippedTo, lite });
     paginated(res, result.contracts, result.total, page, pageSize);
   } catch (error) {
     next(error);
@@ -33,6 +33,15 @@ const getById = async (req, res, next) => {
   try {
     const contract = await salesService.getSalesContractById(req.params.id);
     success(res, contract);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/** 只读装柜计划（3D/2D/打印共用）；?containerType= 仅用于模拟。 */
+const getLoadingPlan = async (req, res, next) => {
+  try {
+    success(res, await salesService.getLoadingPlan(req.params.id, req.query.containerType));
   } catch (error) {
     next(error);
   }
@@ -161,13 +170,18 @@ const getNextContractNo = async (req, res, next) => {
   }
 };
 
+// 带 items 时返回订单整体利润率预览（只提示）；否则按单个成本（可带 productId 取分类加价）给推荐单价。
 const calculatePrice = async (req, res, next) => {
   try {
-    const result = salesService.calculateSellingPrice({
-      costPrice: req.body?.costPrice,
-      exchangeRate: req.body?.exchangeRate,
-      profitRate: req.body?.profitRate,
-    });
+    const body = req.body || {};
+    const result = body.items !== undefined
+      ? await salesService.previewOrderMargin({ exchangeRate: body.exchangeRate, items: body.items })
+      : await salesService.calculateProductSellingPrice({
+        productId: typeof body.productId === 'string' ? body.productId : undefined,
+        costPrice: body.costPrice,
+        exchangeRate: body.exchangeRate,
+        profitRate: body.profitRate,
+      });
     success(res, result);
   } catch (error) {
     next(error);
@@ -252,6 +266,7 @@ const uploadFile = async (req, res, next) => {
       req.file,
       req.body?.description,
       req.body?.category,
+      req.user,
     );
 
     created(res, contractFile, '文件上传成功');
@@ -426,6 +441,7 @@ const generateExportPacket = async (req, res, next) => {
 module.exports = {
   list,
   getById,
+  getLoadingPlan,
   create,
   update,
   remove,

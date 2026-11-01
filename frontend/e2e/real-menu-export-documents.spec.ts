@@ -119,12 +119,13 @@ test.afterEach(async () => {
  */
 async function enterFromMenu(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
-  await page.getByRole("link", { name: "出口", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/dashboard\/sales$/);
   await page
-    .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
+    .getByRole("link", { name: "出口订单", exact: true })
+    .first()
     .click();
-  await expect(page).toHaveURL(`/dashboard/sales/${fixture.salesId}`);
+  await expect(page).toHaveURL(/\/dashboard\/orders$/);
+  await page.getByRole("link", { name: fixture.salesNo!, exact: true }).click();
+  await expect(page).toHaveURL(`/dashboard/orders/${fixture.salesId}`);
   await expect(
     page.getByRole("heading", { name: fixture.salesNo!, exact: true }),
   ).toBeVisible();
@@ -137,7 +138,8 @@ async function enterFromMenu(page: Page) {
  * @throws 入口缺失或准备度未通过时断言失败
  */
 async function openForms(page: Page) {
-  await page.getByRole("button", { name: "生成申报三表", exact: true }).click();
+  await page.getByRole("button", { name: "单证", exact: true }).click();
+  await page.getByRole("menuitem", { name: /申报三表/ }).click();
   const dialog = page.getByRole("dialog", { name: "一键生成出口三张表" });
   await expect(dialog.getByRole("button", { name: /^确认生成/ })).toBeEnabled();
   return dialog;
@@ -171,9 +173,8 @@ async function generateForms(page: Page, dialog: Locator) {
  * @throws 入口点击失败或页面关闭
  */
 async function openPacket(page: Page) {
-  await page
-    .getByRole("button", { name: "出口三单工作台", exact: true })
-    .click();
+  await page.getByRole("button", { name: "单证", exact: true }).click();
+  await page.getByRole("menuitem", { name: /生成出口单证/ }).click();
   return page.getByRole("dialog", {
     name: `出口三单工作台 · ${fixture.salesNo}`,
   });
@@ -307,14 +308,12 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   // The active primary module preserves its current detail URL. Sales detail
   // has no module tabs, so use its existing Return action before the menu path.
   await page.getByRole("button", { name: "返回", exact: true }).click();
-  await expect(page).toHaveURL(/\/dashboard\/sales$/);
-  await page.getByRole("link", { name: "出口", exact: true }).first().click();
-  const exportTabs = page.getByRole("navigation", {
-    name: "出口",
-    exact: true,
-  });
-  await expect(exportTabs).toBeVisible();
-  await exportTabs.getByRole("link", { name: "出口退税", exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard\/orders$/);
+  await page
+    .getByRole("navigation", { name: "侧边导航" })
+    .getByRole("link", { name: "单证与退税", exact: true })
+    .click();
+  // 报关单 / 出口退税是该页内页签，侧边栏只有「单证与退税」一个入口。
   await page.getByRole("tab", { name: "报关单", exact: true }).click();
   await page
     .getByRole("button", {
@@ -325,8 +324,7 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   // Next client navigation must commit before reload, or reload cancels it.
   await expect(page).toHaveURL(
     (url) =>
-      url.pathname ===
-      `/dashboard/customs-declarations/${saved.customs_declarations[0].id}`,
+      url.pathname === `/dashboard/customs/${saved.customs_declarations[0].id}`,
   );
   await expect(
     page.getByRole("heading", {
@@ -347,10 +345,10 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
     .locator('[data-slot="card-content"]');
   await expect(customsAmount).toBeVisible();
   await expect(customsAmount).toHaveText("USD 20");
-  await page.getByRole("link", { name: "出口", exact: true }).first().click();
-  // Customs detail already renders the same module tabs after reload.
-  await expect(exportTabs).toBeVisible();
-  await exportTabs.getByRole("link", { name: "出口退税", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "侧边导航" })
+    .getByRole("link", { name: "单证与退税", exact: true })
+    .click();
   await page.getByRole("tab", { name: "退税记录", exact: true }).click();
   await page
     .getByRole("button", {
@@ -458,7 +456,8 @@ test("SALES commercial prerequisites and cancelled preview do not reprice or arc
   ).toBeDisabled();
   await fillPacket(dialog);
   const preview = await previewPacket(page, dialog);
-  expect(preview.summary.totalUsd).toBe(20);
+  // owner 14:33 rule: 11.3 × 1.3 ÷ 7 = 2.10 is under $5 → ceil to whole dollar = 3 USD per piece × 10
+  expect(preview.summary.totalUsd).toBe(30);
   expect(preview.summary.purchaseCostCny).toBe(113);
   expect(readExportDocuments(fixture)).toEqual(before);
   await dialog
@@ -514,6 +513,8 @@ test("SALES commercial confirmation downloads three accurate sheets and archived
   expect(saved.sales_contract_files).toHaveLength(1);
   expect(saved.sales_contract_files[0].id).toBe(generated.file.id);
   await page.reload();
+  // 已归档文件列在订单详情的「单证」页签；重载后默认回到概览。
+  await page.getByRole("tab", { name: "单证", exact: true }).click();
   const again = page.waitForEvent("download");
   await page
     .getByRole("button", {

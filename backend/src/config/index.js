@@ -1,6 +1,6 @@
 /**
  * Input: 环境变量 (.env)
- * Output: 统一配置对象（含显式代理白名单、JWT、活动 AI/Kimi、HSCIQ、上传、CORS 配置）
+ * Output: 统一配置对象（含显式代理白名单、JWT、活动 AI/可选回退 AI/Kimi、HSCIQ、上传、CORS 配置）
  * Pos: 配置中心，集中管理所有环境变量
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -134,6 +134,40 @@ if (aiProvider === 'openai') {
   }
 }
 
+// 可选 DeepSeek 自动回退（AI_FALLBACK_PROVIDER=deepseek）：未设置时完全惰性，所有 AI_FALLBACK_* 被忽略。
+// 设置后非法值启动失败；回退与主供应商相同则关闭。缺少密钥不阻断启动（密钥也可来自库内 deepseekApiKey，运行时解析）。
+const fallbackProvider = (process.env.AI_FALLBACK_PROVIDER || '').trim().toLowerCase();
+if (fallbackProvider && fallbackProvider !== 'deepseek') {
+  throw new Error('AI_FALLBACK_PROVIDER 仅支持 deepseek');
+}
+const fallbackIntEnv = (name, fallback, min, max) => {
+  const raw = (process.env[name] || '').trim();
+  if (!raw) return fallback;
+  const parsed = /^\d+$/.test(raw) ? Number.parseInt(raw, 10) : NaN;
+  if (parsed >= min && parsed <= max) return parsed;
+  throw new Error(`${name} 必须是 ${min}–${max} 之间的整数`);
+};
+const aiFallback = { enabled: false };
+if (fallbackProvider && fallbackProvider !== aiProvider) {
+  Object.assign(aiFallback, {
+    enabled: true,
+    provider: 'deepseek',
+    apiKey: (process.env.DEEPSEEK_API_KEY || '').trim(),
+    baseUrl: (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').trim(),
+    breakerThreshold: fallbackIntEnv('AI_FALLBACK_BREAKER_THRESHOLD', 3, 1, 20),
+    breakerCooldownMs: fallbackIntEnv('AI_FALLBACK_BREAKER_COOLDOWN_MS', 300000, 5000, 3600000),
+  });
+  let endpoint;
+  try { endpoint = new URL(aiFallback.baseUrl); } catch { throw new Error('DEEPSEEK_BASE_URL 无效'); }
+  const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname);
+  if (endpoint.protocol !== 'https:' && !(endpoint.protocol === 'http:' && loopback)) {
+    throw new Error('DEEPSEEK_BASE_URL 必须使用 https（仅本机回环可用 http）');
+  }
+  if (!aiFallback.apiKey) {
+    console.warn('[ai-fallback] 未配置 DEEPSEEK_API_KEY：仅当库内存在 deepseekApiKey 时回退可用，否则保持主供应商原有行为');
+  }
+}
+
 // Optional email registration must be either fully configured or disabled.
 const emailKeys = ['ALIBABA_CLOUD_ACCESS_KEY_ID', 'ALIBABA_CLOUD_ACCESS_KEY_SECRET', 'JIESONG_EMAIL_FROM'];
 if (emailKeys.some((key) => process.env[key]?.trim()) &&
@@ -161,6 +195,7 @@ const config = {
   } : kimi,
   kimi,
   openai,
+  aiFallback,
 
   // HSCIQ API 配置（海关编码智能查询）
   hsciq: {

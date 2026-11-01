@@ -14,7 +14,7 @@ describe("SettingsNav", () => {
     expect(menu.open).toBe(false);
     fireEvent.click(menu.querySelector("summary")!);
     expect(menu.open).toBe(true);
-    expect(screen.getByRole("link", { name: "港口管理" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "港口" })).toHaveAttribute(
       "href",
       "/dashboard/settings/ports",
     );

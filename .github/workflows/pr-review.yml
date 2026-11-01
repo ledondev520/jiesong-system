@@ -7,6 +7,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# 新 push 取消同一 PR 的旧运行。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   # 代码变更分析
   analyze:
@@ -74,7 +79,7 @@ jobs:
 
       - name: Test PR tooling
         working-directory: ./frontend
-        run: node --test ../scripts/check-pr-format.test.cjs ../scripts/check-review-freshness.test.cjs
+        run: node --test ../scripts/check-pr-format.test.cjs ../scripts/check-review-freshness.test.cjs ../scripts/check-ui-only.test.cjs
 
       - name: Check changed source formatting
         working-directory: ./frontend
@@ -82,6 +87,22 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: npm run format:pr
+
+  # 必过检查名别名 "Code Quality"：ESLint(lint) 与 tsc(type-safety) 已并行各跑一次，这里不重复运行。
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    needs: [type-safety, lint]
+    if: always()
+    permissions: {}
+    steps:
+      - name: Require lint and type jobs
+        env:
+          TYPE_CHECK_RESULT: ${{ needs.type-safety.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+        run: |
+          echo "type=$TYPE_CHECK_RESULT lint=$LINT_RESULT"
+          [ "$TYPE_CHECK_RESULT" = success ] && [ "$LINT_RESULT" = success ]
 
   # PR 检查结果摘要：不需要 GitHub 写权限，保留类型和 lint 的结果。
   comment:

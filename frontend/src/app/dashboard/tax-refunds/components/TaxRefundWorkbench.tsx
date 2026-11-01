@@ -620,9 +620,13 @@ export function TaxRefundWorkbench() {
                               ? "待确认"
                               : "待补件"}
                       </TableCell>
-                      <TableCell className="max-w-sm text-xs text-muted-foreground">
+                      <TableCell className="max-w-sm whitespace-normal break-words text-xs text-muted-foreground">
                         {item.issues.length ? (
-                          item.issues.slice(0, 3).join("；")
+                          <ul className="list-disc space-y-0.5 pl-4">
+                            {item.issues.map((issue) => (
+                              <li key={issue}>{issue}</li>
+                            ))}
+                          </ul>
                         ) : (
                           <span className="text-emerald-700">
                             <CheckCircle2 className="mr-1 inline h-3 w-3" />

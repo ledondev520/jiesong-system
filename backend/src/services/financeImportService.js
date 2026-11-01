@@ -8,6 +8,7 @@
 
 const xlsx = require('xlsx');
 const prisma = require('../utils/prisma');
+const { roundMoney } = require('../utils/money');
 
 const COMPANY_NAME = '上海捷淞国际物流有限公司';
 
@@ -202,10 +203,6 @@ function textCell(row, colIndex) {
   const value = row[colIndex];
   if (value === null || value === undefined) return null;
   return String(value).trim() || null;
-}
-
-function roundMoney(value) {
-  return Math.sign(value) * Math.round((Math.abs(value) + Number.EPSILON) * 100) / 100;
 }
 
 function normalizeBankCurrency(value) {

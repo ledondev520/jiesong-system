@@ -11,10 +11,6 @@
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  ModuleTabHeader,
-  FINANCE_TABS,
-} from "@/components/layout/ModuleTabHeader";
 import { ErrorState } from "@/components/ui/data-state";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { clearApiGetCache } from "@/lib/axios";
@@ -125,6 +121,10 @@ export default function ReconciliationPage() {
     "PURCHASE",
   );
   const [contractSearch, setContractSearch] = useState("");
+  // 选中银行流水 = 付款匹配（不含草稿采购合同）；否则按发票关联（含草稿）
+  const pickerPurpose: "PAYMENT" | "INVOICE" = selectedBankId
+    ? "PAYMENT"
+    : "INVOICE";
   const [contracts, setContracts] = useState<ContractForMatch[]>([]);
   const [contractsLoading, setContractsLoading] = useState(false);
 
@@ -179,7 +179,12 @@ export default function ReconciliationPage() {
   const fetchContracts = useCallback(
     () =>
       runAwait(
-        () => getContractsForMatch(contractType, contractSearch || undefined),
+        () =>
+          getContractsForMatch(
+            contractType,
+            contractSearch || undefined,
+            pickerPurpose,
+          ),
         (list) => {
           setContracts(list);
         },
@@ -190,7 +195,7 @@ export default function ReconciliationPage() {
           setContractsLoading(false);
         },
       ),
-    [contractType, contractSearch],
+    [contractType, contractSearch, pickerPurpose],
   );
 
   const loadContracts = useCallback(() => {
@@ -214,7 +219,11 @@ export default function ReconciliationPage() {
   }
 
   // 合同查询条件变化（含首次渲染，与原挂载 effect 一致）时在渲染期同步进入加载态
-  const contractsKey = JSON.stringify([contractType, contractSearch]);
+  const contractsKey = JSON.stringify([
+    contractType,
+    contractSearch,
+    pickerPurpose,
+  ]);
   const [prevContractsKey, setPrevContractsKey] = useState<string | null>(null);
   if (prevContractsKey !== contractsKey) {
     setPrevContractsKey(contractsKey);
@@ -288,8 +297,6 @@ export default function ReconciliationPage() {
 
   return (
     <div className="space-y-4">
-      <ModuleTabHeader tabs={FINANCE_TABS} />
-
       {(reconError || unmatchedError || contractsError) && (
         <ErrorState
           title="对账数据读取失败"

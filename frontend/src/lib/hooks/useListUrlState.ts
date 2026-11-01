@@ -1,6 +1,7 @@
 "use client";
 
 import { CustomsDeclarationStatus } from "@/types";
+import { QUOTE_STATUSES } from "@/lib/quote";
 import { useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { replaceBrowserQuery, useBrowserQuery } from "./useBrowserQuery";
@@ -17,6 +18,37 @@ type State<T extends Fields> = {
 };
 
 export const listUrlFields = {
+  customers: {
+    keyword: { default: "", resetPage: true },
+    archived: { default: "no", values: ["no", "yes"], resetPage: true },
+    page: { default: 1 },
+    pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
+  },
+  // 出口订单列表；沿用旧 /dashboard/sales 的查询参数名（q、status、shipped、shippedFrom/To、storeId）
+  orders: {
+    keyword: { default: "", key: "q", resetPage: true },
+    status: { default: "", resetPage: true },
+    shipped: { default: "", values: ["", "true"], resetPage: true },
+    shippedFrom: { default: "", resetPage: true },
+    shippedTo: { default: "", resetPage: true },
+    storeId: { default: "", resetPage: true },
+    page: { default: 1 },
+    pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
+  },
+  // 财务报表页内页签（?view=）
+  statements: {
+    view: {
+      default: "overview",
+      values: [
+        "overview",
+        "balance",
+        "income",
+        "cashflow",
+        "ledger",
+        "library",
+      ],
+    },
+  },
   customs: {
     keyword: { default: "", resetPage: true },
     status: {
@@ -27,8 +59,19 @@ export const listUrlFields = {
     page: { default: 1 },
     pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
   },
+  quotes: {
+    keyword: { default: "", resetPage: true },
+    status: {
+      default: "ALL",
+      values: ["ALL", ...QUOTE_STATUSES],
+      resetPage: true,
+    },
+    page: { default: 1 },
+    pageSize: { default: 20, values: [20, 50, 100], resetPage: true },
+  },
   inventory: {
     keyword: { default: "", key: "inventoryKeyword", resetPage: true },
+    store: { default: "", key: "inventoryStore", resetPage: true },
     page: { default: 1, key: "inventoryPage" },
     pageSize: {
       default: 20,
@@ -36,9 +79,6 @@ export const listUrlFields = {
       values: [20, 50, 100],
       resetPage: true,
     },
-  },
-  productTabs: {
-    tab: { default: "products", values: ["products", "inventory"] },
   },
 } as const satisfies Record<string, Fields>;
 

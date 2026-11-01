@@ -5,9 +5,11 @@
 const { createError } = require('./errorHandler');
 const READ_PATHS = [
   /^\/auth\/(me|session)$/,
-  /^\/dashboard\/(wps-sync|stats|analytics|trade-workflows|track-product)$/,
+  /^\/dashboard\/(wps-sync|stats|analytics|trade-workflows|track-product|todos)$/,
   /^\/reports\/business-overview$/,
-  /^\/(suppliers|stores|products|sales|containers|inventory|customs-declarations|forex-verifications|tax-refunds)(\/[^/]+)?$/,
+  /^\/(suppliers|stores|customers|products|sales|containers|inventory|customs-declarations|forex-verifications|tax-refunds)(\/[^/]+)?$/,
+  // Quotes incl. cost columns are readable by BOSS; export.xlsx has a second segment and stays denied.
+  /^\/quotes(\/[^/]+)?$/,
   /^\/purchases(\/(?!export$)[^/]+)?$/,
   /^\/purchases\/[^/]+\/(files|invoice-preparation|receipts)$/,
   /^\/purchases\/[^/]+\/receipts\/[^/]+\/inspections$/,
@@ -16,7 +18,8 @@ const READ_PATHS = [
   /^\/products\/[^/]+\/(suppliers|price-history|price-trend)$/,
   /^\/products\/options\/categories$/,
   /^\/stores\/options\/ports$/,
-  /^\/sales\/[^/]+\/(files|packing-list-checks|finance-summary)$/,
+  /^\/customers\/[^/]+\/stores$/,
+  /^\/sales\/[^/]+\/(files|packing-list-checks|finance-summary|loading-plan)$/,
   /^\/sales\/files\/[^/]+\/download$/,
   /^\/inventory\/(product|contract)\/[^/]+$/,
   /^\/containers\/[^/]+\/(items(\/summary)?|products|visualization)$/,
@@ -27,7 +30,7 @@ const READ_PATHS = [
   /^\/bank-flow\/(transactions(\/stats)?|invoices(\/stats|\/by-seller)?|batches|reconciliation(\/full)?|incoming-summary)$/,
   /^\/tax-refunds\/workbench$/,
   /^\/hs-codes(\/(search|hsciq-usage|\d+))?$/,
-  /^\/system\/(notifications|exchange-rate|ports|categories|customs-brokers)$/,
+  /^\/system\/(notifications|exchange-rate|seller-identity|ports|categories|customs-brokers)$/,
   /^\/notifications(\/unread-count)?$/,
   /^\/search$/,
 ];

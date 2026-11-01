@@ -3,7 +3,7 @@
 ## 当前入口与范围
 
 - 基线：`6f3026dbde78f5d2d5ba0aaf1c37a837a1f70f86`，独立工作区与分支。
-- 当前页面为 `/dashboard/contracts`，`/dashboard/purchase` 只是重定向。页面的“批量导入”通过 `purchaseService.importExcel` 上传 multipart 文件至 `POST /api/v1/purchases/import`。
+- 当前页面为 `/dashboard/purchases`，旧 `/dashboard/contracts`、`/dashboard/purchase` 为重定向。页面的“批量导入”通过 `purchaseService.importExcel` 上传 multipart 文件至 `POST /api/v1/purchases/import`。
 - 该入口导入采购合同表头/汇总，不是 `/batch-import/purchase` 的商品明细 JSON 导入。
 - 页面先显示普通/历史补录选择和取消按钮；选中文件即上传，随后显示逐行结果。没有解析后的行预览、确认提交阶段或独立 Excel 模板下载。“合同模板”是生成合同的 Word 模板，不能当作导入模板。生成工作簿使用当前采购 Excel 导出的列形状。
 - 本轮只使用内存生成的合成工作簿、真实 Express/认证/multipart 以及已提交迁移创建的私有 SQLite。数据库目录 `0700`、文件 `0600`，独立只读 SQLite 连接比较落库值和时间戳；结束后清理合成上传与数据库。未读取真实业务文件，未访问生产、外部供应商、AI 提供商或用户电脑。

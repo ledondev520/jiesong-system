@@ -12,7 +12,8 @@ GitHub Actions 工作流配置，实现完整的自动化开发循环。
 | **Test And Acceptance** | `test-and-acceptance.yml` | PR / Push | 后端、前端单测/coverage及hosted Playwright验收 |
 | **QA & Health** | `qa.yml` | Daily / Push | 自动化测试 + 健康度检查 |
 | **PR Review** | `pr-review.yml` | PR | 类型、ESLint、锁定 Prettier 的 PR 源码检查与 Actions 摘要 |
-| **Review Freshness** | `review-freshness.yml` | 指向 main 的 PR opened / synchronize / reopened / edited | 只读检查复核标记与 base 后续改动，过期或信息不足则失败 |
+| **Review Freshness** | `review-freshness.yml` | 指向 main 的 PR opened / synchronize / reopened（edited 仅 base 变化）；含 `review-freshness/` 的 PR 评论（issue_comment，运行 main 上的版本） | 只读检查复核标记与 base 后续改动；承载 job 为 `Review Freshness Evaluate`，必过检查 `review-freshness` 由其经 Checks API 发布：无标记（规则 a）保持 in_progress 挡住合并且不失败，有效为 success，规则 b-e 为 failure |
+| **UI-only Label Check** | `ui-only.yml` | 指向 main 的 PR opened / synchronize / reopened / labeled / unlabeled | 带 `ui-only` 标签时运行 `scripts/check-ui-only.cjs`；非必过检查 |
 | **Security** | `security.yml` | PR / Weekly | 安全扫描 |
 | **Weekly Retro** | `weekly-retro.yml` | Weekly | 每周工程回顾 |
 | **Deploy** | `deploy.yml` | main Push / Tag / Manual | 部署并核对 PM2 运行目录与公网构建 |
@@ -59,7 +60,7 @@ review-freshness/v1 pass head=<复核时的 PR head SHA> base=<复核使用的 o
 
 没有有效标记、PR head 变化、标记 base 不是当前 base 的祖先、历史缺失或浅克隆、API/Git 失败都会作废。PR 文件集合取 B0/H、B1/H 两对所有最佳共同祖先（`merge-base --all`）到 H 的 diff 文件并集；任一对没有共同祖先则按信息不足作废。base 自复核后改动的文件只要与 PR 文件有交集也会作废：包括重命名/复制的旧新路径、删除，以及 main 改过又改回的文件。作废后应更新分支、重跑 CI、新的独立复核，再写新标记。检查器只验证标记和历史，独立复核仍由流程保证。
 
-新标记评论不会自动触发此工作流，写完后须在 Actions 中 re-run `review-freshness` job。仓库管理员需将 `review-freshness` 设置为 main 的必过检查才能由 GitHub 阻止合并；本次工作流文件不会自动修改远端分支保护。GitHub 上已绿的检查不会因 main 前进自动变红，因此**合并前本地检查是必做步骤**：在完整历史仓库中，确保已安装并认证 `gh`，且 `origin` 指向目标仓库，再运行：
+新标记评论会触发 `issue_comment` 重新评估（该事件运行默认分支 main 上的工作流；本改动合并进 main 之前，评论不会触发，须在 Actions 中 re-run `Review Freshness Evaluate` job）。仓库管理员需将 `review-freshness` 设置为 main 的必过检查才能由 GitHub 阻止合并；本次工作流文件不会自动修改远端分支保护。GitHub 上已绿的检查不会因 main 前进自动变红，因此**合并前本地检查是必做步骤**：在完整历史仓库中，确保已安装并认证 `gh`，且 `origin` 指向目标仓库，再运行：
 
 ```bash
 node scripts/check-review-freshness.cjs --repo <owner/name> --pr <N>
@@ -83,7 +84,7 @@ act -j quality
 act -j test
 ```
 
-前端Vitest会运行 `name-lifecycle.test.tsx` 的真实localhost/SQLite夹具，需要同一checkout的锁定backend依赖与Prisma client。`ci.yml` 的 Unit Tests、`test-and-acceptance.yml` 的 Frontend Unit And Coverage、`deploy.yml` 的 Pre-deploy Checks均在前端测试前于backend目录断言 `.env` 文件/符号链接不存在，执行 `npm ci` 和现有 `npm run db:generate`；不为此创建默认业务数据库。已锁定的 `@prisma/client` 5.22.0 postinstall会尝试generate，但会捕获部分失败，显式命令提供可失败的生成门槛。
+前端Vitest会运行 `name-lifecycle.test.tsx` 的真实localhost/SQLite夹具，需要同一checkout的锁定backend依赖与Prisma client。`test-and-acceptance.yml` 的 Frontend Unit And Coverage（`Unit Tests` 为同文件的别名 job，`Code Quality` 为 `pr-review.yml` 的别名 job，不重复跑测试）、`deploy.yml` 的 Pre-deploy Checks均在前端测试前于backend目录断言 `.env` 文件/符号链接不存在，执行 `npm ci` 和现有 `npm run db:generate`；不为此创建默认业务数据库。已锁定的 `@prisma/client` 5.22.0 postinstall会尝试generate，但会捕获部分失败，显式命令提供可失败的生成门槛。
 
 名称夹具仍由每次测试独占0700目录、0600 SQLite并通过已提交迁移初始化；子进程只接收测试环境，不读取backend/.env，也不复制共享client。CI后端测试复用已安装的依赖/客户端，既有迁移与测试步骤保持原顺序。前端E2E已有自己的backend安装/生成前置；PR Review的工具测试为Node `--test`，不是Vitest。其他现有workflow没有直接运行前端Vitest，无需加入该前置。生产SSH发布步骤与secret/env策略未变。
 
@@ -128,3 +129,17 @@ act -j test
 发布流程固定触发提交 SHA，并以 `scripts/verify-vps-runtime.cjs` 验证运行目录、健康、公网 BUILD_ID 和 API 登录边界；PM2 启动成功不能单独作为新版生效的证据。
 
 PR 格式检查使用 `fetch-depth: 0` 和事件的完整 base/head SHA，运行 `scripts/check-pr-format.cjs`；NUL 路径支持空格/换行文件名，重命名目标会检查，历史缺失不能当作无改动。仅修改源码接受 Prettier 3.9.9 格式检查，全部单测/验收照常运行。报告任务使用 `permissions: {}`，通过 `GITHUB_STEP_SUMMARY` 输出结果；上游失败或取消时仍保留失败状态，不调用评论写入 API。
+
+### 轻量 UI-only PR 流程
+
+规范见 `docs/redesign/UX-REDESIGN-2026.md` §14。`scripts/check-ui-only.cjs` 用完整历史与事件 SHA 校验整个 PR diff：全部路径须在允许清单（`frontend/src/app|components`、`lib/format*`、`e2e`、`public`、`docs/redesign`、`DESIGN.md`）内，且不命中拒绝项（鉴权/axios/services/middleware/next.config、package.json 与锁文件、`backend/ config/ scripts/ lifecycle/ .github/`、Prisma）。`ui-only.yml` 在 PR 带 `ui-only` 标签时运行它；该 job 不在 ruleset 的 9 项必过检查中，合并前人工确认通过。
+
+9 项必过检查在 UI-only PR 与后端 PR 上都会上报（未使用 workflow 级 `paths` 过滤）：
+
+| 必过检查 | UI-only PR（gate: `backend_changed=false`） | 其他 PR / push |
+|---|---|---|
+| Code Quality, Type Safety Check, Lint Check, Build Test, Frontend Unit And Coverage, Frontend E2E Acceptance, Secret Detection | 完整运行（Lint Check 另跑本脚本的回归测试） | 同左 |
+| Backend Unit Tests (`test-and-acceptance.yml`) | 仅 `npm ci` + `check-lifecycle.cjs`，跳过 prisma 与 `test:all` | 全部后端测试 |
+| Unit Tests (`ci.yml`) | 前端单测照常，后端仅 `check-lifecycle.cjs` | 前端 + 后端全测 |
+
+生命周期合同检查扫描前端列表页，UI 改动可能使其失败，所以门禁跳过时它仍会运行。gate 只在整个 diff 被证明为 UI-only 时为 false；push 事件、SHA 缺失、浅历史或脚本异常都视为有后端改动。标签本身不会放宽任何检查。UI-only PR 正文用 `.github/PULL_REQUEST_TEMPLATE/ui-only.md`（新建 PR 时加 `?template=ui-only.md`）；复核标记与本地 `check-review-freshness.cjs` 仍必需。

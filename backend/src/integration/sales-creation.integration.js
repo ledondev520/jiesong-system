@@ -24,6 +24,8 @@ test('HTTP/SQLite：销售表头明细原子创建，同一请求重试不产生
   execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbFile], { input: ddl });
   fs.chmodSync(dbFile, 0o600);
   db = require('../utils/prisma');
+  // Order creation needs exactly one active customer (DATA-MODEL §2.4).
+  await db.customer.create({ data: { name: '合成客户' } });
   const jwt = require('jsonwebtoken');
   const config = require('../config');
   const tokens = [];

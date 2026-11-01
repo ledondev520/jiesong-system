@@ -13,6 +13,7 @@
 
 const { Router } = require('express');
 const salesController = require('../controllers/salesController');
+const purchaseDraftController = require('../controllers/purchaseDraftController');
 const { exportSalesContractExcel } = require('../services/exportService');
 const { exportSalesContractPdf } = require('../services/pdfExportService');
 const { authenticate, roleAuth } = require('../middleware/auth');
@@ -22,6 +23,8 @@ const { upload, pdfCheckUpload } = require('../utils/upload');
 
 const router = Router();
 const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
+// 装柜计划含 Confidential 箱规/重量：显式人类角色白名单（含 BOSS 只读）；Agent 无 req.user，roleAuth 返回 401。
+const LOADING_PLAN_ROLES = [...WRITE_ROLES, 'BOSS'];
 
 router.use(authenticate);
 
@@ -35,6 +38,9 @@ router.get('/options/next-no', salesController.getNextContractNo);
 
 // GET /api/v1/sales/:id - 获取出口合同详情（包含装箱明细）
 router.get('/:id', withIdValidation, salesController.getById);
+
+// GET /api/v1/sales/:id/loading-plan - 只读装柜计划（显式角色白名单；必须位于 /:id 通配之外的独立路径）
+router.get('/:id/loading-plan', withIdValidation, roleAuth(...LOADING_PLAN_ROLES), salesController.getLoadingPlan);
 
 // POST /api/v1/sales - 创建出口合同
 router.post('/', [
@@ -107,6 +113,12 @@ const exportPacketValidation = [
   body('priceOverrides.*.unitPriceUsd').isFloat({ gt: 0 }).withMessage('人工单价必须大于 0'),
   handleValidation,
 ];
+
+// POST /api/v1/sales/:id/purchase-drafts - 生成采购单：每个供应商一份 DRAFT 采购合同（草稿不是应付）
+router.post('/:id/purchase-drafts', withIdValidation, roleAuth('ADMIN', 'PURCHASE'), withAuditLog(
+  { entity: 'PurchaseContract', action: 'GENERATE_FROM_SALES' },
+  purchaseDraftController.generate
+));
 
 // POST /api/v1/sales/:id/export-packet/preview - 只读预检和定价草案
 router.post('/:id/export-packet/preview', withIdValidation, roleAuth(...WRITE_ROLES), exportPacketValidation, salesController.previewExportPacket);

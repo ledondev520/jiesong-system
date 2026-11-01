@@ -111,6 +111,68 @@ test('createFile: 生产实物图分类只接受 JPG/PNG，错误文件不留在
   }
 });
 
+test('createFile: 到货照片分类只接受 JPG/PNG，错误文件不留在磁盘', async () => {
+  const tempDir = fs.mkdtempSync(path.join(testUploadRoot, 'receipt-photo-'));
+  const filePath = path.join(tempDir, 'not-photo.pdf');
+  fs.writeFileSync(filePath, '%PDF');
+
+  try {
+    await withMockDelegates({ purchaseContract: { findUnique: async () => ({ id: 'purchase-1' }) } }, async () => {
+      await assert.rejects(
+        () => fileService.createFile('purchase-1', 'PURCHASE', {
+          originalname: 'not-photo.pdf',
+          path: filePath,
+          mimetype: 'application/pdf',
+          size: 4,
+        }, null, 'RECEIPT_PHOTO', { role: 'WAREHOUSE' }),
+        (error) => error.statusCode === 400 && /到货照片仅支持 JPG、PNG/.test(error.message),
+      );
+    });
+    assert.equal(fs.existsSync(filePath), false);
+    assert.equal(fileService.CONTRACT_FILE_CATEGORY.RECEIPT_PHOTO, 'RECEIPT_PHOTO');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('createFile: 到货照片仅采购合同 + ADMIN/PURCHASE/WAREHOUSE 可上传，其余 403 且清理当前上传', async t => {
+  const cases = [
+    ['SALES 角色', 'PURCHASE', { role: 'SALES' }],
+    ['FINANCE 角色', 'PURCHASE', { role: 'FINANCE' }],
+    ['无用户', 'PURCHASE', undefined],
+    ['销售合同', 'SALES', { role: 'ADMIN' }],
+  ];
+  for (const [name, contractType, user] of cases) {
+    await t.test(name, async () => {
+      const tempDir = fs.mkdtempSync(path.join(testUploadRoot, 'receipt-photo-role-'));
+      const filePath = path.join(tempDir, 'photo.jpg');
+      fs.writeFileSync(filePath, 'jpg');
+      try {
+        await assert.rejects(
+          () => fileService.createFile('c-1', contractType, {
+            originalname: 'photo.jpg', path: filePath, mimetype: 'image/jpeg', size: 3,
+          }, null, 'RECEIPT_PHOTO', user),
+          (error) => error.statusCode === 403,
+        );
+        assert.equal(fs.existsSync(filePath), false);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test('assertReceiptPhotoAccess: 到货照片删除沿用同一角色/合同类型门槛，其他分类不受影响', () => {
+  for (const role of ['ADMIN', 'PURCHASE', 'WAREHOUSE']) {
+    assert.doesNotThrow(() => fileService.assertReceiptPhotoAccess('PURCHASE', 'RECEIPT_PHOTO', { role }));
+  }
+  for (const user of [{ role: 'SALES' }, { role: 'FINANCE' }, undefined]) {
+    assert.throws(() => fileService.assertReceiptPhotoAccess('PURCHASE', 'RECEIPT_PHOTO', user), (e) => e.statusCode === 403);
+  }
+  assert.throws(() => fileService.assertReceiptPhotoAccess('SALES', 'RECEIPT_PHOTO', { role: 'ADMIN' }), (e) => e.statusCode === 403);
+  assert.doesNotThrow(() => fileService.assertReceiptPhotoAccess('PURCHASE', 'OTHER', { role: 'SALES' }));
+});
+
 test('createFile: 验证/权限/持久化失败仅清理当前上传，保留既有凭证', async t => {
   for (const failure of ['invalid-type', 'missing-contract', 'category', 'chmod', 'database', 'deleted-contract']) {
     await t.test(failure, async () => {

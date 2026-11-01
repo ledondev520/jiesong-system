@@ -10,21 +10,21 @@ import { mockApiRoutes, signInAsAdmin } from "./helpers";
 // 合成数据验收布局和交互；不向真实业务接口提交记录。
 const routes = [
   "/dashboard",
-  "/dashboard/reports",
-  "/dashboard/contracts",
-  "/dashboard/purchase/create",
-  "/dashboard/purchase/pc-001",
+  "/dashboard/finance/analysis",
+  "/dashboard/purchases",
+  "/dashboard/purchases/new",
+  "/dashboard/purchases/pc-001",
   "/dashboard/suppliers",
   "/dashboard/products",
-  "/dashboard/inventory-status",
+  "/dashboard/inventory",
   "/dashboard/sales",
   "/dashboard/sales/create",
   "/dashboard/sales/sc-001",
-  "/dashboard/tax-refunds",
-  "/dashboard/tax-refunds?view=customs",
-  "/dashboard/tax-refunds?view=refunds",
+  "/dashboard/customs",
+  "/dashboard/customs?view=customs",
+  "/dashboard/customs?view=refunds",
   "/dashboard/tax-refunds/create",
-  "/dashboard/customs-declarations/create",
+  "/dashboard/customs/new",
   "/dashboard/hs-codes",
   "/dashboard/finance",
   "/dashboard/finance/statements",
@@ -35,21 +35,18 @@ const routes = [
   "/dashboard/finance/invoices",
   "/dashboard/finance/reconciliation",
   "/dashboard/settings",
-  "/dashboard/users",
-  "/dashboard/system/logs",
-  "/dashboard/system/notifications",
-  "/dashboard/ai",
-  "/dashboard/ai/sessions",
-  "/dashboard/about",
+  "/dashboard/settings/users",
+  "/dashboard/settings/logs",
+  "/dashboard/notifications",
+  "/dashboard/settings/ai-usage",
+  "/dashboard/settings/ai-access",
   "/dashboard/settings/ports",
   "/dashboard/settings/categories",
   "/dashboard/settings/customs-brokers",
   "/dashboard/settings/export",
   "/dashboard/settings/users",
-  "/dashboard/system",
   "/dashboard/logistics",
   "/dashboard/logistics/containers",
-  "/dashboard/contracts/templates",
 ];
 
 async function expectFitsViewport(page: Page) {
@@ -120,11 +117,9 @@ for (const width of [320, 390, 430]) {
       await page.getByRole("button", { name: "更多", exact: true }).click();
       const sheet = page.getByRole("dialog");
       await expect(
-        sheet.getByRole("button", { name: "系统管理", exact: true }),
+        sheet.getByRole("button", { name: "设置", exact: true }),
       ).toBeVisible();
-      await sheet
-        .getByRole("button", { name: "系统管理", exact: true })
-        .click();
+      await sheet.getByRole("button", { name: "设置", exact: true }).click();
       await expect(page).toHaveURL(/\/dashboard\/settings$/);
       await page.getByRole("button", { name: /搜索商品/ }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
@@ -161,7 +156,7 @@ for (const width of [320, 390, 430]) {
     });
 
     test("财务明细加载后宽账簿在卡片内滚动", async ({ page }) => {
-      await signInAsAdmin(page, "/dashboard/finance/statements");
+      await signInAsAdmin(page, "/dashboard/finance/statements?view=ledger");
       await expect(
         page.getByTestId("financial-statements-drilldowns"),
       ).toBeVisible();
@@ -287,7 +282,7 @@ test.describe("手机核心操作", () => {
     await expect(
       page.getByText("请选择商品", { exact: true }).last(),
     ).toBeVisible();
-    await page.goto("/dashboard/sales/sc-001");
+    await page.goto("/dashboard/sales/sc-001?tab=container");
     await page
       .getByRole("button", { name: "编辑 不锈钢门", exact: true })
       .click();
@@ -300,14 +295,14 @@ test.describe("手机核心操作", () => {
       .scrollIntoViewIfNeeded();
     await expectFitsViewport(page);
     await dialog.getByRole("button", { name: "取消", exact: true }).click();
-    for (const name of ["合同信息", "报关信息", "财务结算", "装箱明细"]) {
+    for (const name of ["明细", "单证", "收款", "货柜"]) {
       await page.getByRole("tab", { name, exact: true }).click();
       await expectFitsViewport(page);
     }
   });
 
   test("采购供应商选择与手机档案定位", async ({ page }) => {
-    await signInAsAdmin(page, "/dashboard/purchase/create");
+    await signInAsAdmin(page, "/dashboard/purchases/new");
     await page.getByRole("combobox", { name: "商品 *", exact: true }).click();
     await page.getByRole("option", { name: /不锈钢门/ }).click();
     await page
@@ -338,8 +333,8 @@ test.describe("手机核心操作", () => {
   test("报关退税详情、编辑和手机卡片完整显示", async ({ page }) => {
     await signInAsAdmin(page);
     for (const route of [
-      "/dashboard/customs-declarations/cd-1",
-      "/dashboard/customs-declarations/cd-1/edit",
+      "/dashboard/customs/cd-1",
+      "/dashboard/customs/cd-1/edit",
       "/dashboard/tax-refunds/tr-1",
       "/dashboard/tax-refunds/tr-1/edit",
     ]) {
@@ -362,7 +357,7 @@ test.describe("平板与桌面保持可用", () => {
       await signInAsAdmin(page);
       for (const route of [
         "/dashboard",
-        "/dashboard/contracts",
+        "/dashboard/purchases",
         "/dashboard/sales",
         "/dashboard/settings",
       ]) {
@@ -388,9 +383,9 @@ test.describe("手机查阅与异常恢复", () => {
     await signInAsAdmin(page, "/dashboard/settings");
     const menu = page.locator("details");
     for (const [label, path] of [
-      ["港口管理", "ports"],
+      ["港口", "ports"],
       ["商品分类", "categories"],
-      ["报关公司", "customs-brokers"],
+      ["报关行", "customs-brokers"],
       ["数据导入导出", "export"],
     ]) {
       await menu.locator("summary").click();

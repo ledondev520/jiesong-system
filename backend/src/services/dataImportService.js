@@ -7,6 +7,7 @@
  */
 
 const Papa = require('papaparse');
+const { defaultSpotRate } = require('./exportPricing');
 const prisma = require('../utils/prisma');
 const { isFormalSalesAmount } = require('./salesContractAmount');
 
@@ -608,7 +609,7 @@ const getOrCreateSalesContract = async (contractNo, cache, results, options = {}
         contractNo,
         totalAmount: 0,
         receivedAmount: 0,
-        exchangeRate: 7.0,
+        exchangeRate: defaultSpotRate(),
         status,
         signedAt: options.signedAt ?? null,
         portId: options.portId || undefined,

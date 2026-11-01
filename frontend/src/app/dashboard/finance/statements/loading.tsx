@@ -4,7 +4,7 @@
  * Pos: Next.js App Router streaming skeleton，财务报表加载时即时展示
  */
 
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export default function StatementsLoading() {
   return (
@@ -12,7 +12,16 @@ export default function StatementsLoading() {
       {/* Tab 导航占位 */}
       <div className="mb-6 border-b">
         <div className="flex items-end gap-0 h-11">
-          {['财务概览', '财务报表', '收付管理'].map((label) => (
+          {[
+            "财务概览",
+            "应收",
+            "应付",
+            "银行流水",
+            "发票",
+            "对账",
+            "财务报表",
+            "经营分析",
+          ].map((label) => (
             <div
               key={label}
               className="flex min-h-[44px] items-center px-4 py-2.5 text-sm text-muted-foreground"

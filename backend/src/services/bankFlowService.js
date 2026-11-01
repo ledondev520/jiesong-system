@@ -8,6 +8,7 @@
 
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
+const { roundMoney } = require('../utils/money');
 
 const COMPANY = '上海捷淞国际物流有限公司';
 
@@ -264,10 +265,10 @@ async function runReconciliation() {
       matched.push({
         payName,
         invName: invName !== payName ? invName : undefined,
-        netPaid: Math.round(netPaid * 100) / 100,
-        totalInvoice: Math.round(inv.totalInvoice * 100) / 100,
-        totalTax: Math.round(inv.totalTax * 100) / 100,
-        gap: Math.round(gap * 100) / 100,
+        netPaid: roundMoney(netPaid),
+        totalInvoice: roundMoney(inv.totalInvoice),
+        totalTax: roundMoney(inv.totalTax),
+        gap: roundMoney(gap),
         gapPct: Math.round(gapPct * 10) / 10,
         category,
         txnCount: pay.outCount + pay.inCount,
@@ -287,7 +288,7 @@ async function runReconciliation() {
     if (netPaid <= 1) continue;
     unmatchedPayments.push({
       counterpart: name,
-      netPaid: Math.round(netPaid * 100) / 100,
+      netPaid: roundMoney(netPaid),
       txnCount: pay.outCount + pay.inCount,
     });
   }
@@ -298,7 +299,7 @@ async function runReconciliation() {
     if (matchedSet.has(name)) continue;
     unmatchedInvoices.push({
       seller: name,
-      totalInvoice: Math.round(inv.totalInvoice * 100) / 100,
+      totalInvoice: roundMoney(inv.totalInvoice),
       invCount: inv.invCount,
     });
   }
@@ -321,13 +322,13 @@ async function runReconciliation() {
       matchedCount: matched.length,
       normalCount: normalMatched.length,
       underInvoicedCount: underInvoiced.length,
-      underInvoicedGap: Math.round(underInvoiced.reduce((s, m) => s + m.gap, 0) * 100) / 100,
+      underInvoicedGap: roundMoney(underInvoiced.reduce((s, m) => s + m.gap, 0)),
       overInvoicedCount: overInvoiced.length,
-      overInvoicedGap: Math.round(overInvoiced.reduce((s, m) => s + Math.abs(m.gap), 0) * 100) / 100,
+      overInvoicedGap: roundMoney(overInvoiced.reduce((s, m) => s + Math.abs(m.gap), 0)),
       unmatchedPaymentCount: unmatchedPayments.length,
-      unmatchedPaymentTotal: Math.round(unmatchedPayments.reduce((s, p) => s + p.netPaid, 0) * 100) / 100,
+      unmatchedPaymentTotal: roundMoney(unmatchedPayments.reduce((s, p) => s + p.netPaid, 0)),
       unmatchedInvoiceCount: unmatchedInvoices.length,
-      unmatchedInvoiceTotal: Math.round(unmatchedInvoices.reduce((s, i) => s + i.totalInvoice, 0) * 100) / 100,
+      unmatchedInvoiceTotal: roundMoney(unmatchedInvoices.reduce((s, i) => s + i.totalInvoice, 0)),
     },
   };
 }
@@ -356,12 +357,12 @@ async function getIncomingSummary() {
   const items = Object.entries(map)
     .map(([name, v]) => ({
       name,
-      totalIn: Math.round(v.totalIn * 100) / 100,
+      totalIn: roundMoney(v.totalIn),
       txnCount: v.txnCount,
     }))
     .sort((a, b) => b.totalIn - a.totalIn);
 
-  return { items, total: Math.round(total * 100) / 100 };
+  return { items, total: roundMoney(total) };
 }
 
 module.exports = { listTransactions, getStats, listBatches, groupByCounterpart, runReconciliation, getIncomingSummary };

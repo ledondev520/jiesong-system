@@ -1,19 +1,34 @@
-# 复核时效检查：仅使用只读 GitHub 权限，无需安装 npm 依赖。
+# 复核时效检查：只读代码权限，无需安装 npm 依赖。
+# 必过检查 "review-freshness" 现在是本 job 通过 Checks API 发布的检查（仍由 GitHub Actions 应用 15368 创建，
+# 因此 ruleset 无需修改）；承载它的 job 名为 "Review Freshness Evaluate"，避免同名冲突：
+#   - 没有可信复核标记（规则 a）：检查保持 in_progress（挡住合并），job 本身成功 → 不发失败邮件；
+#   - 标记有效：检查 completed/success；
+#   - 规则 b-e（真正过期/信息不足）：检查 completed/failure，job 同时失败。
+# issue_comment 事件始终运行默认分支（main）上的本文件与脚本；评论里的标记写入后会重新评估。
 name: Review Freshness
 
 on:
   pull_request:
     branches: [main]
+    # edited 仅在 base 变化时才真正运行（见 job.if）；改标题/描述不再触发评估。
     types: [opened, synchronize, reopened, edited]
+  issue_comment:
+    types: [created, edited, deleted]
 
 permissions:
   contents: read
   pull-requests: read
   issues: read
+  checks: write
 
 jobs:
-  review-freshness:
-    name: review-freshness
+  evaluate:
+    name: Review Freshness Evaluate
+    # 评论事件只处理 PR 上含 review-freshness/ 的评论（含被编辑前的内容）。
+    if: >-
+      (github.event_name == 'pull_request' && (github.event.action != 'edited' || github.event.changes.base)) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+       (contains(github.event.comment.body, 'review-freshness/') || contains(github.event.changes.body.from, 'review-freshness/')))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -28,9 +43,44 @@ jobs:
       - name: Test review freshness
         run: node --test scripts/check-review-freshness.test.cjs
 
-      - name: Check review freshness
+      - name: Check review freshness and publish review-freshness check
         env:
           GH_TOKEN: ${{ github.token }}
           REVIEW_REPO: ${{ github.repository }}
-          REVIEW_PR: ${{ github.event.pull_request.number }}
-        run: node scripts/check-review-freshness.cjs --repo "$REVIEW_REPO" --pr "$REVIEW_PR"
+          REVIEW_PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set +e
+          head_sha() { gh api "repos/$REVIEW_REPO/pulls/$REVIEW_PR" --jq .head.sha; }
+          HEAD_BEFORE=$(head_sha) || { echo "无法读取 PR head" >&2; exit 1; }
+          OUT=$(node scripts/check-review-freshness.cjs --repo "$REVIEW_REPO" --pr "$REVIEW_PR" 2>&1)
+          RC=$?
+          echo "$OUT"
+          # 评估期间又有新 push：交给新 head 的运行，不给旧 SHA 写结果。
+          if [ "$(head_sha)" != "$HEAD_BEFORE" ]; then echo "PR head 已变化，放弃发布"; exit 0; fi
+          if [ "$RC" -eq 0 ]; then
+            STATE=success
+          elif [[ "$OUT" == "作废 [规则 a]"* ]]; then
+            STATE=pending
+          else
+            STATE=failure
+          fi
+          SUMMARY=$(printf '%s' "$OUT" | head -c 2000)
+          if [ "$STATE" = pending ]; then
+            args=(-f status=in_progress)
+          else
+            args=(-f status=completed -f "conclusion=$STATE")
+          fi
+          # 始终新建检查；同名最新一条生效（规则 a 的 in_progress 会被后续的 success/failure 取代）。
+          gh api "repos/$REVIEW_REPO/check-runs" -X POST \
+            -f name=review-freshness -f "head_sha=$HEAD_BEFORE" -f "details_url=$RUN_URL" \
+            -f "output[title]=review-freshness: $STATE" -f "output[summary]=$SUMMARY" "${args[@]}" >/dev/null
+          PUB=$?
+          if [ "$PUB" -ne 0 ]; then
+            # 只读令牌（如 dependabot PR）无法发布：缺少检查同样挡住合并，等待评论事件或有写权限的重跑。
+            echo "::warning::无法发布 review-freshness 检查（状态 $STATE）"
+            [ "$STATE" = pending ] && exit 0
+            exit 1
+          fi
+          # 仅规则 b-e 的真实失败让 job 失败。
+          [ "$STATE" != failure ]

@@ -20,6 +20,8 @@ router.use(authenticate);
 
 router.get('/pricing-config', roleAuth('ADMIN'), pricingController.getPricing);
 router.put('/pricing-config', roleAuth('ADMIN'), pricingController.updatePricing);
+// 预览只读计算，用 GET：lifecycle 契约不允许新增未登记的写路由（check-lifecycle.cjs）
+router.get('/pricing-config/preview', roleAuth('ADMIN'), pricingController.previewPricing);
 
 // GET /api/v1/system/configs - 获取系统配置（平铺格式，向后兼容）
 router.get('/configs', systemController.getConfigs);
@@ -53,6 +55,9 @@ router.put('/notifications/:id/read', roleAuth('ADMIN', 'BOSS', 'PURCHASE', 'SAL
   { entity: 'Notification', action: 'UPDATE', model: 'notification' },
   systemController.markNotificationRead
 ));
+
+// GET /api/v1/system/seller-identity - 统一卖方信息（公司信息 + 旧开票抬头别名；银行资料仅 ADMIN/FINANCE）
+router.get('/seller-identity', systemController.getSellerIdentity);
 
 // GET /api/v1/system/exchange-rate - 获取当前汇率
 router.get('/exchange-rate', systemController.getExchangeRate);

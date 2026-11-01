@@ -10,6 +10,7 @@
 | 文件名 | 地位 | 功能 |
 |--------|------|------|
 | check-pr-format.cjs / check-pr-format.test.cjs | CI 工具与回归 | 完整历史下按 PR base/head 检查改动 TS/TSX 源码；特殊路径、浅历史和失败摘要回归 |
+| check-ui-only.cjs / check-ui-only.test.cjs | CI 工具与回归 | 轻量 UI PR：`ui-only` 模式按 §14.1 清单校验完整 diff（重命名新旧路径、删除均计入，空 diff 失败）；`backend-gate` 模式仅在 diff 全为 UI-only 时输出 `backend_changed=false`，其余及任何错误为 true |
 | check-review-freshness.cjs / check-review-freshness.test.cjs | 复核时效门禁与离线回归 | 本地合并前和 CI 共用 CLI；PR 文件集合取 B0/H、B1/H 两对所有最佳共同祖先（`merge-base --all`）到 H 的 diff 文件并集；检查可信最新评论、head/base 历史和文件交集，保留重命名/复制双路径及改后撤销记录，含交叉合并回归，信息不足则失败 |
 | audit_api_write_success_times.js | 性能审计 | 只对一次性（disposable）后端做写接口成功路径耗时审计；须同时设置 `API_PERF_ALLOW_WRITES`/`API_PERF_DISPOSABLE_DB`/`API_PERF_ISOLATED_FILES=true`、`API_BASE_URL`，以及 `API_PERF_UPLOAD_DIR`（该后端自己的 UPLOAD_DIR，绝对路径且已存在）。该目录真实路径与默认 `backend/uploads`（按脚本位置或调用方 cwd）、`backend/.env` 配置的 UPLOAD_DIR、启动环境 UPLOAD_DIR 相同或互相包含时拒绝运行；残留文件清理只删除该目录真实路径内的普通文件（相对/绝对路径统一做包含检查，拒绝符号链接逃逸，清理前复核根目录身份未被替换；`backend/scripts/perf-upload-cleanup.js`），清理目录不回退 `backend/.env` 或默认目录（`backend/.env` 仅用于拒绝比对）。运行本脚本的 shell 不要设置 `UPLOAD_DIR`（一次性后端在自己的进程环境中设置即可） |
 | fix_export_contracts.js | 数据修复 | 修复出口合同的美元金额 + 创建装箱明细（已修正箱数逻辑） |
@@ -370,19 +371,9 @@ Put local history workbooks in the selected directory. An absent/empty history d
 
 `drill_sqlite_restore.py --directory <不存在的临时目录>` 使用已提交迁移和合成商品/期初库存，调用真实备份恢复CLI并保存独立读回回执。它不访问已有库或.env。详见 `docs/operations/sqlite-backup-restore.md`。
 
-## 可配置出口报价
+## 出口报价规则
 
-`prepare_export_packet.py` 通过 `pricing_config.py` 读取仓库的
-`config/pricing.json`，或与后端相同的 `JIESONG_PRICING_CONFIG` 显式文件。
-校验范围来自同一 `config/pricing.schema.json`。默认 tiered、汇率调整 -0.2、
-有退税加价 0.3、零退税上限 0.1，multiplier 模式的乘数默认为 1.3。
-所有模式沿用原有凑整规则，multiplier 对全部已核验退税商品使用同一目标加价。
-旧 `--fx-buffer`、`--refundable-markup`、`--no-refund-markup` 仅接受与共用文件一致的值，
-不再允许成为独立的报价配置来源。非法文件或值拒绝运行，日志只含文件指纹。
-
-`pricing_snapshot.cjs` 与 `tests/pricing_snapshot.py` 只运行合成输入和模拟来源。
-`verify_pricing_defaults.py --baseline-root <纯Git导出目录> --evidence <临时目录>`
-比较旧、新完整 JSON，并生成 SHA-256 回执。旧目录需能使用原有后端依赖。
-不读取真实库、税则 DBF 或历史工作簿。
-readiness 的新推荐价和定价元数据必须符合 `tests/fixtures/pricing-readiness-defaults.json`。
-`test_verify_pricing_defaults.py` 验证错误价格及元数据会使检查失败。
+报价规则只在后端 `services/exportPricing.js` 的 `priceFor()` 实现，配置为 `config/pricing.json`（新结构见 `config/pricing.schema.json`）。
+`prepare_export_packet.py` 的 Python 公式副本已退役，脚本拒绝运行（待负责人确认生产不再使用后删除）；原 `pricing_config.py`、
+`pricing_snapshot.cjs`、`verify_pricing_defaults.py` 及其测试已删除。运行时 `pricing.json` 由部署保留，旧结构用
+`node backend/scripts/convert-pricing-config.js --file <路径> --spot-rate <现汇>`（默认 dry-run）转换。

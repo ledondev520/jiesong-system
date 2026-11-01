@@ -34,7 +34,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | 文件/目录 | 地位 | 功能 |
 |-----------|------|------|
 | app.js | 入口 | Express 应用初始化和启动（含定时任务启动） |
-| config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与常量（含单元测试） |
+| config/ | 配置层 | 权限校验后的环境加载、活动 AI 供应商与可选 DeepSeek 回退/熔断参数、常量（含单元测试） |
 | controllers/ | 控制层 | 处理 HTTP 请求，调用服务层 |
 | integration/ | 集成测试层 | 数据库集成测试（空结构/事务/seed 幂等、真实 HTTP 进销存闭环、首个门店创建/RBAC、仓储异常出库/FIFO/来源守恒、收验货后采购更正/补录边界与合同附件 multipart/权限/失败留存矩阵，以及银行流水/发票查询筛选、币种、分类与既有角色边界）；generic-export-content.integration.js 解析七个设置模块的 CSV 下载，覆盖空表头、文本/日期/金额和重复导出的业务只读性 |
 | integration/ordinary-setting-text.integration.js | 普通文本验收 | 私有迁移库中仅写既有开票固定文本，验证单键保存/错误留存/明确重试/清空与独立回读，不提交含 AI/汇率参数的整表 |
@@ -91,8 +91,10 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | financialEvidenceService.js | 财务资料分类、脱敏与受限查询；普通幂等导入与单月/累计报表快照仅新增留存分离，快照不替换已有账期 |
 | financialEvidenceTransferService.js | 指定资料的版本化跨机迁移包、完整性及目标预检、冲突拒绝与事务内仅新增回读；由 financial-evidence-transfer.js 强制私有文件及实际SQLite在线备份 |
 | ai/contextService.js | 按当前销售合同港口关联构造美元上下文；局部查询失败保留其他资料并提示不可用，解析汇率后继续拼接财务概况 |
-| aiService.js | DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量 |
+| aiService.js | OpenAI/DeepSeek/Kimi 活动供应商、DeepSeek 独立密钥与 flash thinking/high、完整时限、零重试与流式用量；可选 `AI_FALLBACK_PROVIDER=deepseek` 经唯一的 `getOpenAIClient` 接入，用量记录实际作答模型 |
+| ai/fallbackClient.js | 主 AI 调用失败（网络/超时/429/5xx/提供方 4xx）时同一请求透明改发 DeepSeek 一次：流已输出正文/推理/工具调用则不拼接、总预算 50s、取消与本地错误不回退、双失败抛主错误；进程内熔断（连续失败直连、冷却后半开探测）；聊天/SSE/解析/HS/Agent 共用 |
 | anthropicCompatService.js | Open Agent 的 OpenAI 协议适配，保留思考/工具回合与图像，共用请求时限及模型参数 |
+| agentPendingActionService.js | Agent 待确认写操作的 SQLite 持久层：原子抢占 pending→executing，30 分钟过期，创建时惰性清理 |
 | openAgentService.js | 出口详情复用销售服务从装箱行计算拼柜来源；内部草稿按请求直接执行；其他写操作一次确认；当前 AI 客户端校验与零自动重试、工具角色与执行回放；SDK 错误终止传播为 503/SSE error，不写成功记录 |
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
 | importService.js | 仅内存CSV/xlsx字节导入，拒绝字符串路径与磁盘上传对象，避免路径穿越/绝对路径/符号链接读取；导入记录文件名去控制字符并按 `/` 与 `\` 取末段，仅作展示 |
@@ -191,13 +193,13 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 - xlsx 合并单元格需先拆分并粘贴为值；加载前检查实际行/单元格/列索引（5001 行含表头、100 列）及工作表 ID（最多 65535），避免小文件声明巨型区域耗尽内存。
 
 `services/pricingConfigService.js` 读取共用的 `config/pricing.json` 与 schema，
-`controllers/system/pricingController.js` 提供 ADMIN-only 报价配置 GET/PUT。
-原子替换、版本冲突及无参数值日志由真实文件/HTTP测试验证。
+`controllers/system/pricingController.js` 提供 ADMIN-only 报价配置 GET/PUT 和只读 `GET /pricing-config/preview`。
+原子替换、版本冲突及无参数值日志由真实文件/HTTP测试验证；保存时核对分类 ID 存在。
 `routes/pricingConfig.test.js` 的认证身份为合成桩，角色中间件与文件写入为真实实现。
 
-`services/exportPricing.js` 保留原 packet 的凑整算法，集中模式目标和历史报价校验。
-`exportPacketService.js` 每次计算读取一份配置快照，历史/人工价格校验及提示使用同一口径。
-`exportPricing.configuration.test.js` 用同一临时配置文件对照真实 Python 合成建议输出。
+`services/exportPricing.js` 是唯一报价规则 `priceFor()`（向上取整到整美元、浮点保护、分类/祖先加价、缺成本）；`lastConfirmedPrice.js` 给老商品取上次确认价（报价/建单预填），
+`productCategoryChain.js` 给明细附分类链。`exportPricing.test.js` 覆盖规范示例和负责人示例。
+`scripts/convert-pricing-config.js` 把旧结构 pricing.json 转成新结构（dry-run 默认，--confirm 先备份）。
 `routes/pricingConfig.auth.test.js` 另以真实应用认证、合成 JWT 和临时迁移 SQLite
 验证当前数据库角色的 ADMIN-only 边界、管理员改权立即拒绝，以及配置文件保存不写业务表。
 

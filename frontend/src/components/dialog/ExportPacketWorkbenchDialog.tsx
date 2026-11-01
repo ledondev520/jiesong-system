@@ -87,7 +87,11 @@ export function ExportPacketWorkbenchDialog({
   onGenerated,
 }: Props) {
   const [form, setForm] = useState<ExportPacketInput>({
-    spotRate: salesContract.exchangeRate || 6.8,
+    // 工作台填的是现汇；报价转换的订单 exchangeRate 存的是计价汇率，所以用详情接口给出的 spotRate 预填
+    spotRate:
+      (salesContract.rateBasis === "effective"
+        ? salesContract.spotRate
+        : salesContract.exchangeRate) || 6.8,
     sellerName: "上海捷淞国际物流有限公司",
     buyerName: "",
     packageKind: "",

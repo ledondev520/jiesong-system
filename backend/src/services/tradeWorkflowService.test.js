@@ -65,7 +65,7 @@ test('历史补录付款未核验时不把默认零值当成未付定金', () =>
     assert.match(payment.reason, /付款.*待核验/);
     assert(!payment.reason.includes('待付'));
     assert.equal(payment.action.label, '核验采购付款');
-    assert.equal(payment.action.href, '/dashboard/purchase/pc-1');
+    assert.equal(payment.action.href, '/dashboard/purchases/pc-1');
     assert.match(workflow.stages.find(s => s.key === 'finance').reason, /付款待核验/);
     const verified = buildTradeWorkflow(baseSales, new Map([[purchase.contractNo, { ...purchase, paidAmount: 5000 }]]));
     assert.equal(verified.stages.find(s => s.key === 'payment').status, 'completed');
@@ -92,7 +92,7 @@ test('从采购合同号关联整笔专项单并给出最早下一动作', () =>
   assert.equal(workflow.stages[1].key, 'payment');
   assert.equal(workflow.stages[1].status, 'current');
   assert.equal(workflow.nextAction.label, '登记采购尾款');
-  assert.equal(workflow.nextAction.href, '/dashboard/purchase/pc-1');
+  assert.equal(workflow.nextAction.href, '/dashboard/purchases/pc-1');
 });
 
 test('未关联采购合同时明确阻塞而不是伪造完成线路', () => {
@@ -118,7 +118,7 @@ test('商业利用率达标但存在未装箱时装柜阶段保持阻塞', () =>
 
   const loading = workflow.stages.find((stage) => stage.key === 'loading');
   assert.equal(loading.status, 'blocked');
-  assert.match(loading.reason, /1 箱无法装入/);
+  assert.match(loading.reason, /超过40HQ内尺寸，无法装入/);
 });
 
 test('发运后的内部退税准备日为次月5日', () => {
@@ -267,6 +267,37 @@ test('采购备注不是丢失合同；已有合同仍需明确采购明细分�
   assert(!assigned.issues.some(x => x.startsWith('采购明细待分配')));
 });
 
+test('列表：单行排柜 503 只降级该行为「装柜计划不可用」（不可发运），其余行照常', async () => {
+  const prisma = require('../utils/prisma');
+  const pool = require('./containerPackingPool');
+  const { listTradeWorkflows } = require('./tradeWorkflowService');
+  const originalSales = prisma.salesContract.findMany;
+  const originalPurchase = prisma.purchaseContract.findMany;
+  const originalPack = pool.packContainersAsync;
+  prisma.salesContract.findMany = async () => [{ ...baseSales, id: 'fails' }, { ...baseSales, id: 'ok' }];
+  prisma.purchaseContract.findMany = async () => [basePurchase];
+  let calls = 0;
+  pool.packContainersAsync = (...args) => {
+    calls += 1;
+    return calls === 1 ? Promise.reject(Object.assign(new Error('x'), { statusCode: 503 })) : originalPack(...args);
+  };
+  try {
+    const rows = await listTradeWorkflows({ limit: 6, scope: 'recent' });
+    const failed = rows.find((row) => row.id === 'fails');
+    assert.equal(failed.readiness.planUnavailable, true);
+    assert.equal(failed.readiness.ready, false);
+    assert.equal(failed.readiness.check.ready, false);
+    assert.equal(failed.stages.find((stage) => stage.key === 'loading').status, 'blocked');
+    assert.match(failed.stages.find((stage) => stage.key === 'loading').reason, /装柜计划暂不可用/);
+    assert.equal(rows.find((row) => row.id === 'ok').readiness.planUnavailable, undefined);
+    // 非 503 的真实错误不被吞掉
+    pool.packContainersAsync = () => Promise.reject(new Error('bug'));
+    await assert.rejects(() => listTradeWorkflows({ limit: 6, scope: 'recent' }), /bug/);
+  } finally {
+    prisma.salesContract.findMany = originalSales; prisma.purchaseContract.findMany = originalPurchase; pool.packContainersAsync = originalPack;
+  }
+});
+
 test('待处理/阻塞/风险范围从全量合同筛选后限量，避免先取最近6笔漏历史风险', async () => {
   const prisma = require('../utils/prisma');
   const { listTradeWorkflows } = require('./tradeWorkflowService');
@@ -275,7 +306,7 @@ test('待处理/阻塞/风险范围从全量合同筛选后限量，避免先取
   const calls = [];
   prisma.salesContract.findMany = async (args) => {
     calls.push(args);
-    return [{ ...baseSales, id: 'older-risk', grossWeight: 23000 }, { ...baseSales, id: 'newer', status: 'SHIPPED', packingItems: [] }];
+    return [{ ...baseSales, id: 'older-risk', grossWeight: 23000, packingItems: [{ ...baseSales.packingItems[0], grossWeight: 23000 }] }, { ...baseSales, id: 'newer', status: 'SHIPPED', packingItems: [] }];
   };
   prisma.purchaseContract.findMany = async () => [basePurchase];
   try {

@@ -1,6 +1,6 @@
 /**
  * Input: Existing ADMIN config HTTP route, committed migrations and private synthetic SQLite
- * Output: Company-name-only invoiceTitleInfo save, retry, failure and independent readback
+ * Output: Company-name-only companyName save (the old invoiceTitleInfo setting was merged into 公司信息, J35), retry, failure and independent readback
  * Pos: Row 30 ordinary text acceptance; no full-form, provider, accounting or security writes
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -12,11 +12,11 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-const KEY = 'invoiceTitleInfo';
-const ORIGINAL = '公司名称：合成普通设置公司';
-const SAVED = '公司名称：合成文本回读公司\n合成说明：仅测试固定文本';
+const KEY = 'companyName';
+const ORIGINAL = '合成普通设置公司';
+const SAVED = '合成文本回读公司';
 
-test('HTTP/SQLite: existing ADMIN can persist only ordinary invoice title text', async t => {
+test('HTTP/SQLite: existing ADMIN can persist only ordinary company name text', async t => {
   assert.equal(fs.existsSync(path.resolve(__dirname, '../../.env')), false,
     'The acceptance checkout must not contain an environment file');
   const originalUmask = process.umask(0o077);
@@ -63,7 +63,7 @@ c=sqlite3.connect(sys.argv[1])
 c.execute('INSERT INTO users (id,username,name,password,role,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?)',
  ('user-ADMIN','synthetic-overview-ADMIN','Synthetic ADMIN','test-only-unused-hash','ADMIN',0,0))
 c.execute('INSERT INTO system_configs (id,key,value,note,updatedAt) VALUES (?,?,?,?,?)',
- ('ordinary-text-setting','invoiceTitleInfo',json.dumps('公司名称：合成普通设置公司'),'Synthetic fixed text',0))
+ ('ordinary-text-setting','companyName',json.dumps('合成普通设置公司'),'Synthetic fixed text',0))
 c.commit()
 c.close()`);
 
@@ -155,11 +155,11 @@ c.close()`));
     const before = await readback(SAVED);
     sqlite(`import sqlite3,sys
 c=sqlite3.connect(sys.argv[1])
-c.execute("CREATE TRIGGER ordinary_text_failure BEFORE UPDATE ON system_configs WHEN NEW.key='invoiceTitleInfo' BEGIN SELECT RAISE(ABORT,'synthetic text write failure'); END")
+c.execute("CREATE TRIGGER ordinary_text_failure BEFORE UPDATE ON system_configs WHEN NEW.key='companyName' BEGIN SELECT RAISE(ABORT,'synthetic text write failure'); END")
 c.commit()
 c.close()`);
     try {
-      const failed = await request('PUT', '公司名称：合成失败草稿', 500);
+      const failed = await request('PUT', '合成失败草稿', 500);
       // The installed Prisma SQLite engine classifies RAISE(ABORT) as P2003.
       assert.equal(failed.message, '存在关联数据，无法执行该操作');
       assert.deepEqual(await readback(SAVED), before);
@@ -171,9 +171,9 @@ c.execute('DROP TRIGGER ordinary_text_failure')
 c.commit()
 c.close()`);
     }
-    await request('PUT', '公司名称：合成明确重试公司');
+    await request('PUT', '合成明确重试公司');
     await db.$disconnect();
-    await readback('公司名称：合成明确重试公司');
+    await readback('合成明确重试公司');
   });
 
   await t.test('clear the existing optional text without deleting its setting or changing other data', async () => {

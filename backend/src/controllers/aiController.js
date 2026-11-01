@@ -7,6 +7,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { stripPageContext } = require('../utils/pageContext');
 const { success, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const { createError } = require('../middleware/errorHandler');
@@ -595,7 +596,7 @@ const getSessions = async (req, res, next) => {
       for (const row of firstMessages) {
         if (!previewMap[row.sessionId]) {
           previewMap[row.sessionId] = {
-            text: row.content?.slice(0, 60) || '',
+            text: stripPageContext(row.content)?.slice(0, 60) || '',
             metadata: parseAgentMetadata(row.metadata),
           };
         }

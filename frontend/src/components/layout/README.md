@@ -23,3 +23,5 @@ Header/MobileTabBar退出登录先等待服务端撤销当前浏览器会话，�
 `HeaderProfileDialog` 捕获同步本地保存失败，显示可访问的“保存未完成”提示并保留显示名称和个人偏好草稿，用户可重试；取消或重新打开仍由 `HeaderUserMenu` 重新加载保存值。原保存顺序保持为先写偏好、再调用资料回调、成功后关闭；偏好写入失败不调用资料回调，资料回调失败时偏好可能已保存，不保证原子保存。`HeaderUserMenu.lifecycle.test.tsx` 在 jsdom 隔离存储中覆盖取消丢弃、重开读取、存储/资料回调失败重试及保存后重开，不代表真实 HTTP、生产浏览器存储或偏好对其他页面的应用效果。
 
 `HeaderUserMenu.auth-profile.test.tsx` 使用与 Header 相同的真实 `useAuthStore.updateProfile` 装配菜单，不替换资料回调：sessionStorage 写入失败前内存姓名已更新且偏好已保存；仓库 rehydrate 读回旧保存姓名，表单仍保留草稿；明确重试成功后再次 rehydrate/重开读回规范化姓名与备注。测试不读出认证存储、令牌或 cookies。真实整页重载证据由 `frontend/e2e/profile-preference-lifecycle.spec.ts` 四项 hosted 定义负责；新增定义和 jsdom 通过不等于浏览器执行通过。
+
+导航结构（侧栏 `Sidebar.tsx`、手机底栏 `MobileTabBar.tsx`）统一来自 `navigation.config.ts`：首页 / 业务（出口订单、采购、库存、单证与退税、财务）/ 资料（供应商、商品、HS 编码）/ 设置，菜单指向现有 URL；`hidden` 项（报价、客户与门店、AI 助手、通知中心）不出现在菜单，仅用于路由归属与角色拦截。激活项在侧栏展开 `children` 子页面，`ModuleTabHeader` 与 tab-memory 已删除。桌面顶栏 `Header.tsx` 含面包屑（当前页标题）、⌘K 搜索、通知、AI 入口和用户菜单；手机端面包屑留在内容区。`navigation.config.test.ts` 覆盖各角色菜单、路由归属和底栏分组。

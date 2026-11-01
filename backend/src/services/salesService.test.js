@@ -6,6 +6,17 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+// 报价口径只来自唯一配置：用私有临时文件固定数值，不依赖仓库 config/pricing.json 的当前值。
+const pricingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sales-service-pricing-'));
+process.env.JIESONG_PRICING_CONFIG = path.join(pricingDir, 'pricing.json');
+fs.writeFileSync(process.env.JIESONG_PRICING_CONFIG, JSON.stringify({
+  exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3,
+  categoryMarkups: [{ categoryId: 'cat-tile', categoryName: '瓷砖', markup: 0.1 }],
+}), { mode: 0o600 });
+test.after(() => fs.rmSync(pricingDir, { recursive: true, force: true }));
 const prisma = require('../utils/prisma');
 const salesService = require('./salesService');
 
@@ -180,16 +191,41 @@ test('getSalesContractById: 返回第三方拼柜标记与来源方', async () =
   }
 });
 
+test('getSalesContractById: 读取关联采购单的数量与状态但不读取采购价格', async () => {
+  const originalFindUnique = prisma.salesContract.findUnique;
+  let args = null;
+  prisma.salesContract.findUnique = async (callArgs) => {
+    args = callArgs;
+    return { id: 'sc-3', packingItems: [], purchaseContracts: [] };
+  };
+
+  try {
+    await salesService.getSalesContractById('sc-3');
+    const { select } = args.include.purchaseContracts;
+    assert.equal(select.status, true);
+    assert.equal(select.items.select.storeId, true);
+    assert.equal(select.items.select.unitPrice, undefined);
+    assert.equal(select.items.select.totalPrice, undefined);
+    assert.equal(select.totalAmount, undefined);
+  } finally {
+    prisma.salesContract.findUnique = originalFindUnique;
+  }
+});
+
 test('createSalesContract: 未传合同号时自动生成并写入', async () => {
   const originalCount = prisma.salesContract.count;
   const originalCreate = prisma.salesContract.create;
   let createArgs = null;
 
+  const originalCustomer = { findMany: prisma.customer.findMany, findUnique: prisma.customer.findUnique };
   prisma.salesContract.count = async () => 7;
   prisma.salesContract.create = async (args) => {
     createArgs = args;
     return { id: 'sc-1', ...args.data };
   };
+  // 恰有一个启用客户：订单自动关联并复制其默认条款（DATA-MODEL §2.4）
+  prisma.customer.findMany = async () => [{ id: 'cu-1' }];
+  prisma.customer.findUnique = async () => ({ defaultIncoterm: 'FOB', defaultPaymentTerms: 'T/T 30%', defaultPortOfLoading: 'Shanghai' });
 
   try {
     const result = await salesService.createSalesContract({ exchangeRate: '6.5' });
@@ -198,9 +234,14 @@ test('createSalesContract: 未传合同号时自动生成并写入', async () =>
     assert.equal(createArgs.data.contractNo, `EXP${year}00008`);
     assert.equal(createArgs.data.exchangeRate, 6.5);
     assert.equal(result.contractNo, `EXP${year}00008`);
+    assert.deepEqual(
+      { customerId: createArgs.data.customerId, incoterm: createArgs.data.incoterm, paymentTerms: createArgs.data.paymentTerms, portOfLoading: createArgs.data.portOfLoading, currency: createArgs.data.currency },
+      { customerId: 'cu-1', incoterm: 'FOB', paymentTerms: 'T/T 30%', portOfLoading: 'Shanghai', currency: 'USD' },
+    );
   } finally {
     prisma.salesContract.count = originalCount;
     prisma.salesContract.create = originalCreate;
+    Object.assign(prisma.customer, originalCustomer);
   }
 });
 
@@ -233,15 +274,21 @@ test('updateSalesContract: explicit invalid rates are rejected before any databa
   } finally { prisma.salesContract.update = originalUpdate; }
 });
 
-test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写总额', async () => {
+test('addSalesItem: 未传 sellingPrice 时按唯一报价规则（订单已保存现汇）定价并回写总额', async () => {
   const originalFindUnique = prisma.salesContract.findUnique;
   const originalCreate = prisma.salesItem.create;
   const originalFindMany = prisma.salesItem.findMany;
   const originalUpdate = prisma.salesContract.update;
+  const originalStoreFindMany = prisma.store.findMany;
   let createArgs = null;
   let updateArgs = null;
 
-  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5 });
+  const originalProduct = prisma.product.findUnique;
+  const originalQuoteItems = prisma.quoteItem.findMany;
+  prisma.quoteItem.findMany = async () => [];
+  prisma.product.findUnique = async () => ({ id: 'p-1', categoryId: null });
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5, customerId: 'c-1' });
+  prisma.store.findMany = async () => [{ id: 's-1', customerId: 'c-1' }];
   prisma.salesItem.create = async (args) => {
     createArgs = args;
     return { id: 'si-1', ...args.data };
@@ -265,16 +312,78 @@ test('addSalesItem: 未传 sellingPrice 时按汇率与利润率计算并回写�
       costPrice: 50,
     });
 
-    assert.equal(createArgs.data.sellingPrice, 13);
+    // 成本 ¥50 × 1.3 ÷ (5 − 0.2) = 13.54 → 14（向上取整到整美元）；不是旧的 ×1.3 公式
+    assert.equal(createArgs.data.sellingPrice, 14);
     assert.deepEqual(updateArgs, {
       where: { id: 'sc-1' },
       data: { totalAmount: 26 },
     });
   } finally {
+    prisma.product.findUnique = originalProduct;
+    prisma.quoteItem.findMany = originalQuoteItems;
     prisma.salesContract.findUnique = originalFindUnique;
     prisma.salesItem.create = originalCreate;
     prisma.salesItem.findMany = originalFindMany;
     prisma.salesContract.update = originalUpdate;
+    prisma.store.findMany = originalStoreFindMany;
+  }
+});
+
+test('addSalesItem: 门店属于其他客户时拒绝写入（评审 R1-3）', async () => {
+  const originals = [prisma.salesContract.findUnique, prisma.store.findMany, prisma.salesItem.create];
+  let created = false;
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5, customerId: 'c-B' });
+  prisma.store.findMany = async () => [{ id: 's-A', customerId: 'c-A' }];
+  prisma.salesItem.create = async () => { created = true; return {}; };
+  try {
+    await assert.rejects(salesService.addSalesItem('sc-1', { productId: 'p-1', storeId: 's-A', quantity: 1, costPrice: 1, sellingPrice: 1 }),
+      (error) => error.statusCode === 400 && /门店不属于所选客户/.test(error.message));
+    assert.equal(created, false);
+  } finally {
+    [prisma.salesContract.findUnique, prisma.store.findMany, prisma.salesItem.create] = originals;
+  }
+});
+
+test('addSalesItem: 未传 sellingPrice 且老商品有上次确认价时直接取该价（排除本订单）', async () => {
+  const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany, prisma.store.findMany];
+  let lookup = null;
+  let createArgs = null;
+  prisma.quoteItem.findMany = async () => [];
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 5, customerId: 'c-1' });
+  prisma.store.findMany = async () => [{ id: 's-1', customerId: 'c-1' }];
+  prisma.salesItem.create = async (args) => { createArgs = args; return { id: 'si-1', ...args.data }; };
+  prisma.salesItem.findMany = async (args) => {
+    if (args.where?.productId) { lookup = args.where; return [{ productId: 'p-1', sellingPrice: 2500.5, createdAt: new Date('2026-10-01') }]; }
+    return [{ quantity: 2, sellingPrice: 2500.5, costPrice: 50 }];
+  };
+  prisma.salesContract.update = async () => ({ id: 'sc-1' });
+  try {
+    await salesService.addSalesItem('sc-1', { productId: 'p-1', storeId: 's-1', quantity: 2, unit: '件', costPrice: 50 });
+    assert.equal(createArgs.data.sellingPrice, 2500.5);
+    assert.deepEqual(lookup.salesContractId, { not: 'sc-1' });
+  } finally {
+    [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.quoteItem.findMany, prisma.store.findMany] = originals;
+  }
+});
+
+test('addSalesItem: 报价转换订单（有 quoteId）已存计价汇率，定价不再重复扣调整', async () => {
+  const originals = [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.product.findUnique, prisma.store.findMany];
+  const originalQuoteItems = prisma.quoteItem.findMany;
+  let created = null;
+  prisma.quoteItem.findMany = async () => [];
+  prisma.product.findUnique = async () => ({ id: 'p-1', categoryId: null });
+  prisma.store.findMany = async () => [{ id: 's-1', customerId: 'c-1' }];
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1', exchangeRate: 6.52, quoteId: 'q-1', customerId: 'c-1' });
+  prisma.salesItem.create = async (args) => { created = args; return { id: 'si-1', ...args.data }; };
+  prisma.salesItem.findMany = async () => [];
+  prisma.salesContract.update = async () => ({ id: 'sc-1' });
+  try {
+    await salesService.addSalesItem('sc-1', { productId: 'p-1', storeId: 's-1', quantity: 1, unit: '件', costPrice: 10000 });
+    // 成本 ¥10000 × 1.3 ÷ 6.52 = 1993.87 → 1994；若再扣 0.2 会得到 2055
+    assert.equal(created.data.sellingPrice, 1994);
+  } finally {
+    [prisma.salesContract.findUnique, prisma.salesItem.create, prisma.salesItem.findMany, prisma.salesContract.update, prisma.product.findUnique, prisma.store.findMany] = originals;
+    prisma.quoteItem.findMany = originalQuoteItems;
   }
 });
 
@@ -363,7 +472,7 @@ test('updateSalesStatus: 有箱件无法放入时拒绝确认发运', async () =
   try {
     await assert.rejects(
       () => salesService.updateSalesStatus('sc-1', 'SHIPPED'),
-      (error) => error.statusCode === 400 && /仍有 1 箱无法装入/.test(error.message),
+      (error) => error.statusCode === 400 && /13000×1000×1000 mm 超过40HQ内尺寸，无法装入/.test(error.message),
     );
     assert.equal(outStockCalled, false);
   } finally {
@@ -372,24 +481,151 @@ test('updateSalesStatus: 有箱件无法放入时拒绝确认发运', async () =
   }
 });
 
-test('calculateSellingPrice: 输入非法时抛错，合法时返回四种结果', () => {
+test('updateSalesStatus: 交互事务超时放宽到 15 s（门禁排柜排队不得耗尽默认 5 s）', async () => {
+  const originalTransaction = prisma.$transaction;
+  let options;
+  prisma.$transaction = async (fn, opts) => {
+    options = opts;
+    return fn({ salesContract: { findUnique: async () => null } });
+  };
+  try {
+    await assert.rejects(() => salesService.updateSalesStatus('sc-x', 'SHIPPED'), (error) => error.statusCode === 404);
+    assert.equal(options.timeout, 15000);
+  } finally { prisma.$transaction = originalTransaction; }
+});
+
+test('updateSalesStatus: 排柜 worker 超时/崩溃（503）时拒绝确认发运且不写入任何数据', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const pool = require('./containerPackingPool');
+  const originalPack = pool.packContainersAsync;
+  const originalTransaction = prisma.$transaction;
+  const originalApplySalesOutStock = inventorySnapshot.applySalesOutStock;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-503-'));
+  const crashFile = path.join(dir, 'crash.js');
+  fs.writeFileSync(crashFile, 'process.exit(1);');
+  const writes = [];
+  prisma.$transaction = async (fn) => fn({
+    salesContract: {
+      findUnique: async () => ({
+        id: 'sc-1',
+        status: 'PACKING',
+        grossWeight: 10,
+        volume: 0.1,
+        packingItems: [{ id: 'pk-1', boxes: 1, quantity: 1, volume: 0.1, grossWeight: 10, length: 500, width: 400, height: 300, product: { customsName: '样品' } }],
+      }),
+      update: async (args) => { writes.push(args); return {}; },
+    },
+  });
+  inventorySnapshot.applySalesOutStock = async () => { writes.push('outStock'); return { results: [] }; };
+
+  try {
+    // 真实 pool：一次 1 ms 超时，一次注入崩溃 worker；两种失败都必须是 503，且无任何写入。
+    for (const poolOptions of [{ timeoutMs: 1 }, { workerFile: crashFile, timeoutMs: 5000 }]) {
+      pool.packContainersAsync = (lines, spec, config, options) => originalPack(lines, spec, config, { ...options, ...poolOptions });
+      await assert.rejects(
+        () => salesService.updateSalesStatus('sc-1', 'SHIPPED'),
+        (error) => error.statusCode === 503,
+      );
+    }
+    assert.deepEqual(writes, []);
+  } finally {
+    pool.packContainersAsync = originalPack;
+    prisma.$transaction = originalTransaction;
+    inventorySnapshot.applySalesOutStock = originalApplySalesOutStock;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('calculateSellingPrice: 只按唯一报价规则；拒绝请求里的 profitRate，缺省现汇取配置', () => {
   assert.throws(
     () => salesService.calculateSellingPrice({ costPrice: 100, exchangeRate: 0 }),
     (error) => error.statusCode === 400 && error.message === 'exchangeRate 必须大于0',
   );
+  assert.throws(
+    () => salesService.calculateSellingPrice({ costPrice: 100, exchangeRate: 7, profitRate: 1.3 }),
+    (error) => error.statusCode === 400 && /利润率由报价规则统一配置/.test(error.message),
+  );
+  assert.throws(() => salesService.calculateSellingPrice({ costPrice: 0, exchangeRate: 7 }), (error) => error.statusCode === 400);
 
-  const result = salesService.calculateSellingPrice({
-    costPrice: 130,
-    exchangeRate: 10,
-    profitRate: 1.3,
-  });
+  // 负责人示例：¥10000 @6.72 → 13000 ÷ 6.52 = 1993.87 → 1994
+  const result = salesService.calculateSellingPrice({ costPrice: 10000, exchangeRate: 6.72 });
+  assert.deepEqual(
+    [result.exact, result.roundedUp, result.roundedDown, result.recommended, result.effectiveRate, result.markup],
+    ['1993.87', 1994, 1993, 1994, 6.52, 0.3],
+  );
+  assert.equal(salesService.calculateSellingPrice({ costPrice: 10000 }).recommended, 1994); // 现汇取配置 6.72
+});
 
-  assert.deepEqual(result, {
-    exact: '16.90',
-    roundedUp: 17,
-    roundedDown: 16,
-    recommended: 17,
-  });
+// 合成商品：p-tile 属于“瓷砖”子分类（祖先命中 cat-tile 加价 10%），p-cup 无分类
+const withSyntheticCatalog = async (run) => {
+  const originalProducts = prisma.product.findMany;
+  const originalCategories = prisma.productCategory.findMany;
+  const originalOrders = prisma.salesItem.findMany;
+  const originalQuotes = prisma.quoteItem.findMany;
+  prisma.salesItem.findMany = async () => [];
+  prisma.quoteItem.findMany = async () => [];
+  prisma.product.findMany = async ({ where }) => [{ id: 'p-tile', categoryId: 'cat-tile-sub' }, { id: 'p-cup', categoryId: null }]
+    .filter((product) => where.id.in.includes(product.id));
+  prisma.productCategory.findMany = async () => [{ id: 'cat-tile-sub', parentId: 'cat-tile' }, { id: 'cat-tile', parentId: null }];
+  try {
+    await run();
+  } finally {
+    prisma.product.findMany = originalProducts;
+    prisma.productCategory.findMany = originalCategories;
+    prisma.salesItem.findMany = originalOrders;
+    prisma.quoteItem.findMany = originalQuotes;
+  }
+};
+
+test('calculateProductSellingPrice: 带商品时按分类链取瓷砖 ×1.1，无分类按默认 ×1.3', () => withSyntheticCatalog(async () => {
+  // 11000 ÷ 6.52 = 1687.12 → 1688；13000 ÷ 6.52 → 1994
+  assert.equal((await salesService.calculateProductSellingPrice({ productId: 'p-tile', costPrice: 10000, exchangeRate: 6.72 })).recommended, 1688);
+  assert.equal((await salesService.calculateProductSellingPrice({ productId: 'p-cup', costPrice: 10000, exchangeRate: 6.72 })).recommended, 1994);
+  assert.equal((await salesService.calculateProductSellingPrice({ costPrice: 10000, exchangeRate: 6.72 })).recommended, 1994);
+}));
+
+test('calculateProductSellingPrice: 老商品 recommended 取上次确认价，formulaRecommended 仍是规则价；新商品 RULE', () => withSyntheticCatalog(async () => {
+  prisma.salesItem.findMany = async ({ where }) => (where.productId.in.includes('p-cup')
+    ? [{ productId: 'p-cup', sellingPrice: 2500.5, createdAt: new Date('2026-10-01') }] : []);
+  const repeat = await salesService.calculateProductSellingPrice({ productId: 'p-cup', costPrice: 10000, exchangeRate: 6.72 });
+  assert.deepEqual([repeat.recommended, repeat.formulaRecommended, repeat.source], [2500.5, 1994, 'LAST_CONFIRMED']);
+  const fresh = await salesService.calculateProductSellingPrice({ productId: 'p-tile', costPrice: 10000, exchangeRate: 6.72 });
+  assert.deepEqual([fresh.recommended, fresh.source], [1688, 'RULE']);
+}));
+
+test('previewOrderMargin: 返回订单整体利润率与不阻断提示；瓷砖行不参与区间检查', () => withSyntheticCatalog(async () => {
+  const cup = { productId: 'p-cup', quantity: 2, costPrice: 10000, sellingPrice: 1994 };
+  const tile = { productId: 'p-tile', quantity: 1, costPrice: 10000, sellingPrice: 1688 };
+  const inBand = await salesService.previewOrderMargin({ exchangeRate: 6.72, items: [cup, tile] });
+  assert.deepEqual([inBand.marginPct, inBand.excludedLines, inBand.warning], [30.01, 1, null]);
+  const low = await salesService.previewOrderMargin({ exchangeRate: 6.72, items: [{ ...cup, sellingPrice: 1900 }, tile] });
+  assert.equal(low.warning, '订单整体利润率 23.88% 不在 30%~35% 范围内');
+  const tilesOnly = await salesService.previewOrderMargin({ exchangeRate: 6.72, items: [tile] });
+  assert.deepEqual([tilesOnly.marginPct, tilesOnly.warning], [null, null]);
+  await assert.rejects(salesService.previewOrderMargin({ items: 'x' }), (error) => error.statusCode === 400);
+  await assert.rejects(salesService.previewOrderMargin({ exchangeRate: 0, items: [cup] }), (error) => error.statusCode === 400);
+}));
+
+test('createSalesContract: 未给汇率时用唯一报价配置的现汇，而不是代码里的 7.0', async () => {
+  const originalCount = prisma.salesContract.count;
+  const originalCreate = prisma.salesContract.create;
+  let createArgs;
+  const originalCustomer = { findMany: prisma.customer.findMany, findUnique: prisma.customer.findUnique };
+  prisma.salesContract.count = async () => 0;
+  prisma.salesContract.create = async (args) => { createArgs = args; return { id: 'sc-new' }; };
+  // 订单必须有客户（#123）：恰有一个启用客户时自动关联
+  prisma.customer.findMany = async () => [{ id: 'cu-1' }];
+  prisma.customer.findUnique = async () => ({ defaultIncoterm: 'FOB', defaultPaymentTerms: null, defaultPortOfLoading: null });
+  try {
+    await salesService.createSalesContract({});
+    assert.equal(createArgs.data.exchangeRate, 6.72);
+  } finally {
+    prisma.salesContract.count = originalCount;
+    prisma.salesContract.create = originalCreate;
+    Object.assign(prisma.customer, originalCustomer);
+  }
 });
 
 test('addPackingItem: 计算 totalPrice 并回写货柜统计', async () => {
@@ -488,6 +724,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
   const source = {
     id: 'pi-1',
     productId: 'p-1',
+    storeId: 'st-1',
     quantity: 100,
     unit: '件',
     totalPrice: 1130,
@@ -539,6 +776,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
       salesContractId: 'sc-1',
       purchaseItemId: 'pi-1',
       productId: 'p-1',
+      storeId: 'st-1', // 部分导入（4/10 箱）仍保留来源门店
       quantity: 40,
       unit: '件',
       boxes: 4,

@@ -4,6 +4,7 @@
  * Pos: 采购创建、详情、付款、催票和合同文档共用的权威金额 Module
  */
 
+const { roundMoney } = require('../utils/money');
 const MONEY_EPSILON = 0.02;
 const LEGACY_LINE_ROUNDING_TOLERANCE = 1;
 
@@ -11,8 +12,6 @@ const toFiniteNumber = (value, fallback = 0) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 };
-
-const roundMoney = (value) => Math.round((toFiniteNumber(value) + Number.EPSILON) * 100) / 100;
 
 /** 历史导入曾把 1% 写成 100；只在读取兼容，不继续写入该编码。 */
 const normalizePurchaseTaxRate = (value) => {

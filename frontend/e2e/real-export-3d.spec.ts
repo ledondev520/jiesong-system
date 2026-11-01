@@ -177,8 +177,8 @@ async function exerciseControl(
  * @throws 页签、真实箱数、尺寸预估提示或商品绘制缺失
  */
 async function openVisualization(page: Page): Promise<Locator> {
-  await page.getByRole("tab", { name: "3D 可视化", exact: true }).click();
-  const panel = page.getByRole("tabpanel", { name: "3D 可视化", exact: true });
+  await page.getByRole("tab", { name: "货柜", exact: true }).click();
+  const panel = page.getByRole("tabpanel", { name: "货柜", exact: true });
   await expect(panel.getByText("已装: 2 箱", { exact: true })).toBeVisible();
   await expect(panel.getByText("未装: 0 箱", { exact: true })).toBeVisible();
   await expect(
@@ -225,12 +225,12 @@ test("SALES 3D canvas renders estimated cargo, controls and resize survive tab r
     page.on("console", (message) => {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
-    await page.getByRole("link", { name: "出口", exact: true }).first().click();
-    await expect(page).toHaveURL(/\/dashboard\/sales$/);
+    await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
+    await expect(page).toHaveURL(/\/dashboard\/orders$/);
     await page
-      .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
+      .getByRole("link", { name: fixture.salesNo!, exact: true })
       .click();
-    await expect(page).toHaveURL(`/dashboard/sales/${fixture.salesId}`);
+    await expect(page).toHaveURL(`/dashboard/orders/${fixture.salesId}`);
     await expect(
       page.getByRole("heading", { name: fixture.salesNo!, exact: true }),
     ).toBeVisible();
@@ -242,19 +242,29 @@ test("SALES 3D canvas renders estimated cargo, controls and resize survive tab r
       await exerciseControl(page, canvas, gesture);
     expect(readExportDocuments(fixture)).toEqual(before);
 
-    // 2. Observe ResizeObserver/camera output across the existing height breakpoint.
-    for (const width of [390, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
-      await canvas.scrollIntoViewIfNeeded();
-      const frame = await waitForRenderedFrame(canvas);
-      expect(frame.cssHeight).toBe(width < 768 ? 420 : 520);
-      expect(frame.left).toBeGreaterThanOrEqual(0);
-      expect(frame.right).toBeLessThanOrEqual(frame.viewportWidth + 1);
-      await exerciseControl(page, canvas, "rotate");
-    }
+    // 2. Below 768px the WebGL scene is replaced by the static 2D plan (no canvas);
+    // back at 1440 the scene mounts again at the desktop height and stays interactive.
+    await page.setViewportSize({ width: 390, height: 900 });
+    await expect(canvas).toHaveCount(0);
+    const topView = page.getByRole("img", { name: "装柜俯视图", exact: true });
+    await expect(topView).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "装柜侧视图", exact: true }),
+    ).toBeVisible();
+    const plan = await topView.boundingBox();
+    expect(plan!.x).toBeGreaterThanOrEqual(0);
+    expect(plan!.x + plan!.width).toBeLessThanOrEqual(391);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(canvas).toHaveCount(1);
+    await canvas.scrollIntoViewIfNeeded();
+    const frame = await waitForRenderedFrame(canvas);
+    expect(frame.cssHeight).toBe(520);
+    expect(frame.left).toBeGreaterThanOrEqual(0);
+    expect(frame.right).toBeLessThanOrEqual(frame.viewportWidth + 1);
+    await exerciseControl(page, canvas, "rotate");
 
     // 3. The ordinary tab return remounts the scene; reload reads unchanged cargo.
-    await page.getByRole("tab", { name: "装箱明细", exact: true }).click();
+    await page.getByRole("tab", { name: "明细", exact: true }).click();
     await expect(canvas).toHaveCount(0);
     canvas = await openVisualization(page);
     await exerciseControl(page, canvas, "zoom");

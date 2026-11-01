@@ -166,7 +166,7 @@ for (const width of [390, 1440]) {
     });
     await signInAsAdmin(
       page,
-      "/dashboard/purchase/create?editId=qa-editor-draft",
+      "/dashboard/purchases/new?editId=qa-editor-draft",
     );
     await expect(page.getByRole("spinbutton", { name: /数量/ })).toHaveValue(
       "2",

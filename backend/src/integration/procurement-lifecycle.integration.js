@@ -87,7 +87,7 @@ test('HTTP/SQLite：采购收验货闭环、库存查询与草稿删除后编号
   assert.equal(history.pagination.total, 2);
   assert.equal(history.items.length, 1);
   assert.equal(history.items[0].acceptedQuantity, 6);
-  await call('DELETE', `/purchases/${purchase.id}`, undefined, { role: 'PURCHASE', expected: 400 });
+  await call('DELETE', `/purchases/${purchase.id}`, undefined, { role: 'PURCHASE', expected: 409 });
 
   // 删除较早的草稿后，后续编号不能依赖记录总数而撞上仍存在的合同。
   const deletedDraft = await create();

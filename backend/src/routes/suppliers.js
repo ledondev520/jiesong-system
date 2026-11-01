@@ -38,11 +38,17 @@ router.put('/:id', withIdValidation, accessAuth({ roles: ['ADMIN', 'PURCHASE', '
   supplierController.update
 ));
 
-// DELETE /api/v1/suppliers/:id - 删除供应商
-router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+// DELETE /api/v1/suppliers/:id - 归档供应商（软停用，非物理删除）
+router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE'), withAuditLog(
   { entity: 'Supplier', action: 'DELETE', model: 'supplier' },
   supplierController.remove
 ));
+
+// GET /api/v1/suppliers/:id/hard-delete-preview - 永久删除预览（仅 ADMIN，只读）
+router.get('/:id/hard-delete-preview', withIdValidation, roleAuth('ADMIN'), supplierController.hardDeletePreview);
+
+// POST /api/v1/suppliers/:id/hard-delete - 永久删除（仅 ADMIN；审计行在删除事务内写入，故不套 withAuditLog）
+router.post('/:id/hard-delete', withIdValidation, roleAuth('ADMIN'), supplierController.hardDelete);
 
 // POST /api/v1/suppliers/:id/aliases - 添加供应商昵称
 router.post('/:id/aliases', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(

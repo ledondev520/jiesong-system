@@ -134,3 +134,16 @@ test('removeForexVerification: 记录存在时执行删除', async () => {
     assert.deepEqual(deleteArgs, { where: { id: 'fv-4' } });
   });
 });
+
+
+test('createForexVerification: 未填汇率时采用订单已保存的汇率，显式汇率不变', async () => {
+  const created = [];
+  await withMockDelegate('salesContract', { findUnique: async () => ({ exchangeRate: 6.52 }) }, async () => {
+    await withMockDelegate('forexVerification', { create: async ({ data }) => { created.push(data); return data; } }, async () => {
+      const base = { verificationNo: 'FX-R', salesContractId: 'sc-1', receivedAmount: '100' };
+      await forexVerificationService.createForexVerification(base);
+      await forexVerificationService.createForexVerification({ ...base, verificationNo: 'FX-R2', exchangeRate: '7.01' });
+    });
+  });
+  assert.deepEqual(created.map((data) => data.exchangeRate), [6.52, 7.01]);
+});

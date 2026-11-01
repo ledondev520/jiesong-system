@@ -6,11 +6,17 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { UserCog } from 'lucide-react';
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
+import { UserCog } from "lucide-react";
 
 /**
  * 职责：渲染用户管理引导入口
@@ -21,7 +27,7 @@ export function UsersTab() {
   return (
     <Card
       className="hover:border-primary/50 transition-colors cursor-pointer"
-      onClick={() => router.push('/dashboard/users')}
+      onClick={() => router.push("/dashboard/settings/users")}
     >
       <CardHeader className="flex flex-row items-center gap-4">
         <div className="p-2 bg-primary/10 rounded-lg">

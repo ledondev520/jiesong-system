@@ -39,13 +39,13 @@ test.afterEach(async () => {
  */
 async function enterHeader(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
-  await page.getByRole("link", { name: "出口", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/dashboard\/sales$/);
+  await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/dashboard\/orders$/);
   await page
-    .getByRole("button", { name: `查看合同 ${fixture.salesNo}`, exact: true })
+    .getByRole("link", { name: fixture.salesNo!, exact: true })
     .click();
-  await expect(page).toHaveURL(`/dashboard/sales/${fixture.salesId}`);
-  await page.getByRole("tab", { name: "合同信息", exact: true }).click();
+  await expect(page).toHaveURL(`/dashboard/orders/${fixture.salesId}`);
+  await page.getByRole("tab", { name: "明细", exact: true }).click();
   return token;
 }
 /**
@@ -54,7 +54,7 @@ async function enterHeader(page: Page) {
  * @returns 合同信息 tabpanel 定位器
  */
 const panelFor = (page: Page) =>
-  page.getByRole("tabpanel", { name: "合同信息" });
+  page.getByRole("tabpanel", { name: "明细" });
 const savedValues = {
   rate: "7.2",
   signedAt: "2026-10-01",
@@ -203,7 +203,7 @@ test("SALES header cancel discards full draft, reopen and reload produce zero bu
   await expectValues(panelFor(page), savedValues);
   expect(writes).toBe(0);
   await page.reload();
-  await page.getByRole("tab", { name: "合同信息", exact: true }).click();
+  await page.getByRole("tab", { name: "明细", exact: true }).click();
   await panelFor(page)
     .getByRole("button", { name: "编辑", exact: true })
     .click();
@@ -344,7 +344,7 @@ test("SALES header saved supplement survives authenticated readback, page reload
     before.packing_items[0].id,
   );
   await page.reload();
-  await page.getByRole("tab", { name: "合同信息", exact: true }).click();
+  await page.getByRole("tab", { name: "明细", exact: true }).click();
   await panelFor(page)
     .getByRole("button", { name: "编辑", exact: true })
     .click();

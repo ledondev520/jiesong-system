@@ -2,6 +2,7 @@
 import { getAuthToken } from "@/lib/auth-token";
 import api from "@/lib/axios";
 import type { ApiResponse, PackingItem, SalesContract } from "@/types";
+import type { ContainerTypeCode, LoadingPlan } from "@/lib/containerLoading";
 import { createCrudService } from "./crudService";
 import { downloadResponseBlob } from "./fileDownload";
 import { runIdempotentRequest } from "@/lib/idempotentRequest";
@@ -25,12 +26,29 @@ export interface SalesCreationItem {
   quantity: number;
   unit?: string;
   costPrice: number;
-  sellingPrice: number;
+  /** 人工价才填；省略时服务端按报价规则计算 */
+  sellingPrice?: number;
   note?: string;
 }
 export type SalesCreationPayload = Omit<SalesCreatePayload, "items"> & {
   items: SalesCreationItem[];
 };
+
+export interface OrderMarginItem {
+  productId: string;
+  quantity: number;
+  costPrice: number;
+  sellingPrice: number;
+}
+
+export interface OrderMargin {
+  margin: number | null;
+  marginPct: number | null;
+  band: { minPct: number; maxPct: number };
+  effectiveRate: number;
+  excludedLines: number;
+  warning: string | null;
+}
 
 /** 装箱单核对：单个字段比对结果（matched=null 表示系统未录入、跳过比对） */
 export interface PackingListCheckField {
@@ -354,6 +372,22 @@ export const salesService = {
   },
 
   /** 按出口合同状态机推进到下一阶段。 */
+  /** 生成采购单：每个供应商一份 DRAFT 采购合同（ADMIN/PURCHASE） */
+  generatePurchaseDrafts: async (
+    salesContractId: string,
+    lines: Array<{
+      salesItemId: string;
+      supplierId: string;
+      unitPrice: number;
+    }>,
+  ) => {
+    return api.post<
+      ApiResponse<{ contracts: Array<{ id: string; contractNo: string }> }>,
+      ApiResponse<{ contracts: Array<{ id: string; contractNo: string }> }>,
+      { lines: typeof lines }
+    >(`/sales/${salesContractId}/purchase-drafts`, { lines });
+  },
+
   updateStatus: async (id: string, status: SalesContract["status"]) => {
     return api.put<
       ApiResponse<SalesContract>,
@@ -430,6 +464,14 @@ export const salesService = {
     >(`/sales/${id}/tax-refund-preparation`);
   },
 
+  /** 只读装柜计划；containerType 仅用于模拟，确认发运门槛由后端固定按默认柜型。 */
+  getLoadingPlan: async (id: string, containerType?: ContainerTypeCode) => {
+    return api.get<ApiResponse<LoadingPlan>, ApiResponse<LoadingPlan>>(
+      `/sales/${id}/loading-plan`,
+      { params: containerType ? { containerType } : undefined },
+    );
+  },
+
   /** 读取单柜美元收入、人民币成本、退税和现金流的统一财务口径。 */
   getFinanceSummary: async (id: string) => {
     return api.get<
@@ -453,15 +495,41 @@ export const salesService = {
     );
   },
 
-  /**
-   * 计算推荐售价。
-   */
-  calculatePrice: (
+  /** 当前现汇（来自唯一报价配置），用于新订单的汇率预填。 */
+  getExchangeRate: () =>
+    api.get<
+      ApiResponse<{ rate: number; buffer: number; effectiveRate: number }>,
+      ApiResponse<{ rate: number; buffer: number; effectiveRate: number }>
+    >("/system/exchange-rate"),
+
+  /** 推荐售价（USD 单价）：由后端 priceFor 计算（现汇-0.2、分类加价、单价取整规则）；带 productId 才能取瓷砖等分类加价。 */
+  calculatePrice: async (
     costPrice: number,
     exchangeRate: number,
-    profitRate: number,
-  ) => {
-    const effectiveRate = Math.max(0.1, exchangeRate - 0.2);
-    return Math.ceil((costPrice / effectiveRate) * profitRate);
+    productId?: string,
+  ): Promise<number> => {
+    const response = await api.post<
+      ApiResponse<{ recommended: number }>,
+      ApiResponse<{ recommended: number }>,
+      { costPrice: number; exchangeRate: number; productId?: string }
+    >("/sales/calculate-price", {
+      costPrice,
+      exchangeRate,
+      ...(productId ? { productId } : {}),
+    });
+    return response.data.recommended;
+  },
+
+  /** 订单整体利润率预览（后端 orderMargin）；warning 只提示，不阻止保存。 */
+  previewOrderMargin: async (
+    exchangeRate: number,
+    items: OrderMarginItem[],
+  ): Promise<OrderMargin> => {
+    const response = await api.post<
+      ApiResponse<OrderMargin>,
+      ApiResponse<OrderMargin>,
+      { exchangeRate: number; items: OrderMarginItem[] }
+    >("/sales/calculate-price", { exchangeRate, items });
+    return response.data;
   },
 };

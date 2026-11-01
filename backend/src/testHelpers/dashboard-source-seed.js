@@ -34,7 +34,7 @@ function seedDashboardSources(database, ids) {
       row({ id: 'dashboard-draft-purchase', contractNo: 'CG-SYNTHETIC-DRAFT-B', supplierId: ids.supplierId,
         status: 'DRAFT', totalAmount: 200, paidAmount: 50 }),
       row({ id: 'dashboard-pending-purchase', contractNo: 'CG-SYNTHETIC-PENDING', supplierId: ids.supplierId,
-        status: 'PENDING', totalAmount: 300, paidAmount: 100 }),
+        status: 'SIGNED', totalAmount: 300, paidAmount: 100 }),
       row({ id: 'dashboard-cancelled-purchase', contractNo: 'CG-SYNTHETIC-CANCELLED', supplierId: ids.supplierId,
         status: 'CANCELLED', totalAmount: 900, paidAmount: 100 }),
       row({ id: 'dashboard-completed-purchase', contractNo: 'CG-SYNTHETIC-COMPLETED', supplierId: ids.supplierId,

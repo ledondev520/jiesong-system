@@ -6,15 +6,15 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import api from '@/lib/axios';
-import type { PaginatedResponse } from '@/types';
+import api from "@/lib/axios";
+import type { PaginatedResponse } from "@/types";
 
 export interface BankTransaction {
   id: string;
   batchId: string;
   bankName: string | null;
   accountNoMasked: string | null;
-  currency: 'CNY' | 'USD' | string;
+  currency: "CNY" | "USD" | string;
   txnTime: string;
   txnDate: string;
   amount: number;
@@ -25,11 +25,11 @@ export interface BankTransaction {
   txnId: string | null;
   balance: number | null;
   counterpart: string | null;
-  direction: 'IN' | 'OUT';
+  direction: "IN" | "OUT";
   matchedContractId: string | null;
   matchedContractType: string | null;
   matchScore: number | null;
-  matchStatus: 'PENDING' | 'MATCHED' | 'IGNORED';
+  matchStatus: "PENDING" | "MATCHED" | "IGNORED";
   matchedAt: string | null;
   batch?: { fileName: string; importedAt: string };
 }
@@ -56,14 +56,14 @@ export interface InvoiceRecord {
   matchedContractId: string | null;
   matchedContractType: string | null;
   matchScore: number | null;
-  matchStatus: 'PENDING' | 'MATCHED' | 'IGNORED';
+  matchStatus: "PENDING" | "MATCHED" | "IGNORED";
   matchedAt: string | null;
   batch?: { fileName: string; importedAt: string };
 }
 
 export interface FinanceDataBatch {
   id: string;
-  type: 'BANK_FLOW' | 'INVOICE';
+  type: "BANK_FLOW" | "INVOICE";
   fileName: string;
   recordCount: number;
   dataStartDate: string | null;
@@ -119,8 +119,13 @@ export interface InvoiceQuery {
  * 职责：获取银行流水列表
  * 注意：axios 拦截器已经返回 response.data，所以 api.get() 直接返回响应体
  */
-export async function getTransactions(params: TransactionQuery): Promise<PaginatedResponse<BankTransaction>> {
-  const res: { data: PaginatedResponse<BankTransaction> } = await api.get('/bank-flow/transactions', { params });
+export async function getTransactions(
+  params: TransactionQuery,
+): Promise<PaginatedResponse<BankTransaction>> {
+  const res: { data: PaginatedResponse<BankTransaction> } = await api.get(
+    "/bank-flow/transactions",
+    { params },
+  );
   return res.data;
 }
 
@@ -128,17 +133,32 @@ export async function getTransactions(params: TransactionQuery): Promise<Paginat
  * 职责：获取银行流水统计（支持全部筛选条件）
  */
 export async function getTransactionStats(params?: {
-  search?: string; direction?: string; dateFrom?: string; dateTo?: string; currency?: string; accountNoMasked?: string; amountMin?: number; amountMax?: number;
+  search?: string;
+  direction?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  currency?: string;
+  accountNoMasked?: string;
+  amountMin?: number;
+  amountMax?: number;
 }): Promise<BankFlowStats> {
-  const res: { data: BankFlowStats } = await api.get('/bank-flow/transactions/stats', { params });
+  const res: { data: BankFlowStats } = await api.get(
+    "/bank-flow/transactions/stats",
+    { params },
+  );
   return res.data;
 }
 
 /**
  * 职责：获取发票列表
  */
-export async function getInvoices(params: InvoiceQuery): Promise<PaginatedResponse<InvoiceRecord>> {
-  const res: { data: PaginatedResponse<InvoiceRecord> } = await api.get('/bank-flow/invoices', { params });
+export async function getInvoices(
+  params: InvoiceQuery,
+): Promise<PaginatedResponse<InvoiceRecord>> {
+  const res: { data: PaginatedResponse<InvoiceRecord> } = await api.get(
+    "/bank-flow/invoices",
+    { params },
+  );
   return res.data;
 }
 
@@ -146,9 +166,15 @@ export async function getInvoices(params: InvoiceQuery): Promise<PaginatedRespon
  * 职责：获取发票统计（支持全部筛选条件）
  */
 export async function getInvoiceStats(params?: {
-  search?: string; status?: string; dateFrom?: string; dateTo?: string;
+  search?: string;
+  status?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }): Promise<InvoiceStats> {
-  const res: { data: InvoiceStats } = await api.get('/bank-flow/invoices/stats', { params });
+  const res: { data: InvoiceStats } = await api.get(
+    "/bank-flow/invoices/stats",
+    { params },
+  );
   return res.data;
 }
 
@@ -156,7 +182,10 @@ export async function getInvoiceStats(params?: {
  * 职责：获取导入批次
  */
 export async function getBatches(type?: string): Promise<FinanceDataBatch[]> {
-  const res: { data: FinanceDataBatch[] } = await api.get('/bank-flow/batches', { params: { type } });
+  const res: { data: FinanceDataBatch[] } = await api.get(
+    "/bank-flow/batches",
+    { params: { type } },
+  );
   return res.data;
 }
 
@@ -189,7 +218,7 @@ interface MatchedEntry {
   totalTax: number;
   gap: number;
   gapPct: number;
-  category: 'normal' | 'under_invoiced' | 'over_invoiced';
+  category: "normal" | "under_invoiced" | "over_invoiced";
   txnCount: number;
   invCount: number;
 }
@@ -231,7 +260,9 @@ export interface FullReconciliationResult {
  * 职责：获取全量对账分析（银行流水 vs 发票按供应商汇总匹配）
  */
 export async function getFullReconciliation(): Promise<FullReconciliationResult> {
-  const res: { data: FullReconciliationResult } = await api.get('/bank-flow/reconciliation/full');
+  const res: { data: FullReconciliationResult } = await api.get(
+    "/bank-flow/reconciliation/full",
+  );
   return res.data;
 }
 
@@ -252,7 +283,9 @@ export interface IncomingSummaryResult {
  * 职责：获取银行收入按对手方汇总（应收 fallback）
  */
 export async function getIncomingSummary(): Promise<IncomingSummaryResult> {
-  const res: { data: IncomingSummaryResult } = await api.get('/bank-flow/incoming-summary');
+  const res: { data: IncomingSummaryResult } = await api.get(
+    "/bank-flow/incoming-summary",
+  );
   return res.data;
 }
 
@@ -273,8 +306,20 @@ export interface AutoMatchResult {
   invoiceMatched: number;
   invoiceTotal: number;
   details: {
-    bank: Array<{ id: string; matched: boolean; contractId?: string; contractType?: string; score: number }>;
-    invoices: Array<{ id: string; matched: boolean; contractId?: string; contractType?: string; score: number }>;
+    bank: Array<{
+      id: string;
+      matched: boolean;
+      contractId?: string;
+      contractType?: string;
+      score: number;
+    }>;
+    invoices: Array<{
+      id: string;
+      matched: boolean;
+      contractId?: string;
+      contractType?: string;
+      score: number;
+    }>;
   };
 }
 
@@ -298,7 +343,10 @@ interface SalesContractForMatch {
   signedAt: string | null;
   portId: string | null;
   port: { id: string; name: string } | null;
-  packingItems: Array<{ id: string; store: { id: string; name: string } | null }>;
+  packingItems: Array<{
+    id: string;
+    store: { id: string; name: string } | null;
+  }>;
 }
 
 export type ContractForMatch = PurchaseContractForMatch | SalesContractForMatch;
@@ -306,8 +354,16 @@ export type ContractForMatch = PurchaseContractForMatch | SalesContractForMatch;
 /**
  * 职责：获取未匹配项列表
  */
-export async function getUnmatchedItems(params?: { page?: number; pageSize?: number; type?: 'BANK' | 'INVOICE'; search?: string }): Promise<UnmatchedItemsResult> {
-  const res: { data: UnmatchedItemsResult } = await api.get('/finance/unmatched', { params });
+export async function getUnmatchedItems(params?: {
+  page?: number;
+  pageSize?: number;
+  type?: "BANK" | "INVOICE";
+  search?: string;
+}): Promise<UnmatchedItemsResult> {
+  const res: { data: UnmatchedItemsResult } = await api.get(
+    "/finance/unmatched",
+    { params },
+  );
   return res.data;
 }
 
@@ -315,7 +371,7 @@ export async function getUnmatchedItems(params?: { page?: number; pageSize?: num
  * 职责：触发自动匹配
  */
 export async function postAutoMatch(): Promise<AutoMatchResult> {
-  const res: { data: AutoMatchResult } = await api.post('/finance/auto-match');
+  const res: { data: AutoMatchResult } = await api.post("/finance/auto-match");
   return res.data;
 }
 
@@ -323,28 +379,45 @@ export async function postAutoMatch(): Promise<AutoMatchResult> {
  * 职责：人工确认关联
  */
 export async function postManualMatch(body: {
-  entityType: 'BANK' | 'INVOICE';
+  entityType: "BANK" | "INVOICE";
   entityId: string;
   contractId: string;
-  contractType: 'PURCHASE' | 'SALES';
+  contractType: "PURCHASE" | "SALES";
 }): Promise<BankTransaction | InvoiceRecord> {
-  const res: { data: BankTransaction | InvoiceRecord } = await api.post('/finance/match', body);
+  const res: { data: BankTransaction | InvoiceRecord } = await api.post(
+    "/finance/match",
+    body,
+  );
   return res.data;
 }
 
 /**
  * 职责：忽略该项
  */
-export async function postIgnore(body: { entityType: 'BANK' | 'INVOICE'; entityId: string }): Promise<BankTransaction | InvoiceRecord> {
-  const res: { data: BankTransaction | InvoiceRecord } = await api.post('/finance/ignore', body);
+export async function postIgnore(body: {
+  entityType: "BANK" | "INVOICE";
+  entityId: string;
+}): Promise<BankTransaction | InvoiceRecord> {
+  const res: { data: BankTransaction | InvoiceRecord } = await api.post(
+    "/finance/ignore",
+    body,
+  );
   return res.data;
 }
 
 /**
  * 职责：获取可用于匹配的合同列表
  */
-export async function getContractsForMatch(contractType: 'PURCHASE' | 'SALES', search?: string): Promise<ContractForMatch[]> {
-  const res: { data: ContractForMatch[] } = await api.get('/finance/contracts-for-match', { params: { contractType, search } });
+export async function getContractsForMatch(
+  contractType: "PURCHASE" | "SALES",
+  search?: string,
+  /** PAYMENT（默认）：银行流水匹配，不含草稿采购合同；INVOICE：发票关联 */
+  purpose: "PAYMENT" | "INVOICE" = "PAYMENT",
+): Promise<ContractForMatch[]> {
+  const res: { data: ContractForMatch[] } = await api.get(
+    "/finance/contracts-for-match",
+    { params: { contractType, search, purpose } },
+  );
   return res.data;
 }
 
@@ -372,43 +445,64 @@ export interface ImportResult {
 /**
  * 职责：预览银行对账单解析结果
  */
-export async function previewBankFlowImport(file: File, bankType: string): Promise<ImportPreviewResult> {
+export async function previewBankFlowImport(
+  file: File,
+  bankType: string,
+): Promise<ImportPreviewResult> {
   const form = new FormData();
-  form.append('file', file);
-  form.append('bankType', bankType);
-  const res: { data: ImportPreviewResult } = await api.post('/bank-flow/import/preview', form);
+  form.append("file", file);
+  form.append("bankType", bankType);
+  const res: { data: ImportPreviewResult } = await api.post(
+    "/bank-flow/import/preview",
+    form,
+  );
   return res.data;
 }
 
 /**
  * 职责：批量导入银行对账单
  */
-export async function importBankFlow(file: File, bankType: string): Promise<ImportResult> {
+export async function importBankFlow(
+  file: File,
+  bankType: string,
+): Promise<ImportResult> {
   const form = new FormData();
-  form.append('file', file);
-  form.append('bankType', bankType);
-  const res: { data: ImportResult } = await api.post('/bank-flow/import', form);
+  form.append("file", file);
+  form.append("bankType", bankType);
+  const res: { data: ImportResult } = await api.post("/bank-flow/import", form);
   return res.data;
 }
 
 /**
  * 职责：预览发票解析结果
  */
-export async function previewInvoiceImport(file: File, invoiceType: string): Promise<ImportPreviewResult> {
+export async function previewInvoiceImport(
+  file: File,
+  invoiceType: string,
+): Promise<ImportPreviewResult> {
   const form = new FormData();
-  form.append('file', file);
-  form.append('invoiceType', invoiceType);
-  const res: { data: ImportPreviewResult } = await api.post('/bank-flow/invoices/import/preview', form);
+  form.append("file", file);
+  form.append("invoiceType", invoiceType);
+  const res: { data: ImportPreviewResult } = await api.post(
+    "/bank-flow/invoices/import/preview",
+    form,
+  );
   return res.data;
 }
 
 /**
  * 职责：批量导入发票
  */
-export async function importInvoices(file: File, invoiceType: string): Promise<ImportResult> {
+export async function importInvoices(
+  file: File,
+  invoiceType: string,
+): Promise<ImportResult> {
   const form = new FormData();
-  form.append('file', file);
-  form.append('invoiceType', invoiceType);
-  const res: { data: ImportResult } = await api.post('/bank-flow/invoices/import', form);
+  form.append("file", file);
+  form.append("invoiceType", invoiceType);
+  const res: { data: ImportResult } = await api.post(
+    "/bank-flow/invoices/import",
+    form,
+  );
   return res.data;
 }

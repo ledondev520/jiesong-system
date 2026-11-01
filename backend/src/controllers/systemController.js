@@ -10,6 +10,7 @@ const {
   updateConfig,
   getExchangeRate,
   syncExchangeRate,
+  getSellerIdentity,
 } = require('./system/configController');
 const {
   getNotifications,
@@ -73,6 +74,7 @@ module.exports = {
   markNotificationRead,
   getExchangeRate,
   syncExchangeRate,
+  getSellerIdentity,
   getPorts,
   createPort,
   updatePort,

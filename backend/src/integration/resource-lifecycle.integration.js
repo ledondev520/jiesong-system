@@ -29,7 +29,7 @@ test('registered resource lifecycle matrix over HTTP, private SQLite and singlet
   // Only archive routes use response-finish database audit writes. Pricing audits
   // hashes/field names in its file service and must not store config in the DB.
   const auditedPaths = resources
-    .filter((resource) => resource.kind !== 'singleton-config')
+    .filter((resource) => resource.kind !== 'singleton-config' && resource.kind !== 'action')
     .map((resource) => resource.matrix.path);
   t.after(async () => {
     if (server) {
@@ -112,6 +112,12 @@ test('registered resource lifecycle matrix over HTTP, private SQLite and singlet
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const payload = await response.json();
+    // The real global limiter (100/min) stays mounted; with many registered resources the matrix must pace itself.
+    const remaining = Number(response.headers.get('x-ratelimit-remaining'));
+    if (remaining <= 5) {
+      const wait = Number(response.headers.get('x-ratelimit-reset')) - Date.now() + 100;
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    }
     if (
       method !== 'GET' &&
       response.status >= 200 &&
@@ -175,7 +181,7 @@ test('registered resource lifecycle matrix over HTTP, private SQLite and singlet
   const {
     runSingletonConfigMatrix,
   } = require('../lifecycle/runSingletonConfigMatrix');
-  for (const resource of resources) {
+  for (const resource of resources.filter((entry) => entry.kind !== 'action')) {
     await t.test(resource.id, async (t) => {
       const singleton = resource.kind === 'singleton-config';
       if (singleton) {

@@ -66,6 +66,7 @@ const CATEGORY_LABELS: Record<ContractFileCategory, string> = {
   OTHER: "其他附件",
   SIGNED_CONTRACT: "供应商盖章件",
   PRODUCTION_PHOTO: "生产实物图",
+  RECEIPT_PHOTO: "到货照片",
   SUPPLIER_INVOICE: "供应商发票",
   CARRIER_DOCUMENT: "船司文件",
   SYSTEM_GENERATED_WORD: "系统生成 Word",

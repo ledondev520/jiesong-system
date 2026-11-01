@@ -31,6 +31,7 @@ const {
   updatePurchaseProductionDetails,
 } = require('../services/purchaseProductionService');
 const purchaseInvoiceService = require('../services/purchaseInvoiceService');
+const { roundMoney } = require('../utils/money');
 
 /**
  * 职责：检查商品价格是否高于历史均价并生成警告
@@ -68,8 +69,8 @@ const checkPriceWarnings = async (items, prismaClient) => {
     if (diffPct > 10) {
       warnings.push({
         productId: item.productId,
-        currentPrice: Number(currentPrice.toFixed(2)),
-        averagePrice: Number(averagePrice.toFixed(2)),
+        currentPrice: roundMoney(currentPrice),
+        averagePrice: roundMoney(averagePrice),
         diffPct: Number(diffPct.toFixed(1)),
         message: `当前价格 ¥${currentPrice} 高于历史均价 ¥${averagePrice.toFixed(2)} ${diffPct.toFixed(1)}%，请说明原因`,
       });
@@ -286,11 +287,29 @@ const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
     
-    const contract = await prisma.purchaseContract.findUnique({ where: { id }, select: { _count: { select: { receipts: true } } } });
-    if (!contract) throw createError('采购合同不存在', 404);
-    if (contract._count.receipts > 0) throw createError('已有到货记录的合同不可删除', 400);
-    await prisma.purchaseContract.delete({ where: { id } });
-    
+    // Code-level guard: Payment.purchaseContract has no onDelete rule (default SetNull would orphan ledger rows).
+    // Checks and delete share one transaction; the no-op UPDATE takes the SQLite writer lock first so a
+    // concurrent payment/receipt cannot slip in between (same pattern as financeService allocations).
+    await prisma.$transaction(async (tx) => {
+      const locked = await tx.$executeRaw`UPDATE purchase_contracts SET id = id WHERE id = ${id}`;
+      if (locked !== 1) throw createError('采购合同不存在', 404);
+      const contract = await tx.purchaseContract.findUnique({
+        where: { id },
+        select: { invoiceNo: true, _count: { select: { receipts: true, payments: true } } },
+      });
+      const [invoiceFiles, matchedInvoices, matchedBank, packingItems] = await Promise.all([
+        tx.contractFile.count({ where: { purchaseContractId: id, category: 'SUPPLIER_INVOICE' } }),
+        tx.invoiceRecord.count({ where: { matchedContractId: id, matchedContractType: 'PURCHASE' } }),
+        tx.bankTransaction.count({ where: { matchedContractId: id, matchedContractType: 'PURCHASE' } }),
+        tx.packingItem.count({ where: { purchaseItem: { purchaseContractId: id } } }),
+      ]);
+      if (contract._count.receipts > 0 || contract._count.payments > 0 || contract.invoiceNo
+        || invoiceFiles > 0 || matchedInvoices > 0 || matchedBank > 0 || packingItems > 0) {
+        throw createError('已有到货、付款、发票、银行流水、装箱或核销记录的合同不可删除', 409);
+      }
+      await tx.purchaseContract.delete({ where: { id } });
+    });
+
     success(res, null, '采购合同删除成功');
   } catch (error) {
     next(error);
@@ -474,6 +493,7 @@ const uploadFile = async (req, res, next) => {
       req.file,
       req.body?.description,
       req.body?.category,
+      req.user,
     );
     
     created(res, contractFile, '文件上传成功');
@@ -516,6 +536,7 @@ const deleteFile = async (req, res, next) => {
       throw createError('文件不存在', 404);
     }
     fileService.assertFileAccess(file, req.user);
+    fileService.assertReceiptPhotoAccess(fileService.CONTRACT_TYPE.PURCHASE, file.category, req.user);
     
     // 旧采购入口继续保留物理归档；不改变现有留存约定。
     
@@ -573,16 +594,24 @@ const getNextContractNo = async (req, res, next) => {
  * 职责：获取商品历史采购价格统计
  * 思路：查询 PurchaseItem 中该商品的所有历史记录，计算均价、最低价、最高价
  * @param productId 商品ID
- * @returns { averagePrice, minPrice, maxPrice, count, history }
+ * @returns { averagePrice, minPrice, maxPrice, count, history, bySupplier }
+ * 草稿/已取消合同不计入（与应付口径一致）；bySupplier 另排除已停用(isActive=false)供应商
  */
 const getProductPriceHistory = async (req, res, next) => {
   try {
     const { productId } = req.params;
 
     const historyItems = await prisma.purchaseItem.findMany({
-      where: { productId, quantity: { gt: 0 } },
+      where: { productId, quantity: { gt: 0 }, purchaseContract: { status: { notIn: ['DRAFT', 'CANCELLED'] } } },
       include: {
-        purchaseContract: { select: { contractNo: true, createdAt: true } },
+        purchaseContract: {
+          select: {
+            contractNo: true,
+            createdAt: true,
+            taxRate: true,
+            supplier: { select: { id: true, name: true, shortName: true, isActive: true, hasQualityIssue: true } },
+          },
+        },
         product: { select: { customsName: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -595,6 +624,7 @@ const getProductPriceHistory = async (req, res, next) => {
         maxPrice: null,
         count: 0,
         history: [],
+        bySupplier: [],
       });
     }
 
@@ -603,6 +633,8 @@ const getProductPriceHistory = async (req, res, next) => {
         contractNo: h.purchaseContract.contractNo,
         price: Number(h.unitPrice),
         date: h.purchaseContract.createdAt,
+        taxRate: h.purchaseContract.taxRate,
+        supplier: h.purchaseContract.supplier,
       }))
       .filter((h) => Number.isFinite(h.price) && h.price > 0);
 
@@ -613,6 +645,7 @@ const getProductPriceHistory = async (req, res, next) => {
         maxPrice: null,
         count: 0,
         history: [],
+        bySupplier: [],
       });
     }
 
@@ -622,20 +655,50 @@ const getProductPriceHistory = async (req, res, next) => {
     const maxPrice = Math.max(...priceValues);
 
     success(res, {
-      averagePrice: Number(averagePrice.toFixed(2)),
-      minPrice: Number(minPrice.toFixed(2)),
-      maxPrice: Number(maxPrice.toFixed(2)),
+      averagePrice: roundMoney(averagePrice),
+      minPrice: roundMoney(minPrice),
+      maxPrice: roundMoney(maxPrice),
       count: priceValues.length,
       history: prices.map((p) => ({
         contractNo: p.contractNo,
-        price: Number(p.price.toFixed(2)),
+        price: roundMoney(p.price),
         date: p.date,
       })),
+      bySupplier: summarizePricesBySupplier(prices),
     });
   } catch (error) {
     next(error);
   }
 };
+
+/** 按供应商汇总价格（最近价、最低、均价、次数、最近日期）；已停用供应商不参与；最近价最低者在前 */
+function summarizePricesBySupplier(prices) {
+  const groups = new Map();
+  for (const p of prices) {
+    if (!p.supplier || p.supplier.isActive === false) continue;
+    if (!groups.has(p.supplier.id)) groups.set(p.supplier.id, []);
+    groups.get(p.supplier.id).push(p);
+  }
+  return [...groups.values()]
+    .map((list) => {
+      const sorted = [...list].sort((a, b) => new Date(b.date) - new Date(a.date));
+      const last = sorted[0];
+      const values = list.map((p) => p.price);
+      return {
+        supplierId: last.supplier.id,
+        supplierName: last.supplier.shortName || last.supplier.name,
+        hasQualityIssue: last.supplier.hasQualityIssue,
+        lastPrice: roundMoney(last.price),
+        lastDate: last.date,
+        lastContractNo: last.contractNo,
+        lastTaxRate: last.taxRate,
+        minPrice: roundMoney(Math.min(...values)),
+        averagePrice: roundMoney(values.reduce((a, b) => a + b, 0) / values.length),
+        count: values.length,
+      };
+    })
+    .sort((a, b) => a.lastPrice - b.lastPrice);
+}
 
 /**
  * 职责：根据商品ID列表获取曾供应过这些商品的供应商ID

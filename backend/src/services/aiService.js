@@ -8,8 +8,10 @@
 
 const config = require('../config');
 const prisma = require('../utils/prisma');
+const { currentRates, priceFor } = require('./exportPricing');
 const { buildChatSession } = require('./ai/chatOrchestrator');
 const { collectStreamedChat } = require('./ai/streamHelpers');
+const { wrapWithFallback, createBreaker } = require('./ai/fallbackClient');
 
 const OpenAI = require('openai');
 const { wrapOpenAIClient } = require('./ai/openaiProvider');
@@ -155,27 +157,65 @@ const getAIRequestOptions = (timeoutMs = kimiRequestTimeoutMs) => ({
   signal: createTimeoutSignal(timeoutMs),
 });
 
-// 初始化OpenAI客户端（用于流式调用）
-const getOpenAIClient = async () => {
+const resolveDeepSeekKey = async (envKey) => {
+  const stored = await prisma.systemConfig.findUnique({ where: { key: 'deepseekApiKey' }, select: { value: true } });
+  return (stored?.value && decryptApiKeyFromStorage(stored.value)) || envKey;
+};
+
+const buildSdkClient = (apiKey, baseUrl) => new OpenAI({
+  apiKey,
+  baseURL: baseUrl,
+  timeout: kimiRequestTimeoutMs,
+  maxRetries: 0,
+  logLevel: 'off',
+});
+
+// AI_FALLBACK_PROVIDER 启用且主供应商不是 DeepSeek 时才回退；熔断状态按进程保存，阈值/冷却变化时重建。
+const isFallbackEnabled = () => Boolean(config.aiFallback?.enabled) && !isDeepSeek();
+let fallbackBreaker = null;
+let fallbackBreakerKey = '';
+const getFallbackBreaker = () => {
+  const { breakerThreshold: threshold, breakerCooldownMs: cooldownMs } = config.aiFallback;
+  const key = `${threshold}:${cooldownMs}`;
+  if (!fallbackBreaker || fallbackBreakerKey !== key) {
+    fallbackBreaker = createBreaker({ threshold, cooldownMs });
+    fallbackBreakerKey = key;
+  }
+  return fallbackBreaker;
+};
+
+let fallbackKeyWarned = false;
+const getFallbackClient = async () => {
+  const fallback = config.aiFallback;
+  const apiKey = await resolveDeepSeekKey(fallback.apiKey);
+  if (!apiKey) {
+    if (!fallbackKeyWarned) { fallbackKeyWarned = true; console.warn('[ai-fallback] 未找到 DeepSeek 密钥，回退不可用'); }
+    return null;
+  }
+  return buildSdkClient(apiKey, fallback.baseUrl);
+};
+
+// 初始化OpenAI客户端（用于流式调用）；所有调用方（聊天、解析、HS、Agent）都经此处，回退只在这一处接入。
+const getOpenAIClient = async ({ fallback = true } = {}) => {
   if (shouldForceLocalAI) return null;
   const active = getActiveAIConfig();
-  let apiKey = active.apiKey;
-  if (isDeepSeek()) {
-    const stored = await prisma.systemConfig.findUnique({ where: { key: 'deepseekApiKey' }, select: { value: true } });
-    apiKey = (stored?.value && decryptApiKeyFromStorage(stored.value)) || apiKey;
-  }
+  const apiKey = isDeepSeek() ? await resolveDeepSeekKey(active.apiKey) : active.apiKey;
   if (!apiKey) return null;
-  const client = new OpenAI({
-    apiKey,
-    baseURL: active.baseUrl,
-    timeout: kimiRequestTimeoutMs,
-    maxRetries: 0,
-    logLevel: 'off',
-  });
+  const client = buildSdkClient(apiKey, active.baseUrl);
   // SDK 自身重试保持关闭；OpenAI 仅在共用 deadline 内对创建请求做 429/5xx 有限重试（流开始后不重放）。
-  return isOpenAI()
+  const primary = isOpenAI()
     ? wrapOpenAIClient(client, { maxRetries: active.maxRetries, maxOutputTokens: active.maxOutputTokens })
     : client;
+  // 问候等极短 deadline 的调用不回退（否则 300ms 超时会触发一次被丢弃的付费调用）
+  return fallback && isFallbackEnabled()
+    ? wrapWithFallback({
+      primary,
+      getFallback: getFallbackClient,
+      breaker: getFallbackBreaker(),
+      getRequestOptions: (timeoutMs) => getAIRequestOptions(timeoutMs),
+      deadlineMs: kimiRequestTimeoutMs,
+    })
+    : primary;
 };
 
 const persistChatMessage = ({ userId, sessionId, role, content, imageUrl = null, promptTokens = 0, outputTokens = 0, modelUsed = null }) => {
@@ -262,6 +302,7 @@ const runThinkingChat = async ({ message, model, messages, onChunk, onThinking }
     return {
       response: streamResult.fullContent,
       tokenUsage,
+      model: streamResult.servedBy?.model,
     };
   } catch (error) {
     console.error('流式调用失败:', { name: error.name, status: error.status || null });
@@ -286,6 +327,7 @@ const runStandardChat = async ({ messages, model }) => {
         promptTokens: safeToNumber(result.tokenUsage.promptTokens),
         outputTokens: safeToNumber(result.tokenUsage.outputTokens),
       },
+      model: result.model,
     };
   } catch (error) {
     const fallback = extractErrorMessage(error);
@@ -427,7 +469,7 @@ const runChatSession = async ({
 
   await persistUserMessage({ userId, sessionId, message, imageUrl });
 
-  const { response: aiResponse, tokenUsage } = await runChatModel({
+  const { response: aiResponse, tokenUsage, model: servedModel } = await runChatModel({
     message,
     model,
     useThinking,
@@ -435,8 +477,10 @@ const runChatSession = async ({
     onChunk,
     onThinking,
   });
+  // 实际作答的模型（回退成功时为 DeepSeek）用于用量、历史与 done.model；主调用成功时与原行为相同。
+  const answeredModel = servedModel || model;
 
-  const tokenRecord = buildTokenRecordArgs(userId, sessionId, model, tokenUsage, useThinking);
+  const tokenRecord = buildTokenRecordArgs(userId, sessionId, answeredModel, tokenUsage, useThinking);
   if (tokenRecord) {
     await recordTokenUsage(tokenRecord.userId, tokenRecord.sessionId, tokenRecord.model, tokenRecord.tokenUsage, tokenRecord.requestType);
   }
@@ -448,12 +492,12 @@ const runChatSession = async ({
     content: aiResponse,
     promptTokens: tokenUsage.promptTokens,
     outputTokens: tokenUsage.outputTokens,
-    modelUsed: model,
+    modelUsed: answeredModel,
   });
 
   return {
     response: aiResponse,
-    model,
+    model: answeredModel,
     tokenUsage,
   };
 };
@@ -633,7 +677,7 @@ const callKimiAPI = async (messages, model = MODELS.default) => {
     
     return {
       content: fullContent || '抱歉，我暂时无法回答这个问题。',
-      model,
+      model: streamResult.servedBy?.model || model,
       tokenUsage,
     };
   } catch (error) {
@@ -717,26 +761,20 @@ const generateLocalResponse = async (message) => {
     return '未找到相关商品信息。请确认商品名称后重试。';
   }
   
-  // 汇率查询
+  // 汇率查询：只读唯一报价配置
   if (lowerMessage.includes('汇率')) {
-    const exchangeConfig = await prisma.systemConfig.findUnique({
-      where: { key: 'exchangeRate' },
-    });
-    if (exchangeConfig) {
-      const rate = JSON.parse(exchangeConfig.value);
-      return `当前系统汇率为${rate.rate}，缓冲值${rate.buffer || 0.2}，实际计算汇率为${rate.rate - (rate.buffer || 0.2)}。`;
-    }
-    return '当前系统汇率为6.8，缓冲值0.2，实际计算汇率为6.6。';
+    const rates = currentRates();
+    return `当前现汇为${rates.spotRate}，调整${rates.adjustment}，实际报价汇率为${rates.effectiveRate}。`;
   }
   
-  // 价格计算
+  // 价格计算：唯一报价规则（加价、现汇调整、单价取整规则见 exportPricing.roundUnitPrice）
   if (lowerMessage.includes('价格') || lowerMessage.includes('售价')) {
     const numbers = message.match(/\d+(\.\d+)?/g);
     if (numbers && numbers.length > 0) {
       const cost = parseFloat(numbers[0]);
-      const rate = 6.6;
-      const sellingPrice = (cost / rate * 1.3).toFixed(2);
-      return `成本${cost}元，按汇率6.6、利润率30%计算，推荐售价为 $${sellingPrice} (约$${Math.round(parseFloat(sellingPrice))})`;
+      const priced = priceFor({ costCny: cost });
+      if (priced.status !== 'OK') return '请提供大于0的单位采购成本（人民币），我来帮您按报价规则计算售价。';
+      return `成本${cost}元，按报价规则（加价${Math.round(priced.markup * 100)}%、报价汇率${priced.effectiveRate}，单价向上取整）计算，推荐售价为 $${priced.unitPriceUsd}`;
     }
     return '请告诉我成本价，我来帮您计算推荐售价。';
   }
@@ -834,7 +872,7 @@ const parseInput = async (content, type, imageUrl = null, userId = null) => {
       await recordTokenUsage(
         userId,
         null,
-        model,
+        result.model || model,
         result.tokenUsage,
         'parse',
         result.content,
@@ -997,7 +1035,7 @@ const MAYDAY_SONGS = [
  */
 const generateGreeting = async () => {
   if (usesUpstreamUsage()) return getLocalGreeting();
-  const client = await getOpenAIClient();
+  const client = await getOpenAIClient({ fallback: false });
   if (!client) {
     return getLocalGreeting();
   }

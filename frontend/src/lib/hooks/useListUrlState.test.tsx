@@ -14,8 +14,8 @@ describe("list URL state", () => {
       const fields = listUrlFields[name];
       const path =
         name === "customs"
-          ? "/dashboard/tax-refunds?view=customs"
-          : "/dashboard/products?tab=inventory";
+          ? "/dashboard/customs?view=customs"
+          : "/dashboard/inventory?x=1";
       window.history.replaceState({}, "", path + "&source=qa#rows");
       let hook = renderHook(() => useListUrlState(fields));
       act(() => hook.result.current[1]({ keyword: "瓷砖 & A", pageSize: 50 }));
@@ -46,30 +46,29 @@ describe("list URL state", () => {
     },
   );
 
-  it("rejects invalid query values and retains the product tab after refresh", () => {
+  it("rejects invalid query values and ignores a stale tab=inventory bookmark", () => {
     window.history.replaceState(
       {},
       "",
       "/dashboard/products?tab=inventory&page=-1&pageSize=999&status=bad",
     );
-    const tab = renderHook(() => useListUrlState(listUrlFields.productTabs));
     const list = renderHook(() => useListUrlState(listUrlFields.customs));
-    expect(tab.result.current[0].tab).toBe("inventory");
     expect(list.result.current[0]).toMatchObject({
       page: 1,
       pageSize: 20,
       status: "ALL",
     });
-    act(() => tab.result.current[1]({ tab: "products" }));
-    expect(new URLSearchParams(window.location.search).has("tab")).toBe(false);
+    expect(new URLSearchParams(window.location.search).get("tab")).toBe(
+      "inventory",
+    );
   });
 
   it("checks the current tab before publishing a stale event", () => {
-    window.history.replaceState({}, "", "/dashboard/tax-refunds?view=customs");
+    window.history.replaceState({}, "", "/dashboard/customs?view=customs");
     const { result } = renderHook(() =>
       useListUrlState(listUrlFields.customs, ["view", "customs"]),
     );
-    window.history.replaceState({}, "", "/dashboard/tax-refunds?view=refunds");
+    window.history.replaceState({}, "", "/dashboard/customs?view=refunds");
     act(() => result.current[1]({ keyword: "late", page: 2 }));
     expect(window.location.search).toBe("?view=refunds");
   });

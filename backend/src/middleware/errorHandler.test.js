@@ -96,6 +96,17 @@ test('errorHandler: 英文技术错误转为通用中文提示', () => {
   console.error = originalConsole;
 });
 
+test('errorHandler: Prisma 交互事务超时 P2028 返回 503 提示重试，而非通用 500', () => {
+  const originalConsole = console.error;
+  console.error = () => {};
+  const error = Object.assign(new Error('Transaction already closed: expired transaction'), { code: 'P2028' });
+  const res = createMockResponse();
+  errorHandler(error, {}, res, () => {});
+  console.error = originalConsole;
+  assert.equal(res.statusCode, 503);
+  assert.match(res.payload.message, /系统繁忙/);
+});
+
 test('errorHandler: 已知错误族映射为具体中文提示', () => {
   const originalConsole = console.error;
   console.error = () => {};

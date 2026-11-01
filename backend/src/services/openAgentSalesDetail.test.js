@@ -11,17 +11,18 @@ const vm = require('node:vm');
 const { createRequire } = require('node:module');
 
 function salesDetailTool(contract) {
-  const filename = require.resolve('./openAgentService');
+  // Evaluate the tool file with a fake prisma injected; the tool specs live in agent/tools/readTools.js.
+  const filename = require.resolve('./agent/tools/readTools');
   const localRequire = createRequire(filename);
   const module = { exports: {} };
-  vm.runInNewContext(fs.readFileSync(filename, 'utf8') + '\nmodule.exports.readToolsForTest = READ_TOOL_SPECS;', {
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
     module, exports: module.exports, __dirname: path.dirname(filename), __filename: filename, process, console,
-    setInterval: () => ({ unref() {} }),
-    require: (name) => name === '../utils/prisma'
+    require: (name) => name === '../../../utils/prisma'
       ? { salesContract: { findFirst: async () => contract } }
       : localRequire(name),
   });
-  return module.exports.readToolsForTest.find((tool) => tool.name === 'GetSalesContractDetail');
+  const specs = module.exports({ toJson: (value) => JSON.stringify(value, null, 2) });
+  return specs.find((tool) => tool.name === 'GetSalesContractDetail');
 }
 
 test('AI出口合同详情根据装箱行计算第三方来源，去重并保留未命名来源', async () => {

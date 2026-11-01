@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, MoreHorizontal, Settings, Ship } from "lucide-react";
+import { Bot, LogOut, MoreHorizontal, Settings, Ship } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,9 +25,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useAuthStore } from "@/store/auth.store";
+import { useAiPanelStore } from "@/store/ai-panel.store";
 import { Role } from "@/types";
 import {
-  getModuleTargetHref,
   getPrimaryMobileModuleNavItems,
   getSecondaryMobileModuleNavItems,
   isModuleRouteActive,
@@ -85,10 +85,10 @@ function TabButton({
 /**
  * 职责：渲染移动端底部固定 TabBar，提供核心模块快速跳转和"更多"二级菜单
  * 思路：
- *   1. 前 4 个 Tab 直接映射到核心模块（经营中台、采购、出口、财务）
- *   2. 第 5 个 Tab"更多"打开底部 Sheet，包含 AI 助手、系统管理、用户信息与退出
+ *   1. 前 4 个 Tab 直接映射到核心模块（首页、订单、采购、库存）
+ *   2. 第 5 个 Tab"更多"打开底部 Sheet，包含其余菜单、AI 助手、用户信息与退出
  *   3. 活动状态：使用 isModuleRouteActive 精确判断当前模块
- *   4. 点击模块时保留 tab 记忆跳转（getModuleTargetHref）
+ *   4. 点击模块直接跳转其 defaultHref
  *   5. 底部使用 pb-[env(safe-area-inset-bottom)] 适配 iPhone Home Indicator
  */
 export function MobileTabBar({
@@ -116,7 +116,7 @@ export function MobileTabBar({
   );
 
   const handleModuleNavigate = (item: ModuleNavItem) => {
-    router.push(getModuleTargetHref(item));
+    router.push(item.defaultHref);
   };
 
   const handleLogout = async () => {
@@ -151,7 +151,7 @@ export function MobileTabBar({
           return (
             <TabButton
               key={item.key}
-              label={item.label}
+              label={item.mobileLabel ?? item.label}
               icon={item.icon}
               active={active}
               onClick={() => handleModuleNavigate(item)}
@@ -216,6 +216,22 @@ export function MobileTabBar({
                 );
               })}
             </nav>
+          )}
+
+          {/* AI 助手：不设菜单项，从此处进入（BOSS 无权限） */}
+          {user?.role !== Role.BOSS && (
+            <div className="px-4 pb-1">
+              <button
+                onClick={() => {
+                  setMoreOpen(false);
+                  useAiPanelStore.getState().setOpen(true);
+                }}
+                className="flex min-h-[52px] w-full touch-manipulation items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                <Bot className="h-5 w-5 shrink-0" />
+                <span>AI 助手</span>
+              </button>
+            </div>
           )}
 
           {/* 用户信息 + 退出 */}

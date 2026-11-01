@@ -119,7 +119,7 @@ for (const width of [390, 1440]) {
           : "image/png",
       });
     });
-    await signInAsAdmin(page, "/dashboard/purchase/pc-001");
+    await signInAsAdmin(page, "/dashboard/purchases/pc-001");
     await expect(
       page.getByRole("button", { name: "预览合成附件.png", exact: true }),
     ).toBeVisible();
@@ -215,7 +215,7 @@ for (const width of [390, 1440]) {
     await dialog.getByRole("button", { name: "关闭", exact: true }).click();
     await page.goto("/dashboard/suppliers");
     await page.goBack();
-    await expect(page).toHaveURL(/\/dashboard\/purchase\/pc-001$/);
+    await expect(page).toHaveURL(/\/dashboard\/purchases\/pc-001$/);
     await expect(dialog).not.toBeVisible();
     expect(reads.length).toBeGreaterThanOrEqual(7);
     expect(errors).toEqual([]);

@@ -96,7 +96,7 @@ router.put('/:id', withIdValidation, accessAuth({ roles: ['ADMIN', 'PURCHASE', '
 ));
 
 // DELETE /api/v1/purchases/:id - 删除采购合同
-router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE'), withAuditLog(
   { entity: 'PurchaseContract', action: 'DELETE', model: 'purchaseContract' },
   purchaseController.remove
 ));

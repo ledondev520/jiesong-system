@@ -238,7 +238,7 @@ test('BOSS以数据库角色判定：拒绝业务/AI/MCP写及生成文件GET，
   try {
     for (const [method, path, allowed] of [
       ['GET', '/api/v1/reports/business-overview', true], ['GET', '/api/v1/finance/stats', true],
-      ['GET', '/api/v1/sales/record/finance-summary', true], ['GET', '/api/v1/purchases/record/receipts', true],
+      ['GET', '/api/v1/sales/record/finance-summary', true], ['GET', '/api/v1/sales/record/loading-plan?containerType=40HQ', true], ['GET', '/api/v1/purchases/record/receipts', true],
       ['GET', '/api/v1/purchases/record/receipts/batch/inspections', true],
       ['GET', '/api/v1/containers/record/items', true], ['GET', '/api/v1/containers/record/items/summary', true],
       ['GET', '/api/v1/containers/record/products', true], ['GET', '/api/v1/containers/record/visualization', true],

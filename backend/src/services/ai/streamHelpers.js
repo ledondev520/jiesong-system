@@ -68,7 +68,8 @@ const collectStreamedChat = async ({
       }
     }
     // SDK 会吞掉 AbortError，不能把 deadline 中断的半截结果当作完成。
-    requestOptions?.signal?.throwIfAborted();
+    // 回退成功的流带有自己的全新 deadline
+    (stream.deadlineSignal || requestOptions?.signal)?.throwIfAborted();
   } catch (error) {
     stream.controller?.abort();
     throw error;
@@ -78,6 +79,7 @@ const collectStreamedChat = async ({
     fullContent,
     thinkingContent,
     tokenUsage,
+    servedBy: stream.servedBy,
   };
 };
 

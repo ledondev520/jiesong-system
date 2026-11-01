@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 const { ensureBootstrapAdmin } = require('./bootstrapAdmin');
 
 test('secure admin ignores unused invalid bootstrap settings; password writes still validate', async () => {

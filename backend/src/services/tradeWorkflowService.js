@@ -5,8 +5,9 @@
  */
 
 const prisma = require('../utils/prisma');
+const { roundMoney } = require('../utils/money');
 const { createError } = require('../middleware/errorHandler');
-const { evaluateShipmentReadiness } = require('./shipmentReadinessService');
+const { evaluateShipmentReadiness, evaluateShipmentReadinessAsync } = require('./shipmentReadinessService');
 const { normalizePurchaseStatus, PURCHASE_STATUS } = require('./purchaseStateMachine');
 const { normalizeSalesStatus, SALES_STATUS } = require('./salesStateMachine');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
@@ -34,7 +35,6 @@ const SALES_RANK = Object.freeze({
 });
 
 const unique = (values) => Array.from(new Set(values.filter(Boolean)));
-const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 const hasInvoiceNumbers = (value) => {
   try {
     return normalizeInvoiceNumbers(value).length > 0;
@@ -66,7 +66,31 @@ const hasSignedContractArchive = (purchase) => (purchase.files || []).some((file
   return isLegacyUnclassified && /\.(pdf|docx?)$/i.test(file.fileName || '');
 });
 
-const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
+const LOADING_ACTIONS = {
+  'missing-packing-items': '补充箱规数据',
+  'missing-box-count': '补充箱规数据',
+  'missing-dimensions': '补充箱规数据',
+  'over-weight': '调整装箱明细',
+  'over-volume': '调整装箱明细',
+};
+const blockersWithPrefix = (check, prefix) => check.blockers.filter((item) => item.code.startsWith(prefix));
+
+// utilisationOnly：非 recent 范围对已发运历史合同只看汇总利用率，不逐柜排箱。
+// readiness：调用方已在 worker 中算好的 evaluateShipmentReadiness 结果；缺省时同步计算（仅小数据/测试）。
+const isShippedContract = (salesContract) => (
+  (SALES_RANK[normalizeSalesStatus(salesContract.status)] ?? 0) >= SALES_RANK[SALES_STATUS.SHIPPED]
+);
+const PLAN_UNAVAILABLE = '装柜计划暂不可用，请稍后刷新';
+// 仅汇总利用率（不排柜）+ 强制 blocked，避免空装柜计划被误判为可发运。
+const planUnavailableReadiness = (salesContract) => {
+  const base = evaluateShipmentReadiness(salesContract, { utilisationOnly: true });
+  const check = {
+    ...base.check, ready: false, status: 'blocked', headline: PLAN_UNAVAILABLE,
+    blockers: [{ code: 'plan-unavailable', message: PLAN_UNAVAILABLE }, ...base.check.blockers],
+  };
+  return { ...base, ready: false, check, blockers: check.blockers.map((item) => item.code), planUnavailable: true };
+};
+const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisationOnly = false, readiness: given } = {}) => {
   const packingItems = salesContract.packingItems || [];
   const purchaseContractNos = unique(packingItems.map((item) => item.purchaseContractNo));
   const linkedPurchases = purchaseContractNos
@@ -105,7 +129,8 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   const salesStatus = normalizeSalesStatus(salesContract.status);
   const salesRank = SALES_RANK[salesStatus] ?? 0;
   const shipped = salesRank >= SALES_RANK[SALES_STATUS.SHIPPED];
-  const readiness = evaluateShipmentReadiness(salesContract);
+  const readiness = given || evaluateShipmentReadiness(salesContract, { utilisationOnly: utilisationOnly && shipped });
+  const { check } = readiness;
   const packingListChecks = [...(salesContract.packingListChecks || [])].sort((left, right) => (
     new Date(right.checkedAt || right.createdAt || 0).getTime()
     - new Date(left.checkedAt || left.createdAt || 0).getTime()
@@ -152,12 +177,12 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
       : !allPurchasesSigned
         ? {
             key: 'procurement', label: '采购签约', status: 'current', reason: '仍有购销合同待签约',
-            action: { label: '完成购销合同签约', href: `/dashboard/purchase/${firstPurchase?.id}` },
+            action: { label: '完成购销合同签约', href: `/dashboard/purchases/${firstPurchase?.id}` },
           }
         : purchaseMissingSignedArchive
           ? {
               key: 'procurement', label: '采购签约', status: 'current', reason: '已签约，仍有供应商盖章件未归档',
-              action: { label: '上传供应商盖章件', href: `/dashboard/purchase/${purchaseMissingSignedArchive.id}` },
+              action: { label: '上传供应商盖章件', href: `/dashboard/purchases/${purchaseMissingSignedArchive.id}` },
             }
           : {
               key: 'procurement', label: '采购签约', status: 'completed',
@@ -169,7 +194,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
     : paymentUnverifiedPurchase
       ? {
           key: 'payment', label: '采购付款', status: 'current', reason: '历史采购付款待核验，默认已付零值不代表尚未付款',
-          action: { label: '核验采购付款', href: `/dashboard/purchase/${paymentUnverifiedPurchase.id}` },
+          action: { label: '核验采购付款', href: `/dashboard/purchases/${paymentUnverifiedPurchase.id}` },
         }
     : allPurchasesPaid
       ? { key: 'payment', label: '采购付款', status: 'completed', reason: `已付清 ¥${roundMoney(purchasePaid).toLocaleString('zh-CN')}` }
@@ -178,7 +203,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
           reason: `已付 ¥${roundMoney(purchasePaid).toLocaleString('zh-CN')}，待付 ¥${roundMoney(Math.max(purchaseTotal - purchasePaid, 0)).toLocaleString('zh-CN')}`,
           action: {
             label: purchasePaid > 0 ? '登记采购尾款' : '登记采购定金',
-            href: `/dashboard/purchase/${firstPurchase?.id}`,
+            href: `/dashboard/purchases/${firstPurchase?.id}`,
           },
         };
 
@@ -193,37 +218,27 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
             : '待补齐规格、箱数、毛净重和体积并确认生产完成；实物图为选填',
           action: {
             label: '补齐生产资料',
-            href: `/dashboard/purchase/${productionIncompletePurchase?.contract.id || firstPurchase?.id}`,
+            href: `/dashboard/purchases/${productionIncompletePurchase?.contract.id || firstPurchase?.id}`,
           },
         };
 
   let loadingStage;
   if (shipped) {
     loadingStage = { key: 'loading', label: '排柜与出货', status: 'completed', reason: '已确认发运' };
-  } else if (readiness.overloaded) {
+  } else if (check.status === 'blocked') {
+    const firstCode = check.blockers[0].code;
     loadingStage = {
-      key: 'loading', label: '排柜与出货', status: 'blocked',
-      reason: readiness.overloadReasons.includes('weight') ? '毛重超过 22 吨安全上限' : '体积超过 68 立方米安全上限',
-      action: { label: '调整装箱明细', href: `/dashboard/sales/${salesContract.id}` },
+      key: 'loading', label: '排柜与出货', status: 'blocked', reason: check.headline,
+      action: { label: LOADING_ACTIONS[firstCode] || '调整排柜', href: `/dashboard/sales/${salesContract.id}` },
     };
-  } else if (readiness.unplacedBoxCount > 0) {
-    loadingStage = {
-      key: 'loading', label: '排柜与出货', status: 'blocked', reason: `3D 排柜仍有 ${readiness.unplacedBoxCount} 箱无法装入`,
-      action: { label: '调整排柜', href: `/dashboard/sales/${salesContract.id}` },
-    };
-  } else if (readiness.missingBoxItemCount > 0 || packingItems.length === 0) {
-    loadingStage = {
-      key: 'loading', label: '排柜与出货', status: 'blocked', reason: '箱数或装箱明细未填写完整',
-      action: { label: '补充箱规数据', href: `/dashboard/sales/${salesContract.id}` },
-    };
-  } else if (readiness.ready) {
+  } else if (check.ready) {
     loadingStage = {
       key: 'loading', label: '排柜与出货', status: 'current', reason: '利用率达标且全部箱件可装下',
       action: { label: '确认发运', href: `/dashboard/sales/${salesContract.id}` },
     };
   } else {
     loadingStage = {
-      key: 'loading', label: '排柜与出货', status: 'current', reason: '毛重和体积均未达到 80% 出柜标准',
+      key: 'loading', label: '排柜与出货', status: 'current', reason: check.headline,
       action: { label: '继续排柜', href: `/dashboard/sales/${salesContract.id}` },
     };
   }
@@ -254,7 +269,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
       ? { key: 'invoice', label: '供应商发票', status: 'pending', reason: '发运后催供应商开票' }
       : {
           key: 'invoice', label: '供应商发票', status: 'current', reason: '仍有供应商发票号码未登记',
-          action: { label: '催票并登记号码', href: `/dashboard/purchase/${firstPurchase?.id || ''}` },
+          action: { label: '催票并登记号码', href: `/dashboard/purchases/${firstPurchase?.id || ''}` },
         };
 
   const taxStage = taxCompleted
@@ -304,8 +319,13 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map()) => {
   if (unallocated.length) issues.push(`采购明细待分配：${unallocated.join('、')}`);
   if (purchasePaid > purchaseTotal + 0.01) issues.push('采购已付金额超过合同金额');
   if (productionIncompletePurchase) issues.push('采购生产状态已完成，但装柜输入资料不完整');
-  if (readiness.overloaded) issues.push(shipped ? '历史装箱数据超出 40HQ 参数，待核对' : '货柜超过 40HQ 安全上限');
-  if (readiness.unplacedBoxCount > 0) issues.push(shipped ? '历史箱规与 3D 排柜结果不一致，待核对' : `仍有 ${readiness.unplacedBoxCount} 箱无法装入`);
+  const overBlockers = blockersWithPrefix(check, 'over-');
+  if (overBlockers.length > 0) {
+    issues.push(...(shipped ? [`历史装箱数据超出 ${check.containerType} 参数，待核对`] : overBlockers.map((item) => item.message)));
+  }
+  if (readiness.unplacedBoxCount > 0) {
+    issues.push(...(shipped ? ['历史箱规与 3D 排柜结果不一致，待核对'] : [...blockersWithPrefix(check, 'oversize'), ...blockersWithPrefix(check, 'unplaced')].map((item) => item.message)));
+  }
   if (salesContract.shippedAt && salesContract.createdAt && new Date(salesContract.shippedAt) < new Date(salesContract.createdAt)) {
     issues.push('发运时间早于系统创建时间，请确认是否为历史补录');
   }
@@ -340,7 +360,7 @@ const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
     ...(scope === 'recent' ? { take: safeLimit } : {}),
     orderBy: [{ updatedAt: 'desc' }, { contractNo: 'desc' }],
     include: {
-      packingItems: { include: { product: true } },
+      packingItems: { include: { product: { include: { category: true } } } },
       files: true,
       customsDeclarations: { select: { id: true, status: true } },
       taxRefunds: { select: { id: true, status: true } },
@@ -372,7 +392,20 @@ const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
     purchaseMap.set(contract.contractNo.replace(/^CG/, 'PO'), contract);
   });
 
-  let workflows = salesContracts.map((contract) => buildTradeWorkflow(contract, purchaseMap));
+  // 排柜在 worker 线程；逐个等待，使单次请求最多占一个 worker。单行排柜失败（503）只降级该行为「装柜计划不可用」（不可发运，绝不显示 ready），其余行照常。
+  let workflows = [];
+  for (const contract of salesContracts) {
+    const utilisationOnly = scope !== 'recent';
+    const options = { utilisationOnly: utilisationOnly && isShippedContract(contract) };
+    let readiness;
+    try {
+      readiness = await evaluateShipmentReadinessAsync(contract, options);
+    } catch (error) {
+      if (error?.statusCode !== 503) throw error;
+      readiness = planUnavailableReadiness(contract);
+    }
+    workflows.push(buildTradeWorkflow(contract, purchaseMap, { utilisationOnly, readiness }));
+  }
   if (scope === 'pending') workflows = workflows.filter((item) => item.completedStageCount < item.stageCount);
   if (scope === 'blocked') workflows = workflows.filter((item) => item.stages.some((stage) => stage.status === 'blocked'));
   if (scope === 'risk') workflows.sort((a, b) => {

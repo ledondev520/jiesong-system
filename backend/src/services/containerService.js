@@ -1,20 +1,16 @@
 /** 旧货柜接口复用出口合同状态机及出库事务；创建仅为草稿，表头不能绕过状态流转。 */
 const prisma = require('../utils/prisma');
+const { defaultSpotRate } = require('./exportPricing');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
 const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
 const { SALES_STATUS, normalizeSalesStatus } = require('./salesStateMachine');
+const { getContainerSpec } = require('./containerSpecs');
 const {
   generateNextContractNo,
   normalizeFilterStatus,
   parseNullableNumber,
 } = require('./shared/contractUtils');
-
-const DEFAULT_CONTAINER_DIMENSIONS_MM = Object.freeze({
-  length: 12032,
-  width: 2352,
-  height: 2698,
-});
 
 const DEFAULT_ITEM_DIMENSION_MM = 500;
 const ASCII_GRID_WIDTH = 48;
@@ -300,7 +296,7 @@ const create = async (data = {}) => {
     throw createError('新货柜必须为草稿，请通过状态入口登记后续流转', 400);
   }
   const contractNo = data.contractNo || (await generateNextContainerNo(data.portId));
-  const exchangeRate = parseNullableNumber(data.exchangeRate, 7.0);
+  const exchangeRate = parseNullableNumber(data.exchangeRate, defaultSpotRate());
 
   const contract = await prisma.salesContract.create({
     data: {
@@ -430,7 +426,7 @@ const getVisualization = async (id) => {
     throw createError('货柜不存在', 404);
   }
 
-  const dimensionsMm = { ...DEFAULT_CONTAINER_DIMENSIONS_MM };
+  const dimensionsMm = { ...getContainerSpec().innerMm };
   const capacityCbm = roundNumber(
     (dimensionsMm.length * dimensionsMm.width * dimensionsMm.height) / 1_000_000_000,
     3

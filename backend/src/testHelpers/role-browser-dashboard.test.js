@@ -108,7 +108,7 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
   await t.test('KPI and funds use draft-only, all inventory records and formal/derived ownership sources', async () => {
     // Independent SQL source literals establish the worked example, never an API echo.
     assert.deepEqual(before.purchase_contracts.map(row => [row.status, row.totalAmount, row.paidAmount]).sort(),
-      [['DRAFT', 1130, 130], ['DRAFT', 200, 50], ['PENDING', 300, 100], ['CANCELLED', 900, 100], ['COMPLETED', 100, 100]].sort());
+      [['DRAFT', 1130, 130], ['DRAFT', 200, 50], ['SIGNED', 300, 100], ['CANCELLED', 900, 100], ['COMPLETED', 100, 100]].sort());
     assert.deepEqual(before.inventories.map(row => [row.status, row.quantity]).sort(),
       [['IN_STOCK', 8], ['OUT_STOCK', 4], ['PRODUCING', 20]].sort());
     assert.equal(before.sales_contracts.find(row => row.id === 'dashboard-old-risk').amountSource, 'DERIVED');
@@ -121,8 +121,8 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       assert.equal(data.inventory.totalQuantity, 32);
       // Derived: owned 700, proportional received 175 => 525. Formal: 400-100 => 300.
       assert.equal(data.contracts.sales.receivable, 825);
-      // Non-cancelled purchases: 1000 + 150 + 200 CNY; pending is not a draft KPI.
-      assert.equal(data.contracts.purchase.unpaidAmount, 1350);
+      // Payables count only in-effect contracts (decision 12): drafts and cancelled excluded; SIGNED 300-100 = 200, COMPLETED 0.
+      assert.equal(data.contracts.purchase.unpaidAmount, 200);
       const periods = await read('/finance/statements', role);
       // The API lists periods ascending; the mounted workbench must choose max year/month, not its first row.
       assert.deepEqual(periods.map(row => [row.year, row.month, row.periodLabel]),
@@ -141,8 +141,9 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
     assert.deepEqual(risk[0].stages.map(row => row.key),
       ['procurement', 'payment', 'production', 'loading', 'documents', 'invoice', 'tax-refund', 'finance']);
     assert.equal(risk[0].stages[0].reason, '找不到购销合同 CG-SYNTHETIC-MISSING');
-    assert.equal(risk[0].stages[3].reason, '毛重超过 22 吨安全上限');
-    assert.deepEqual(risk[0].issues, ['货柜超过 40HQ 安全上限']);
+    // Totals come from the two packing lines (25000 + 10 kg), not the editable header.
+    assert.match(risk[0].stages[3].reason, /^超重：毛重 25010 kg，超过40HQ安全上限 22000 kg$/);
+    assert.deepEqual(risk[0].issues, [risk[0].stages[3].reason]);
     assert.equal(risk[0].nextAction.href, '/dashboard/sales/dashboard-old-risk');
     const pending = await read('/dashboard/trade-workflows?limit=100&scope=pending');
     assert.equal(pending.length, 10);
@@ -188,7 +189,7 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       assert.equal(current.role, role);
       const recent = await read('/dashboard/trade-workflows?limit=6&scope=recent', role);
       const action = recent[0].nextAction;
-      assert.equal(action.href, `/dashboard/purchase/${f.purchaseId}`);
+      assert.equal(action.href, `/dashboard/purchases/${f.purchaseId}`);
       const purchase = await read(`/purchases/${f.purchaseId}`, role);
       assert.equal(purchase.id, f.purchaseId);
       assert.equal(purchase.contractNo, f.dashboardSources.purchaseNo);

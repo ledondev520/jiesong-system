@@ -75,6 +75,7 @@ const searchProducts = async (query, limit) => {
 const searchSuppliers = async (query, limit) => {
   const items = await prisma.supplier.findMany({
     where: {
+      isActive: true,
       OR: [
         { name: { contains: query } },
         { shortName: { contains: query } },

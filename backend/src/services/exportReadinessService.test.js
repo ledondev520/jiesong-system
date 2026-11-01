@@ -90,8 +90,8 @@ test('缺 HS 或出口售价时禁止生成完整单证，但给出基于采购�
 
   assert.equal(result.customsReady, false);
   assert.equal(result.taxRefundReady, false);
-  assert.equal(result.lines[0].recommendedUnitPriceUsd, 21);
-  assert.equal(result.lines[0].pricingFormula, 'purchaseCostCny × 1.3 ÷ effectiveExchangeRate ÷ quantity（整数单价或总额尾数 0/5 凑整）');
+  assert.equal(result.lines[0].recommendedUnitPriceUsd, 21); // 向上取整到整美元（负责人 2026-11-01 规则，不再取 5 的倍数）
+  assert.equal(result.lines[0].pricingFormula, '单位采购成本¥ × 1.3 ÷ 报价汇率（现汇-0.2），单价向上取整到整美元（老商品默认取上次确认价）');
   assert.deepEqual(
     result.lines[0].issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code),
     ['MISSING_HS_CODE', 'MISSING_EXPORT_PRICE', 'MISSING_DECLARATION_ELEMENTS', 'MISSING_REFUND_RATE'],
@@ -145,4 +145,15 @@ test('本票装箱确认的 HS 和申报要素优先于历史与共享商品档�
   assert.equal(result.lines[0].hsSource, 'packing_confirmation');
   assert.equal(result.lines[0].declarationElements, '0|0|铝合金|型材|挤压喷涂|||无品牌');
   assert.equal(result.lines[0].origin, '广东省佛山市');
+});
+
+test('评审 R1-1：报价转换的订单 exchangeRate 已是计价汇率，建议售价只做一次汇率调整', () => {
+  const config = { exchangeRate: 6.72, exchangeAdjustment: -0.2, defaultMarkup: 0.3, categoryMarkups: [] };
+  const priced = (contract) => evaluateExportReadiness(makeContract({ ...contract, packingItems: [{ ...makeContract().packingItems[0], purchaseCost: 10000, quantity: 10 }] }), {}, config);
+  const manual = priced({ exchangeRate: 6.72 });
+  const converted = priced({ exchangeRate: 6.52, quoteId: 'quote-1' });
+  assert.equal(manual.lines[0].recommendedUnitPriceUsd, 200); // 1000 × 1.3 ÷ 6.52 = 199.39 → 200
+  assert.equal(converted.lines[0].recommendedUnitPriceUsd, 200);
+  // Without the quote link the same 6.52 would be treated as spot (6.32) — the double adjustment the review found.
+  assert.equal(priced({ exchangeRate: 6.52 }).lines[0].recommendedUnitPriceUsd, 206); // 205.70 → 206
 });

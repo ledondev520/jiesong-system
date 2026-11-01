@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SemanticBadge } from "@/components/ui/semantic-badge";
+import { SemanticBadge } from "@/components/ui/status-badge";
 import {
   Loader2,
   Save,
