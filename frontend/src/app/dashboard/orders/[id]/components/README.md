@@ -4,7 +4,7 @@
 
 - `OrderDetailPage.tsx`：数据加载、页头（状态、唯一下一步按钮、「单证 ▾」）与七个页签；阶段保存保留 Axios 错误 DTO 中的原始原因，发运成功后打开退税准备；`?tab=` 记住页签，旧 `/dashboard/sales/[id]?tab=` 键（packing/3d/info/customs/finance）映射到新页签
 - `orderDetailModel.ts` / `.test.ts`：纯计算——页签键、按状态的下一步（CONFIRMED：ADMIN/PURCHASE 且有未生成明细 → 生成采购单，否则 → 选择采购装柜）、出柜判定文案（装箱明细合计，与后端门槛同源）、按门店履约汇总、待生成采购单的明细
-- `OrderOverviewTab.tsx`：金额与装柜摘要、「按门店」表（下单 / 已采购（未取消采购单）/ 已入库（验货合格）/ 已装箱）、物流时间线
+- `OrderOverviewTab.tsx`：金额与装柜摘要、「按门店」表（下单 / 已采购（未取消采购单）/ 已入库（验货合格）/ 已装箱；无下单/采购明细的历史行显示「历史数据」+装箱箱数）、物流时间线（已发运订单装箱完成不显示不可靠的 updatedAt）
 - `OrderLinesTab.tsx`：只读商品 × 门店网格 + `ContractInfoEditor`（失败保留草稿供明确重试；门店读回保留港口关联）
 - `OrderPurchasesTab.tsx`：由本订单生成的采购单（只含数量与状态，不含采购价格）
 - `OrderContainerTab.tsx`：出柜条件（双 80% + 3D 排柜）、容量卡片、装箱明细、40HQ `Container3DView`、保存为图片

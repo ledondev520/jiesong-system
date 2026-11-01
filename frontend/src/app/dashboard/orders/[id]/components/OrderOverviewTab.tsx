@@ -28,7 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { buildStoreFulfilment, type OrderReadiness } from "./orderDetailModel";
+import {
+  buildStoreFulfilment,
+  hasOrderShipped,
+  type OrderReadiness,
+} from "./orderDetailModel";
 
 const LOGISTICS_EVENTS = [
   { status: SalesStatus.DRAFT, label: "合同草稿", icon: CircleDashed },
@@ -79,7 +83,8 @@ const buildTimeline = (contract: SalesContract, readiness: OrderReadiness) => {
   }
   if (contract.packingItems && contract.packingItems.length > 0) {
     timeline.push({
-      date: contract.updatedAt,
+      // updatedAt 会被迁移/回填刷新；已发运订单没有可靠的装箱完成时间，留空
+      date: hasOrderShipped(contract.status) ? undefined : contract.updatedAt,
       label: "装箱完成",
       description: `${readiness.totals.cartons} 箱，${readiness.totals.cargoCbm.toFixed(2)} CBM`,
       completed: currentStep >= STATUS_ORDER[SalesStatus.PACKING],
@@ -203,19 +208,30 @@ export function OrderOverviewTab({
                       <TableCell className="font-medium">
                         {row.storeName}
                       </TableCell>
-                      {[
-                        row.ordered,
-                        row.purchased,
-                        row.received,
-                        row.packed,
-                      ].map((value, index) => (
+                      {row.historical ? (
                         <TableCell
-                          key={index}
-                          className="text-right tabular-nums"
+                          colSpan={3}
+                          className="text-right text-muted-foreground"
                         >
-                          {value.toLocaleString()}
+                          历史数据
                         </TableCell>
-                      ))}
+                      ) : (
+                        [row.ordered, row.purchased, row.received].map(
+                          (value, index) => (
+                            <TableCell
+                              key={index}
+                              className="text-right tabular-nums"
+                            >
+                              {value.toLocaleString()}
+                            </TableCell>
+                          ),
+                        )
+                      )}
+                      <TableCell className="text-right tabular-nums">
+                        {row.historical
+                          ? `${row.packedBoxes.toLocaleString()} 箱`
+                          : row.packed.toLocaleString()}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -223,7 +239,7 @@ export function OrderOverviewTab({
             </div>
           )}
           <p className="mt-2 text-xs text-muted-foreground">
-            已采购只计未取消的采购单；已入库为验货合格数量。
+            已采购只计未取消的采购单；已入库为验货合格数量；历史数据行无下单/采购明细，仅显示装箱箱数。
           </p>
         </CardContent>
       </Card>
@@ -280,7 +296,7 @@ export function OrderOverviewTab({
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium">{item.label}</span>
                     <span className="text-xs tabular-nums text-muted-foreground">
-                      {formatDate(item.date)}
+                      {item.date ? formatDate(item.date) : "—"}
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
