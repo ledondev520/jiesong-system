@@ -1,5 +1,5 @@
-import api, { type ApiRequestConfig } from '@/lib/axios';
-import { ApiResponse, PaginatedResponse } from '@/types';
+import api, { type ApiRequestConfig } from "@/lib/axios";
+import { ApiResponse, PaginatedResponse } from "@/types";
 
 interface SupplierLite {
   id: string;
@@ -28,8 +28,18 @@ export interface DashboardStats {
   };
 }
 
+export interface ReasonCount {
+  code: string;
+  label: string;
+  count: number;
+}
+
 export interface BusinessOverview {
-  period: { startDate: string | null; endDate: string | null; dateField: 'shippedAt' };
+  period: {
+    startDate: string | null;
+    endDate: string | null;
+    dateField: "shippedAt";
+  };
   overview: {
     totalSales: number | null;
     totalPurchases: number | null;
@@ -37,11 +47,27 @@ export interface BusinessOverview {
     profitMargin: number | null;
     marginReady: boolean;
     cashReady: boolean;
-    currency: 'CNY';
+    currency: "CNY";
     contractCount: number;
     netCashCny: number | null;
     scope: string;
-    unavailableContracts: Array<{ id: string; reasons: string[] }>;
+    unavailableContracts: Array<{
+      id: string;
+      contractNo: string;
+      reasons: string[];
+      reasonCodes: string[];
+    }>;
+    /** 按原因的笔数；一笔可同时缺多项，合计可大于不可用笔数 */
+    marginReasonSummary: ReasonCount[];
+    cashReasonSummary: ReasonCount[];
+    /** 只含已核实出货的汇总，不替代整体口径 */
+    verified: {
+      contractCount: number;
+      totalPurchases: number;
+      grossProfit: number;
+    };
+    /** 已发运状态但没有发运日期、不在任何期间内的出货 */
+    shippedWithoutDate: number;
   };
   funds: {
     totalReceivable: number;
@@ -62,37 +88,51 @@ export interface BusinessOverview {
 
 export const reportsService = {
   getSuppliers: async (params?: { pageSize?: number }) => {
-    return api.get<ApiResponse<PaginatedResponse<SupplierLite>>, ApiResponse<PaginatedResponse<SupplierLite>>>(
-      '/suppliers',
-      { params },
-    );
+    return api.get<
+      ApiResponse<PaginatedResponse<SupplierLite>>,
+      ApiResponse<PaginatedResponse<SupplierLite>>
+    >("/suppliers", { params });
   },
 
   getStores: async (params?: { pageSize?: number }) => {
-    return api.get<ApiResponse<PaginatedResponse<StoreLite>>, ApiResponse<PaginatedResponse<StoreLite>>>(
-      '/stores',
-      { params },
-    );
+    return api.get<
+      ApiResponse<PaginatedResponse<StoreLite>>,
+      ApiResponse<PaginatedResponse<StoreLite>>
+    >("/stores", { params });
   },
 
   getDashboardStats: async () => {
-    return api.get<ApiResponse<DashboardStats>, ApiResponse<DashboardStats>>('/dashboard/stats');
+    return api.get<ApiResponse<DashboardStats>, ApiResponse<DashboardStats>>(
+      "/dashboard/stats",
+    );
   },
 
   getPurchasesBySupplier: async (supplierId: string) => {
-    return api.get<ApiResponse<PurchaseSummaryResponse>, ApiResponse<PurchaseSummaryResponse>>('/purchases', {
+    return api.get<
+      ApiResponse<PurchaseSummaryResponse>,
+      ApiResponse<PurchaseSummaryResponse>
+    >("/purchases", {
       params: { supplierId, pageSize: 1 },
     });
   },
 
   getSalesByStore: async (storeId: string) => {
-    return api.get<ApiResponse<PurchaseSummaryResponse>, ApiResponse<PurchaseSummaryResponse>>('/sales', {
+    return api.get<
+      ApiResponse<PurchaseSummaryResponse>,
+      ApiResponse<PurchaseSummaryResponse>
+    >("/sales", {
       params: { storeId, pageSize: 1 },
     });
   },
 
-  getBusinessOverview: async (params?: { startDate?: string; endDate?: string }) => {
+  getBusinessOverview: async (params?: {
+    startDate?: string;
+    endDate?: string;
+  }) => {
     const config: ApiRequestConfig = { params, cache: { enabled: false } };
-    return api.get<ApiResponse<BusinessOverview>, ApiResponse<BusinessOverview>>('/reports/business-overview', config);
+    return api.get<
+      ApiResponse<BusinessOverview>,
+      ApiResponse<BusinessOverview>
+    >("/reports/business-overview", config);
   },
 };
