@@ -17,6 +17,11 @@ permissions:
   actions: read
   security-events: write
 
+# 新 push 取消同一 PR 的旧运行；push/定时事件用唯一 run_id，永不取消。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # 依赖安全扫描
   dependency-scan:
@@ -29,8 +34,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '22.23.4'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          # 不配置 npm 缓存：本 job 只跑 npm audit、不安装依赖，会抢先把近乎空的 ~/.npm 存进共享 key。
 
       - name: Run npm audit
         working-directory: ./frontend
