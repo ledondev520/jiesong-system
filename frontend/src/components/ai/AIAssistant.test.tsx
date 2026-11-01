@@ -95,6 +95,7 @@ describe("AIAssistant", () => {
       '/dashboard/x"onmouseover=1',
       "/dashboard/<script>",
       "/other/dashboard/x",
+      "/dashboard/../api/v1/auth/logout",
     ]) {
       expect(toSafeDashboardPath(bad)).toBeNull();
     }

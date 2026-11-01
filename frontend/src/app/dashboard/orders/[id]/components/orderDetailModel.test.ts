@@ -192,6 +192,20 @@ describe("buildStoreFulfilment", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ historical: true, packedBoxes: 15 });
   });
+  it("在途订单的未分配装箱行不标历史数据", () => {
+    const rows = buildStoreFulfilment(
+      order({
+        packingItems: [
+          { id: "k9", productId: "p1", quantity: 3, boxes: 2 },
+        ] as SalesContract["packingItems"],
+        purchaseContracts: [],
+      }),
+    );
+    expect(rows.find((r) => r.storeId === "")).toMatchObject({
+      packed: 3,
+      historical: false,
+    });
+  });
   it("导入自采购明细但缺 storeId 的装箱行按来源采购明细回填门店（含部分导入），真正无来源的仍未分门店", () => {
     const rows = buildStoreFulfilment(
       order({

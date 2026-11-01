@@ -114,7 +114,7 @@ export { stripPageContext };
 // 只允许站内 /dashboard/ 路径，AI 文本不能借此带出外链或 javascript: 等协议
 const SAFE_DASHBOARD_PATH = /^\/dashboard\/[\w\-/?=&%.#]*$/;
 export const toSafeDashboardPath = (value: string): string | null =>
-  SAFE_DASHBOARD_PATH.test(value) ? value : null;
+  SAFE_DASHBOARD_PATH.test(value) && !value.includes("..") ? value : null;
 
 const formatRecommendationPriority = (
   priority?: AiActionRecommendation["priority"],

@@ -21,8 +21,10 @@ const bodyText = (value, label) => {
 };
 const bodyNumber = (value, label) => {
   if (value === undefined || value === null) return value;
-  if (value === '') return null;
-  const parsed = typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+  if (typeof value === 'string' && value.trim() === '') return null;
+  // 拒绝十六进制/Infinity 等 Number() 能解析的非十进制写法
+  const decimal = typeof value !== 'string' || /^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(value.trim());
+  const parsed = decimal && (typeof value === 'number' || typeof value === 'string') ? Number(value) : NaN;
   if (!Number.isFinite(parsed)) throw createError(`${label} 必须是数字`, 400);
   return parsed;
 };
