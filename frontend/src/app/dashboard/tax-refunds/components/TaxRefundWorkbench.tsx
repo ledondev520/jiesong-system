@@ -6,6 +6,7 @@
 
 "use client";
 
+import { LoadingValue } from "@/components/ui/loading-value";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import {
   useCallback,
@@ -372,7 +373,7 @@ export function TaxRefundWorkbench() {
       )}
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>
-          共 {data?.total ?? 0} 条，第 {page} 页
+          共 <LoadingValue loading={loading}>{data?.total ?? 0}</LoadingValue> 条，第 {page} 页
         </span>
         <PageSizeSelect
           value={pageSize}

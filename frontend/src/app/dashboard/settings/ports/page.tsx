@@ -6,6 +6,7 @@
 
 "use client";
 
+import { LoadingValue } from "@/components/ui/loading-value";
 import { useCallback, useEffect, useState } from "react";
 import {
   getSystemPorts,
@@ -412,7 +413,7 @@ export default function PortsPage() {
       {!loading && !loadError ? (
         <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>
-            共 {filteredPorts.length} 条
+            共 <LoadingValue loading={loading}>{filteredPorts.length}</LoadingValue> 条
             {totalPages > 1 ? `，第 ${currentPage}/${totalPages} 页` : ""}
           </span>
           <div className="flex flex-wrap items-center gap-2">
