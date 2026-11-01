@@ -149,3 +149,7 @@ PR 格式检查使用 `fetch-depth: 0` 和事件的完整 base/head SHA，运行
 | Unit Tests (`ci.yml`) | 前端单测照常，后端仅 `check-lifecycle.cjs` | 前端 + 后端全测 |
 
 生命周期合同检查扫描前端列表页，UI 改动可能使其失败，所以门禁跳过时它仍会运行。gate 只在整个 diff 被证明为 UI-only 时为 false；push 事件、SHA 缺失、浅历史或脚本异常都视为有后端改动。标签本身不会放宽任何检查。UI-only PR 正文用 `.github/PULL_REQUEST_TEMPLATE/ui-only.md`（新建 PR 时加 `?template=ui-only.md`）；复核标记与本地 `check-review-freshness.cjs` 仍必需。
+
+## CI speed (TESTSPEED)
+- `.github/actions/npm-ci-cached` restores `node_modules` keyed on runner OS + node version + directory + lockfile hash and runs `npm ci` only on a miss; `prisma generate` still runs every job. `deploy.yml`/`deploy.sh` keep their own `npm ci` (no cache).
+- `E2E_SKIP_BUILD_TYPECHECK=1` (Next `typescript.ignoreBuildErrors`) is set only on the Playwright acceptance step; Type Safety Check and Build Test still type-check. `scripts/check-build-typecheck-flag.test.cjs` (run in Lint Check) fails if any deploy workflow/script/package script sets it.

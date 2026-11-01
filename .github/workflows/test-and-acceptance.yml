@@ -34,8 +34,9 @@ jobs:
         run: node scripts/check-ui-only.cjs backend-gate
       # 依赖始终安装：生命周期合同检查扫描前端列表页，需要后端 acorn。
       - name: Install backend dependencies
-        run: npm ci
-        working-directory: backend
+        uses: ./.github/actions/npm-ci-cached
+        with:
+          working-directory: backend
       - name: Run backend all tests (unit + db integration)
         if: steps.gate.outputs.backend_changed != 'false'
         run: |
@@ -67,14 +68,19 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
       - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
-      - name: Prepare isolated frontend API fixture dependencies
+        uses: ./.github/actions/npm-ci-cached
+        with:
+          working-directory: frontend
+      - name: Install isolated frontend API fixture dependencies
+        uses: ./.github/actions/npm-ci-cached
+        with:
+          working-directory: backend
+      # generate 每次都跑：Prisma client 不依赖缓存命中。
+      - name: Prepare isolated frontend API fixture
         working-directory: backend
         run: |
           test ! -e .env
           test ! -L .env
-          npm ci
           npm run db:generate
       # 单片覆盖率不完整，阈值只在合并后的 frontend-unit 判定（此处置 0 避免误报）。
       - name: Run frontend unit shard
@@ -113,8 +119,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
+        uses: ./.github/actions/npm-ci-cached
+        with:
+          working-directory: frontend
       - name: Download shard reports
         uses: actions/download-artifact@v7
         with:
@@ -167,12 +174,15 @@ jobs:
             frontend/package-lock.json
             backend/package-lock.json
       - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
+        uses: ./.github/actions/npm-ci-cached
+        with:
+          working-directory: frontend
       - name: Install isolated recovery backend fixture
-        run: |
-          npm ci
-          npx prisma generate
+        uses: ./.github/actions/npm-ci-cached
+        with:
+          working-directory: backend
+      - name: Generate Prisma client
+        run: npx prisma generate
         working-directory: backend
       - name: Resolve Playwright version
         id: pw
@@ -198,6 +208,8 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
           PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ strategy.job-index }}.zip
+          # 仅 E2E webServer 构建跳过 Next 的类型检查（Type Safety Check / Build Test 仍为必过）；禁止出现在部署流程，见 scripts/check-build-typecheck-flag.test.cjs。
+          E2E_SKIP_BUILD_TYPECHECK: '1'
         run: |
           node --test ../scripts/e2e-shard-files.test.cjs
           npm run test:e2e -- --reporter=list,blob $(node ../scripts/e2e-shard-files.cjs "${SHARD%/*}" "${SHARD#*/}")
