@@ -36,7 +36,10 @@ const EMPTY: CompanyForm = {
   companyBankInfo: "",
 };
 
-const IDENTITY_FIELD: Record<CompanyKey, keyof Omit<SellerIdentity, "legacyFilled" | "invoiceTitleText">> = {
+const IDENTITY_FIELD: Record<
+  CompanyKey,
+  keyof Omit<SellerIdentity, "legacyFilled" | "invoiceTitleText">
+> = {
   companyName: "name",
   companyTaxId: "taxId",
   companyAddress: "address",
@@ -145,7 +148,10 @@ export default function CompanySettingsPage() {
         showBack={false}
       />
       {legacyFilled.length > 0 ? (
-        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <p
+          role="status"
+          className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+        >
           部分内容来自旧的「我方开票抬头信息」，已带入下方表单；点击「保存」后写入公司信息，之后旧文本不再使用。
         </p>
       ) : null}
