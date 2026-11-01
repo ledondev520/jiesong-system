@@ -10,8 +10,6 @@ GitHub Actions 工作流配置，实现完整的自动化开发循环。
 |-------|------|---------|------|
 | **CI** | `ci.yml` | PR / Push | 代码质量检查 + 单元测试 |
 | **Test And Acceptance** | `test-and-acceptance.yml` | PR / Push | 后端、前端单测/coverage及hosted Playwright验收 |
-
-E2E 分片：`e2e-shard` 为 4 片（原 3 片，run 41268231634 实测 285/252/236 s，其中 `next build`+启动约 35–50 s/片）。曾评估“单独 build job + 产物下载”：额外 job 约 100 s 且在关键路径上，会使 E2E 关键路径变长，故未采用；改为第 4 片缩短测试段。必过检查名 `Frontend E2E Acceptance` 由汇总 job 提供，分片数变化不影响 ruleset 上下文。
 | **QA & Health** | `qa.yml` | Daily / Push | 自动化测试 + 健康度检查 |
 | **PR Review** | `pr-review.yml` | PR | 类型、ESLint、锁定 Prettier 的 PR 源码检查与 Actions 摘要 |
 | **Review Freshness** | `review-freshness.yml` | 指向 main 的 PR opened / synchronize / reopened（edited 仅 base 变化）；含 `review-freshness/` 的 PR 评论（issue_comment，运行 main 上的版本） | 只读检查复核标记与 base 后续改动；承载 job 为 `Review Freshness Evaluate`，必过检查 `review-freshness` 由其经 Checks API 发布：无标记（规则 a）保持 in_progress 挡住合并且不失败，有效为 success，规则 b-e 为 failure |
@@ -19,6 +17,8 @@ E2E 分片：`e2e-shard` 为 4 片（原 3 片，run 41268231634 实测 285/252/
 | **Security** | `security.yml` | PR / Weekly | 安全扫描 |
 | **Weekly Retro** | `weekly-retro.yml` | Weekly | 每周工程回顾 |
 | **Deploy** | `deploy.yml` | main Push / Tag / Manual | 部署并核对 PM2 运行目录与公网构建 |
+
+E2E 分片：`e2e-shard` 为 4 片，不再用 `--shard`（按文件数切分，实测最慢/最快 1.84×，`mobile.spec.ts` 单文件约 129 s）；改由 `scripts/e2e-shard-files.cjs` 按各 spec 秒数权重（取自 run 41269387437）贪心装箱，未登记的新 spec 取默认权重自动并入，`scripts/e2e-shard-files.test.cjs` 在每片开头校验“每个 spec 恰在一片”。每片固定开销约 105 s（安装、`next build`、启动），故按权重预测 4 片约 234/217/212/200 s（≤1.3×）；权重漂移时手工更新脚本内表。曾评估“单独 build job + 产物下载”：额外 job 约 100 s 且在关键路径上，未采用。无 `--shard` 时 blob 文件同名，故用 `PLAYWRIGHT_BLOB_OUTPUT_NAME=report-<job-index>.zip` 区分。必过检查名 `Frontend E2E Acceptance` 由汇总 job 提供，分片数变化不影响 ruleset 上下文。
 
 ## 🔄 流程图
 
