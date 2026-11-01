@@ -187,3 +187,20 @@ test('请求体校验：数组/对象/非十进制数值 400，空串为 null，
   const partial = await run('update', { customsName: 'n' });
   assert.equal(partial.args.data.grossWeight, undefined);
 });
+
+test('请求体不是普通对象（null/数组/字符串）时 create 与 update 返回 400', async () => {
+  for (const method of ['create', 'update']) {
+    for (const body of [null, [], ['x'], 'abc']) {
+      let error = null;
+      let called = false;
+      await withMockProductDelegate({
+        create: async () => { called = true; return {}; },
+        update: async () => { called = true; return {}; },
+      }, async () => {
+        await productController[method]({ params: { id: 'p' }, body }, createMockRes(), (e) => { error = e; });
+      });
+      assert.equal(error?.statusCode, 400);
+      assert.equal(called, false);
+    }
+  }
+});

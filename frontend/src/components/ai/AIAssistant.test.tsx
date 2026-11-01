@@ -96,6 +96,8 @@ describe("AIAssistant", () => {
       "/dashboard/<script>",
       "/other/dashboard/x",
       "/dashboard/../api/v1/auth/logout",
+      "/dashboard/%2e%2e/api/v1/auth/logout",
+      "/dashboard/.%2E/api/v1/auth/logout",
     ]) {
       expect(toSafeDashboardPath(bad)).toBeNull();
     }
