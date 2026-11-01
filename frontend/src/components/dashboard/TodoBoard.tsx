@@ -170,8 +170,12 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                   {list.historical && list.historical.count > 0 && (
                     <p className="text-xs text-muted-foreground">
                       另有 {list.historical.count} 条{" "}
-                      {list.historical.before.slice(0, 4)} 年前的历史记录未计入，
-                      <Link href={meta.all} className="text-primary hover:underline">
+                      {list.historical.before.slice(0, 4)}{" "}
+                      年前的历史记录未计入，
+                      <Link
+                        href={meta.all}
+                        className="text-primary hover:underline"
+                      >
                         查看完整列表
                       </Link>
                     </p>

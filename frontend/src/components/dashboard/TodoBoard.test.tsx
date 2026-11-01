@@ -24,7 +24,9 @@ const todos = (historicalCount: number): DashboardTodos => ({
 describe("TodoBoard historical note", () => {
   it("shows the uncounted historical total with a link to the full list", () => {
     render(<TodoBoard todos={todos(88)} />);
-    expect(screen.getByText(/另有 88 条/)).toHaveTextContent("2026 年前的历史记录未计入");
+    expect(screen.getByText(/另有 88 条/)).toHaveTextContent(
+      "2026 年前的历史记录未计入",
+    );
     expect(screen.getByRole("link", { name: "查看完整列表" })).toHaveAttribute(
       "href",
       "/dashboard/payments?tab=payable",
