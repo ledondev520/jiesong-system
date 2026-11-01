@@ -1,6 +1,7 @@
 /**
  * Input: Prisma client、BankTransaction / InvoiceRecord / PurchaseContract / SalesContract 模型
- * Output: 智能关联引擎；发票自动写入重验待匹配状态，仅有效发票（正常且正数）可被自动关联、红冲/负数留待人工，人工关联验证有效购销目标
+ * Output: 智能关联引擎；发票自动写入重验待匹配状态，仅有效发票（正常且正数）可被自动关联、红冲/负数留待人工，人工关联验证有效购销目标；
+ *         发票→采购合同另有硬护栏（累计额≤合同额+1%、税号冲突排除、早于签约30天以上排除）与仅动自动关联的重配 rematchAutoInvoiceLinks
  * Pos: 财务模块-智能关联业务逻辑层
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -30,6 +31,11 @@ const SCORE_THRESHOLD = 70; // 高置信度阈值
 const AMOUNT_TOLERANCE = 0.001; // ±0.1%
 const AMOUNT_LOOSE_TOLERANCE = 0.01; // ±1%
 const DATE_MATCH_WINDOW_DAYS = 30; // 日期匹配窗口
+// 发票→采购合同的硬性护栏（INVMATCH-4，修复 prod 回填后审计出的错链）：
+const INVOICE_EARLY_DAYS = 30; // 发票早于签约超过 30 天不关联，与 scoreDate「早于 30 天基本不可能」同口径
+const INVOICE_CAP_TOLERANCE = AMOUNT_LOOSE_TOLERANCE; // 追加发票后累计额上限 = 合同额 × (1+1%) + 0.01，容忍税差/凑整
+// manualMatch 固定写 100；自动也可能打满 100，二者无法区分，批量重配一律视为人工锁定、不动。
+const LOCKED_SCORE = 100;
 const PURCHASE_KEYWORDS = ['货款', '采购', '购货', '材料款', '设备款', '商品款'];
 
 // ==================== 字符串工具 ====================
@@ -237,6 +243,28 @@ async function loadSalesContracts() {
   });
 }
 
+// ==================== 发票护栏 ====================
+
+const taxKey = (value) => String(value || '').replace(/\s/g, '').toUpperCase();
+
+// 双方都有税号且不同 → 不是同一主体（同名不同税号、近似名称也一样）；任一方缺失则退回名称判断。
+function taxIdConflict(sellerTaxId, supplierTaxId) {
+  const a = taxKey(sellerTaxId);
+  const b = taxKey(supplierTaxId);
+  return Boolean(a && b && a !== b);
+}
+
+function invoiceTooEarly(invDate, signedAt) {
+  if (!invDate || !signedAt) return false;
+  const diffDays = Math.floor((new Date(invDate).getTime() - new Date(signedAt).getTime()) / (24 * 60 * 60 * 1000));
+  return diffDays < -INVOICE_EARLY_DAYS;
+}
+
+// 合同上第一张发票不受此限（是否合理交给金额评分）：审计未把单张略高于合同额的发票判为错链，硬拒会误伤；上限只拦「追加」发票。
+function exceedsInvoiceCap(contract, linkedTotal, invTotal) {
+  return linkedTotal > 0 && linkedTotal + invTotal > contract.totalAmount * (1 + INVOICE_CAP_TOLERANCE) + 0.01;
+}
+
 // ==================== 匹配核心 ====================
 
 /**
@@ -305,10 +333,14 @@ function matchBankToSales(txn, contracts) {
 /**
  * 职责：发票→采购合同匹配（进项）
  */
-function matchInvoiceToPurchase(inv, contracts) {
+// linkedTotals：合同ID→已关联有效发票累计额；传 null 只排名、不做累计额上限（见 planInvoiceLinks）。
+function matchInvoiceToPurchase(inv, contracts, linkedTotals = null) {
   const best = { score: 0, contract: null, details: null };
 
   for (const contract of contracts) {
+    if (taxIdConflict(inv.sellerTaxId, contract.supplier?.taxId)) continue;
+    if (invoiceTooEarly(inv.invDate, contract.signedAt)) continue;
+    if (linkedTotals && exceedsInvoiceCap(contract, linkedTotals.get(contract.id) || 0, inv.total)) continue;
     const nameSim = maxStringSimilarity(inv.seller, contract.nameCandidates);
     if (nameSim < 50) continue;
 
@@ -352,6 +384,42 @@ function matchInvoiceToSales(inv, contracts) {
   }
 
   return best;
+}
+
+/**
+ * 职责：为一批发票规划关联（纯函数，不写库）
+ * 思路：先按「无累计额上限」的最优分降序（同分按开票日、id）排队，让最贴合的发票先占合同额度；
+ *       再逐张按累计额上限匹配，超额的合同被跳过并回落到次优候选。fixedTotals 为不参与重配的已关联发票累计额。
+ */
+function planInvoiceLinks(invoices, purchaseContracts, salesContracts, fixedTotals = new Map()) {
+  const totals = new Map(fixedTotals);
+  const queue = invoices
+    .map((inv) => ({
+      inv,
+      rank: Math.max(matchInvoiceToPurchase(inv, purchaseContracts).score, matchInvoiceToSales(inv, salesContracts).score),
+    }))
+    .sort((a, b) => b.rank - a.rank || String(a.inv.invDate).localeCompare(String(b.inv.invDate)) || String(a.inv.id).localeCompare(String(b.inv.id)));
+
+  return queue.map(({ inv }) => {
+    const pBest = matchInvoiceToPurchase(inv, purchaseContracts, totals);
+    const sBest = matchInvoiceToSales(inv, salesContracts);
+    const usePurchase = pBest.score >= sBest.score;
+    const best = usePurchase ? pBest : sBest;
+    const contractType = usePurchase ? CONTRACT_TYPE.PURCHASE : CONTRACT_TYPE.SALES;
+    const linked = best.score >= SCORE_THRESHOLD;
+    if (linked && usePurchase) totals.set(best.contract.id, (totals.get(best.contract.id) || 0) + inv.total);
+    return { inv, best, contractType, linked };
+  });
+}
+
+async function loadLinkedPurchaseTotals(extraWhere = {}) {
+  const rows = await prisma.invoiceRecord.findMany({
+    where: { matchStatus: MATCH_STATUS.MATCHED, matchedContractType: CONTRACT_TYPE.PURCHASE, ...VALID_INVOICE_WHERE, ...extraWhere },
+    select: { matchedContractId: true, total: true },
+  });
+  const totals = new Map();
+  for (const row of rows) totals.set(row.matchedContractId, (totals.get(row.matchedContractId) || 0) + row.total);
+  return totals;
 }
 
 // ==================== 对外服务接口 ====================
@@ -433,23 +501,10 @@ async function runAutoMatchOnce() {
     }
   }
 
-  // 2. 匹配发票
-  for (const inv of invoices) {
-    const pBest = matchInvoiceToPurchase(inv, invoicePurchaseContracts);
-    const sBest = matchInvoiceToSales(inv, salesContracts);
-
-    let best;
-    let contractType;
-
-    if (pBest.score >= sBest.score) {
-      best = pBest;
-      contractType = CONTRACT_TYPE.PURCHASE;
-    } else {
-      best = sBest;
-      contractType = CONTRACT_TYPE.SALES;
-    }
-
-    if (best.score >= SCORE_THRESHOLD) {
+  // 2. 匹配发票（累计额上限以库里已关联的有效发票为基线，人工关联的也计入）
+  const plans = planInvoiceLinks(invoices, invoicePurchaseContracts, salesContracts, await loadLinkedPurchaseTotals());
+  for (const { inv, best, contractType, linked } of plans) {
+    if (linked) {
       // A user may confirm/ignore this invoice after the candidate read. Keep the
       // existing PENDING-only rule at the write so that newer decisions survive.
       const updated = await prisma.invoiceRecord.updateMany({
@@ -494,6 +549,72 @@ async function runAutoMatchOnce() {
       invoices: invoiceResults,
     },
   };
+}
+
+/**
+ * 职责：按当前规则重配「自动」采购发票关联（默认只出报告；apply 才写库）
+ * 范围：MATCHED + PURCHASE + 有效 + matchScore<100 的发票。人工关联（固定 100）、100 分、销售、已忽略、待匹配行一律不动，
+ *       但已锁定行的金额计入合同累计额基线。结果是纯函数式的：自动关联集合和锁定集合不变时，再跑一次计划为空（幂等）。
+ * 写入：逐行带乐观条件（仍 MATCHED、同合同、同分数），期间被人工改动的行跳过；解除的行回到 PENDING，与 unmatch 一致。
+ */
+async function rematchAutoInvoiceLinks({ apply = false } = {}) {
+  similarityCache = new Map();
+  try {
+    const [rows, purchaseContracts, salesContracts] = await Promise.all([
+      prisma.invoiceRecord.findMany({
+        where: { matchStatus: MATCH_STATUS.MATCHED, matchedContractType: CONTRACT_TYPE.PURCHASE, ...VALID_INVOICE_WHERE },
+        orderBy: { invDate: 'asc' },
+      }),
+      loadPurchaseContracts(MATCH_PURPOSE.INVOICE),
+      loadSalesContracts(),
+    ]);
+    const isAuto = (r) => r.matchScore != null && r.matchScore < LOCKED_SCORE;
+    const auto = rows.filter(isAuto);
+    const lockedTotals = new Map();
+    for (const r of rows.filter((x) => !isAuto(x))) {
+      lockedTotals.set(r.matchedContractId, (lockedTotals.get(r.matchedContractId) || 0) + r.total);
+    }
+
+    const contractNo = new Map(purchaseContracts.map((c) => [c.id, c.contractNo]));
+    const changes = [];
+    let kept = 0;
+    for (const { inv, best, contractType, linked } of planInvoiceLinks(auto, purchaseContracts, salesContracts, lockedTotals)) {
+      const toId = linked ? best.contract.id : null;
+      if (linked && contractType === CONTRACT_TYPE.PURCHASE && toId === inv.matchedContractId) { kept += 1; continue; } // 同合同：分数漂移不算变更
+      if (linked && contractType !== CONTRACT_TYPE.PURCHASE) { kept += 1; continue; } // 销售最优分更高：不跨类型改写，保持原状
+      changes.push({
+        id: inv.id,
+        invNo: inv.invNo,
+        action: toId ? 'MOVE' : 'UNLINK',
+        fromContractId: inv.matchedContractId,
+        fromContractNo: contractNo.get(inv.matchedContractId) || null,
+        fromScore: inv.matchScore,
+        toContractId: toId,
+        toContractNo: toId ? contractNo.get(toId) : null,
+        toScore: toId ? best.score : null,
+      });
+    }
+
+    let applied = 0;
+    let skipped = 0;
+    if (apply && changes.length > 0) {
+      await prisma.$transaction(async (tx) => {
+        for (const change of changes) {
+          const data = change.toContractId
+            ? { matchedContractId: change.toContractId, matchScore: change.toScore, matchedAt: new Date() }
+            : { matchedContractId: null, matchedContractType: null, matchScore: null, matchStatus: MATCH_STATUS.PENDING, matchedAt: null };
+          const result = await tx.invoiceRecord.updateMany({
+            where: { id: change.id, matchStatus: MATCH_STATUS.MATCHED, matchedContractId: change.fromContractId, matchScore: change.fromScore },
+            data,
+          });
+          if (result.count === 1) applied += 1; else skipped += 1;
+        }
+      });
+    }
+    return { mode: apply ? 'apply' : 'dry-run', autoLinks: auto.length, lockedLinks: rows.length - auto.length, kept, changes, applied, skipped };
+  } finally {
+    similarityCache = null;
+  }
 }
 
 /**
@@ -689,6 +810,7 @@ module.exports = {
   loadPendingBankTxns,
   loadPendingInvoices,
   runAutoMatch,
+  rematchAutoInvoiceLinks,
   getUnmatchedItems,
   manualMatch,
   unmatch,
