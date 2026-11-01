@@ -31,6 +31,8 @@ export interface TodoList {
   label: string;
   count: number;
   items: TodoItem[];
+  /** 仅「待付款/缺进项发票」：签约早于 before 的历史合同不计入 count。 */
+  historical?: { count: number; before: string };
 }
 
 export interface BossFigures {

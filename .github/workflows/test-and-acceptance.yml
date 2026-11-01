@@ -80,7 +80,7 @@ jobs:
       - name: Run frontend unit shard
         working-directory: frontend
         run: >
-          npx vitest run --coverage --reporter=blob --shard=${{ matrix.shard }}
+          npx vitest run --coverage --reporter=default --reporter=blob --shard=${{ matrix.shard }}
           --coverage.reporter=text-summary
           --coverage.thresholds.statements=0 --coverage.thresholds.lines=0
           --coverage.thresholds.functions=0 --coverage.thresholds.branches=0
@@ -194,7 +194,13 @@ jobs:
         run: npx playwright install-deps chromium
         working-directory: frontend
       - name: Run Playwright acceptance tests (shard ${{ matrix.shard }})
-        run: npm run test:e2e -- --shard=${{ matrix.shard }} --reporter=list,blob
+        # 按权重分文件（--shard 按文件数切分会失衡）；无 --shard 时 blob 文件同名，故按序号命名以便 merge-multiple。
+        env:
+          SHARD: ${{ matrix.shard }}
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ strategy.job-index }}.zip
+        run: |
+          node --test ../scripts/e2e-shard-files.test.cjs
+          npm run test:e2e -- --reporter=list,blob $(node ../scripts/e2e-shard-files.cjs "${SHARD%/*}" "${SHARD#*/}")
         working-directory: frontend
         timeout-minutes: 25
       - name: Upload blob report
