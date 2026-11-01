@@ -41,6 +41,18 @@ export const formatMoney = (
 };
 
 /**
+ * 职责：无币种符号的金额数值（币种已在表头/相邻文字给出时用），固定 2 位小数 + 千分位
+ * 例：146.0007440476191 → 146.00；无效值同 formatMoney 显示「—」
+ */
+export const formatAmount = (value: unknown): string => {
+  const n = toFinite(value);
+  if (n === null) return EMPTY_VALUE;
+  const text = group(Math.abs(n), 2);
+  const sign = n < 0 && Number(text.replace(/,/g, "")) !== 0 ? "-" : "";
+  return `${sign}${text}`;
+};
+
+/**
  * 职责：单价显示；整数单价（报价规则取整后的价格）不带小数，否则 2 位小数
  * 不在此取整：取整口径（整元/整美元）由定价配置决定，这里只按值显示
  */

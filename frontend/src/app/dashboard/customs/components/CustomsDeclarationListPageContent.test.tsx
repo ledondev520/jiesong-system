@@ -42,6 +42,16 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     });
   });
 
+  it("数据返回前页脚用加载占位，不显示「共 0 条」；返回后显示真实条数", async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.getAll.mockReturnValue(new Promise((r) => (resolve = r)));
+    render(<CustomsDeclarationListPageContent embedded />);
+    expect(screen.getAllByRole("status", { name: "加载中" }).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/共\s*0\s*条/)).toBeNull();
+    resolve({ data: { items: [], pagination: { total: 0 } } });
+    await waitFor(() => expect(screen.getByText(/共\s*0\s*条/)).toBeTruthy());
+  });
+
   it("挂载时保留报关页签，不把父页面重定向回退税工作台", async () => {
     render(<CustomsDeclarationListPageContent embedded />);
     await waitFor(() => expect(mocks.getAll).toHaveBeenCalled());

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMoney, formatStat, formatUnitPrice } from "./format";
+import { formatAmount, formatMoney, formatStat, formatUnitPrice } from "./format";
 
 describe("formatMoney", () => {
   it("固定 2 位小数、千分位和币种符号", () => {
@@ -46,5 +46,20 @@ describe("formatStat", () => {
     expect(formatStat(0)).toBe("0");
     expect(formatStat(undefined)).toBe("—");
     expect(formatStat(1500, {}, (n) => formatMoney(n))).toBe("¥1,500.00");
+  });
+});
+
+describe("formatAmount", () => {
+  it("长浮点数固定 2 位小数，不带币种符号", () => {
+    expect(formatAmount(146.0007440476191)).toBe("146.00");
+    expect(formatAmount(1234.5)).toBe("1,234.50");
+    expect(formatAmount("12")).toBe("12.00");
+  });
+
+  it("极小负数不显示负号，无效值显示占位", () => {
+    expect(formatAmount(-0.001)).toBe("0.00");
+    expect(formatAmount(-5)).toBe("-5.00");
+    expect(formatAmount(null)).toBe("—");
+    expect(formatAmount("abc")).toBe("—");
   });
 });
