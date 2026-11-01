@@ -4,7 +4,8 @@
  * Pos: GET /dashboard/todos 的只读聚合（规格 §4.9）；不写库，只算当前角色可见的列表
  *
  * 口径说明（当前库结构下的最小可靠定义）：
- *   ordersToPurchase  已确认订单中，至少一条订单行没有未取消采购单行（同订单、商品+门店，与「生成采购单」重复规则一致）
+ *   ordersToPurchase  已确认订单中，至少一条订单行未被覆盖：既无未取消采购单行（同订单、商品+门店，与「生成采购单」重复规则一致），
+ *                     库存分配到该行的数量也不足订单行数量（全额库存分配视为已覆盖；部分分配仍待采购）
  *   paymentsDue       已生效采购合同应付>0（payablesService 同一口径，草稿不计）
  *   receiptsToInspect 采购合同已发货、尚未收货
  *   toLoad / toShip   出口合同 CONFIRMED（待装柜）/ PACKING（待发运）
@@ -47,14 +48,16 @@ const LISTS = {
     async load(db) {
       const orders = await db.salesContract.findMany({
         where: { status: SALES_STATUS.CONFIRMED }, orderBy: { createdAt: 'asc' }, take: CONFIRMED_SCAN_CAP,
-        select: { id: true, contractNo: true, totalAmount: true, signedAt: true, items: { select: { productId: true, storeId: true } } },
+        select: { id: true, contractNo: true, totalAmount: true, signedAt: true, items: { select: { productId: true, storeId: true, quantity: true, inventories: { select: { quantity: true } } } } },
       });
       const purchased = await db.purchaseItem.findMany({
         where: { purchaseContract: { salesContractId: { in: orders.map((o) => o.id) }, status: { not: PURCHASE_STATUS.CANCELLED } } },
         select: { productId: true, storeId: true, purchaseContract: { select: { salesContractId: true } } },
       });
       const covered = new Set(purchased.map((p) => `${p.purchaseContract.salesContractId}/${p.productId}/${p.storeId}`));
-      const rows = orders.filter((o) => o.items.some((i) => !covered.has(`${o.id}/${i.productId}/${i.storeId}`)));
+      // shortcut: list shows the whole order, not the uncovered remainder per line; upgrade if purchasers need remaining quantities.
+      const stockCovers = (i) => i.inventories.reduce((sum, inv) => sum + inv.quantity, 0) + 1e-9 >= i.quantity;
+      const rows = orders.filter((o) => o.items.some((i) => !covered.has(`${o.id}/${i.productId}/${i.storeId}`) && !stockCovers(i)));
       return asList(rows.length, rows.map((r) => item(r.id, r.contractNo, null, r.totalAmount, r.signedAt)));
     },
   },

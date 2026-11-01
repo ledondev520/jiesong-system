@@ -106,7 +106,14 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   const allocated = await sale("SYN-S-ALLOCATED", "CONFIRMED");
   const allocatedItem = await line(allocated.id);
   await db.inventory.create({ data: { productId: product.id, quantity: 1, salesItemId: allocatedItem.id } });
-  // R1-6: coverage is by non-cancelled purchase lines (order+product+store), not inventory.
+  // Partially stock-allocated (2 of 5) still waits; fully allocated across two inventory rows (3+2 of 5) does not.
+  const stockPartial = await sale("SYN-S-STOCK-PARTIAL", "CONFIRMED");
+  const stockPartialItem = await db.salesItem.create({ data: { salesContractId: stockPartial.id, productId: product.id, storeId: store.id, quantity: 5, costPrice: 1, sellingPrice: 2 } });
+  await db.inventory.create({ data: { productId: product.id, quantity: 2, salesItemId: stockPartialItem.id } });
+  const stockFull = await sale("SYN-S-STOCK-FULL", "CONFIRMED");
+  const stockFullItem = await db.salesItem.create({ data: { salesContractId: stockFull.id, productId: product.id, storeId: store.id, quantity: 5, costPrice: 1, sellingPrice: 2 } });
+  await db.inventory.createMany({ data: [3, 2].map((quantity) => ({ productId: product.id, quantity, salesItemId: stockFullItem.id })) });
+  // R1-6: coverage is by non-cancelled purchase lines (order+product+store) or full stock allocation.
   const otherProduct = await db.product.create({ data: { customsName: "Synthetic product 2" } });
   const purchaseLine = (salesContractId, productId, status, contractNo) =>
     db.purchaseContract.create({
@@ -149,10 +156,10 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   const admin = await todos("ADMIN");
   assert.deepEqual(keys(admin), ["missingInvoice", "ordersToPurchase", "overdueReceivables", "paymentsDue", "quotesAwaitingCustomer", "quotesToSend", "receiptsToInspect", "refundable", "toLoad", "toShip"]);
   assert.equal(admin.figures, undefined);
-  // Unpurchased, inventory-allocated (no purchase line), partially purchased and cancelled-purchase orders wait; fully purchased does not.
+  // Unpurchased, partially stock-allocated, partially purchased and cancelled-purchase orders wait; fully purchased or fully stock-allocated do not.
   assert.deepEqual(
     admin.lists.ordersToPurchase.items.map((i) => i.contractNo).sort(),
-    ["SYN-S-ALLOCATED", "SYN-S-CANCELLED-PURCHASE", "SYN-S-OPEN", "SYN-S-PARTIAL"],
+    ["SYN-S-CANCELLED-PURCHASE", "SYN-S-OPEN", "SYN-S-PARTIAL", "SYN-S-STOCK-PARTIAL"],
   );
   assert.equal(admin.lists.ordersToPurchase.count, 4);
   // Quotes: DRAFT awaiting send (top five of six), SENT awaiting customer; other statuses excluded.
@@ -167,7 +174,7 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   assert.equal(admin.lists.paymentsDue.items[0].contractNo, "SYN-P-SIGNED");
   assert.equal(admin.lists.paymentsDue.items[0].amount, 600);
   assert.equal(admin.lists.receiptsToInspect.count, 1);
-  assert.equal(admin.lists.toLoad.count, 5);
+  assert.equal(admin.lists.toLoad.count, 7);
   assert.equal(admin.lists.toShip.count, 1);
   assert.equal(admin.lists.missingInvoice.count, 1);
   assert.equal(admin.lists.missingInvoice.items[0].contractNo, "SYN-P-SHIPPED");
@@ -184,8 +191,8 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   const boss = await todos("BOSS");
   assert.deepEqual(keys(boss), ["overdueReceivables"]);
   assert.equal(boss.figures.payable, 600, "BOSS payable uses the shared in-effect basis");
-  // Seven non-cancelled export contracts of 1000 each, nothing received: finance-overview basis.
-  assert.equal(boss.figures.receivable, 7000, "BOSS receivable equals the finance overview unreceived total");
+  // Nine non-cancelled export contracts of 1000 each, nothing received: finance-overview basis.
+  assert.equal(boss.figures.receivable, 9000, "BOSS receivable equals the finance overview unreceived total");
   assert.ok("monthGrossProfit" in boss.figures);
   assert.ok(boss.figures.definitions.payable);
 
