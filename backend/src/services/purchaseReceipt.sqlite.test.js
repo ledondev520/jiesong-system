@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 test('真实SQLite：分批验货幂等、并发限量、故障回滚与老板权限', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-receipt-test-'));
@@ -21,8 +21,7 @@ test('真实SQLite：分批验货幂等、并发限量、故障回滚与老板�
     fs.rmSync(directory, { recursive: true, force: true });
   });
   // 使用已安装Prisma生成空DDL；不是db push，也不会连接现有数据库。
-  const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 30000 });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', databaseFile], { input: ddl });
+  copyTemplate('schema', databaseFile);
   fs.chmodSync(databaseFile, 0o600);
   db = require('../utils/prisma');
   const service = require('./purchaseReceiptService');

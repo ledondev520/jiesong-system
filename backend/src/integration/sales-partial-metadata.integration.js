@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 test('HTTP/SQLite: partial sales metadata preserves omitted fields and rejects invalid rates atomically', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-sales-partial-metadata-'));
@@ -23,8 +24,7 @@ test('HTTP/SQLite: partial sales metadata preserves omitted fields and rejects i
     if (db) await db.$disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
   });
-  const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 30000 });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbFile], { input: ddl });
+  copyTemplate('schema', dbFile);
   fs.chmodSync(dbFile, 0o600);
   assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
   assert.equal(fs.statSync(dbFile).mode & 0o777, 0o600);

@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与权限', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-purchase-import-test-'));
@@ -21,8 +21,7 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
     if (db) await db.$disconnect();
     fs.rmSync(directory, { recursive: true, force: true });
   });
-  fs.writeFileSync(dbFile, '', { mode: 0o600 });
-  execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy', '--schema', path.resolve(__dirname, '../../prisma/schema.prisma')], { stdio: 'pipe', timeout: 30000 });
+  copyTemplate('deploy', dbFile);
   fs.chmodSync(dbFile, 0o600);
   assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
   assert.equal(fs.statSync(dbFile).mode & 0o777, 0o600);

@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { copyTemplate } = require('../testHelpers/sqlite-template');
 
 test('HTTP/SQLite：发运后不能通过销售或旧货柜入口篡改已出库货物', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-sales-cargo-test-'));
@@ -16,8 +16,7 @@ test('HTTP/SQLite：发运后不能通过销售或旧货柜入口篡改已出库
   process.env.JWT_SECRET = 'test-only-lifecycle-secret-never-for-production';
   let db, server;
   t.after(async () => { if (server) await new Promise(resolve => server.close(resolve)); if (db) await db.$disconnect(); fs.rmSync(directory, { recursive: true, force: true }); });
-  const ddl = execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.resolve(__dirname, '../../prisma/schema.prisma'), '--script'], { encoding: 'utf8', timeout: 30000 });
-  execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbFile], { input: ddl });
+  copyTemplate('schema', dbFile);
   fs.chmodSync(dbFile, 0o600);
   db = require('../utils/prisma');
   // Order creation needs exactly one active customer (DATA-MODEL §2.4).

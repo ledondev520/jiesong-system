@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
+const { copyTemplate } = require('./sqlite-template');
 
 const directory = process.env.HS_BROWSER_TEST_DIR;
 if (process.env.NODE_ENV !== 'test' || !process.send
@@ -30,14 +31,7 @@ process.env.JWT_SECRET = 'test-only-hs-browser-jwt-never-production';
  */
 async function start() {
   // 0. 初始化已提交的迁移；不运行 db push、diff 或 client generate。
-  fs.closeSync(fs.openSync(database, 'wx', 0o600));
-  const previousUmask = process.umask(0o022);
-  try {
-    execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
-      cwd: path.resolve(__dirname, '../..'), stdio: 'ignore', timeout: 30000,
-    });
-  } finally { process.umask(previousUmask); }
-  fs.chmodSync(database, 0o600);
+  copyTemplate('deploy', database);
   // 1. 字典记录仅用于检索/人工维护，不代表实际税则或归类建议。
   execFileSync('python3', ['-c', `import sqlite3,sys
 c=sqlite3.connect(sys.argv[1])

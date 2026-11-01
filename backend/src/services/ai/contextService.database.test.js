@@ -9,8 +9,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const vm = require('node:vm');
-const { execFileSync } = require('node:child_process');
 const { PrismaClient } = require('@prisma/client');
+const { copyTemplate } = require('../../testHelpers/sqlite-template');
 
 // 汇率只来自唯一报价配置：私有临时文件，不读仓库配置。
 const pricingDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-context-pricing-'));
@@ -49,10 +49,7 @@ test('AI各类上下文查询使用当前Prisma模型与关联', async () => {
   const root = path.resolve(__dirname, '../../..');
   let db;
   try {
-    const ddl = execFileSync(path.join(root, 'node_modules/.bin/prisma'), [
-      'migrate', 'diff', '--from-empty', '--to-schema-datamodel', path.join(root, 'prisma/schema.prisma'), '--script',
-    ], { env: { ...process.env, DATABASE_URL: databaseUrl }, encoding: 'utf8' });
-    execFileSync('python3', ['-c', 'import sqlite3,sys,os; os.umask(0o077); c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', dbPath], { input: ddl });
+    copyTemplate('schema', dbPath);
     db = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
     await db.salesContract.create({ data: { contractNo: 'EXP123', exchangeRate: 7, totalAmount: 100 } });
     await db.systemConfig.create({ data: { key: 'exchangeRate', value: '{"rate":99,"buffer":0}' } });
