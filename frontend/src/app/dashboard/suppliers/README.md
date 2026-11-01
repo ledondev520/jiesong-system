@@ -11,3 +11,4 @@ Archive: 删除 is a soft archive (`isActive=false`); the page loads `status=all
 
 Permanent delete (ADMIN only, 「永久删除」): `components/HardDeleteSupplierDialog.tsx` shows the server preview (counts per record type, or the blocking reasons when money/customs records exist) and requires typing the supplier name; the page then sends the preview's `confirmToken` to `POST /suppliers/:id/hard-delete`. Archive (「归档当前」, ADMIN/PURCHASE) has no contract check.
 - `supplierCounts.ts`: index summary counts; total = normal + quality issue + archived (mutually exclusive), regression in `supplierCounts.test.ts` and `page.test.tsx` (B20).
+B17: clicking a supplier opens the read-only `components/SupplierSummary.tsx` (no bank details); 「编辑」 is an explicit action that loads the form. 「归档当前」/「永久删除」 live in a separate 「危险操作」 section under the edit form (naming the supplier); the permanent-delete dialog is unchanged (preview + typed name). Write endpoints are untouched.

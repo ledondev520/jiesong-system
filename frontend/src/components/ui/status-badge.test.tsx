@@ -24,10 +24,11 @@ describe("status-badge", () => {
     });
   });
 
-  it("未知状态回退显示原始文本", () => {
+  it("未知状态回退显示中文「未知状态」，不露出英文原值", () => {
     render(<StatusBadge status="UNKNOWN_STATUS" />);
-    const badge = screen.getByText("UNKNOWN_STATUS");
+    const badge = screen.getByText("未知状态");
     expect(badge.className).toContain("bg-muted");
+    expect(screen.queryByText("UNKNOWN_STATUS")).toBeNull();
   });
 
   it("PACKING 显示装箱中文案", () => {
@@ -45,7 +46,7 @@ describe("status-badge", () => {
       tone: "info",
     });
     expect(getStatusBadgeConfig("READY", {}, "purchaseContract")).toEqual({
-      label: "待装柜",
+      label: "生产完成",
       tone: "warning",
     });
     expect(getStatusBadgeConfig("EXPIRED", {}, "quote")).toEqual({
@@ -69,5 +70,41 @@ describe("status-badge", () => {
     render(<StatusBadge status="arrived" domain="salesOrder" />);
     const badge = screen.getByText("已到港");
     expect(badge.className).toContain("text-amber-800");
+  });
+});
+
+describe("status glossary (B13)", () => {
+  const hasChinese = (text: string) => /[一-鿿]/.test(text);
+
+  it("every purchase status and legacy alias has one Chinese label in the purchase domain", () => {
+    for (const status of [
+      "DRAFT",
+      "SIGNED",
+      "PRODUCING",
+      "READY",
+      "SHIPPED",
+      "RECEIVED",
+      "COMPLETED",
+      "CANCELLED",
+      "PENDING_INSPECTION",
+      "IN_STOCK",
+    ]) {
+      const { label } = getStatusBadgeConfig(status, {}, "purchaseContract");
+      expect(hasChinese(label), status).toBe(true);
+    }
+  });
+
+  it("purchases and payables agree: SIGNED is 已签订 with or without the domain", () => {
+    expect(getStatusBadgeConfig("SIGNED", {}, "purchaseContract").label).toBe(
+      "已签订",
+    );
+    expect(getStatusBadgeConfig("SIGNED").label).toBe("已签订");
+    expect(getStatusBadgeConfig("READY").label).toBe("生产完成");
+    expect(getStatusBadgeConfig("RECEIVED").label).toBe("已收货");
+  });
+
+  it("an unregistered status never leaks English text", () => {
+    expect(getStatusBadgeConfig("SOMETHING_NEW").label).toBe("未知状态");
+    expect(getStatusBadgeConfig(undefined).label).toBe("未知状态");
   });
 });

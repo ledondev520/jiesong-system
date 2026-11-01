@@ -42,6 +42,7 @@ import {
 } from "@/services/supplier.service";
 import { countSuppliers } from "./supplierCounts";
 import { HardDeleteSupplierDialog } from "./components/HardDeleteSupplierDialog";
+import { SupplierSummary } from "./components/SupplierSummary";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
 import { useMobile } from "@/lib/hooks/useMobile";
@@ -179,6 +180,8 @@ export default function SuppliersPage() {
     null,
   );
   const activeSupplierId = activeSupplier?.id || null;
+  // 点击列表只进入只读摘要；「编辑」是显式动作，避免误触生产数据。
+  const [viewing, setViewing] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<SupplierStatusFilter>("all");
   const editorSession = useRef(0);
@@ -298,6 +301,7 @@ export default function SuppliersPage() {
   const startNewSupplier = () => {
     beginEditorSession();
     setActiveSupplier(null);
+    setViewing(false);
     form.reset(emptySupplierValues);
     if (isMobile)
       formSectionRef.current?.scrollIntoView({
@@ -309,6 +313,7 @@ export default function SuppliersPage() {
   const selectSupplier = (supplier: SupplierDisplay) => {
     beginEditorSession();
     setActiveSupplier(supplier);
+    setViewing(true);
     form.reset(supplierToFormValues(supplier));
     if (isMobile)
       formSectionRef.current?.scrollIntoView({
@@ -668,118 +673,227 @@ export default function SuppliersPage() {
                   </Button>
                 </BusinessWrite>
               )}
-              {canArchive && (
-                <BusinessWrite>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
-                    disabled={
-                      !activeSupplier ||
-                      activeSupplier.isActive === false ||
-                      saving
-                    }
-                    onClick={handleDeleteActive}
-                  >
-                    <Trash2 className="mr-1.5 h-4 w-4" />
-                    归档当前
-                  </Button>
-                </BusinessWrite>
-              )}
-              {isAdmin && (
-                <BusinessWrite>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
-                    disabled={!activeSupplier || saving}
-                    onClick={openHardDelete}
-                  >
-                    <Trash2 className="mr-1.5 h-4 w-4" />
-                    永久删除
-                  </Button>
-                </BusinessWrite>
-              )}
             </div>
           </div>
 
-          <Form {...form}>
-            <form
-              onSubmit={(event) => {
-                const session = editorSession.current;
-                void form.handleSubmit((values) =>
-                  handleSubmit(values, session, activeSupplier),
-                )(event);
-              }}
-              className="space-y-6 p-5"
-            >
-              <fieldset disabled={readOnly || saving} className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>公司名称 *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="工商注册名称" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="shortName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>简称</FormLabel>
-                        <FormControl>
-                          <Input placeholder="内部常用称呼" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="rounded-xl border border-border/50 p-4">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">供应商别名</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        用于搜索和匹配采购合同里的历史称呼。
-                      </p>
+          {viewing && activeSupplier ? (
+            <SupplierSummary
+              supplier={activeSupplier}
+              onEdit={() => setViewing(false)}
+            />
+          ) : (
+            <>
+              <Form {...form}>
+                <form
+                  onSubmit={(event) => {
+                    const session = editorSession.current;
+                    void form.handleSubmit((values) =>
+                      handleSubmit(values, session, activeSupplier),
+                    )(event);
+                  }}
+                  className="space-y-6 p-5"
+                >
+                  <fieldset disabled={readOnly || saving} className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>公司名称 *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="工商注册名称" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="shortName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>简称</FormLabel>
+                            <FormControl>
+                              <Input placeholder="内部常用称呼" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-                    <BusinessWrite>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 rounded-lg"
-                        onClick={() => append({ alias: "" })}
-                      >
-                        <Plus className="mr-1 h-3.5 w-3.5" />
-                        添加别名
-                      </Button>
-                    </BusinessWrite>
-                  </div>
-                  <div className="space-y-2">
-                    {fields.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground">
-                        暂无别名。
-                      </p>
-                    ) : (
-                      fields.map((field, index) => (
-                        <div key={field.id} className="flex gap-2">
+
+                    <div className="rounded-xl border border-border/50 p-4">
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold">供应商别名</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            用于搜索和匹配采购合同里的历史称呼。
+                          </p>
+                        </div>
+                        <BusinessWrite>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 rounded-lg"
+                            onClick={() => append({ alias: "" })}
+                          >
+                            <Plus className="mr-1 h-3.5 w-3.5" />
+                            添加别名
+                          </Button>
+                        </BusinessWrite>
+                      </div>
+                      <div className="space-y-2">
+                        {fields.length === 0 ? (
+                          <p className="rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground">
+                            暂无别名。
+                          </p>
+                        ) : (
+                          fields.map((field, index) => (
+                            <div key={field.id} className="flex gap-2">
+                              <FormField
+                                control={form.control}
+                                name={`aliases.${index}.alias`}
+                                render={({ field }) => (
+                                  <FormItem className="flex-1">
+                                    <FormControl>
+                                      <Input
+                                        placeholder="例如：黎总、陶瓷厂"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <BusinessWrite>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-10 w-10"
+                                  onClick={() => remove(index)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </BusinessWrite>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <FormField
+                        control={form.control}
+                        name="contactName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="inline-flex items-center gap-1.5">
+                              <User className="h-3.5 w-3.5" />
+                              联系人
+                            </FormLabel>
+                            <FormControl>
+                              <Input placeholder="姓名" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="contactPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="inline-flex items-center gap-1.5">
+                              <Phone className="h-3.5 w-3.5" />
+                              联系电话
+                            </FormLabel>
+                            <FormControl>
+                              <Input placeholder="手机或座机" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="contactEmail"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="inline-flex items-center gap-1.5">
+                              <Mail className="h-3.5 w-3.5" />
+                              邮箱
+                            </FormLabel>
+                            <FormControl>
+                              <Input placeholder="电子邮箱" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="rounded-xl border border-border/50 p-4">
+                      <div className="mb-4">
+                        <p className="text-sm font-semibold">合同与财务信息</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          这些字段会进入采购合同、付款和后续对账流程。
+                        </p>
+                      </div>
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="address"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>公司地址</FormLabel>
+                              <FormControl>
+                                <Input placeholder="完整公司地址" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid gap-4 md:grid-cols-2">
                           <FormField
                             control={form.control}
-                            name={`aliases.${index}.alias`}
+                            name="phone"
                             render={({ field }) => (
-                              <FormItem className="flex-1">
+                              <FormItem>
+                                <FormLabel>公司电话</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="座机电话" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="taxId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>纳税人识别号</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="税号" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <FormField
+                            control={form.control}
+                            name="bankAccountName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>收款户名</FormLabel>
                                 <FormControl>
                                   <Input
-                                    placeholder="例如：黎总、陶瓷厂"
+                                    placeholder="银行账户户名"
                                     {...field}
                                   />
                                 </FormControl>
@@ -787,274 +901,193 @@ export default function SuppliersPage() {
                               </FormItem>
                             )}
                           />
-                          <BusinessWrite>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-10 w-10"
-                              onClick={() => remove(index)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </BusinessWrite>
+                          <FormField
+                            control={form.control}
+                            name="bankAccount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>银行账号</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="银行账号" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                  <FormField
-                    control={form.control}
-                    name="contactName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="inline-flex items-center gap-1.5">
-                          <User className="h-3.5 w-3.5" />
-                          联系人
-                        </FormLabel>
-                        <FormControl>
-                          <Input placeholder="姓名" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="contactPhone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="inline-flex items-center gap-1.5">
-                          <Phone className="h-3.5 w-3.5" />
-                          联系电话
-                        </FormLabel>
-                        <FormControl>
-                          <Input placeholder="手机或座机" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="contactEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="inline-flex items-center gap-1.5">
-                          <Mail className="h-3.5 w-3.5" />
-                          邮箱
-                        </FormLabel>
-                        <FormControl>
-                          <Input placeholder="电子邮箱" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="rounded-xl border border-border/50 p-4">
-                  <div className="mb-4">
-                    <p className="text-sm font-semibold">合同与财务信息</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      这些字段会进入采购合同、付款和后续对账流程。
-                    </p>
-                  </div>
-                  <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="address"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>公司地址</FormLabel>
-                          <FormControl>
-                            <Input placeholder="完整公司地址" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>公司电话</FormLabel>
-                            <FormControl>
-                              <Input placeholder="座机电话" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="taxId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>纳税人识别号</FormLabel>
-                            <FormControl>
-                              <Input placeholder="税号" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <FormField
+                            control={form.control}
+                            name="bankName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>开户银行</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="银行名称" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="bankBranch"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>开户支行</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="例如：佛山祖庙支行"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name="bankCode"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>联行号 / 银行编号</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="银行联行号或汇款所需银行编号"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
+
+                    <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
                       <FormField
                         control={form.control}
-                        name="bankAccountName"
+                        name="hasQualityIssue"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>收款户名</FormLabel>
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                             <FormControl>
-                              <Input placeholder="银行账户户名" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="bankAccount"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>银行账号</FormLabel>
-                            <FormControl>
-                              <Input placeholder="银行账号" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <FormField
-                        control={form.control}
-                        name="bankName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>开户银行</FormLabel>
-                            <FormControl>
-                              <Input placeholder="银行名称" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="bankBranch"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>开户支行</FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="例如：佛山祖庙支行"
-                                {...field}
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
                               />
                             </FormControl>
-                            <FormMessage />
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="font-semibold text-destructive">
+                                质量问题标记
+                              </FormLabel>
+                              <FormDescription>
+                                供应商出现过质量问题时勾选，后续采购选择会显示风险提示。
+                              </FormDescription>
+                            </div>
                           </FormItem>
                         )}
                       />
+
+                      {hasQualityIssue && (
+                        <FormField
+                          control={form.control}
+                          name="qualityNote"
+                          render={({ field }) => (
+                            <FormItem className="mt-4">
+                              <FormLabel>问题描述</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="请描述质量问题、发生时间和处理结果..."
+                                  className="min-h-24 resize-none"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
                     </div>
-                    <FormField
-                      control={form.control}
-                      name="bankCode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>联行号 / 银行编号</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="银行联行号或汇款所需银行编号"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  </fieldset>
+                  <div className="flex flex-col-reverse gap-2 border-t border-border/50 pt-5 sm:flex-row sm:justify-end">
+                    <BusinessWrite>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10 rounded-lg"
+                        onClick={startNewSupplier}
+                      >
+                        取消并新建
+                      </Button>
+                    </BusinessWrite>
+                    <BusinessWrite>
+                      <Button
+                        type="submit"
+                        className="h-10 rounded-lg"
+                        disabled={saving}
+                      >
+                        <Save className="mr-1.5 h-4 w-4" />
+                        {saving
+                          ? "保存中..."
+                          : activeSupplier
+                            ? "保存修改"
+                            : "创建供应商"}
+                      </Button>
+                    </BusinessWrite>
                   </div>
-                </div>
-
-                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
-                  <FormField
-                    control={form.control}
-                    name="hasQualityIssue"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel className="font-semibold text-destructive">
-                            质量问题标记
-                          </FormLabel>
-                          <FormDescription>
-                            供应商出现过质量问题时勾选，后续采购选择会显示风险提示。
-                          </FormDescription>
-                        </div>
-                      </FormItem>
+                </form>
+              </Form>
+              {activeSupplier && (canArchive || isAdmin) && (
+                <section
+                  aria-label="危险操作"
+                  className="mx-5 mb-5 space-y-3 rounded-lg border border-destructive/30 p-4"
+                >
+                  <h3 className="text-sm font-semibold text-destructive">
+                    危险操作
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    以下操作针对「{activeSupplier.name}
+                    」，与保存无关。归档可由管理员恢复；永久删除须先预览关联记录并输入供应商名称确认。
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {canArchive && (
+                      <BusinessWrite>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
+                          disabled={
+                            !activeSupplier ||
+                            activeSupplier.isActive === false ||
+                            saving
+                          }
+                          onClick={handleDeleteActive}
+                        >
+                          <Trash2 className="mr-1.5 h-4 w-4" />
+                          归档当前
+                        </Button>
+                      </BusinessWrite>
                     )}
-                  />
-
-                  {hasQualityIssue && (
-                    <FormField
-                      control={form.control}
-                      name="qualityNote"
-                      render={({ field }) => (
-                        <FormItem className="mt-4">
-                          <FormLabel>问题描述</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="请描述质量问题、发生时间和处理结果..."
-                              className="min-h-24 resize-none"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </div>
-              </fieldset>
-              <div className="flex flex-col-reverse gap-2 border-t border-border/50 pt-5 sm:flex-row sm:justify-end">
-                <BusinessWrite>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-10 rounded-lg"
-                    onClick={startNewSupplier}
-                  >
-                    取消并新建
-                  </Button>
-                </BusinessWrite>
-                <BusinessWrite>
-                  <Button
-                    type="submit"
-                    className="h-10 rounded-lg"
-                    disabled={saving}
-                  >
-                    <Save className="mr-1.5 h-4 w-4" />
-                    {saving
-                      ? "保存中..."
-                      : activeSupplier
-                        ? "保存修改"
-                        : "创建供应商"}
-                  </Button>
-                </BusinessWrite>
-              </div>
-            </form>
-          </Form>
+                    {isAdmin && (
+                      <BusinessWrite>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
+                          disabled={!activeSupplier || saving}
+                          onClick={openHardDelete}
+                        >
+                          <Trash2 className="mr-1.5 h-4 w-4" />
+                          永久删除
+                        </Button>
+                      </BusinessWrite>
+                    )}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
         </section>
       </div>
     </div>

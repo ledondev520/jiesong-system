@@ -199,3 +199,86 @@ test('updateHsCode: 无来源的税率修改被拒绝，防止无证据覆盖当
     );
   });
 });
+
+// 最小的 hsCode 内存表：只支持本检索用到的 where（contains/startsWith/OR/AND/id in）。
+const makeHsTable = (rows) => {
+  const matches = (row, where = {}) =>
+    Object.entries(where).every(([key, cond]) => {
+      if (key === 'OR') return cond.some((c) => matches(row, c));
+      if (key === 'AND') return cond.every((c) => matches(row, c));
+      if (cond && typeof cond === 'object') {
+        if ('contains' in cond) return String(row[key] || '').toLowerCase().includes(cond.contains.toLowerCase());
+        if ('startsWith' in cond) return String(row[key] || '').startsWith(cond.startsWith);
+        if ('in' in cond) return cond.in.includes(row[key]);
+      }
+      return row[key] === cond;
+    });
+  return {
+    findMany: async ({ where, take }) => rows.filter((row) => matches(row, where)).slice(0, take),
+    count: async ({ where } = {}) => rows.filter((row) => matches(row, where)).length,
+  };
+};
+
+const hsRows = [
+  { id: '1', hsCode: '3924100000', productName: '塑料制餐具及厨房用具', title: null },
+  { id: '2', hsCode: '6911100000', productName: '瓷制餐具', title: null },
+  { id: '3', hsCode: '3909200000', productName: '密胺塑料', title: null },
+  { id: '4', hsCode: '7323930000', productName: '不锈钢制餐桌用具', title: 'Stainless steel tableware' },
+];
+
+test('fuzzySearchHsCodes: 英文品名 melamine 通过别名命中中文品名（原先 0 条）', async () => {
+  await withMockDelegate('hsCode', makeHsTable(hsRows), async () => {
+    const result = await hsCodeService.fuzzySearchHsCodes({ keyword: 'melamine', expandAliases: true });
+    const codes = result.items.map((item) => item.hsCode);
+    assert.ok(codes.includes('3909200000'), '密胺塑料应命中');
+    assert.ok(codes.includes('3924100000'), '塑料餐具应命中');
+    assert.ok(!codes.includes('6911100000'), '无关陶瓷餐具不应命中');
+  });
+});
+
+test('fuzzySearchHsCodes: 大小写与复数不影响别名，多词只扩展已知词', async () => {
+  await withMockDelegate('hsCode', makeHsTable(hsRows), async () => {
+    const upper = await hsCodeService.fuzzySearchHsCodes({ keyword: 'MELAMINE Plates', expandAliases: true });
+    assert.ok(upper.items.some((item) => item.hsCode === '3909200000'));
+    const unknown = await hsCodeService.fuzzySearchHsCodes({ keyword: 'zzzunknown', expandAliases: true });
+    assert.equal(unknown.items.length, 0);
+  });
+});
+
+test('fuzzySearchHsCodes: 仅标题含英文词的记录也能被找到', async () => {
+  await withMockDelegate('hsCode', makeHsTable(hsRows), async () => {
+    const result = await hsCodeService.fuzzySearchHsCodes({ keyword: 'Stainless steel', expandAliases: true });
+    assert.deepEqual(result.items.map((item) => item.hsCode), ['7323930000']);
+  });
+});
+
+test('fuzzySearchHsCodes: 中文关键词与纯数字编码检索行为不变', async () => {
+  await withMockDelegate('hsCode', makeHsTable(hsRows), async () => {
+    const byName = await hsCodeService.fuzzySearchHsCodes({ keyword: '瓷制餐具' });
+    assert.equal(byName.items[0].hsCode, '6911100000');
+    const byCode = await hsCodeService.fuzzySearchHsCodes({ keyword: '3924' });
+    assert.deepEqual(byCode.items.map((item) => item.hsCode), ['3924100000']);
+  });
+});
+
+test('fuzzySearchHsCodes: 同时给编码前缀与英文品名，按别名收紧', async () => {
+  await withMockDelegate('hsCode', makeHsTable(hsRows), async () => {
+    const result = await hsCodeService.fuzzySearchHsCodes({ keyword: 'melamine', code: '39', expandAliases: true });
+    assert.deepEqual(result.items.map((item) => item.hsCode).sort(), ['3909200000', '3924100000']);
+  });
+});
+
+test('fuzzySearchHsCodes: 默认调用（批量匹配/AI 推荐）不展开别名、不按标题命中，英文品名仍交给 AI', async () => {
+  await withMockDelegate('hsCode', makeHsTable(hsRows), async () => {
+    assert.equal((await hsCodeService.fuzzySearchHsCodes({ keyword: 'melamine' })).items.length, 0);
+    assert.equal((await hsCodeService.fuzzySearchHsCodes({ keyword: 'Stainless steel' })).items.length, 0);
+  });
+});
+
+test('fuzzySearchHsCodes: 单字别名已移除，plate 只扩展为餐具而不会命中「光盘」', async () => {
+  const rows = [...hsRows, { id: '5', hsCode: '8523290000', productName: '光盘', title: '盘' }];
+  await withMockDelegate('hsCode', makeHsTable(rows), async () => {
+    const result = await hsCodeService.fuzzySearchHsCodes({ keyword: 'steel plate', expandAliases: true });
+    assert.ok(!result.items.some((item) => item.hsCode === '8523290000'));
+  });
+});

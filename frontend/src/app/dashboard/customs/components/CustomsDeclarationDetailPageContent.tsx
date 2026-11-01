@@ -8,6 +8,8 @@
 
 "use client";
 
+import { formatAmount, formatDeclaredPrice } from "@/lib/format";
+import { RemarkText } from "@/components/ui/remark-text";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -46,6 +48,12 @@ const detailFields = (declaration: CustomsDeclaration) => [
   { label: "出口日期", value: declaration.exportDate?.slice(0, 10) || "-" },
   { label: "成交币种", value: declaration.currency },
 ];
+
+// 报关单价/总价后端可能存长浮点（如 XML 换算）：总价 2 位小数，单价保留申报常用的 4 位；缺失仍显示「-」。
+const priceText = (
+  value: number | null | undefined,
+  format: (value: number) => string = formatAmount,
+) => (value === null || value === undefined ? "-" : format(value));
 
 export function CustomsDeclarationDetailPageContent({
   params,
@@ -209,7 +217,7 @@ export function CustomsDeclarationDetailPageContent({
           <div className="space-y-1 md:col-span-2 xl:col-span-3">
             <div className="text-sm text-muted-foreground">备注</div>
             <div className="whitespace-pre-wrap break-words font-medium">
-              {declaration.note || "-"}
+              <RemarkText note={declaration.note} />
             </div>
           </div>
         </CardContent>
@@ -235,11 +243,14 @@ export function CustomsDeclarationDetailPageContent({
                       label: "数量",
                       value: `${item.quantity.toLocaleString()} ${item.unit || ""}`,
                     },
-                    { label: "单价", value: item.unitPrice ?? "-" },
+                    {
+                      label: "单价",
+                      value: priceText(item.unitPrice, formatDeclaredPrice),
+                    },
                   ]}
                   amount={{
                     label: "总价",
-                    value: `${declaration.currency} ${item.totalPrice ?? "-"}`,
+                    value: `${declaration.currency} ${priceText(item.totalPrice)}`,
                   }}
                 />
               ))
@@ -324,10 +335,10 @@ export function CustomsDeclarationDetailPageContent({
                       </TableCell>
                       <TableCell>{item.unit || "-"}</TableCell>
                       <TableCell className="text-right">
-                        {item.unitPrice ?? "-"}
+                        {priceText(item.unitPrice, formatDeclaredPrice)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {item.totalPrice ?? "-"}
+                        {priceText(item.totalPrice)}
                       </TableCell>
                     </TableRow>
                   ))

@@ -195,7 +195,7 @@ test("local HS search distinguishes numeric prefix, intersects name, opens detai
     )
       writes += 1;
   });
-  await page.getByPlaceholder("编码前缀（4–10位）").fill("999901");
+  await page.getByPlaceholder("编码前缀（4–12位）").fill("999901");
   await expect(page).toHaveURL(/code=999901/);
   await expect(
     page.getByRole("cell", { name: "合成999901名称", exact: true }),
@@ -217,7 +217,7 @@ test("local HS search distinguishes numeric prefix, intersects name, opens detai
       url.searchParams.get("code") === "9999010999"
     );
   });
-  await page.getByPlaceholder("编码前缀（4–10位）").fill("9999010999");
+  await page.getByPlaceholder("编码前缀（4–12位）").fill("9999010999");
   const fallback = await fallbackResponse;
   expect(fallback.status()).toBe(200);
   const fallbackData = (await fallback.json()).data;
@@ -232,7 +232,7 @@ test("local HS search distinguishes numeric prefix, intersects name, opens detai
     page.getByRole("button", { name: "复制报关格式", exact: true }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "返回列表", exact: true }).click();
-  await expect(page.getByPlaceholder("编码前缀（4–10位）")).toHaveValue(
+  await expect(page.getByPlaceholder("编码前缀（4–12位）")).toHaveValue(
     "9999010999",
   );
   await expect(page.getByPlaceholder("商品名称（支持模糊匹配）")).toHaveValue(

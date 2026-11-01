@@ -8,6 +8,7 @@ const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { getPurchaseSettlementStatus } = require('./purchaseStateMachine');
 const { payableWhere, isInEffect, outstandingOf, getPayablesSummary } = require('./payablesService');
+const { attachPurchaseSubStatus } = require('./purchaseSubStatusService');
 const { getSalesSettlementStatus } = require('./salesStateMachine');
 const { roundMoney } = require('../utils/money');
 const {
@@ -661,7 +662,7 @@ const getPayables = async ({ page, pageSize, skip, search, outstandingOnly = fal
     unpaidAmount: outstandingOf(contract),
   })).filter((contract) => (!outstandingOnly || contract.unpaidAmount > 0)
     && (!search || `${contract.contractNo} ${contract.supplier?.name || ''}`.toLowerCase().includes(String(search).trim().toLowerCase())));
-  return { payables: payables.slice(skip, skip + pageSize), total: payables.length, page, pageSize };
+  return { payables: await attachPurchaseSubStatus(payables.slice(skip, skip + pageSize)), total: payables.length, page, pageSize };
 };
 
 const getReceivables = async ({ page, pageSize, skip, search, outstandingOnly = false, overdue = false }) => {

@@ -194,6 +194,7 @@ describe("SuppliersPage 表单页交互逻辑", () => {
         name: "选择供应商 佛山陶瓷有限公司",
       }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     expect(screen.getByLabelText("公司名称 *")).toHaveValue("佛山陶瓷有限公司");
     expect(screen.getByLabelText("联系人")).toHaveValue("李总");
     expect(screen.getByText("编辑现有档案")).toBeInTheDocument();
@@ -275,6 +276,7 @@ describe("supplier editor interrupted sessions (synthetic fixtures)", () => {
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.clear(screen.getByLabelText("联系人"));
     await user.type(screen.getByLabelText("联系人"), "合成修改草稿");
     await user.click(screen.getByRole("button", { name: "保存修改" }));
@@ -302,11 +304,13 @@ describe("supplier editor interrupted sessions (synthetic fixtures)", () => {
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.click(screen.getByRole("button", { name: "保存修改" }));
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     await user.click(
       screen.getByRole("button", { name: "选择供应商 合成供应商乙" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.clear(screen.getByLabelText("联系人"));
     await user.type(screen.getByLabelText("联系人"), "合成乙新草稿");
     await user.type(
@@ -368,6 +372,7 @@ describe("supplier editor interrupted sessions (synthetic fixtures)", () => {
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     const form = screen.getByLabelText("公司名称 *").closest("form")!;
     fireEvent.submit(form);
     fireEvent.submit(form);
@@ -384,12 +389,14 @@ describe("supplier editor interrupted sessions (synthetic fixtures)", () => {
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.click(screen.getByRole("button", { name: "保存修改" }));
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     await user.click(screen.getByRole("button", { name: "取消并新建" }));
     await user.click(
       screen.getByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.clear(screen.getByLabelText("联系人"));
     await user.type(screen.getByLabelText("联系人"), "合成重开草稿");
     await act(async () => pending.reject(new Error("synthetic late failure")));
@@ -455,6 +462,7 @@ describe("supplier catalog identity and deletion sessions", () => {
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.click(screen.getByRole("button", { name: "永久删除" }));
     const dialog = await screen.findByRole("alertdialog");
     expect(dialog).toHaveTextContent("采购合同");
@@ -494,6 +502,7 @@ describe("supplier catalog identity and deletion sessions", () => {
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.click(screen.getByRole("button", { name: "永久删除" }));
     const dialog = await screen.findByRole("alertdialog");
     expect(dialog).toHaveTextContent("存在 2 条付款/应付核销记录");
@@ -512,6 +521,7 @@ describe("supplier catalog identity and deletion sessions", () => {
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.click(screen.getByRole("button", { name: "保存修改" }));
     await screen.findByText("暂无供应商");
     await waitFor(() =>
@@ -536,11 +546,13 @@ describe("supplier catalog identity and deletion sessions", () => {
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.click(screen.getByRole("button", { name: "归档当前" }));
     await waitFor(() => expect(mockDelete).toHaveBeenCalledTimes(1));
     await user.click(
       screen.getByRole("button", { name: "选择供应商 合成供应商乙" }),
     );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.type(screen.getByLabelText("联系人"), "合成保留草稿");
     await act(async () => pending.resolve({ data: null }));
     expect(screen.getByLabelText("公司名称 *")).toHaveValue("合成供应商乙");
@@ -570,4 +582,55 @@ it("供应商索引摘要的合计包含已归档，三类相加等于总数 (B2
   expect(
     await screen.findByText(/共 3 家，正常 1 家，质量问题\s*1 家，已归档 1 家/),
   ).toBeInTheDocument();
+});
+
+describe("supplier click lands on a read-only summary (B17)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({
+      user: { id: "synthetic-admin", role: Role.ADMIN } as never,
+    });
+    mockGetAll
+      .mockReset()
+      .mockResolvedValue({ data: { items: syntheticSuppliers } });
+  });
+
+  it("shows the summary without save/archive/permanent-delete until 编辑 is chosen", async () => {
+    const user = userEvent.setup();
+    render(<SuppliersPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
+    );
+    expect(screen.getByTestId("supplier-summary")).toBeInTheDocument();
+    for (const name of ["保存修改", "归档当前", "永久删除"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByLabelText("公司名称 *")).not.toBeInTheDocument();
+    expect(mockUpdate).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "编辑" }));
+    expect(screen.getByLabelText("公司名称 *")).toHaveValue("合成供应商甲");
+    expect(screen.queryByTestId("supplier-summary")).not.toBeInTheDocument();
+  });
+
+  it("keeps archive and permanent delete in a separate danger zone that names the record", async () => {
+    const user = userEvent.setup();
+    render(<SuppliersPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
+    );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
+    const zone = screen.getByRole("region", { name: "危险操作" });
+    expect(zone).toHaveTextContent("合成供应商甲");
+    expect(
+      within(zone).getByRole("button", { name: "归档当前" }),
+    ).toBeInTheDocument();
+    expect(
+      within(zone).getByRole("button", { name: "永久删除" }),
+    ).toBeInTheDocument();
+    // 保存按钮不在危险区内
+    expect(
+      within(zone).queryByRole("button", { name: "保存修改" }),
+    ).not.toBeInTheDocument();
+  });
 });

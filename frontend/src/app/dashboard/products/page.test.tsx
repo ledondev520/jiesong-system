@@ -235,3 +235,29 @@ it("资料不全按钮把 incomplete 发送到后端，页面不再有库存页�
     (await screen.findAllByText(/缺少：毛重、HS编码/)).length,
   ).toBeGreaterThan(0);
 });
+
+it("点击商品卡片或「详情」进入只读详情页，不直接打开编辑弹窗 (B17)", async () => {
+  mockSearchParamGet.mockImplementation(() => null);
+  mockRouterPush.mockReset();
+  mockGetAll.mockResolvedValue({
+    data: {
+      items: [{ id: "p1", customsName: "合成瓷砖", hsCode: "69072100" }],
+      pagination: { total: 1, page: 1, pageSize: 20, totalPages: 1 },
+    },
+  });
+  const user = userEvent.setup();
+  render(<ProductsPage />);
+  await screen.findAllByText("合成瓷砖");
+
+  const names = screen.getAllByText("合成瓷砖");
+  await user.click(names[names.length - 1]);
+  expect(mockRouterPush).toHaveBeenLastCalledWith("/dashboard/products/p1");
+
+  mockRouterPush.mockReset();
+  await user.click(screen.getAllByRole("button", { name: "详情" })[0]);
+  expect(mockRouterPush).toHaveBeenCalledWith("/dashboard/products/p1");
+  expect(screen.queryByText("商品弹窗已打开")).not.toBeInTheDocument();
+
+  await user.click(screen.getAllByRole("button", { name: /编辑/ })[0]);
+  expect(screen.getByText("商品弹窗已打开")).toBeInTheDocument();
+});

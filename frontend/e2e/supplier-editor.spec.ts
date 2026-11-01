@@ -77,6 +77,7 @@ for (const width of [390, 1440]) {
     });
     await signInAsAdmin(page, "/dashboard/suppliers");
     await page.getByRole("button", { name: "选择供应商 合成供应商甲" }).click();
+    await page.getByRole("button", { name: "编辑", exact: true }).click();
     await page.getByLabel("联系人", { exact: true }).fill("合成失败重试草稿");
     await page.getByRole("button", { name: "保存修改", exact: true }).click();
     await expect(page.getByText("更新失败", { exact: true })).toBeVisible();
@@ -92,6 +93,7 @@ for (const width of [390, 1440]) {
     await page.getByRole("button", { name: "保存修改", exact: true }).click();
     await expect.poll(() => writes.length).toBe(3);
     await page.getByRole("button", { name: "选择供应商 合成供应商乙" }).click();
+    await page.getByRole("button", { name: "编辑", exact: true }).click();
     await page.getByLabel("联系人", { exact: true }).fill("合成乙新草稿");
     await page
       .getByPlaceholder("搜索名称、联系人、别名...")

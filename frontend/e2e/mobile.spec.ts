@@ -229,7 +229,7 @@ test.describe("手机查阅与异常恢复", () => {
   });
   test("HS 详情内容、夜间模式与返回", async ({ page }) => {
     await signInAsAdmin(page, "/dashboard/hs-codes");
-    await page.getByPlaceholder("编码前缀（4–10位）").fill("7308");
+    await page.getByPlaceholder("编码前缀（4–12位）").fill("7308");
     await page
       .getByRole("button", { name: "查看申报要素与详情", exact: true })
       .click();

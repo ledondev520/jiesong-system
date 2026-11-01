@@ -33,6 +33,8 @@ export interface TodoList {
   items: TodoItem[];
   /** 仅「待付款/缺进项发票」：签约早于 before 的历史合同不计入 count。 */
   historical?: { count: number; before: string };
+  /** 仅「可申报退税」：count 为材料核验通过数，pending 为退税工作台「待处理出口」总数（同一汇总）。 */
+  pending?: { count: number; label: string };
 }
 
 export interface BossFigures {

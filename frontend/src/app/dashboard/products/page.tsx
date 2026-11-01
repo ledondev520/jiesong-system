@@ -448,6 +448,16 @@ function ProductsPageContent() {
               ]}
               action={
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-10 flex-1 rounded-xl"
+                    onClick={() =>
+                      router.push(`/dashboard/products/${product.id}`)
+                    }
+                  >
+                    详情
+                  </Button>
                   <BusinessWrite>
                     <Button
                       variant="outline"
@@ -513,7 +523,9 @@ function ProductsPageContent() {
                   key={product.id}
                   className="cursor-pointer border-border/40 border-l-[3px] bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
                   style={{ borderLeftColor: "oklch(0.55 0.14 150)" }}
-                  onClick={() => handleEdit(product)}
+                  onClick={() =>
+                    router.push(`/dashboard/products/${product.id}`)
+                  }
                 >
                   <CardContent className="space-y-3 p-4">
                     {/* 名称 + 分类 */}
@@ -590,6 +602,17 @@ function ProductsPageContent() {
 
                     {/* 操作 */}
                     <div className="flex gap-2 pt-1 border-t border-border/30">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 flex-1 rounded-lg text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/products/${product.id}`);
+                        }}
+                      >
+                        详情
+                      </Button>
                       <BusinessWrite>
                         <Button
                           variant="outline"

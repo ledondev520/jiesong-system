@@ -8,6 +8,7 @@
 
 "use client";
 
+import { LoadingValue } from "@/components/ui/loading-value";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import {
   startTransition,
@@ -489,7 +490,9 @@ export function CustomsDeclarationListPageContent({
 
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>
-          共 {total} 条，第 {page} 页；本页已放行 {releasedCount} 条
+          共 <LoadingValue loading={loading}>{total}</LoadingValue> 条，第{" "}
+          {page} 页；本页已放行{" "}
+          <LoadingValue loading={loading}>{releasedCount}</LoadingValue> 条
         </span>
         <Button
           variant="outline"

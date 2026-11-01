@@ -385,9 +385,18 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
     await expect(refundAmount).toBeVisible();
     await expect(refundAmount).toHaveText(amount);
   }
+  // 备注正文只显示说明文字；系统关联的报关单/核销单内部 ID 收在折叠的「导入来源」里。
+  const refundNote = String(saved.tax_refunds[0].note);
+  const refundIds = refundNote.match(/c[a-z0-9]{24}/g) ?? [];
+  expect(refundIds).toHaveLength(2);
   await expect(
-    page.getByText(String(saved.tax_refunds[0].note), { exact: true }),
+    page.getByText(refundNote.split("关联报关单")[0].trim()),
   ).toBeVisible();
+  // 同一页面的其他字段也可能出现这些 ID，所以只在备注自己的折叠区里核对。
+  const source = page.locator("details").filter({ hasText: "导入来源" });
+  await expect(source).not.toHaveAttribute("open", "");
+  await source.getByText("导入来源", { exact: true }).click();
+  for (const id of refundIds) await expect(source).toContainText(id);
   expect(readExportDocuments(fixture)).toEqual(saved);
 });
 

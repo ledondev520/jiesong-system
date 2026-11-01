@@ -6,6 +6,7 @@
 
 "use client";
 
+import { LoadingValue } from "@/components/ui/loading-value";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import {
   useCallback,
@@ -66,6 +67,7 @@ import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
 import { InvoiceVerificationDialog } from "./InvoiceVerificationDialog";
+import { BlockerGroups } from "@/components/tax-refund/BlockerGroups";
 
 const stageMeta: Record<
   Exclude<TaxRefundWorkbenchStage, "ALL">,
@@ -372,7 +374,8 @@ export function TaxRefundWorkbench() {
       )}
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>
-          共 {data?.total ?? 0} 条，第 {page} 页
+          共 <LoadingValue loading={loading}>{data?.total ?? 0}</LoadingValue>{" "}
+          条，第 {page} 页
         </span>
         <PageSizeSelect
           value={pageSize}
@@ -456,11 +459,16 @@ export function TaxRefundWorkbench() {
               }
               action={
                 <div className="space-y-3">
-                  <p className="break-words text-xs text-muted-foreground">
-                    {item.issues.length
-                      ? item.issues.join("；")
-                      : "内部校验通过"}
-                  </p>
+                  {item.issues.length ? (
+                    <BlockerGroups
+                      blockers={item.issues}
+                      className="space-y-2 text-xs text-muted-foreground"
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      内部校验通过
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     <BusinessWrite>
                       <Button
@@ -622,11 +630,10 @@ export function TaxRefundWorkbench() {
                       </TableCell>
                       <TableCell className="max-w-sm whitespace-normal break-words text-xs text-muted-foreground">
                         {item.issues.length ? (
-                          <ul className="list-disc space-y-0.5 pl-4">
-                            {item.issues.map((issue) => (
-                              <li key={issue}>{issue}</li>
-                            ))}
-                          </ul>
+                          <BlockerGroups
+                            blockers={item.issues}
+                            className="space-y-2 text-xs"
+                          />
                         ) : (
                           <span className="text-emerald-700">
                             <CheckCircle2 className="mr-1 inline h-3 w-3" />

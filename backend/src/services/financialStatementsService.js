@@ -978,6 +978,11 @@ async function getAnalytics() {
     adminExpenses: p.incomeStatement?.adminExpensesMonth ?? 0,
     financialExpenses: p.incomeStatement?.financialExpensesMonth ?? 0,
     sellingExpenses: p.incomeStatement?.sellingExpensesMonth ?? 0,
+    // 区分「费用行未录入（NULL）」与「录入为 0」：上面的 ?? 0 会把两者混成 0，占比图靠这个说明原因
+    expenseReported: [
+      p.incomeStatement?.costOfSalesMonth, p.incomeStatement?.adminExpensesMonth,
+      p.incomeStatement?.financialExpensesMonth, p.incomeStatement?.sellingExpensesMonth,
+    ].some((value) => value !== null && value !== undefined),
     operatingProfit: p.incomeStatement?.operatingProfitMonth ?? 0,
     netProfit: p.incomeStatement?.netProfitMonth ?? 0,
     // 资产负债表

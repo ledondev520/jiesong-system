@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PURCHASE_STATUS_LABELS } from "@/components/ui/status-badge";
 
 // 扩展类型
 export interface PurchaseContractDetail extends PurchaseContract {
@@ -64,7 +65,7 @@ export function StatusPill({ status }: { status: PurchaseStatus }) {
         "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800",
     },
     [PurchaseStatus.SIGNED]: {
-      label: "已确认",
+      label: PURCHASE_STATUS_LABELS.SIGNED,
       icon: <CheckCircle2 className="h-3 w-3" />,
       className:
         "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",

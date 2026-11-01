@@ -6,6 +6,7 @@
 
 "use client";
 
+import { RemarkText } from "@/components/ui/remark-text";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import {
   use,
@@ -198,7 +199,9 @@ export function TaxRefundDetailPageContent({
           ))}
           <div className="space-y-1 md:col-span-2 xl:col-span-3">
             <div className="text-sm text-muted-foreground">备注</div>
-            <div className="font-medium">{taxRefund.note || "-"}</div>
+            <div className="font-medium">
+              <RemarkText note={taxRefund.note} />
+            </div>
           </div>
         </CardContent>
       </Card>

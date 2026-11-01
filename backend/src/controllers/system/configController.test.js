@@ -137,13 +137,14 @@ test('getConfigs: OpenAI 环境密钥从不返回（连脱敏后缀也没有）�
   const originalAi = config.ai;
   const originalFindMany = prisma.systemConfig.findMany;
   try {
-    config.ai = { provider: 'openai', apiKey: 'test-only-openai-env-5555', model: 'synthetic-openai-model' };
+    config.ai = { provider: 'openai', apiKey: 'test-only-openai-env-5555', model: 'synthetic-openai-model', maxOutputTokens: 12345 };
     prisma.systemConfig.findMany = async () => [];
     const res = createMockRes();
     await configController.getConfigs({}, res, (error) => { throw error; });
     assert.equal(res.payload.data.aiProvider, 'openai');
     assert.equal(res.payload.data.openaiConfigured, true);
     assert.equal(res.payload.data.openaiModel, 'synthetic-openai-model');
+    assert.equal(res.payload.data.openaiMaxOutputTokens, 12345, '页面据此说明输出长度的真实上限');
     assert.equal(Object.hasOwn(res.payload.data, 'apiKey'), false);
     assert.equal(JSON.stringify(res.payload).includes('5555'), false);
     assert.equal(JSON.stringify(res.payload).includes('test-only-'), false);
