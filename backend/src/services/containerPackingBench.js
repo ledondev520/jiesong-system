@@ -42,4 +42,29 @@ const makeBenchContract = (sizes, { seed = 20261101, maxQty = 4 } = {}) => {
   return { packingItems };
 };
 
-module.exports = { makeBenchContract };
+/**
+ * 直接生成归一化装柜行（跳过 toCartonLines）：n 行、每行 per 箱、箱规互不相同。
+ * fitCbm>0 时按总体积≈fitCbm 缩放（单柜量级）；否则为随机大箱（多柜订单）。
+ */
+const makeOrderLines = (n, per, { seed = 42, fitCbm = 0 } = {}) => {
+  const rand = mulberry32(seed);
+  const int = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1));
+  const scale = fitCbm > 0 ? Math.cbrt((fitCbm * 1e9) / (n * per)) : 0;
+  return Array.from({ length: n }, (_, i) => {
+    const furniture = rand() < 0.5;
+    const cartonMm = scale
+      ? {
+        length: Math.max(1, Math.round(scale * (0.8 + 0.7 * rand()))),
+        width: Math.max(1, Math.round(scale * (0.6 + 0.6 * rand()))),
+        height: Math.max(1, Math.round(scale * (0.5 + 0.6 * rand()))),
+      }
+      : { length: int(300, 1200), width: int(250, 800), height: int(200, 700) };
+    return {
+      lineId: `L${String(i).padStart(5, '0')}`, productId: `P${i}`, name: `SKU${i}`, color: '#000', cartons: per,
+      kgPerCarton: int(3, 25), cartonMm, dimsSource: 'line', profile: furniture ? 'furniture' : 'default',
+      heavy: false, upright: true, maxStackKg: furniture ? 80 : 60,
+    };
+  });
+};
+
+module.exports = { makeBenchContract, makeOrderLines };
