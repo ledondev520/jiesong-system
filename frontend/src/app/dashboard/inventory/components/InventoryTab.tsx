@@ -57,6 +57,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, RefreshCw, Search, X } from "lucide-react";
+import { InventoryDetailDialog } from "./InventoryDetailDialog";
 import { toast } from "sonner";
 import { runAwait } from "@/lib/run-await";
 import { Input } from "@/components/ui/input";
@@ -118,6 +119,7 @@ export function InventoryTab() {
     null,
   );
   const [debouncedKeyword, setDebouncedKeyword] = useState(keyword.trim());
+  const [detailItem, setDetailItem] = useState<Inventory | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [batchUpdating, setBatchUpdating] = useState(false);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
@@ -697,6 +699,15 @@ export function InventoryTab() {
                     </div>
                   </div>
 
+                  <Button
+                    variant="outline"
+                    className="h-11 w-full rounded-2xl"
+                    onClick={() => setDetailItem(item)}
+                    aria-label={`查看 ${itemLabel} 详情`}
+                  >
+                    详情
+                  </Button>
+
                   {nextStatuses.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
                       {item.purchaseItemId || item.receiptInspectionId
@@ -826,6 +837,15 @@ export function InventoryTab() {
                   </TableCell>
                   <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mr-2"
+                      onClick={() => setDetailItem(item)}
+                      aria-label={`查看 ${item.product?.customsName || item.id} 详情`}
+                    >
+                      详情
+                    </Button>
                     {item.purchaseItemId || item.receiptInspectionId ? (
                       <span className="text-sm text-muted-foreground">
                         自动流转
@@ -872,6 +892,17 @@ export function InventoryTab() {
           </TableBody>
         </Table>
       </div>
+
+      <InventoryDetailDialog
+        item={detailItem}
+        statusLabel={detailItem ? STATUS_LABEL_MAP[detailItem.status] : ""}
+        quantityLabel={
+          detailItem
+            ? formatQuantity(detailItem.quantity, detailItem.product?.unit)
+            : ""
+        }
+        onClose={() => setDetailItem(null)}
+      />
 
       <AlertDialog
         open={pendingChange !== null}

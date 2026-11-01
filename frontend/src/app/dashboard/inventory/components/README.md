@@ -4,3 +4,4 @@
 - `InventoryTab.lifecycle.test.tsx`：覆盖批量入库后刷新、待处理批量操作期间的搜索/翻页切换，以及验货后重新进入库存页面的即时显示
 - `InventoryTab.same-round.test.tsx`：同一轮完成的库存列表与状态更新请求，旧列表不覆盖新状态、提示顺序与原 async try/await 一致
 - 采购/验货来源库存由对应业务自动流转，页面不提供重复手工入出库入口
+- `InventoryDetailDialog.tsx`：行内「详情」打开的只读库存详情弹窗，数据来自已加载列表，不发写请求 (B17)
