@@ -1,7 +1,7 @@
 /**
  * Input: Committed Prisma migrations/schema and an exclusive private destination path
  * Output: A 0600 SQLite copy of a once-built migrated (kind "deploy") or schema-DDL (kind "diff") template
- * Pos: Test-only; replaces one Prisma CLI run per fixture with one per migration-content hash
+ * Pos: Test-only; replaces one Prisma CLI run per fixture with one per migration+schema+builder+Prisma-version hash
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -14,9 +14,9 @@ const { execFileSync } = require('node:child_process');
 const backendRoot = path.resolve(__dirname, '../..');
 const prismaCli = () => require.resolve('prisma/build/index.js');
 
-/** 职责：迁移内容+schema 的摘要，迁移或 schema 任何变化都使旧模板作废 */
+/** 职责：迁移内容+schema+本构建器+Prisma 版本的摘要，任一变化都使旧模板作废 */
 function contentKey() {
-  const hash = crypto.createHash('sha256');
+  const hash = crypto.createHash('sha256').update(fs.readFileSync(__filename)).update(require('prisma/package.json').version);
   const migrations = path.join(backendRoot, 'prisma/migrations');
   for (const name of fs.readdirSync(migrations).sort()) {
     const file = path.join(migrations, name, 'migration.sql');
