@@ -243,7 +243,10 @@ export function CustomsDeclarationDetailPageContent({
                       label: "数量",
                       value: `${item.quantity.toLocaleString()} ${item.unit || ""}`,
                     },
-                    { label: "单价", value: priceText(item.unitPrice, formatDeclaredPrice) },
+                    {
+                      label: "单价",
+                      value: priceText(item.unitPrice, formatDeclaredPrice),
+                    },
                   ]}
                   amount={{
                     label: "总价",
