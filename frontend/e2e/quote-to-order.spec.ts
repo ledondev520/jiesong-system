@@ -43,7 +43,7 @@ test("quote → order: accepted quote converts and opens the new order", async (
   await expect(page).toHaveURL(/\/dashboard\/quotes\/q1$/);
   await expect(page.getByRole("button", { name: "转为出口订单" })).toBeVisible();
   await page.getByRole("button", { name: "转为出口订单" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/sales\/ord-1/);
+  await expect(page).toHaveURL(/\/dashboard\/orders\/ord-1$/);
   expect(puts).toEqual([{ status: "CONVERTED" }]);
 });
 
@@ -56,5 +56,5 @@ test("quote detail shows one primary button per status", async ({ page }) => {
   await expect(page.getByRole("button", { name: "转为出口订单" })).toHaveCount(0);
   current = quote("CONVERTED", { salesContract: { id: "ord-1", contractNo: "EXP202600001" } });
   await page.reload();
-  await expect(page.getByRole("link", { name: "查看订单" })).toHaveAttribute("href", "/dashboard/sales/ord-1");
+  await expect(page.getByRole("link", { name: "查看订单" })).toHaveAttribute("href", "/dashboard/orders/ord-1");
 });

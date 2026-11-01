@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import type { PurchaseReceiptList } from "../src/services/purchaseReceipt.service";
 import pricingDefaults from "../../config/pricing.json";
 import pricingSchema from "../../config/pricing.schema.json";
+import { twoContainerPlan } from "../src/components/container/containerFixtures";
 
 const now = "2026-03-01T08:00:00.000Z";
 
@@ -1580,6 +1581,27 @@ export const mockApiRoutes = async (page: Page) => {
 
     if (pathname === "/api/v1/sales" && method === "GET") {
       await fulfillJson(route, asPaginated([salesContract]));
+      return;
+    }
+
+    // 订单详情的货柜页签与发运门槛只读后端 loading-plan；缺少它页面按 fail-closed 显示「加载失败」。
+    if (
+      /^\/api\/v1\/sales\/[^/]+\/loading-plan$/.test(pathname) &&
+      method === "GET"
+    ) {
+      const plan = twoContainerPlan();
+      await fulfillJson(route, {
+        ...plan,
+        containers: plan.containers.slice(0, 1),
+        totals: { cartons: 3, grossKg: 30, cargoCbm: 0.4 },
+        check: {
+          ...plan.check,
+          ready: true,
+          status: "ready",
+          blockers: [],
+          headline: "可出柜：体积 52.5%、毛重 0.1%，全部 3 箱已装入 1 个40HQ",
+        },
+      });
       return;
     }
 
