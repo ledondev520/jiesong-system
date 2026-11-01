@@ -57,7 +57,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BlockerGroups } from "@/components/tax-refund/BlockerGroups";
+import {
+  BlockerGroups,
+  countBlockers,
+} from "@/components/tax-refund/BlockerGroups";
 
 interface TaxRefundPreparationDialogProps {
   open: boolean;
@@ -342,7 +345,7 @@ export function TaxRefundPreparationDialog({
                   )
                 ) : (
                   <div className="space-y-2">
-                    <p>{`仍有 ${blockers.length} 项材料准备阻塞：`}</p>
+                    <p>{`仍有 ${countBlockers(blockers)} 项材料准备阻塞：`}</p>
                     <BlockerGroups blockers={blockers} />
                   </div>
                 )}

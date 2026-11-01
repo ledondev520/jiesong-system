@@ -11,9 +11,10 @@ import { Badge } from "@/components/ui/badge";
 const ENTRY_PREVIEW_CHARS = 60;
 const GROUP_PREVIEW_ENTRIES = 5;
 
-// 顺序即优先级：先报关（「报关金额与商业发票金额有差异」归报关），再发票，再出货/装箱。
+// 顺序即优先级：先报关（「报关金额与商业发票金额有差异」归报关），再供应商资料（「供应商发票号码」仍归发票），再发票，再出货/装箱。
 const GROUP_RULES: ReadonlyArray<{ label: string; test: RegExp }> = [
   { label: "报关单", test: /报关|放行/ },
+  { label: "供应商资料", test: /供应商(?!发票|开票)/ },
   { label: "发票核验", test: /发票|票号|票种|税号|进项/ },
   { label: "出货与装箱", test: /出货|发运|装箱|采购来源/ },
 ];
@@ -42,6 +43,14 @@ export function groupBlockers(blockers: readonly string[]): BlockerGroup[] {
     groups[index === -1 ? GROUP_RULES.length : index].entries.push(entry);
   }
   return groups.filter((group) => group.entries.length > 0);
+}
+
+/** 拆分去重后的问题总数：标题计数必须与各分组计数之和一致。 */
+export function countBlockers(blockers: readonly string[]): number {
+  return groupBlockers(blockers).reduce(
+    (total, group) => total + group.entries.length,
+    0,
+  );
 }
 
 function Entry({ text }: { text: string }) {
