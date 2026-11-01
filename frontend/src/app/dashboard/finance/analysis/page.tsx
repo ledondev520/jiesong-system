@@ -56,6 +56,11 @@ import {
 } from "@/services/reports.service";
 import { Button } from "@/components/ui/button";
 import { ChartTooltip } from "@/components/finance/ChartTooltip";
+import {
+  formatCnyAxisTick,
+  formatMonthAxisTick,
+  rotatedTickProps,
+} from "@/lib/chart-axis";
 
 const formatCurrency = (amount: number | null, currency: "USD" | "CNY") => {
   if (amount === null) return "待核验";
@@ -677,15 +682,17 @@ function BusinessReportsContent() {
                   <XAxis
                     dataKey="month"
                     tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    tickFormatter={(v) => v.substring(5)}
+                    tickFormatter={formatMonthAxisTick}
+                    interval="preserveStartEnd"
+                    minTickGap={12}
+                    {...rotatedTickProps(trends.monthlySales.length, 6)}
                     axisLine={false}
                     tickLine={false}
                   />
                   <YAxis
                     tick={{ fontSize: 12, fill: "var(--muted-foreground)" }}
-                    tickFormatter={(v) =>
-                      v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
-                    }
+                    tickFormatter={formatCnyAxisTick}
+                    width={56}
                     axisLine={false}
                     tickLine={false}
                   />
