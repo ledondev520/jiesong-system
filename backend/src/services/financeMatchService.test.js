@@ -159,10 +159,13 @@ test('已有人工关联发票也计入累计额：合同已满则新发票不�
  assert.deepEqual(writes,[]);
 });
 
-test('合同上第一张略高于合同额的发票仍交评分决定（上限只拦追加发票）',async(t)=>{
- const{writes}=invoiceFixture(t,{contracts:[contract()],invoices:[invoice('only',{total:38300}),]});
+test('累计额上限含首张发票：超合同额 1% 的单张不关联（CG2500075/82/112 型），1% 内仍可',async(t)=>{
+ const over=invoiceFixture(t,{contracts:[contract()],invoices:[invoice('over',{total:38500})]});
  await service.runAutoMatch();
- assert.deepEqual(writes.map(w=>w.id),['only']);
+ assert.deepEqual(over.writes,[]);
+ const within=invoiceFixture(t,{contracts:[contract()],invoices:[invoice('within',{total:38300})]});
+ await service.runAutoMatch();
+ assert.deepEqual(within.writes.map(w=>w.id),['within']);
 });
 
 test('税号冲突：同名/近似名称但税号不同不关联（CG2500050、CG2600012 型）；任一方缺税号退回名称判断',async(t)=>{

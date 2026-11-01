@@ -1,7 +1,7 @@
 /**
  * Input: Prisma client、BankTransaction / InvoiceRecord / PurchaseContract / SalesContract 模型
  * Output: 智能关联引擎；发票自动写入重验待匹配状态，仅有效发票（正常且正数）可被自动关联、红冲/负数留待人工，人工关联验证有效购销目标；
- *         发票→采购合同另有硬护栏（累计额≤合同额+1%、税号冲突排除、早于签约30天以上排除）与仅动自动关联的重配 rematchAutoInvoiceLinks
+ *         发票→采购合同另有硬护栏（累计额≤合同额×1.01、税号冲突排除、早于签约30天以上排除）与仅动自动关联的重配 rematchAutoInvoiceLinks
  * Pos: 财务模块-智能关联业务逻辑层
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -33,7 +33,7 @@ const AMOUNT_LOOSE_TOLERANCE = 0.01; // ±1%
 const DATE_MATCH_WINDOW_DAYS = 30; // 日期匹配窗口
 // 发票→采购合同的硬性护栏（INVMATCH-4，修复 prod 回填后审计出的错链）：
 const INVOICE_EARLY_DAYS = 30; // 发票早于签约超过 30 天不关联，与 scoreDate「早于 30 天基本不可能」同口径
-const INVOICE_CAP_TOLERANCE = AMOUNT_LOOSE_TOLERANCE; // 追加发票后累计额上限 = 合同额 × (1+1%) + 0.01，容忍税差/凑整
+const INVOICE_CAP_TOLERANCE = AMOUNT_LOOSE_TOLERANCE; // 关联发票累计额（含本张）上限 = 合同额 × (1+1%) + 0.01，容忍税差/凑整
 // manualMatch 固定写 100；自动也可能打满 100，二者无法区分，批量重配一律视为人工锁定、不动。
 const LOCKED_SCORE = 100;
 const PURCHASE_KEYWORDS = ['货款', '采购', '购货', '材料款', '设备款', '商品款'];
@@ -260,9 +260,9 @@ function invoiceTooEarly(invDate, signedAt) {
   return diffDays < -INVOICE_EARLY_DAYS;
 }
 
-// 合同上第一张发票不受此限（是否合理交给金额评分）：审计未把单张略高于合同额的发票判为错链，硬拒会误伤；上限只拦「追加」发票。
+// 首张发票同样受限（INVMATCH-4b 业主决定）：单张超出合同额 1% 的发票回到待匹配，由人工确认。
 function exceedsInvoiceCap(contract, linkedTotal, invTotal) {
-  return linkedTotal > 0 && linkedTotal + invTotal > contract.totalAmount * (1 + INVOICE_CAP_TOLERANCE) + 0.01;
+  return linkedTotal + invTotal > contract.totalAmount * (1 + INVOICE_CAP_TOLERANCE) + 0.01;
 }
 
 // ==================== 匹配核心 ====================
