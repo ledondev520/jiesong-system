@@ -7,7 +7,7 @@
 import { expect, type Page, type Route } from "@playwright/test";
 import { createHash } from "node:crypto";
 import type { PurchaseReceiptList } from "../src/services/purchaseReceipt.service";
-import pricingDefaults from "../../config/pricing.json";
+import { pricingConfigFixture as pricingDefaults } from "../src/test/fixtures/pricing-config";
 import pricingSchema from "../../config/pricing.schema.json";
 import { twoContainerPlan } from "../src/components/container/containerFixtures";
 

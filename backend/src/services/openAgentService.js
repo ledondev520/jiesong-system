@@ -6,6 +6,7 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
+const crypto = require('node:crypto');
 const prisma = require('../utils/prisma');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
@@ -1354,7 +1355,7 @@ const resolveSdkSessionConfig = (sessionId) => {
   }
 
   return {
-    sessionId: `agent_runtime_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    sessionId: `agent_runtime_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
     persistSession: true,
   };
 };

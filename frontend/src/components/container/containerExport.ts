@@ -1,6 +1,6 @@
 /**
  * Input: 已渲染的打印页 DOM 元素（每柜一页）
- * Output: PNG 下载、PDF 下载（页面截图 → 图片；按页宽缩放，长表格在行边界分页且逐页截取；不引入新依赖，jsPDF 默认字体不含中文故不直接写文字）
+ * Output: PNG 下载、PDF 下载（页面截图 → 图片；按页宽缩放，长表格在行边界分页且逐页截取；PDF 页统一 A4 竖版、以 JPEG 嵌入控制体积；不引入新依赖，jsPDF 默认字体不含中文故不直接写文字）
  * Pos: 装柜图导出工具，供 ContainerLoadingPanel 调用
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -16,10 +16,16 @@ const download = (href: string, filename: string) => {
 };
 
 /** 截取元素的 [from, to) CSS 像素纵向区间：克隆根节点上移 from，画布只有切片高度，避免整页超出浏览器画布上限。 */
-const capture = async (element: HTMLElement, from = 0, to?: number) => {
-  const { domToPng } = await import("modern-screenshot");
-  return domToPng(element, {
+const capture = async (
+  element: HTMLElement,
+  from = 0,
+  to?: number,
+  format: "png" | "jpeg" = "png",
+) => {
+  const { domToPng, domToJpeg } = await import("modern-screenshot");
+  return (format === "png" ? domToPng : domToJpeg)(element, {
     scale: 2,
+    quality: 0.85, // 仅 JPEG 生效：未压缩 2200px RGB 每页约 20 MB，JPEG 约数百 KB
     backgroundColor: "#ffffff",
     ...(to === undefined
       ? {}
@@ -55,41 +61,44 @@ export function planSlices(total: number, pageH: number, breaks: number[]) {
   return slices;
 }
 
+/**
+ * 职责：收集允许断页的纵向位置（相对元素顶边）：带标题的表/图块顶边、svg 顶边、表体行顶边；
+ * 不含每表第一行体行——在那里断开会把标题+表头单独留在上一页（表头无数据行）。
+ */
+export function collectBreaks(element: HTMLElement) {
+  const top = element.getBoundingClientRect().top;
+  return Array.from(
+    element.querySelectorAll(
+      "[data-pdf-block], svg, tbody tr:not(:first-child)",
+    ),
+  ).map((node) => node.getBoundingClientRect().top - top);
+}
+
 /** 职责：每个元素按 A4 页宽等比缩放（保持可读字号），超出一页高度的长表格分页续排。 */
 export async function exportPagesPdf(
   elements: HTMLElement[],
   filename: string,
 ) {
   const { jsPDF } = await import("jspdf");
-  const orientationOf = (el: HTMLElement) =>
-    el.offsetHeight > el.offsetWidth ? "portrait" : "landscape";
-  const doc = new jsPDF({
-    orientation: orientationOf(elements[0]),
-    unit: "mm",
-    format: "a4",
-  });
+  // 统一 A4 竖版：截图宽度固定，按宽高比自动转横版会让短的柜（如 1 个块）变横版并被拆页。
+  const pageW = 210;
+  const pageH = 297;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   let first = true;
   for (const element of elements) {
-    const orientation = orientationOf(element);
-    const pageW = orientation === "portrait" ? 210 : 297;
-    const pageH = orientation === "portrait" ? 297 : 210;
     const pageCssH = (pageH / pageW) * element.offsetWidth;
-    const top = element.getBoundingClientRect().top;
-    const breaks = Array.from(element.querySelectorAll("tr, table, svg")).map(
-      (node) => node.getBoundingClientRect().top - top,
-    );
-    // 单页放得下就整页输出，与此前一致；放不下才按页宽分页。
+    // 单页放得下就整页输出；放不下才按页宽分页。
     const slices =
       element.offsetHeight <= pageCssH
         ? ([[0, element.offsetHeight]] as Array<[number, number]>)
-        : planSlices(element.offsetHeight, pageCssH, breaks);
+        : planSlices(element.offsetHeight, pageCssH, collectBreaks(element));
     for (const [from, to] of slices) {
-      if (!first) doc.addPage("a4", orientation);
+      if (!first) doc.addPage("a4", "portrait");
       first = false;
       const ratio = pageW / element.offsetWidth;
       doc.addImage(
-        await capture(element, from, to),
-        "PNG",
+        await capture(element, from, to, "jpeg"),
+        "JPEG",
         0,
         0,
         pageW,

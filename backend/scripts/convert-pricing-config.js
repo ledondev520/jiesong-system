@@ -13,6 +13,9 @@ const { validatePricingConfig } = require('../src/services/pricingConfigService'
 
 const NEW_KEYS = ['exchangeRate', 'exchangeAdjustment', 'defaultMarkup', 'categoryMarkups'];
 
+/** 与应用 FX 同步写入一致（Math.round(x*100)/100），转换结果才与下次同步相同 */
+const roundSpotRate = (rate) => Math.round(rate * 100) / 100;
+
 /** 纯函数：旧结构 → 新结构；已是新结构返回 null；缺现汇或结构不明时抛错 */
 const convertPricingConfig = (old, spotRate) => {
   if (!old || typeof old !== 'object' || Array.isArray(old)) throw new Error('配置必须是 JSON 对象');
@@ -42,8 +45,9 @@ const parseArgs = (argv) => {
 const main = (argv) => {
   const args = parseArgs(argv);
   if (!args.file) throw new Error('必须用 --file 指定要转换的 pricing.json');
-  const spotRate = Number(args['spot-rate']);
-  if (!Number.isFinite(spotRate)) throw new Error('必须用 --spot-rate 给出当前现汇（数字）');
+  const rawSpot = Number(args['spot-rate']);
+  if (!Number.isFinite(rawSpot)) throw new Error('必须用 --spot-rate 给出当前现汇（数字）');
+  const spotRate = roundSpotRate(rawSpot);
   const file = path.resolve(args.file);
   const contents = fs.readFileSync(file);
   const converted = convertPricingConfig(JSON.parse(contents.toString('utf8')), spotRate);
@@ -74,4 +78,4 @@ if (require.main === module) {
   try { main(process.argv.slice(2)); } catch (error) { console.error(`转换失败：${error.message}`); process.exit(1); }
 }
 
-module.exports = { convertPricingConfig };
+module.exports = { convertPricingConfig, roundSpotRate };

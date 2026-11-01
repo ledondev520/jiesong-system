@@ -35,10 +35,12 @@ function PlanSvg({
       : b.y - a.y || a.step - b.step,
   );
   const fontSize = length / 60;
+  // 顶部留出「后墙 / 柜门」标签的高度（原按柜宽 4% 留白，比一行字还矮，标签被裁掉）。
+  const topPad = fontSize * 1.6;
 
   return (
     <svg
-      viewBox={`-${length * 0.03} -${depth * 0.04} ${length * 1.06} ${depth * 1.12}`}
+      viewBox={`-${length * 0.03} -${topPad} ${length * 1.06} ${topPad + depth * 1.08}`}
       role="img"
       aria-label={view === "top" ? "装柜俯视图" : "装柜侧视图"}
       className="h-auto w-full"
@@ -88,12 +90,12 @@ function PlanSvg({
           </g>
         );
       })}
-      <text x={0} y={-depth * 0.015} fontSize={fontSize} fill="#475569">
+      <text x={0} y={-fontSize * 0.5} fontSize={fontSize} fill="#475569">
         后墙
       </text>
       <text
         x={length}
-        y={-depth * 0.015}
+        y={-fontSize * 0.5}
         fontSize={fontSize}
         fill="#475569"
         textAnchor="end"

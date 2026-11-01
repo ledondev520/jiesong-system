@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import NextImage from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Bot,
   Send,
@@ -110,6 +111,11 @@ export const withPageContext = (message: string, context?: AIPageContext) =>
 
 export { stripPageContext };
 
+// 只允许站内 /dashboard/ 路径，AI 文本不能借此带出外链或 javascript: 等协议
+const SAFE_DASHBOARD_PATH = /^\/dashboard\/[\w\-/?=&%.#]*$/;
+export const toSafeDashboardPath = (value: string): string | null =>
+  SAFE_DASHBOARD_PATH.test(value) ? value : null;
+
 const formatRecommendationPriority = (
   priority?: AiActionRecommendation["priority"],
 ) => {
@@ -137,6 +143,7 @@ export function AIAssistant({
   onClose,
   pageContext,
 }: AIAssistantProps) {
+  const router = useRouter();
   const isWorkspace = presentation === "workspace";
   const isDocked = presentation === "docked";
   // 只有 floating 形态带可拖动的悬浮入口
@@ -506,19 +513,19 @@ export function AIAssistant({
    * 识别格式：/dashboard/xxx 的链接并使其可点击
    */
   const renderContentWithLinks = (content: string) => {
-    // 匹配 /dashboard/ 开头的链接
-    const linkRegex = /(\/dashboard\/[^\s\n]+)/g;
-    const parts = content.split(linkRegex);
+    // 匹配 /dashboard/ 开头的链接（字符集与 toSafeDashboardPath 一致，奇数下标为捕获的链接）
+    const parts = content.split(/(\/dashboard\/[\w\-/?=&%.#]*)/g);
 
     return parts.map((part, index) => {
-      if (part.match(linkRegex)) {
+      const path = index % 2 === 1 ? toSafeDashboardPath(part) : null;
+      if (path) {
         return (
           <a
             key={index}
-            href={part}
+            href={path}
             onClick={(e) => {
               e.preventDefault();
-              window.location.href = part;
+              router.push(path);
             }}
             className="text-primary underline hover:text-primary/80 cursor-pointer"
           >

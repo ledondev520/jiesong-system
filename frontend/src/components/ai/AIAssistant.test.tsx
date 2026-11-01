@@ -15,13 +15,23 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AIAssistant, stripPageContext, withPageContext } from "./AIAssistant";
+import {
+  AIAssistant,
+  stripPageContext,
+  toSafeDashboardPath,
+  withPageContext,
+} from "./AIAssistant";
 
 const OriginalFileReader = globalThis.FileReader;
 const mockExecuteAgentAction = vi.fn();
 const mockCancelAgentAction = vi.fn();
 const mockGetSessions = vi.fn();
 const mockGetChatHistory = vi.fn();
+
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
 
 vi.mock("@/services/ai.service", () => ({
   aiService: {
@@ -71,6 +81,52 @@ describe("AIAssistant", () => {
 
   afterAll(() => {
     globalThis.FileReader = OriginalFileReader;
+  });
+
+  it("只放行站内 /dashboard/ 路径", () => {
+    expect(toSafeDashboardPath("/dashboard/sales/EXP1?tab=a&b=1#x")).toBe(
+      "/dashboard/sales/EXP1?tab=a&b=1#x",
+    );
+    for (const bad of [
+      "//evil.com/dashboard/x",
+      "https://evil.com/dashboard/x",
+      "javascript:alert(1)",
+      "/dashboard/x\\evil",
+      '/dashboard/x"onmouseover=1',
+      "/dashboard/<script>",
+      "/other/dashboard/x",
+    ]) {
+      expect(toSafeDashboardPath(bad)).toBeNull();
+    }
+  });
+
+  it("点击 AI 回复里的 /dashboard 链接用路由跳转，外链不成链接", async () => {
+    mockPush.mockReset();
+    const reader = createMockSseReader([
+      'data: {"type":"chunk","content":"见 /dashboard/sales/EXP1。另有 https://evil.com/x"}\n\n',
+      'data: {"type":"done","model":"kimi","pendingActions":[]}\n\n',
+    ]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+    } as unknown as Response);
+
+    const user = userEvent.setup();
+    render(<AIAssistant />);
+    await user.click(screen.getByRole("button", { name: "AI 助手" }));
+    await user.type(
+      screen.getByPlaceholderText("输入问题或粘贴图片..."),
+      "订单",
+    );
+    await user.keyboard("{Enter}");
+
+    const link = await screen.findByRole("link", { name: "点击查看详情" });
+    expect(link).toHaveAttribute("href", "/dashboard/sales/EXP1");
+    await user.click(link);
+    expect(mockPush).toHaveBeenCalledWith("/dashboard/sales/EXP1");
+    expect(screen.getAllByRole("link", { name: "点击查看详情" })).toHaveLength(
+      1,
+    );
   });
 
   it("点击低存在感触发器后打开侧边面板", async () => {
