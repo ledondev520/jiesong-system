@@ -27,8 +27,16 @@ test('purchaseController: 模块可正常加载并导出', () => {
 
 test('getById: 返回与状态门禁共用的生产资料完整性', async () => {
   const originalFindUnique = prisma.purchaseContract.findUnique;
+  const originalItems = prisma.purchaseItem.findMany;
+  const originalGroupBy = prisma.purchaseReceiptItem.groupBy;
+  // subStatus 只读派生：这里按同一份未登记到货、资料不全的明细喂给派生查询
+  prisma.purchaseItem.findMany = async () => [{ id: 'pi-1', purchaseContractId: 'pc-1', quantity: 5, specification: '' }];
+  prisma.purchaseReceiptItem.groupBy = async () => [];
   prisma.purchaseContract.findUnique = async () => ({
     id: 'pc-1',
+    status: 'COMPLETED',
+    totalAmount: 100,
+    paidAmount: 0,
     items: [{
       id: 'pi-1',
       specification: '',
@@ -48,8 +56,15 @@ test('getById: 返回与状态门禁共用的生产资料完整性', async () =>
     await purchaseController.getById({ params: { id: 'pc-1' } }, res, (error) => { throw error; });
     assert.equal(payload.data.productionReadiness.ready, false);
     assert.equal(payload.data.productionReadiness.incompleteItemCount, 1);
+    assert.deepEqual(payload.data.subStatus, {
+      payment: 'UNPAID',
+      arrival: { state: 'NONE', ordered: 5, arrived: 0, registered: false },
+      docsComplete: false,
+    });
   } finally {
     prisma.purchaseContract.findUnique = originalFindUnique;
+    prisma.purchaseItem.findMany = originalItems;
+    prisma.purchaseReceiptItem.groupBy = originalGroupBy;
   }
 });
 
