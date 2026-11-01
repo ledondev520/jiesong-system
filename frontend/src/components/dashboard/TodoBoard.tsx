@@ -140,21 +140,23 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                           {meta.detail ? (
                             <Link
                               href={meta.detail(item.id)}
-                              className="truncate font-medium hover:underline"
+                              className="shrink-0 font-medium hover:underline"
                             >
                               {item.contractNo}
                             </Link>
                           ) : (
-                            <span className="truncate font-medium">
+                            <span className="shrink-0 font-medium">
                               {item.contractNo}
                             </span>
                           )}
-                          <span className="shrink-0 truncate text-muted-foreground">
+                          <span className="min-w-0 truncate text-muted-foreground">
                             {item.party ?? ""}
                           </span>
                           {item.amount !== null && (
                             <span className="shrink-0 tabular-nums">
-                              {money(item.amount, meta.currency)}
+                              {item.amount === 0
+                                ? "—"
+                                : money(item.amount, meta.currency)}
                             </span>
                           )}
                         </li>
