@@ -267,6 +267,37 @@ test('采购备注不是丢失合同；已有合同仍需明确采购明细分�
   assert(!assigned.issues.some(x => x.startsWith('采购明细待分配')));
 });
 
+test('列表：单行排柜 503 只降级该行为「装柜计划不可用」（不可发运），其余行照常', async () => {
+  const prisma = require('../utils/prisma');
+  const pool = require('./containerPackingPool');
+  const { listTradeWorkflows } = require('./tradeWorkflowService');
+  const originalSales = prisma.salesContract.findMany;
+  const originalPurchase = prisma.purchaseContract.findMany;
+  const originalPack = pool.packContainersAsync;
+  prisma.salesContract.findMany = async () => [{ ...baseSales, id: 'fails' }, { ...baseSales, id: 'ok' }];
+  prisma.purchaseContract.findMany = async () => [basePurchase];
+  let calls = 0;
+  pool.packContainersAsync = (...args) => {
+    calls += 1;
+    return calls === 1 ? Promise.reject(Object.assign(new Error('x'), { statusCode: 503 })) : originalPack(...args);
+  };
+  try {
+    const rows = await listTradeWorkflows({ limit: 6, scope: 'recent' });
+    const failed = rows.find((row) => row.id === 'fails');
+    assert.equal(failed.readiness.planUnavailable, true);
+    assert.equal(failed.readiness.ready, false);
+    assert.equal(failed.readiness.check.ready, false);
+    assert.equal(failed.stages.find((stage) => stage.key === 'loading').status, 'blocked');
+    assert.match(failed.stages.find((stage) => stage.key === 'loading').reason, /装柜计划暂不可用/);
+    assert.equal(rows.find((row) => row.id === 'ok').readiness.planUnavailable, undefined);
+    // 非 503 的真实错误不被吞掉
+    pool.packContainersAsync = () => Promise.reject(new Error('bug'));
+    await assert.rejects(() => listTradeWorkflows({ limit: 6, scope: 'recent' }), /bug/);
+  } finally {
+    prisma.salesContract.findMany = originalSales; prisma.purchaseContract.findMany = originalPurchase; pool.packContainersAsync = originalPack;
+  }
+});
+
 test('待处理/阻塞/风险范围从全量合同筛选后限量，避免先取最近6笔漏历史风险', async () => {
   const prisma = require('../utils/prisma');
   const { listTradeWorkflows } = require('./tradeWorkflowService');

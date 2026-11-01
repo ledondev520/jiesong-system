@@ -481,6 +481,19 @@ test('updateSalesStatus: 有箱件无法放入时拒绝确认发运', async () =
   }
 });
 
+test('updateSalesStatus: 交互事务超时放宽到 15 s（门禁排柜排队不得耗尽默认 5 s）', async () => {
+  const originalTransaction = prisma.$transaction;
+  let options;
+  prisma.$transaction = async (fn, opts) => {
+    options = opts;
+    return fn({ salesContract: { findUnique: async () => null } });
+  };
+  try {
+    await assert.rejects(() => salesService.updateSalesStatus('sc-x', 'SHIPPED'), (error) => error.statusCode === 404);
+    assert.equal(options.timeout, 15000);
+  } finally { prisma.$transaction = originalTransaction; }
+});
+
 test('updateSalesStatus: 排柜 worker 超时/崩溃（503）时拒绝确认发运且不写入任何数据', async () => {
   const fs = require('node:fs');
   const os = require('node:os');

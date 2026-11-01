@@ -18,8 +18,9 @@ const intEnv = (name, fallback, min, max) => {
 const MAX_CONCURRENT = intEnv('CONTAINER_PACK_MAX_WORKERS', 2, 1, 8);
 const MAX_QUEUED = intEnv('CONTAINER_PACK_MAX_QUEUE', 16, 0, 256);
 const DEFAULT_TIMEOUT_MS = intEnv('CONTAINER_PACK_TIMEOUT_MS', 4000, 500, 120000);
-const HEAP_MB = 512;
-// 4 s < Prisma 交互事务默认 5 s（出货门禁在事务内等待排柜）；实测最慢 1000 种箱规约 1 s。
+// 每 worker 堆上限：2 个 worker × 此值须明显低于 PM2 max_memory_restart（deploy.sh 为 500M），否则病态订单会先重启整个实例；真实排柜仅数十 MB。
+const HEAP_MB = intEnv('CONTAINER_PACK_HEAP_MB', 128, 64, 512);
+// timeoutMs 是「入队到出结果」的总时限（含排队）：出货门禁在 Prisma 交互事务内等待排柜，事务超时设为 15 s（salesService），本时限默认 4 s；实测最慢 1000 种箱规约 1 s。
 // 结果缓存（进程内存、不落盘不记录）：仪表盘每次加载会为所有未发货合同排柜，输入未变时直接命中。
 const CACHE_SIZE = 200;
 const cache = new Map();
@@ -60,8 +61,9 @@ const cacheSet = (key, value) => {
 const drain = () => {
   while (running < MAX_CONCURRENT && queue.length > 0) {
     const job = queue.shift();
+    clearTimeout(job.queueTimer);
     running += 1;
-    runWorker(job.payload, job.timeoutMs, job.workerFile).then(job.resolve, job.reject).finally(() => { running -= 1; drain(); });
+    runWorker(job.payload, Math.max(1, job.deadline - Date.now()), job.workerFile).then(job.resolve, job.reject).finally(() => { running -= 1; drain(); });
   }
 };
 
@@ -77,9 +79,14 @@ const packContainersAsync = (lines, spec, config, { timeoutMs = DEFAULT_TIMEOUT_
   if (hit) { resolve(hit); return; }
   if (queue.length >= MAX_QUEUED) { reject(failure('排柜请求过多，请稍后重试')); return; }
   const job = {
-    payload: { lines, spec, config }, timeoutMs, workerFile, reject,
+    payload: { lines, spec, config }, deadline: Date.now() + timeoutMs, workerFile, reject,
     resolve: (result) => { if (key) cacheSet(key, result); resolve(result); },
   };
+  // 排队期间也受时限约束：到点仍未开工就出队并 503，不再占用调用方的事务。
+  job.queueTimer = setTimeout(() => {
+    const index = queue.indexOf(job);
+    if (index >= 0) { queue.splice(index, 1); reject(failure('排柜计算超时，请稍后重试或拆分订单')); }
+  }, timeoutMs);
   if (priority) queue.unshift(job); else queue.push(job);
   drain();
 });

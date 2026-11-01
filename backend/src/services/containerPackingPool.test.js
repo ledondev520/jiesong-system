@@ -92,3 +92,20 @@ test('priority 任务插队到排队任务之前', async () => {
   await Promise.all([...busy, ...queued]);
   assert.ok(finished.indexOf('P') < finished.indexOf('A') && finished.indexOf('P') < finished.indexOf('B'), finished.join());
 });
+
+test('排队等待计入总时限：worker 全忙时到点即 503，不等 worker 空出', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pack-pool-'));
+  try {
+    const slowFile = path.join(dir, 'slow.js');
+    fs.writeFileSync(slowFile, "const { parentPort } = require('node:worker_threads'); setTimeout(() => parentPort.postMessage({ ok: true, result: { containers: [], unplaced: [] } }), 1500);");
+    const lines = linesOf(3, 2);
+    const busy = Array.from({ length: 2 }, () => packContainersAsync(lines, spec, config, { workerFile: slowFile, timeoutMs: 5000 }));
+    const started = Date.now();
+    await assert.rejects(
+      packContainersAsync(linesOf(333, 5), spec, config, { timeoutMs: 300, priority: true }),
+      (error) => error.statusCode === 503,
+    );
+    assert.ok(Date.now() - started < 1200, '排队超时应在约 300 ms 返回，而不是等 worker 空出');
+    await Promise.all(busy);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

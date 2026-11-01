@@ -388,7 +388,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
     }
 
     return contract;
-  });
+  }, { timeout: 15000 }); // 默认 5 s 容不下门禁排柜排队 + 计算；排柜自身 4 s 总时限（containerPackingPool）
 
   // 记录出库操作的日志
   if (applyResult && applyResult.results) {

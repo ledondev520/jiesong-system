@@ -39,6 +39,7 @@ const PRISMA_ERROR_MESSAGES = {
   P2002: '数据已存在（唯一性冲突），请勿重复提交',
   P2003: '存在关联数据，无法执行该操作',
   P2025: '记录不存在或已被删除',
+  P2028: '系统繁忙，请稍后重试', // 交互事务超时（如排柜排队过久）：失败即回滚，重试安全
 };
 
 const MULTER_ERROR_MESSAGES = {
@@ -102,7 +103,7 @@ const toClientMessage = (err, statusCode) => {
  */
 const errorHandler = (err, req, res, next) => {
   // 1. 确定状态码
-  const statusCode = err.statusCode || (err.name === 'MulterError' || isBusboyInputError(err) ? 400 : 500);
+  const statusCode = err.statusCode || (err.name === 'MulterError' || isBusboyInputError(err) ? 400 : err.code === 'P2028' ? 503 : 500);
   
   // 2. 构建响应对象（统一输出中文提示，原始英文消息只进日志）
   const response = {

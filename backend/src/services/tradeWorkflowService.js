@@ -80,6 +80,16 @@ const blockersWithPrefix = (check, prefix) => check.blockers.filter((item) => it
 const isShippedContract = (salesContract) => (
   (SALES_RANK[normalizeSalesStatus(salesContract.status)] ?? 0) >= SALES_RANK[SALES_STATUS.SHIPPED]
 );
+const PLAN_UNAVAILABLE = '装柜计划暂不可用，请稍后刷新';
+// 仅汇总利用率（不排柜）+ 强制 blocked，避免空装柜计划被误判为可发运。
+const planUnavailableReadiness = (salesContract) => {
+  const base = evaluateShipmentReadiness(salesContract, { utilisationOnly: true });
+  const check = {
+    ...base.check, ready: false, status: 'blocked', headline: PLAN_UNAVAILABLE,
+    blockers: [{ code: 'plan-unavailable', message: PLAN_UNAVAILABLE }, ...base.check.blockers],
+  };
+  return { ...base, ready: false, check, blockers: check.blockers.map((item) => item.code), planUnavailable: true };
+};
 const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisationOnly = false, readiness: given } = {}) => {
   const packingItems = salesContract.packingItems || [];
   const purchaseContractNos = unique(packingItems.map((item) => item.purchaseContractNo));
@@ -382,11 +392,18 @@ const listTradeWorkflows = async ({ limit = 20, scope = 'recent' } = {}) => {
     purchaseMap.set(contract.contractNo.replace(/^CG/, 'PO'), contract);
   });
 
-  // 排柜在 worker 线程；逐个等待，使单次请求最多占一个 worker，失败即整体失败（不返回部分/可发运假象）。
+  // 排柜在 worker 线程；逐个等待，使单次请求最多占一个 worker。单行排柜失败（503）只降级该行为「装柜计划不可用」（不可发运，绝不显示 ready），其余行照常。
   let workflows = [];
   for (const contract of salesContracts) {
     const utilisationOnly = scope !== 'recent';
-    const readiness = await evaluateShipmentReadinessAsync(contract, { utilisationOnly: utilisationOnly && isShippedContract(contract) });
+    const options = { utilisationOnly: utilisationOnly && isShippedContract(contract) };
+    let readiness;
+    try {
+      readiness = await evaluateShipmentReadinessAsync(contract, options);
+    } catch (error) {
+      if (error?.statusCode !== 503) throw error;
+      readiness = planUnavailableReadiness(contract);
+    }
     workflows.push(buildTradeWorkflow(contract, purchaseMap, { utilisationOnly, readiness }));
   }
   if (scope === 'pending') workflows = workflows.filter((item) => item.completedStageCount < item.stageCount);
