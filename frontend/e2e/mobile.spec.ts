@@ -156,7 +156,7 @@ for (const width of [320, 390, 430]) {
     });
 
     test("财务明细加载后宽账簿在卡片内滚动", async ({ page }) => {
-      await signInAsAdmin(page, "/dashboard/finance/statements");
+      await signInAsAdmin(page, "/dashboard/finance/statements?view=ledger");
       await expect(
         page.getByTestId("financial-statements-drilldowns"),
       ).toBeVisible();
@@ -383,9 +383,9 @@ test.describe("手机查阅与异常恢复", () => {
     await signInAsAdmin(page, "/dashboard/settings");
     const menu = page.locator("details");
     for (const [label, path] of [
-      ["港口管理", "ports"],
+      ["港口", "ports"],
       ["商品分类", "categories"],
-      ["报关公司", "customs-brokers"],
+      ["报关行", "customs-brokers"],
       ["数据导入导出", "export"],
     ]) {
       await menu.locator("summary").click();

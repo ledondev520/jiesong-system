@@ -56,8 +56,8 @@ for (const width of [390, 1440]) {
       await page.getByRole("link", { name: "Seapot" }).first().click();
       await expect(page).toHaveURL(/\/dashboard\/customers\/c1$/);
       await expect(page.getByRole("heading", { name: "Seapot" })).toBeVisible();
-      await expect(page.getByText("Sacramento 店").first()).toBeVisible();
-      await expect(page.getByText("EXP260100").first()).toBeVisible();
+      await expect(page.getByText("Sacramento 店").filter({ visible: true }).first()).toBeVisible();
+      await expect(page.getByText("EXP260100").filter({ visible: true }).first()).toBeVisible();
     });
   });
 }
@@ -74,7 +74,7 @@ test.describe("customers desktop store creation", () => {
     await dialog.getByLabel(/门店简称/).fill("fmt");
     await dialog.getByLabel("目的港 *").selectOption("port-la");
     await dialog.getByRole("button", { name: "保存" }).click();
-    await expect(page.getByText("Fremont 店").first()).toBeVisible();
+    await expect(page.getByText("Fremont 店").filter({ visible: true }).first()).toBeVisible();
     expect(created).toHaveLength(1);
     expect(created[0]).toMatchObject({ name: "Fremont 店", code: "FMT", portId: "port-la", customerId: "c1" });
   });

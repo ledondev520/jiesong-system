@@ -67,10 +67,13 @@ for (const width of [390, 1440]) {
       page.getByRole("heading", { name: "合成比价商品" }),
     ).toBeVisible();
     await page.getByRole("tab", { name: "采购价格" }).click();
-    await expect(page.getByText("合成供应商甲")).toBeVisible();
-    await expect(page.getByText("合成供应商乙")).toBeVisible();
-    await expect(page.getByText("最低", { exact: true })).toHaveCount(1);
-    await expect(page.getByText(/13% 增值税发票/)).toBeVisible();
+    // Cards (md:hidden) and table (hidden md:block) both render; assert only the one on screen.
+    const shown = (text: string | RegExp, exact = false) =>
+      page.getByText(text, { exact }).filter({ visible: true });
+    await expect(shown("合成供应商甲").first()).toBeVisible();
+    await expect(shown("合成供应商乙").first()).toBeVisible();
+    await expect(shown("最低", true)).toHaveCount(1);
+    await expect(shown(/13% 增值税发票/).first()).toBeVisible();
     await expect(page.getByText("用此供应商")).toHaveCount(0);
     expect(pageErrors).toEqual([]);
   });

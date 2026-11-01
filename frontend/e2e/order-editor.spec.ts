@@ -84,7 +84,7 @@ test.describe("order editor", () => {
     expect(key).toBeTruthy();
     expect(body).toMatchObject({ customerId: "c1", currency: "USD", incoterm: "FOB", exchangeRate: 6.72 });
     expect(body.items.map((item) => [item.storeId, item.quantity, item.costPrice, item.sellingPrice])).toEqual([
-      ["s1", 10, 10000, 1994],
+      ["s1", 10, 10000, undefined], // auto-priced lines send no price; the server recomputes at the order's rate
       ["s2", 2, 100, 30],
     ]);
   });

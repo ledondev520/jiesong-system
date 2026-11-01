@@ -39,7 +39,9 @@ test.describe("settings sections", () => {
     ["/dashboard/ai/sessions", "/dashboard/settings/ai-usage"],
   ]) {
     test(`${oldPath} redirects to ${newPath}`, async ({ page }) => {
-      await signInAsAdmin(page, oldPath);
+      // signInAsAdmin asserts it lands on its target, so sign in on a stable page first.
+      await signInAsAdmin(page, "/dashboard/settings");
+      await page.goto(oldPath);
       await expect(page).toHaveURL(new RegExp(`${newPath}$`));
     });
   }
