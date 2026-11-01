@@ -77,6 +77,21 @@ test('HTTP/SQLite: draft contracts are not payables and every endpoint shows the
     assert.equal(list.items.reduce((sum, row) => sum + row.unpaidAmount, 0), EXPECTED.unpaid);
   });
 
+  await t.test('payables and purchase list/detail expose the same payment and arrival sub-status (COMPLETED does not mean settled)', async () => {
+    const rows = (await getJson('/finance/payables?pageSize=100')).items;
+    const byNo = Object.fromEntries(rows.map(row => [row.contractNo, row.subStatus]));
+    assert.equal(byNo['CG-OVERPAID'].payment, 'PAID');
+    assert.equal(byNo['CG-SIGNED'].payment, 'PARTIAL');
+    assert.equal(byNo['CG-RECEIVED'].payment, 'UNPAID');
+    assert.equal(byNo['CG-RECEIVED'].arrival.registered, false, '没有任何到货登记');
+    const purchases = (await getJson('/purchases?pageSize=100')).items;
+    const received = purchases.find(row => row.contractNo === 'CG-RECEIVED');
+    assert.deepEqual(received.subStatus, byNo['CG-RECEIVED']);
+    const detail = await getJson(`/purchases/${received.id}`);
+    assert.deepEqual(detail.subStatus, byNo['CG-RECEIVED']);
+    assert.equal(detail.status, 'RECEIVED', '状态原值不被改写');
+  });
+
   await t.test('dashboard analytics (首页)', async () => {
     const purchase = (await getJson('/dashboard/analytics')).contracts.purchase;
     assert.deepEqual([purchase.totalAmount, purchase.paidAmount, purchase.unpaidAmount], [EXPECTED.total, EXPECTED.paid, EXPECTED.unpaid]);
