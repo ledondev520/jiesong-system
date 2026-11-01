@@ -61,17 +61,19 @@ export function planSlices(total: number, pageH: number, breaks: number[]) {
   return slices;
 }
 
+/** 允许断页的节点选择器；e2e 直接引用，避免测试里另抄一份而漏掉回归。 */
+export const PDF_BREAK_SELECTOR =
+  "[data-pdf-block], svg, tbody tr:not(:first-child)";
+
 /**
  * 职责：收集允许断页的纵向位置（相对元素顶边）：带标题的表/图块顶边、svg 顶边、表体行顶边；
  * 不含每表第一行体行——在那里断开会把标题+表头单独留在上一页（表头无数据行）。
  */
 export function collectBreaks(element: HTMLElement) {
   const top = element.getBoundingClientRect().top;
-  return Array.from(
-    element.querySelectorAll(
-      "[data-pdf-block], svg, tbody tr:not(:first-child)",
-    ),
-  ).map((node) => node.getBoundingClientRect().top - top);
+  return Array.from(element.querySelectorAll(PDF_BREAK_SELECTOR)).map(
+    (node) => node.getBoundingClientRect().top - top,
+  );
 }
 
 /** 职责：每个元素按 A4 页宽等比缩放（保持可读字号），超出一页高度的长表格分页续排。 */

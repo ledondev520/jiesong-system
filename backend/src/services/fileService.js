@@ -31,6 +31,13 @@ const CONTRACT_FILE_CATEGORY = Object.freeze({
   SYSTEM_GENERATED_XLSX: 'SYSTEM_GENERATED_XLSX',
 });
 
+// req.body 字段可能是数组/对象（类型混淆，CodeQL #82）；描述/分类只接受普通字符串。
+const optionalText = (value, label) => {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') throw createError(`${label} 必须是字符串`, 400);
+  return value || null;
+};
+
 const normalizeCategory = (value) => (
   Object.values(CONTRACT_FILE_CATEGORY).includes(value) ? value : CONTRACT_FILE_CATEGORY.OTHER
 );
@@ -126,7 +133,8 @@ const createFile = async (contractId, contractType, file, description, category,
     // Tighten the new payload before any asynchronous lookup, including failure paths.
     secureStoredFile(payload.path);
     assertContractType(contractType);
-    const normalizedCategory = normalizeCategory(category);
+    const normalizedCategory = normalizeCategory(optionalText(category, 'category'));
+    const normalizedDescription = optionalText(description, 'description');
     assertReceiptPhotoAccess(contractType, normalizedCategory, user);
     validateUploadedFileCategory(file, normalizedCategory);
     const isSales = contractType === CONTRACT_TYPE.SALES;
@@ -141,7 +149,7 @@ const createFile = async (contractId, contractType, file, description, category,
       fileType: file.mimetype,
       mimeType: file.mimetype,
       fileSize: file.size,
-      description: description ? String(description) : null,
+      description: normalizedDescription,
       category: normalizedCategory,
       checksum: null,
     };
@@ -191,7 +199,8 @@ const archiveBufferFile = async ({
   if (!contractId || !Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new Error('归档文件缺少合同ID或文件内容');
   }
-  const normalizedCategory = normalizeCategory(category);
+  const normalizedCategory = normalizeCategory(optionalText(category, 'category'));
+  const normalizedDescription = optionalText(description, 'description');
   const checksum = crypto.createHash('sha256').update(buffer).digest('hex');
   const isSales = contractType === CONTRACT_TYPE.SALES;
   const delegate = isSales ? prismaClient.salesContractFile : prismaClient.contractFile;
@@ -223,8 +232,8 @@ const archiveBufferFile = async ({
       filePath: path.relative(uploadRoot, absolutePath),
       fileType: mimeType,
       mimeType,
-      fileSize: buffer.length,
-      description: description ? String(description) : defaultDescription,
+      fileSize: Buffer.byteLength(buffer),
+      description: normalizedDescription || defaultDescription,
       category: normalizedCategory,
       checksum,
     },

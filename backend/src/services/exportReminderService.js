@@ -153,7 +153,7 @@ const runInvoiceMissingReminder = async (tx = prisma, options = {}) => {
     orderBy: { updatedAt: 'desc' },
   });
   const noNumber = candidates.filter((contract) => !String(contract.invoiceNo || '').trim());
-  // 与看板「缺进项发票」同一口径：已有有效关联发票记录的合同不催票。
+  // 发票关联规则与看板「缺进项发票」共用；但催票保留完整名单，不套用看板的签约日期截止（已决定）。
   const invoiced = await findInvoicedPurchaseContractIds(tx, noNumber.map((c) => c.id));
   const missingContracts = noNumber.filter((c) => !invoiced.has(c.id));
 

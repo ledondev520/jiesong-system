@@ -24,15 +24,17 @@ const { roundMoney } = require('../utils/money');
 const { isStockCovered } = require('../utils/stockAllocation');
 
 const TOP = 5;
-// 决策 A（BL-1d）：首页「待付款/缺进项发票」只计该日期（UTC 零点）及之后签约的合同；改日期只改这一处。
-const DASHBOARD_TODO_CUTOFF = new Date('2026-01-01T00:00:00.000Z');
+// 决策 A（BL-1d）：首页「待付款/缺进项发票」只计该日期及之后签约的合同；改日期改这一处和 CUTOFF_LABEL。
+// 合同日期按北京时间零点存储，故截止点取北京零点（UTC 前一日 16:00）。
+const DASHBOARD_TODO_CUTOFF = new Date('2026-01-01T00:00:00+08:00');
+const CUTOFF_LABEL = '2026-01-01'; // toISOString 会给出 UTC 日期（12-31），所以单独写死展示用日期
 const isCurrent = (r) => !r.signedAt || r.signedAt >= DASHBOARD_TODO_CUTOFF;
 // 把候选拆成「计入」与「历史未计入」，历史只返回条数和截止日期，让首页能链到完整列表。
 const withHistorical = (rows, build) => {
   const current = rows.filter(isCurrent);
   return {
     ...asList(current.length, build(current)),
-    historical: { count: rows.length - current.length, before: DASHBOARD_TODO_CUTOFF.toISOString().slice(0, 10) },
+    historical: { count: rows.length - current.length, before: CUTOFF_LABEL },
   };
 };
 // shortcut: CONFIRMED orders are scanned oldest-first up to this cap (count undercounts beyond it); upgrade to SQL NOT EXISTS if volumes reach it.
