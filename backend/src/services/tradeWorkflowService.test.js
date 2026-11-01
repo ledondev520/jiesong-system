@@ -304,6 +304,36 @@ test('列表：排柜 503 降级为「装柜计划不可用」（不可发运）
   }
 });
 
+test('列表非 recent 范围（risk）：未发运行 503 熔断，已发运行仅汇总利用率不排柜', async () => {
+  const prisma = require('../utils/prisma');
+  const pool = require('./containerPackingPool');
+  const { listTradeWorkflows } = require('./tradeWorkflowService');
+  const originalSales = prisma.salesContract.findMany;
+  const originalPurchase = prisma.purchaseContract.findMany;
+  const originalPack = pool.packContainersAsync;
+  prisma.salesContract.findMany = async () => [
+    { ...baseSales, id: 'open', status: 'PACKING' },
+    { ...baseSales, id: 'shipped', status: 'SHIPPED' },
+    { ...baseSales, id: 'open2', status: 'PACKING' },
+  ];
+  prisma.purchaseContract.findMany = async () => [basePurchase];
+  let calls = 0;
+  pool.packContainersAsync = () => {
+    calls += 1;
+    return Promise.reject(Object.assign(new Error('x'), { statusCode: 503 }));
+  };
+  try {
+    const rows = await listTradeWorkflows({ limit: 6, scope: 'risk' });
+    assert.equal(rows.find((row) => row.id === 'open').readiness.planUnavailable, true);
+    assert.equal(rows.find((row) => row.id === 'open2').readiness.planUnavailable, true);
+    // 已发运行走 utilisationOnly，不触发排柜池，也不被熔断降级
+    assert.notEqual(rows.find((row) => row.id === 'shipped').readiness.planUnavailable, true);
+    assert.equal(calls, 1);
+  } finally {
+    prisma.salesContract.findMany = originalSales; prisma.purchaseContract.findMany = originalPurchase; pool.packContainersAsync = originalPack;
+  }
+});
+
 test('待处理/阻塞/风险范围从全量合同筛选后限量，避免先取最近6笔漏历史风险', async () => {
   const prisma = require('../utils/prisma');
   const { listTradeWorkflows } = require('./tradeWorkflowService');

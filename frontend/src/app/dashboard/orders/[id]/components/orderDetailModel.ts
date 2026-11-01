@@ -185,9 +185,15 @@ export const buildStoreFulfilment = (
     target.packed += item.quantity || 0;
     target.packedBoxes += Math.max(0, Math.trunc(Number(item.boxes) || 0));
   }
+  // 仅无任何下单明细的旧合同才算历史；在途订单的未分配装箱行不是历史数据
+  const noOrderItems = (contract.items ?? []).length === 0;
   for (const target of rows.values()) {
     target.historical =
-      target.ordered === 0 && target.purchased === 0 && target.received === 0;
+      noOrderItems &&
+      target.packed > 0 &&
+      target.ordered === 0 &&
+      target.purchased === 0 &&
+      target.received === 0;
   }
 
   return [...rows.values()].sort((a, b) => {

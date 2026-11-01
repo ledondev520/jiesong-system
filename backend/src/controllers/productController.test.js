@@ -155,3 +155,52 @@ test('list: 未传 incomplete 时不加资料不全条件', async () => {
   }, async () => productController.list({ query: { page: '1', pageSize: '20' } }, res, () => {}));
   assert.equal(listWhere.AND, undefined);
 });
+
+test('请求体校验：数组/对象/非十进制数值 400，空串为 null，数字字符串转数字，更新时未传字段省略', async () => {
+  const run = async (method, body) => {
+    const res = createMockRes();
+    let args = null;
+    let error = null;
+    await withMockProductDelegate({
+      create: async (a) => { args = a; return { id: 'p', ...a.data }; },
+      update: async (a) => { args = a; return { id: 'p', ...a.data }; },
+    }, async () => {
+      await productController[method]({ params: { id: 'p' }, body }, res, (e) => { error = e; });
+    });
+    return { args, error };
+  };
+  for (const body of [
+    { customsName: ['x'] },
+    { grossWeight: {} },
+    { grossWeight: '0x10' },
+    { grossWeight: 'abc' },
+  ]) {
+    const { args, error } = await run('create', body);
+    assert.equal(error?.statusCode, 400);
+    assert.equal(args, null);
+  }
+  const ok = await run('create', { customsName: 'n', grossWeight: '1.5', netWeight: '', volume: '  ' });
+  assert.equal(ok.error, null);
+  assert.equal(ok.args.data.grossWeight, 1.5);
+  assert.equal(ok.args.data.netWeight, null);
+  assert.equal(ok.args.data.volume, null);
+  const partial = await run('update', { customsName: 'n' });
+  assert.equal(partial.args.data.grossWeight, undefined);
+});
+
+test('请求体不是普通对象（null/数组/字符串）时 create 与 update 返回 400', async () => {
+  for (const method of ['create', 'update']) {
+    for (const body of [null, [], ['x'], 'abc']) {
+      let error = null;
+      let called = false;
+      await withMockProductDelegate({
+        create: async () => { called = true; return {}; },
+        update: async () => { called = true; return {}; },
+      }, async () => {
+        await productController[method]({ params: { id: 'p' }, body }, createMockRes(), (e) => { error = e; });
+      });
+      assert.equal(error?.statusCode, 400);
+      assert.equal(called, false);
+    }
+  }
+});

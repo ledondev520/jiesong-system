@@ -21,27 +21,40 @@ const bodyText = (value, label) => {
 };
 const bodyNumber = (value, label) => {
   if (value === undefined || value === null) return value;
-  if (value === '') return null;
-  const parsed = typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+  let parsed = NaN;
+  if (typeof value === 'number') {
+    parsed = value;
+  } else if (typeof value === 'string') {
+    const text = value.trim();
+    if (text === '') return null;
+    // 拒绝十六进制/Infinity 等 Number() 能解析的非十进制写法
+    if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(text)) parsed = Number(text);
+  }
   if (!Number.isFinite(parsed)) throw createError(`${label} 必须是数字`, 400);
   return parsed;
 };
-const productFields = (data) => ({
-  customsName: bodyText(data.customsName, 'customsName'),
-  description: bodyText(data.description, 'description'),
-  specification: bodyText(data.specification, 'specification'),
-  unit: bodyText(data.unit, 'unit'),
-  hsCode: bodyText(data.hsCode, 'hsCode'),
-  declaration: bodyText(data.declaration, 'declaration'),
-  categoryId: bodyText(data.categoryId, 'categoryId'),
-  grossWeight: bodyNumber(data.grossWeight, 'grossWeight'),
-  netWeight: bodyNumber(data.netWeight, 'netWeight'),
-  volume: bodyNumber(data.volume, 'volume'),
-  packingSpec: bodyText(data.packingSpec, 'packingSpec'),
-  length: bodyNumber(data.length, 'length'),
-  width: bodyNumber(data.width, 'width'),
-  height: bodyNumber(data.height, 'height'),
-});
+// 请求体本身必须是普通对象，数组/字符串会让 data.length 等属性读取产生类型混淆。
+const productFields = (data) => {
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    throw createError('请求体必须是对象', 400);
+  }
+  return {
+    customsName: bodyText(data.customsName, 'customsName'),
+    description: bodyText(data.description, 'description'),
+    specification: bodyText(data.specification, 'specification'),
+    unit: bodyText(data.unit, 'unit'),
+    hsCode: bodyText(data.hsCode, 'hsCode'),
+    declaration: bodyText(data.declaration, 'declaration'),
+    categoryId: bodyText(data.categoryId, 'categoryId'),
+    grossWeight: bodyNumber(data.grossWeight, 'grossWeight'),
+    netWeight: bodyNumber(data.netWeight, 'netWeight'),
+    volume: bodyNumber(data.volume, 'volume'),
+    packingSpec: bodyText(data.packingSpec, 'packingSpec'),
+    length: bodyNumber(data.length, 'length'),
+    width: bodyNumber(data.width, 'width'),
+    height: bodyNumber(data.height, 'height'),
+  };
+};
 
 const parseLowStockThreshold = (value, options = {}) => {
   if (value === undefined) {
