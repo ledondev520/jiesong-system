@@ -52,7 +52,8 @@ import type {
   AnalyticsData,
   FinancialPeriod,
 } from "@/services/financialStatements.service";
-import { profitColor } from "./financialStatementsFormatting";
+import { fmtAmount, profitColor } from "./financialStatementsFormatting";
+import { buildExpenseShare } from "./expenseShare";
 
 const COLORS = {
   revenue: "#10b981",
@@ -68,6 +69,12 @@ const COLORS = {
 };
 
 const PIE_COLORS = ["#f59e0b", "#8b5cf6", "#06b6d4", "#3b82f6"];
+const PIE_COLOR_BY_NAME: Record<string, string> = {
+  营业成本: PIE_COLORS[0],
+  管理费用: PIE_COLORS[1],
+  财务费用: PIE_COLORS[2],
+  销售费用: PIE_COLORS[3],
+};
 
 function ChartTooltipContent({
   active,
@@ -717,32 +724,12 @@ export function FinancialStatementsTabsSection({
 }: FinancialStatementsTabsSectionProps) {
   const readOnly = useBusinessReadOnly();
   const show = (section: FinancialStatementsView) => !view || view === section;
-  // 支出分类占比数据（取最新一期）
-  const latestTrend = analytics.trends[analytics.trends.length - 1];
-  const expensePieData = latestTrend
-    ? [
-        {
-          name: "营业成本",
-          value: latestTrend.costOfSales,
-          color: PIE_COLORS[0],
-        },
-        {
-          name: "管理费用",
-          value: latestTrend.adminExpenses,
-          color: PIE_COLORS[1],
-        },
-        {
-          name: "财务费用",
-          value: latestTrend.financialExpenses,
-          color: PIE_COLORS[2],
-        },
-        {
-          name: "销售费用",
-          value: latestTrend.sellingExpenses,
-          color: PIE_COLORS[3],
-        },
-      ].filter((d) => d.value > 0)
-    : [];
+  // 支出分类占比：取最近一个有正数费用的账期，并说明用了哪个账期、为什么回退
+  const expenseShare = buildExpenseShare(analytics.trends);
+  const expensePieData = expenseShare.slices.map((slice) => ({
+    ...slice,
+    color: PIE_COLOR_BY_NAME[slice.name],
+  }));
 
   // 最近 10 期经营指标（带状态标签）
   const recentMetrics = [...analytics.trends]
@@ -1088,16 +1075,25 @@ export function FinancialStatementsTabsSection({
                     <PieChartIcon className="h-5 w-5 text-primary" />
                     支出分类占比
                   </CardTitle>
-                  <CardDescription>最新账期各项费用占比分布</CardDescription>
+                  <CardDescription data-testid="expense-share-period">
+                    {expenseShare.periodLabel
+                      ? `${expenseShare.periodLabel}各项费用占比分布`
+                      : "最近账期各项费用占比分布"}
+                    {expenseShare.skippedLatestLabel &&
+                      `（${expenseShare.skippedLatestLabel}没有可画的费用，已改用该账期）`}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {expensePieData.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 py-14 text-center">
-                      <span className="rounded-full bg-muted/50 p-3">
-                        <PieChartIcon className="h-5 w-5 text-muted-foreground/50" />
+                    <div
+                      className="flex flex-col items-center gap-2 py-14 text-center"
+                      data-testid="expense-share-empty"
+                    >
+                      <span className="rounded-full bg-muted p-3">
+                        <PieChartIcon className="h-5 w-5 text-muted-foreground" />
                       </span>
-                      <p className="text-sm text-muted-foreground/60">
-                        暂无费用数据
+                      <p className="max-w-sm text-sm text-muted-foreground">
+                        {expenseShare.emptyReason}
                       </p>
                     </div>
                   ) : (
@@ -1128,6 +1124,20 @@ export function FinancialStatementsTabsSection({
                         </Pie>
                       </PieChart>
                     </ResponsiveContainer>
+                  )}
+                  {expenseShare.negatives.length > 0 && (
+                    <p
+                      className="mt-2 text-xs text-muted-foreground"
+                      data-testid="expense-share-negatives"
+                    >
+                      {expenseShare.negatives
+                        .map(
+                          (item) =>
+                            `${item.name}为负（${fmtAmount(item.value)}，如净收益）`,
+                        )
+                        .join("、")}
+                      ，占比图只画正数费用，未画入。
+                    </p>
                   )}
                 </CardContent>
               </Card>

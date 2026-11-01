@@ -200,3 +200,41 @@ test('buildSalesFinanceSummary: 正式合同金额不再扣减第三方装箱货
   assert.equal(result.revenue.receivedUsd, 300);
   assert.equal(result.revenue.outstandingUsd, 300);
 });
+
+test('buildSalesFinanceSummary: 全部为第三方拼柜 = 无自有货物（不适用），不再误报缺美元金额', () => {
+  const summary = buildSalesFinanceSummary({
+    salesContract: {
+      ...salesContract,
+      packingItems: [{ id: 'p1', isOwnedByJiesong: false, sourceParty: '第三方拼柜', purchaseCost: 0, totalPrice: 1000, quantity: 5 }],
+    },
+    purchases,
+  });
+  assert.equal(summary.marginReady, true);
+  assert.ok(summary.issues.some((issue) => issue.code === 'NO_OWNED_GOODS' && issue.severity === 'info'));
+  assert.equal(summary.issues.some((issue) => issue.code === 'MISSING_OWNED_REVENUE'), false);
+});
+
+test('buildSalesFinanceSummary: 有自有明细但美元金额为 0 仍是缺数据；缺成本记录缺几条、几条已关联采购合同', () => {
+  const missingRevenue = buildSalesFinanceSummary({
+    salesContract: { ...salesContract, totalAmount: 0, packingItems: [{ id: 'p1', isOwnedByJiesong: true, purchaseCost: 10, totalPrice: 0 }] },
+    purchases,
+  });
+  assert.equal(missingRevenue.marginReady, false);
+  assert.ok(missingRevenue.issues.some((issue) => issue.code === 'MISSING_OWNED_REVENUE'));
+
+  const missingCost = buildSalesFinanceSummary({
+    salesContract: {
+      ...salesContract,
+      totalAmount: 300,
+      packingItems: [
+        { id: 'a', isOwnedByJiesong: true, purchaseContractNo: 'PO260001', purchaseCost: null, totalPrice: 100 },
+        { id: 'b', isOwnedByJiesong: true, purchaseContractNo: '', purchaseCost: null, totalPrice: 100 },
+        { id: 'c', isOwnedByJiesong: true, purchaseContractNo: 'PO260001', purchaseCost: 50, totalPrice: 100 },
+      ],
+    },
+    purchases,
+  });
+  const issue = missingCost.issues.find((entry) => entry.code === 'MISSING_PURCHASE_COST');
+  assert.deepEqual(issue.meta, { lineCount: 2, linkedLineCount: 1, ownedLineCount: 3 });
+  assert.equal(missingCost.marginReady, false);
+});

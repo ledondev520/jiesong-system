@@ -115,6 +115,10 @@ const report = (
       netCashCny: 0,
       scope: "合成商品口径",
       unavailableContracts: [],
+      marginReasonSummary: [],
+      cashReasonSummary: [],
+      verified: { contractCount: count, totalPurchases: 500, grossProfit: 200 },
+      shippedWithoutDate: 0,
     },
     funds: {
       totalReceivable: 0,

@@ -50,6 +50,7 @@ import {
   type FinancialUploadFileType,
 } from "./FinancialStatementsUploadDialog";
 import { ReceivableReconciliationCard } from "./ReceivableReconciliationCard";
+import { FinancialStatementsStaleness } from "./FinancialStatementsStaleness";
 import type { FinancialStatementsView } from "./FinancialStatementsTabsSection";
 
 const FinancialStatementsTabsSection = lazy(() =>
@@ -394,6 +395,10 @@ export function FinancialStatementsPageContent() {
               ))}
             </TabsList>
           </Tabs>
+
+          {activeView !== "library" && (
+            <FinancialStatementsStaleness periods={periods} />
+          )}
 
           {activeView === "overview" && (
             <FinancialStatementsOverview

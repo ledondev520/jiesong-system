@@ -56,6 +56,7 @@ import {
 } from "@/services/reports.service";
 import { Button } from "@/components/ui/button";
 import { ChartTooltip } from "@/components/finance/ChartTooltip";
+import { MarginPendingNotice, formatReasonCounts } from "./MarginPendingNotice";
 
 const formatCurrency = (amount: number | null, currency: "USD" | "CNY") => {
   if (amount === null) return "待核验";
@@ -332,32 +333,7 @@ function BusinessReportsContent() {
         {data.period.endDate || "当前"}，共 {overview.contractCount} 笔；
         {overview.scope}
       </p>
-      {!overview.marginReady && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/30 p-3 text-sm text-destructive"
-        >
-          毛利待核验，缺少汇率或已售成本，共{" "}
-          {overview.unavailableContracts.length} 笔需要处理。
-          <details className="mt-2">
-            <summary className="cursor-pointer underline">
-              查看清单（{overview.unavailableContracts.length} 笔）
-            </summary>
-            <ul className="mt-2 space-y-1">
-              {overview.unavailableContracts.map((contract, index) => (
-                <li key={contract.id}>
-                  <Link
-                    className="underline"
-                    href={`/dashboard/sales/${contract.id}?tab=finance`}
-                  >
-                    核验第{index + 1}笔：{contract.reasons.join("；")}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </details>
-        </div>
-      )}
+      <MarginPendingNotice overview={overview} />
       {/* 经营概览 */}
       <section aria-label="经营概览" className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">经营概览</h2>
@@ -634,7 +610,8 @@ function BusinessReportsContent() {
           <p className="mt-2 text-xs text-muted-foreground">
             累计已收折算人民币 + 已退税 −
             按已售成本分摊采购已付；显示所选单据的累计占用，不是期间银行现金流。
-            {!overview.cashReady && "采购关联或币种缺失，现金占用待核验。"}
+            {!overview.cashReady &&
+              `现金占用待核验：${formatReasonCounts(overview.cashReasonSummary)}。`}
           </p>
           <Link
             className="mt-3 inline-block text-sm text-primary underline"

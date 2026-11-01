@@ -6,7 +6,7 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import api from '@/lib/axios';
+import api from "@/lib/axios";
 
 // ==================== 类型定义 ====================
 
@@ -102,7 +102,7 @@ export interface CashFlowStatement {
 export interface AccountBalanceEntry {
   id: string;
   sourceRow: number;
-  rowType: 'ACCOUNT' | 'SUBTOTAL' | 'TOTAL';
+  rowType: "ACCOUNT" | "SUBTOTAL" | "TOTAL";
   accountCode: string | null;
   accountName: string;
   openingDebit: number | null;
@@ -118,7 +118,7 @@ export interface AccountBalanceEntry {
 export interface GeneralLedgerEntry {
   id: string;
   sourceRow: number;
-  rowType: 'OPENING' | 'ENTRY' | 'PERIOD_TOTAL' | 'YTD_TOTAL';
+  rowType: "OPENING" | "ENTRY" | "PERIOD_TOTAL" | "YTD_TOTAL";
   accountCode: string;
   accountName: string;
   entryDate: string | null;
@@ -132,7 +132,7 @@ export interface GeneralLedgerEntry {
 
 export interface FinancialDataSource {
   id: string;
-  type: 'STATEMENT' | 'TRIAL_BALANCE' | 'GENERAL_LEDGER';
+  type: "STATEMENT" | "TRIAL_BALANCE" | "GENERAL_LEDGER";
   fileName: string;
   fileSize: number;
   sha256: string;
@@ -165,6 +165,8 @@ interface TrendDataPoint {
   adminExpenses: number;
   financialExpenses: number;
   sellingExpenses: number;
+  /** false = 该账期利润表四项费用行都是空值（未录入），不是 0 */
+  expenseReported?: boolean;
   operatingProfit: number;
   netProfit: number;
   totalAssets: number;
@@ -175,7 +177,7 @@ interface TrendDataPoint {
 }
 
 export interface FinancialAlert {
-  level: 'danger' | 'warning' | 'info';
+  level: "danger" | "warning" | "info";
   code: string;
   message: string;
   detail: string;
@@ -319,7 +321,7 @@ export interface FinancialEvidenceSheet {
 export interface FinancialEvidenceRow {
   id: string;
   sourceRow: number;
-  rowKind: 'HEADER' | 'DATA' | 'TOTAL' | 'NOTE';
+  rowKind: "HEADER" | "DATA" | "TOTAL" | "NOTE";
   values: Array<string | number | boolean | null>;
   numericCellCount: number;
   textCellCount: number;
@@ -338,7 +340,12 @@ export interface FinancialEvidenceDocumentDetail extends FinancialEvidenceDocume
   sheets: FinancialEvidenceSheet[];
   selectedSheet: FinancialEvidenceSheet | null;
   rows: FinancialEvidenceRow[];
-  pagination: { page: number; pageSize: number; total: number; totalPages: number } | null;
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  } | null;
 }
 
 // ==================== API 调用 ====================
@@ -348,7 +355,10 @@ export interface FinancialEvidenceDocumentDetail extends FinancialEvidenceDocume
  * @returns 账期数组
  */
 async function listStatements(): Promise<FinancialPeriod[]> {
-  const res = await api.get('/finance/statements') as { code: number; data: FinancialPeriod[] };
+  const res = (await api.get("/finance/statements")) as {
+    code: number;
+    data: FinancialPeriod[];
+  };
   return res.data;
 }
 
@@ -357,8 +367,14 @@ async function listStatements(): Promise<FinancialPeriod[]> {
  * @param year - 年份
  * @param month - 月份
  */
-async function getStatementDetail(year: number, month: number): Promise<FinancialPeriod | null> {
-  const res = await api.get(`/finance/statements/${year}/${month}`) as { code: number; data: FinancialPeriod };
+async function getStatementDetail(
+  year: number,
+  month: number,
+): Promise<FinancialPeriod | null> {
+  const res = (await api.get(`/finance/statements/${year}/${month}`)) as {
+    code: number;
+    data: FinancialPeriod;
+  };
   return res.data;
 }
 
@@ -367,23 +383,33 @@ async function getStatementDetail(year: number, month: number): Promise<Financia
  * @returns 趋势数据 + 预警列表 + 最新账期数据
  */
 async function getAnalytics(): Promise<AnalyticsData> {
-  const res = await api.get('/finance/statements/analytics') as { code: number; data: AnalyticsData };
+  const res = (await api.get("/finance/statements/analytics")) as {
+    code: number;
+    data: AnalyticsData;
+  };
   return res.data;
 }
 
 async function getEvidenceSummary(): Promise<FinancialEvidenceSummary> {
-  const res = await api.get('/finance/statements/evidence/summary') as { code: number; data: FinancialEvidenceSummary };
+  const res = (await api.get("/finance/statements/evidence/summary")) as {
+    code: number;
+    data: FinancialEvidenceSummary;
+  };
   return res.data;
 }
 
-async function listEvidenceDocuments(filters: {
-  category?: string;
-  year?: number;
-  month?: number;
-  page?: number;
-  pageSize?: number;
-} = {}): Promise<FinancialEvidenceDocumentPage> {
-  const res = await api.get('/finance/statements/evidence/documents', { params: filters }) as {
+async function listEvidenceDocuments(
+  filters: {
+    category?: string;
+    year?: number;
+    month?: number;
+    page?: number;
+    pageSize?: number;
+  } = {},
+): Promise<FinancialEvidenceDocumentPage> {
+  const res = (await api.get("/finance/statements/evidence/documents", {
+    params: filters,
+  })) as {
     code: number;
     data: FinancialEvidenceDocumentPage;
   };
@@ -394,19 +420,26 @@ async function getEvidenceDocument(
   id: string,
   options: { sheetId?: string; page?: number; pageSize?: number } = {},
 ): Promise<FinancialEvidenceDocumentDetail> {
-  const res = await api.get(`/finance/statements/evidence/documents/${id}`, { params: options }) as {
+  const res = (await api.get(`/finance/statements/evidence/documents/${id}`, {
+    params: options,
+  })) as {
     code: number;
     data: FinancialEvidenceDocumentDetail;
   };
   return res.data;
 }
 
-const buildStatementFormData = (file: File, year: number, month: number, periodLabel?: string) => {
+const buildStatementFormData = (
+  file: File,
+  year: number,
+  month: number,
+  periodLabel?: string,
+) => {
   const formData = new FormData();
-  formData.append('file', file);
-  formData.append('year', String(year));
-  formData.append('month', String(month));
-  if (periodLabel) formData.append('periodLabel', periodLabel);
+  formData.append("file", file);
+  formData.append("year", String(year));
+  formData.append("month", String(month));
+  if (periodLabel) formData.append("periodLabel", periodLabel);
   return formData;
 };
 
@@ -417,12 +450,12 @@ const buildBundleFormData = (
   periodLabel?: string,
 ) => {
   const formData = new FormData();
-  formData.append('statement', files.statement);
-  formData.append('trialBalance', files.trialBalance);
-  formData.append('generalLedger', files.generalLedger);
-  formData.append('year', String(year));
-  formData.append('month', String(month));
-  if (periodLabel) formData.append('periodLabel', periodLabel);
+  formData.append("statement", files.statement);
+  formData.append("trialBalance", files.trialBalance);
+  formData.append("generalLedger", files.generalLedger);
+  formData.append("year", String(year));
+  formData.append("month", String(month));
+  if (periodLabel) formData.append("periodLabel", periodLabel);
   return formData;
 };
 
@@ -434,9 +467,17 @@ async function previewFile(
   periodLabel?: string,
 ): Promise<FinancialStatementImportPreview> {
   const formData = buildStatementFormData(file, year, month, periodLabel);
-  const res = await api.post('/finance/statements/import-file/preview', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }) as { code: number; message: string; data: FinancialStatementImportPreview };
+  const res = (await api.post(
+    "/finance/statements/import-file/preview",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  )) as {
+    code: number;
+    message: string;
+    data: FinancialStatementImportPreview;
+  };
   return res.data;
 }
 
@@ -450,11 +491,15 @@ async function confirmFile(
   periodLabel?: string,
 ): Promise<{ message: string; data: ImportResult }> {
   const formData = buildStatementFormData(file, year, month, periodLabel);
-  formData.append('previewId', previewId);
-  formData.append('allowOverwrite', String(allowOverwrite));
-  const res = await api.post('/finance/statements/import-file/confirm', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }) as { code: number; message: string; data: ImportResult };
+  formData.append("previewId", previewId);
+  formData.append("allowOverwrite", String(allowOverwrite));
+  const res = (await api.post(
+    "/finance/statements/import-file/confirm",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  )) as { code: number; message: string; data: ImportResult };
   return { message: res.message, data: res.data };
 }
 
@@ -466,9 +511,17 @@ async function previewBundle(
   periodLabel?: string,
 ): Promise<FinancialStatementImportPreview> {
   const formData = buildBundleFormData(files, year, month, periodLabel);
-  const res = await api.post('/finance/statements/import-bundle/preview', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }) as { code: number; message: string; data: FinancialStatementImportPreview };
+  const res = (await api.post(
+    "/finance/statements/import-bundle/preview",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  )) as {
+    code: number;
+    message: string;
+    data: FinancialStatementImportPreview;
+  };
   return res.data;
 }
 
@@ -482,11 +535,15 @@ async function confirmBundle(
   periodLabel?: string,
 ): Promise<{ message: string; data: ImportResult }> {
   const formData = buildBundleFormData(files, year, month, periodLabel);
-  formData.append('previewId', previewId);
-  formData.append('allowOverwrite', String(allowOverwrite));
-  const res = await api.post('/finance/statements/import-bundle/confirm', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }) as { code: number; message: string; data: ImportResult };
+  formData.append("previewId", previewId);
+  formData.append("allowOverwrite", String(allowOverwrite));
+  const res = (await api.post(
+    "/finance/statements/import-bundle/confirm",
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  )) as { code: number; message: string; data: ImportResult };
   return { message: res.message, data: res.data };
 }
 

@@ -152,7 +152,8 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.deepEqual(analytics.trends.map(row => [row.year, row.month, row.revenue, row.netProfit]), [
       [2025, 2, 1000, 100], [2025, 12, 5000, 200], [2026, 1, 20000, -500], [2026, 10, 12000, -200],
     ]);
-    assert.deepEqual(analytics.trends[3], { label: '2026年10月', month: 10, year: 2026, revenue: 12000, costOfSales: 6000, adminExpenses: 1200, financialExpenses: 100, sellingExpenses: 700, operatingProfit: 0, netProfit: -200, totalAssets: 240000, totalLiabilities: 60000, totalEquity: 180000, cash: 90000, debtRatio: 0.25 });
+    assert.deepEqual(analytics.trends[3], { label: '2026年10月', month: 10, year: 2026, revenue: 12000, costOfSales: 6000, adminExpenses: 1200, financialExpenses: 100, sellingExpenses: 700, expenseReported: true, operatingProfit: 0, netProfit: -200, totalAssets: 240000, totalLiabilities: 60000, totalEquity: 180000, cash: 90000, debtRatio: 0.25 });
+    assert.deepEqual(analytics.trends.map(row => row.expenseReported), [false, false, false, true], '费用行未录入（NULL）与录入为 0 要分得开');
     assert.equal(analytics.latestPeriod.periodLabel, 'Synthetic 2026-10');
     assert.deepEqual(analytics.latestPeriod.balanceSheet, httpRow(before.balance_sheet_entries.find(row => row.id === 'balance-latest')));
     assert.deepEqual(analytics.latestPeriod.incomeStatement, httpRow(before.income_statement_entries.find(row => row.id === 'income-latest')));
