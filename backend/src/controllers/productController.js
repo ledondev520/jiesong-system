@@ -27,8 +27,8 @@ const bodyNumber = (value, label) => {
   } else if (typeof value === 'string') {
     const text = value.trim();
     if (text === '') return null;
-    // 拒绝十六进制/Infinity 等 Number() 能解析的非十进制写法
-    if (/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(text)) parsed = Number(text);
+    // 拒绝十六进制/Infinity 等 Number() 能解析的非十进制写法；小数点可选段不与前面的 \d+ 重叠，失败匹配保持线性（防 ReDoS）
+    if (/^[+-]?(\d+(\.\d*)?|\.\d+)(e[+-]?\d+)?$/i.test(text)) parsed = Number(text);
   }
   if (!Number.isFinite(parsed)) throw createError(`${label} 必须是数字`, 400);
   return parsed;

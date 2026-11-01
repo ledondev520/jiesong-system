@@ -193,6 +193,26 @@ test('请求体校验：数组/对象/非十进制数值 400，空串为 null，
   assert.equal(partial.args.data.grossWeight, undefined);
 });
 
+test('请求体校验：超长数字串不触发正则回溯（ReDoS 回归），失败匹配快速返回 400', async () => {
+  const run = async (grossWeight) => {
+    const res = createMockRes();
+    let error = null;
+    await withMockProductDelegate({ create: async (a) => ({ id: 'p', ...a.data }) }, async () => {
+      await productController.create({ params: {}, body: { customsName: 'n', grossWeight } }, res, (e) => { error = e; });
+    });
+    return error;
+  };
+  // 旧正则 \d+\.?\d* 对 20k 个 0 + 非法尾字符为 O(n^2)（约 3 秒）；线性正则应在毫秒级
+  for (const raw of ['0'.repeat(20000) + 'x', '0'.repeat(20000) + '.' + '0'.repeat(20000) + 'x', '0'.repeat(20000) + 'e']) {
+    const start = process.hrtime.bigint();
+    const error = await run(raw);
+    const ms = Number(process.hrtime.bigint() - start) / 1e6;
+    assert.equal(error?.statusCode, 400);
+    assert.ok(ms < 500, `took ${ms}ms`);
+  }
+  assert.equal(await run('0'.repeat(20000)), null); // 合法的超长数字串仍可通过
+});
+
 test('请求体不是普通对象（null/数组/字符串）时 create 与 update 返回 400', async () => {
   for (const method of ['create', 'update']) {
     for (const body of [null, [], ['x'], 'abc']) {
