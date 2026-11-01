@@ -19,7 +19,7 @@ export default defineConfig({
     environment: 'jsdom',
     // BL-8: worker threads start a fresh jsdom per file cheaper than the default child processes (forks);
     // file isolation stays on (isolate:false was measured: 713 cross-file failures).
-    pool: 'threads',
+    pool: 'vmThreads',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['src/test/setup.ts'],
     // Page-level interaction tests exceed Vitest's 5s default under full-suite load in CI,
