@@ -153,25 +153,27 @@ const overlaps = (a, b) => (
   && a.z < b.z + b.dz && a.z + a.dz > b.z
 );
 
+const overLimit = (block, pressure) => (
+  (block.nz - 1) * block.kgEach + (block.pTop + pressure) * block.cartonArea > block.maxStackKg + EPS
+);
 /**
  * 承压向下传递（压强模型）：新块总重 W 均摊到支撑面积上，得到压强 p = W / supportArea；
  * 支撑块每个底层纸箱承受 p × 箱底面积 + 自身 (nz−1) 层重量，不得超过 maxStackKg。
  * 落到支撑块上的重量再按其自身支撑面积继续向下传递。
- * @returns {Map<object, number>|null} 各祖先块新增的顶部压强；任一超限返回 null
+ * check=true：累计压强只增不减，任一祖先块一旦超限最终必超限，故立即返回 null（与事后整体检查等价，但绝大多数失败候选只走第一层）。
+ * @returns {Map<object, number>|null} 各祖先块新增的顶部压强；check 时任一超限返回 null
  */
-const collectLoad = (refs, supportArea, weightKg, acc = new Map()) => {
+const collectLoad = (refs, supportArea, weightKg, acc = new Map(), check = false) => {
   if (weightKg <= 0 || supportArea <= 0) return acc;
   const pressure = weightKg / supportArea;
   for (const { block, overlap } of refs) {
-    acc.set(block, (acc.get(block) || 0) + pressure);
-    collectLoad(block.supportRefs, block.supportArea, pressure * overlap, acc);
+    const total = (acc.get(block) || 0) + pressure;
+    acc.set(block, total);
+    if (check && overLimit(block, total)) return null;
+    if (!collectLoad(block.supportRefs, block.supportArea, pressure * overlap, acc, check)) return null;
   }
   return acc;
 };
-
-const loadWithinLimits = (acc) => [...acc].every(([block, pressure]) => (
-  (block.nz - 1) * block.kgEach + (block.pTop + pressure) * block.cartonArea <= block.maxStackKg + EPS
-));
 
 /**
  * 每个底层纸箱（nx×ny 网格的一格）的底面都须有 ≥ minRatio 的面积落在下方块顶面；块平均支撑会漏掉悬空的单箱。
@@ -271,7 +273,7 @@ const formBlock = (ctx, ep, o, work) => {
           if (ox > 0 && oy > 0) { supportArea += ox * oy; supportRefs.push({ block: b, overlap: ox * oy }); }
         }
         if (line.heavy && supportRefs.some(({ block }) => !block.heavy)) continue;
-        if (kg > 0 && !loadWithinLimits(collectLoad(supportRefs, supportArea, cartons * kg))) continue;
+        if (kg > 0 && !collectLoad(supportRefs, supportArea, cartons * kg, new Map(), true)) continue;
       }
       best = { ...candidate, cartons, supportRefs, supportArea };
     }

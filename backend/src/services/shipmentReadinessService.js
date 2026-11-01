@@ -6,7 +6,7 @@
 
 const { getContainerSpec, listContainerTypes, loadContainerConfig } = require('./containerSpecs');
 const { toCartonLines, packContainers, usableMm } = require('./containerPacking');
-const { packContainersAsync } = require('./containerPackingPool');
+const containerPackingPool = require('./containerPackingPool'); // 经模块对象调用，测试可替换
 
 const toNumber = (value) => {
   const parsed = Number(value);
@@ -188,7 +188,7 @@ const buildLoadingPlanAsync = async (salesContract, options = {}, poolOptions = 
   const prepared = prepareLoadingPlan(salesContract, options);
   const packed = prepared.lines.length === 0
     ? packContainers(prepared.lines, prepared.spec, prepared.config)
-    : await packContainersAsync(prepared.lines, prepared.spec, prepared.config, poolOptions);
+    : await containerPackingPool.packContainersAsync(prepared.lines, prepared.spec, prepared.config, poolOptions);
   return assembleLoadingPlan(prepared, packed);
 };
 

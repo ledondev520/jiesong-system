@@ -481,6 +481,50 @@ test('updateSalesStatus: 有箱件无法放入时拒绝确认发运', async () =
   }
 });
 
+test('updateSalesStatus: 排柜 worker 超时/崩溃（503）时拒绝确认发运且不写入任何数据', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const pool = require('./containerPackingPool');
+  const originalPack = pool.packContainersAsync;
+  const originalTransaction = prisma.$transaction;
+  const originalApplySalesOutStock = inventorySnapshot.applySalesOutStock;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-503-'));
+  const crashFile = path.join(dir, 'crash.js');
+  fs.writeFileSync(crashFile, 'process.exit(1);');
+  const writes = [];
+  prisma.$transaction = async (fn) => fn({
+    salesContract: {
+      findUnique: async () => ({
+        id: 'sc-1',
+        status: 'PACKING',
+        grossWeight: 10,
+        volume: 0.1,
+        packingItems: [{ id: 'pk-1', boxes: 1, quantity: 1, volume: 0.1, grossWeight: 10, length: 500, width: 400, height: 300, product: { customsName: '样品' } }],
+      }),
+      update: async (args) => { writes.push(args); return {}; },
+    },
+  });
+  inventorySnapshot.applySalesOutStock = async () => { writes.push('outStock'); return { results: [] }; };
+
+  try {
+    // 真实 pool：一次 1 ms 超时，一次注入崩溃 worker；两种失败都必须是 503，且无任何写入。
+    for (const poolOptions of [{ timeoutMs: 1 }, { workerFile: crashFile, timeoutMs: 5000 }]) {
+      pool.packContainersAsync = (lines, spec, config, options) => originalPack(lines, spec, config, { ...options, ...poolOptions });
+      await assert.rejects(
+        () => salesService.updateSalesStatus('sc-1', 'SHIPPED'),
+        (error) => error.statusCode === 503,
+      );
+    }
+    assert.deepEqual(writes, []);
+  } finally {
+    pool.packContainersAsync = originalPack;
+    prisma.$transaction = originalTransaction;
+    inventorySnapshot.applySalesOutStock = originalApplySalesOutStock;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('calculateSellingPrice: 只按唯一报价规则；拒绝请求里的 profitRate，缺省现汇取配置', () => {
   assert.throws(
     () => salesService.calculateSellingPrice({ costPrice: 100, exchangeRate: 0 }),
