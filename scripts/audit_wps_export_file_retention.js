@@ -89,7 +89,7 @@ function uniqueSorted(values) {
 }
 
 function escapeMarkdownCell(value) {
-  return String(value || '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  return String(value || '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 }
 
 function fileStat(relativePath) {
