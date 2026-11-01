@@ -1,25 +1,12 @@
-'use client';
+import type { Metadata } from "next";
+import { LandingPage } from "@/components/landing/LandingPage";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/store/auth.store';
+export const metadata: Metadata = {
+  title: { absolute: "捷淞国际物流 · 进出口业务管理系统" },
+  description:
+    "捷淞国际物流进出口业务管理系统：报价、订单、采购、收货、发运、单证、发票与出口退税。",
+};
 
 export default function RootPage() {
-  const router = useRouter();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  // persist 在首次加载时需要等待 hydration 完成，否则会出现认证状态闪烁
-  const hasHydrated = useAuthStore.persist?.hasHydrated?.() ?? false;
-
-  useEffect(() => {
-    // 0. 等待持久化状态恢复后再决定跳转，避免误跳回登录页
-    if (!hasHydrated) return;
-    // 1. 按认证态路由到 dashboard 或 login
-    if (isAuthenticated) {
-      router.push('/dashboard');
-    } else {
-      router.push('/login');
-    }
-  }, [hasHydrated, isAuthenticated, router]);
-
-  return null;
+  return <LandingPage />;
 }

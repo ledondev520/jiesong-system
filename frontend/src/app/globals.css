@@ -360,22 +360,32 @@
     opacity: 1;
   }
 
-  /* Ink & Seal：认证页是平整的暖纸底，不再有主色光晕、网格与毛玻璃（B27 再按分栏版式重做 AuthShell） */
+  /* 公开页/认证页的拉丁字母与数字用 Montserrat（montserrat.ts 提供 --font-montserrat）；中文回落系统字体 */
+  .font-brand {
+    font-family: var(--font-montserrat), var(--font-body-sans), sans-serif;
+  }
+
+  /* 认证页：<1024px 顶部 72px 纸色带 + 表单；≥1024px 左 5/12 纸色品牌面板 + 右 7/12 表单。纯色，无光晕/毛玻璃 */
   .auth-shell {
-    @apply relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-8;
+    @apply flex min-h-screen flex-col bg-background lg:flex-row;
   }
 
+  .auth-aside {
+    @apply flex h-[72px] shrink-0 items-center gap-3 border-b border-border bg-secondary px-4 text-secondary-foreground lg:h-auto lg:min-h-screen lg:w-5/12 lg:flex-col lg:items-start lg:justify-between lg:gap-0 lg:border-b-0 lg:border-r lg:p-12;
+  }
+
+  .auth-main {
+    @apply flex flex-1 flex-col items-center justify-center px-4 py-8 lg:w-7/12 lg:px-8;
+  }
+
+  /* 表单卡：桌面 8px 圆角、1px 边框、sm 阴影；手机无边框无阴影，直接落在纸色画布上 */
   .auth-card {
-    @apply relative w-full max-w-md rounded-2xl border border-border bg-card shadow-sm;
+    @apply w-full max-w-[400px] rounded-lg border border-border bg-card shadow-sm;
   }
-
-  /* 注册/找回密码沿用登录页的圆角输入框与按钮 */
-  .auth-card [data-slot="input"],
-  .auth-card [data-slot="button"] {
-    @apply rounded-xl;
-  }
-  .auth-card [data-slot="input"] {
-    @apply h-11;
+  @media (max-width: 767px) {
+    .auth-card {
+      @apply border-transparent bg-transparent shadow-none;
+    }
   }
 
   .text-brand-emphasis {
