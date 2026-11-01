@@ -233,3 +233,24 @@ test('重配：无冲突时保留原关联；乐观条件让并发被人工改�
  assert.equal(result.kept,1);assert.equal(result.applied,0);assert.equal(result.skipped,1);
  assert.equal(fixture.rows.find(r=>r.id==='bad').matchStatus,'MATCHED','读后被改成人工 100 分：不覆盖');
 });
+
+test('重配 MOVE：最优合同已被人工发票占满时，自动关联移到次优合同并写入新合同与新分数',async(t)=>{
+ const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',...over});
+ const fixture=invoiceFixture(t,{contracts:[contract(),contract({id:'c2',contractNo:'CG-SYN-2',totalAmount:40000})],invoices:[
+  link('manual',{matchScore:100}),
+  link('mover',{matchScore:90}),
+ ]});
+ const dry=await service.rematchAutoInvoiceLinks();
+ assert.equal(dry.changes.length,1);
+ const[change]=dry.changes;
+ assert.deepEqual({id:change.id,action:change.action,from:change.fromContractId,fromScore:change.fromScore,to:change.toContractId},{id:'mover',action:'MOVE',from:'c1',fromScore:90,to:'c2'});
+ assert.ok(change.toScore>=70&&change.toScore<100,'次优合同分数达阈值但不到 100（否则会被当成人工锁定）');
+ assert.equal(fixture.writes.length,0);
+ const applied=await service.rematchAutoInvoiceLinks({apply:true});
+ assert.equal(applied.applied,1);
+ const row=fixture.rows.find(r=>r.id==='mover');
+ assert.equal(row.matchedContractId,'c2');assert.equal(row.matchScore,change.toScore);
+ assert.equal(row.matchStatus,'MATCHED');assert.equal(row.matchedContractType,'PURCHASE');
+ assert.equal(fixture.rows.find(r=>r.id==='manual').matchedContractId,'c1','人工关联不动');
+ assert.deepEqual((await service.rematchAutoInvoiceLinks({apply:true})).changes,[]);
+});

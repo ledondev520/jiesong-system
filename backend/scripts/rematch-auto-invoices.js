@@ -3,7 +3,7 @@
  * Input: --database <abs path> [--apply --backup-dir <dir> --receipt <file>] [--report <file>].
  * Output: one JSON summary line; --report writes the per-invoice change list (contract numbers, invoice numbers; Confidential) as a 0600 file.
  * Pos: INVMATCH-4 one-off re-run of invoice auto-matching under the cap / tax-ID / early-date rules (financeMatchService.rematchAutoInvoiceLinks).
- * Prerequisite: private SQLite, and for --apply a private backup directory + Python3 online backup. Dry-run (default) writes nothing.
+ * Prerequisite: private SQLite, and for --apply a private backup directory + Python3 online backup. Dry-run (default) changes no business rows (Prisma still opens the SQLite file read-write, so -wal/-shm may be touched).
  * Never reads .env: DATABASE_URL comes only from --database. Manual links (score 100) are never touched; running twice gives the same result.
  */
 const fs = require('node:fs');
@@ -41,10 +41,12 @@ async function main(args = process.argv.slice(2)) {
   const configured = configuredDatabase();
   const db = require('../src/utils/prisma');
   const { rematchAutoInvoiceLinks } = require('../src/services/financeMatchService');
-  let receiptFd, committed = false;
+  let receiptFd, reportFd, committed = false;
   try {
     const target = await targetIdentity(db, configured);
     let backupPath = null;
+    // Reserve every output file before the transaction: an existing path must fail while nothing has been changed.
+    if (options.report) reportFd = reservePrivateFile(options.report);
     if (options.apply) {
       receiptFd = reservePrivateFile(options.receipt);
       backupPath = await backupDatabase(target, options.backupDir);
@@ -56,17 +58,17 @@ async function main(args = process.argv.slice(2)) {
     const summary = { ...counts, changed: changes.length, moved: changes.filter(c => c.action === 'MOVE').length,
       unlinked: changes.filter(c => c.action === 'UNLINK').length, backupPath,
       targetFingerprint: target.fingerprint, completedAt: options.apply ? new Date().toISOString() : null };
-    if (options.report) {
-      const fd = reservePrivateFile(options.report);
-      try { writeJson(fd, { format: 'jiesong-invoice-rematch-report-v1', ...summary, changes }); } finally { fs.closeSync(fd); }
-    }
-    if (options.apply) writeJson(receiptFd, { format: 'jiesong-invoice-rematch-receipt-v1', ...summary, changedIds: changes.map(c => c.id) });
+    if (reportFd !== undefined) writeJson(reportFd, { format: 'jiesong-invoice-rematch-report-v1', ...summary, changes });
+    // Receipt is self-sufficient for undo: original contract/score and new state per invoice (no amounts or contract numbers).
+    if (options.apply) writeJson(receiptFd, { format: 'jiesong-invoice-rematch-receipt-v2', ...summary,
+      changes: changes.map(({ id, action, fromContractId, fromScore, toContractId, toScore }) => ({ id, action, fromContractId, fromScore, toContractId, toScore })) });
     console.log(JSON.stringify(summary));
   } catch (error) {
     if (committed) { const wrapped = new Error('数据库事务已提交，但回执保存失败；须先只读核验。'); wrapped.code = 'REMATCH_RECEIPT_FAILED'; throw wrapped; }
     throw error;
   } finally {
     if (receiptFd !== undefined) fs.closeSync(receiptFd);
+    if (reportFd !== undefined) fs.closeSync(reportFd);
     await db.$disconnect();
   }
 }
