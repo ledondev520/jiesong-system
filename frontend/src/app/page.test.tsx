@@ -102,7 +102,7 @@ describe("RootPage 公开落地页", () => {
     );
   });
 
-  it("业务链八个环节、三张功能卡都在", () => {
+  it("业务链八个环节都在；功能卡与页中收尾带已移除", () => {
     render(<RootPage />);
     for (const step of [
       "报价",
@@ -117,10 +117,14 @@ describe("RootPage 公开落地页", () => {
       expect(screen.getAllByText(step).length).toBeGreaterThan(0);
     }
     for (const title of ["全程可追溯", "权限分明", "AI 助手随页可用"]) {
-      expect(
-        screen.getByRole("heading", { level: 3, name: title }),
-      ).toBeInTheDocument();
+      expect(screen.queryByText(title)).toBeNull();
     }
+    expect(screen.queryByText("系统特点")).toBeNull();
+    expect(screen.queryByText("已有账号？")).toBeNull();
+    expect(screen.queryByText("需要开通？")).toBeNull();
+    // 入口只剩顶栏、首屏、页脚三处：登录 3、申请账号 3
+    expect(screen.getAllByRole("link", { name: /^登录/ })).toHaveLength(3);
+    expect(screen.getAllByRole("link", { name: "申请账号" })).toHaveLength(3);
   });
 
   it("内容规则：所有链接与资源都是站内地址，没有外部字体、脚本或框架", () => {
@@ -130,20 +134,5 @@ describe("RootPage 公开落地页", () => {
       expect(url, el.outerHTML.slice(0, 80)).toMatch(/^\//);
     }
     expect(container.querySelectorAll("script, iframe, link")).toHaveLength(0);
-  });
-
-  it("权限卡片只声称后端真实做到的：账簿明细与凭证仅财务/管理员，不声称整个财务数据", () => {
-    render(<RootPage />);
-    expect(
-      screen.getByText(/账簿明细与财务凭证仅财务和管理员可见/),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/财务数据只对财务和管理员可见/)).toBeNull();
-  });
-
-  it("功能卡的 h3 在一个 h2 之下（屏幕阅读器标题层级不跳级）", () => {
-    render(<RootPage />);
-    expect(
-      screen.getByRole("heading", { level: 2, name: "系统特点" }),
-    ).toBeInTheDocument();
   });
 });
