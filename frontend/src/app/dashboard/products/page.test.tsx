@@ -117,6 +117,21 @@ describe("ProductsPage 交互逻辑", () => {
     expect(screen.getAllByText("0.2 CBM").length).toBeGreaterThan(0);
   });
 
+  it("已停用商品的卡片带「已停用」徽标，启用商品没有", async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          { id: "p1", customsName: "合成停用商品", isActive: false },
+          { id: "p2", customsName: "合成启用商品", isActive: true },
+        ],
+      },
+    });
+    render(<ProductsPage />);
+    await screen.findAllByText("合成停用商品");
+    // 手机卡片 + 桌面卡片各一份，只对停用商品出现
+    expect(screen.getAllByText("已停用")).toHaveLength(2);
+  });
+
   it("仅含空白的 HS 编码按未填写处理", async () => {
     mockGetAll.mockResolvedValue({
       data: {

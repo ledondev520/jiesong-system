@@ -110,4 +110,21 @@ describe("商品详情", () => {
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith("product-1"));
     expect(mocks.push).toHaveBeenCalledWith("/dashboard/products");
   });
+
+  it("危险区文案如实说明是停用：不称无法撤销，也不声称会拒绝被引用商品 (B40 review)", async () => {
+    render(<ProductDetailPage />);
+    const zone = await screen.findByRole("region", { name: "危险操作" });
+    expect(zone).toHaveTextContent("停用");
+    expect(zone).not.toHaveTextContent("无法撤销");
+    expect(zone).not.toHaveTextContent("拒绝");
+  });
+
+  it("已停用商品显示「已停用」徽标且不再提供删除入口", async () => {
+    mocks.getById.mockResolvedValue({ data: { ...product, isActive: false } });
+    render(<ProductDetailPage />);
+    await screen.findByText("合成商品");
+    expect(screen.getByText("已停用")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "危险操作" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "删除商品" })).toBeNull();
+  });
 });

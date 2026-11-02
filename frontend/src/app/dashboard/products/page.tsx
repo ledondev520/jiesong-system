@@ -352,6 +352,11 @@ function ProductsPageContent() {
             <MobileListCard
               key={product.id}
               title={product.customsName}
+              badge={
+                product.isActive === false ? (
+                  <Badge variant="secondary">已停用</Badge>
+                ) : undefined
+              }
               subtitle={
                 [product.specification, product.unit]
                   .filter(Boolean)
@@ -468,9 +473,16 @@ function ProductsPageContent() {
                           {product.specification || "—"}
                         </p>
                       </div>
-                      <Badge variant="outline" className="shrink-0 text-[11px]">
-                        {product.unit || "件"}
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {product.isActive === false && (
+                          <Badge variant="secondary" className="text-[11px]">
+                            已停用
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-[11px]">
+                          {product.unit || "件"}
+                        </Badge>
+                      </div>
                     </div>
 
                     {incomplete && (
