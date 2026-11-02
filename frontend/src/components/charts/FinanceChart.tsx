@@ -1,7 +1,7 @@
 /**
  * 财务统计图表
  */
-'use client';
+"use client";
 
 import {
   BarChart,
@@ -17,11 +17,18 @@ import {
   Legend,
   ResponsiveContainer,
   ComposedChart,
-} from 'recharts';
-import { ChartCard } from './ChartCard';
-import { ChartSkeleton } from './ChartSkeleton';
+} from "recharts";
+import { ChartCard } from "./ChartCard";
+import { ChartSkeleton } from "./ChartSkeleton";
 
-const COLORS = ['#00C49F', '#FF8042', '#0088FE', '#FFBB28', '#8884D8', '#FF6B6B'];
+const COLORS = [
+  "var(--chart-2)",
+  "var(--chart-4)",
+  "var(--chart-1)",
+  "var(--chart-3)",
+  "var(--chart-5)",
+  "var(--status-red)",
+];
 
 interface FinanceChartProps {
   data?: {
@@ -66,21 +73,34 @@ export default function FinanceChart({
         className="md:col-span-2"
       >
         <ResponsiveContainer width="100%" height={300}>
-          <ComposedChart data={monthlyData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+          <ComposedChart
+            data={monthlyData}
+            margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
             <YAxis />
             <Tooltip
-              formatter={(value) => [`$${Number(value).toLocaleString()}`, '']}
+              formatter={(value) => [`$${Number(value).toLocaleString()}`, ""]}
             />
             <Legend />
-            <Bar dataKey="receipts" name="收款" fill="#00C49F" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="payments" name="付款" fill="#FF8042" radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="receipts"
+              name="收款"
+              fill="var(--chart-2)"
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey="payments"
+              name="付款"
+              fill="var(--chart-4)"
+              radius={[4, 4, 0, 0]}
+            />
             <Line
               type="monotone"
               dataKey="net"
               name="净额"
-              stroke="#0088FE"
+              stroke="var(--chart-1)"
               strokeWidth={2}
               dot={{ r: 4 }}
             />
@@ -102,10 +122,15 @@ export default function FinanceChart({
               dataKey="value"
             >
               {paymentStatusData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Pie>
-            <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+            <Tooltip
+              formatter={(value) => `$${Number(value).toLocaleString()}`}
+            />
             <Legend />
           </PieChart>
         </ResponsiveContainer>
@@ -118,10 +143,20 @@ export default function FinanceChart({
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
             <YAxis />
-            <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
-            <Bar dataKey="value" name="金额" fill="#8884D8" radius={[4, 4, 0, 0]}>
+            <Tooltip
+              formatter={(value) => `$${Number(value).toLocaleString()}`}
+            />
+            <Bar
+              dataKey="value"
+              name="金额"
+              fill="var(--chart-5)"
+              radius={[4, 4, 0, 0]}
+            >
               {currencyData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Bar>
           </BarChart>

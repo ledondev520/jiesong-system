@@ -4,15 +4,15 @@
  * Pos: 财务模块通用 KPI 展示组件
  */
 
-import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface KpiCardProps {
   label: string;
   value: string;
   subLabel?: string;
-  trend?: 'up' | 'down' | 'neutral';
+  trend?: "up" | "down" | "neutral";
   trendValue?: string;
   icon?: React.ReactNode;
   className?: string;
@@ -23,20 +23,20 @@ export function KpiCard({
   label,
   value,
   subLabel,
-  trend = 'neutral',
+  trend = "neutral",
   trendValue,
   icon,
   className,
   valueClassName,
 }: KpiCardProps) {
-  const isUp = trend === 'up';
-  const isDown = trend === 'down';
+  const isUp = trend === "up";
+  const isDown = trend === "down";
 
   return (
     <Card
       className={cn(
-        'relative overflow-hidden border-border/60 bg-card transition-all duration-200 hover:border-border/80 hover:shadow-sm',
-        className
+        "relative overflow-hidden border-border/60 bg-card transition-all duration-200 hover:border-border/80 hover:shadow-sm",
+        className,
       )}
     >
       <CardContent className="p-5">
@@ -48,8 +48,8 @@ export function KpiCard({
             <div className="space-y-1">
               <p
                 className={cn(
-                  'text-2xl font-bold tabular-nums tracking-tight text-foreground',
-                  valueClassName
+                  "text-2xl font-bold tabular-nums tracking-tight text-foreground",
+                  valueClassName,
                 )}
               >
                 {value}
@@ -62,10 +62,10 @@ export function KpiCard({
               <div className="flex items-center gap-1.5">
                 <span
                   className={cn(
-                    'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold',
-                    isUp && 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400',
-                    isDown && 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400',
-                    !isUp && !isDown && 'bg-muted text-muted-foreground'
+                    "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
+                    isUp && "bg-status-green-soft text-status-green",
+                    isDown && "bg-status-red-soft text-status-red",
+                    !isUp && !isDown && "bg-muted text-muted-foreground",
                   )}
                 >
                   {isUp && <ArrowUpRight className="h-3 w-3" />}

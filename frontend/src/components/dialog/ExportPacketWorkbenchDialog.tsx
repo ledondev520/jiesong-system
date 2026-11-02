@@ -391,7 +391,7 @@ export function ExportPacketWorkbenchDialog({
                     <p className="text-xs text-muted-foreground">预检状态</p>
                     <p className="mt-1 flex items-center gap-2 text-sm font-semibold">
                       {preview.ready ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <CheckCircle2 className="h-4 w-4 text-status-green" />
                       ) : (
                         <AlertCircle className="h-4 w-4 text-destructive" />
                       )}
@@ -485,7 +485,7 @@ export function ExportPacketWorkbenchDialog({
                             {line.pricingReference}
                           </p>
                           {line.rejectedHistoricalQuote && (
-                            <p className="mt-1 text-xs text-amber-700">
+                            <p className="mt-1 text-xs text-status-amber">
                               已拒绝 {line.rejectedHistoricalQuote.contractNo}{" "}
                               历史价
                             </p>
@@ -528,7 +528,7 @@ export function ExportPacketWorkbenchDialog({
                           ) : (
                             <Badge
                               variant="secondary"
-                              className="text-emerald-700"
+                              className="text-status-green"
                             >
                               完整
                             </Badge>

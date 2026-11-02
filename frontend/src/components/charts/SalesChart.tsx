@@ -1,7 +1,7 @@
 /**
  * 销售合同统计图表
  */
-'use client';
+"use client";
 
 import {
   BarChart,
@@ -17,11 +17,18 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
-} from 'recharts';
-import { ChartCard } from './ChartCard';
-import { ChartSkeleton } from './ChartSkeleton';
+} from "recharts";
+import { ChartCard } from "./ChartCard";
+import { ChartSkeleton } from "./ChartSkeleton";
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B'];
+const COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--status-red)",
+];
 
 interface SalesChartProps {
   data?: {
@@ -65,15 +72,26 @@ export default function SalesChart({
         className="md:col-span-2"
       >
         <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <AreaChart
+            data={monthlyData}
+            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+          >
             <defs>
               <linearGradient id="colorContracts" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0088FE" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#0088FE" stopOpacity={0} />
+                <stop
+                  offset="5%"
+                  stopColor="var(--chart-1)"
+                  stopOpacity={0.8}
+                />
+                <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#00C49F" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="#00C49F" stopOpacity={0} />
+                <stop
+                  offset="5%"
+                  stopColor="var(--chart-2)"
+                  stopOpacity={0.8}
+                />
+                <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis dataKey="month" />
@@ -87,7 +105,7 @@ export default function SalesChart({
               type="monotone"
               dataKey="contracts"
               name="合同数量"
-              stroke="#0088FE"
+              stroke="var(--chart-1)"
               fillOpacity={1}
               fill="url(#colorContracts)"
             />
@@ -96,7 +114,7 @@ export default function SalesChart({
               type="monotone"
               dataKey="amount"
               name="金额 (USD)"
-              stroke="#00C49F"
+              stroke="var(--chart-2)"
               fillOpacity={1}
               fill="url(#colorAmount)"
             />
@@ -113,13 +131,18 @@ export default function SalesChart({
               cx="50%"
               cy="50%"
               labelLine={false}
-              label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+              label={({ name, percent }) =>
+                `${name} ${((percent || 0) * 100).toFixed(0)}%`
+              }
               outerRadius={80}
-              fill="#8884d8"
+              fill="var(--chart-5)"
               dataKey="value"
             >
               {statusData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Pie>
             <Tooltip />
@@ -136,9 +159,17 @@ export default function SalesChart({
             <XAxis type="number" />
             <YAxis dataKey="name" type="category" width={80} />
             <Tooltip />
-            <Bar dataKey="value" name="合同数量" fill="#8884D8" radius={[0, 4, 4, 0]}>
+            <Bar
+              dataKey="value"
+              name="合同数量"
+              fill="var(--chart-5)"
+              radius={[0, 4, 4, 0]}
+            >
               {portData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Bar>
           </BarChart>

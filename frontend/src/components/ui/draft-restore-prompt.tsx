@@ -3,12 +3,18 @@
  * 思路：检测到有草稿时显示提示，提供恢复或丢弃选项
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Clock, RotateCcw, X } from 'lucide-react';
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Clock, RotateCcw, X } from "lucide-react";
 
 interface DraftRestorePromptProps {
   /** 草稿时间 */
@@ -43,17 +49,17 @@ export function DraftRestorePrompt({
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
 
-    if (minutes < 1) return '刚刚';
+    if (minutes < 1) return "刚刚";
     if (minutes < 60) return `${minutes} 分钟前`;
     if (hours < 24) return `${hours} 小时前`;
     return `${days} 天前`;
   };
 
   return (
-    <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+    <Card className="border-status-amber/30 bg-status-amber-soft/50">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Clock className="h-4 w-4 text-amber-600" />
+          <Clock className="h-4 w-4 text-status-amber" />
           发现未提交的草稿
         </CardTitle>
         <CardDescription>
@@ -65,7 +71,7 @@ export function DraftRestorePrompt({
           variant="default"
           size="sm"
           onClick={onRestore}
-          className="bg-amber-600 hover:bg-amber-700"
+          className="bg-status-amber text-background hover:bg-status-amber/90"
         >
           <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
           恢复草稿

@@ -123,7 +123,7 @@ export function RowActionsMenu({
               <AlertDialogCancel disabled={pending}>取消</AlertDialogCancel>
               <AlertDialogAction
                 disabled={pending}
-                className="bg-destructive text-white hover:bg-destructive/90"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={(event) => {
                   // 默认会立刻关闭对话框；这里自己控制，等 onDelete 结束再关
                   event.preventDefault();

@@ -86,24 +86,24 @@ const THREE_FORMS_CONFIG = [
     id: "customs",
     name: "报关单",
     icon: FileText,
-    color: "text-blue-500",
-    bgColor: "bg-blue-50",
+    color: "text-status-blue",
+    bgColor: "bg-status-blue-soft",
     description: "海关出口货物报关单",
   },
   {
     id: "forex",
     name: "外汇核销",
     icon: DollarSign,
-    color: "text-green-500",
-    bgColor: "bg-green-50",
+    color: "text-status-green",
+    bgColor: "bg-status-green-soft",
     description: "出口收汇核销单",
   },
   {
     id: "tax-refund",
     name: "出口退税",
     icon: ReceiptText,
-    color: "text-orange-500",
-    bgColor: "bg-orange-50",
+    color: "text-status-amber",
+    bgColor: "bg-status-amber-soft",
     description: "出口货物退税申报表",
   },
 ];
@@ -114,7 +114,7 @@ function SourceBadge({ source }: { source: HsSource }) {
     return (
       <Badge
         variant="outline"
-        className="border-emerald-300 bg-emerald-50 text-xs text-emerald-700"
+        className="border-status-green/30 bg-status-green-soft text-xs text-status-green"
       >
         历史报关
       </Badge>
@@ -123,7 +123,7 @@ function SourceBadge({ source }: { source: HsSource }) {
     return (
       <Badge
         variant="outline"
-        className="text-green-600 border-green-300 bg-green-50 text-xs"
+        className="text-status-green border-status-green/30 bg-status-green-soft text-xs"
       >
         商品档案
       </Badge>
@@ -132,7 +132,7 @@ function SourceBadge({ source }: { source: HsSource }) {
     return (
       <Badge
         variant="outline"
-        className="text-blue-600 border-blue-300 bg-blue-50 text-xs"
+        className="text-status-blue border-status-blue/30 bg-status-blue-soft text-xs"
       >
         AI 建议
       </Badge>
@@ -141,7 +141,7 @@ function SourceBadge({ source }: { source: HsSource }) {
     return (
       <Badge
         variant="outline"
-        className="text-orange-600 border-orange-300 bg-orange-50 text-xs"
+        className="text-status-amber border-status-amber/30 bg-status-amber-soft text-xs"
       >
         手动
       </Badge>
@@ -149,7 +149,7 @@ function SourceBadge({ source }: { source: HsSource }) {
   return (
     <Badge
       variant="outline"
-      className="text-red-500 border-red-300 bg-red-50 text-xs"
+      className="text-status-red border-status-red/30 bg-status-red-soft text-xs"
     >
       未填写
     </Badge>
@@ -624,7 +624,7 @@ export function GenerateThreeFormsDialog({
             {displayRows.length} 个商品，
             {readyCount} 个已有 HS 编码
             {missingCount > 0 && (
-              <span className="text-red-500 ml-1">
+              <span className="text-status-red ml-1">
                 ，{missingCount} 个待填写
               </span>
             )}
@@ -660,7 +660,7 @@ export function GenerateThreeFormsDialog({
                 size="sm"
                 onClick={handleBatchSuggest}
                 disabled={batchSuggesting}
-                className="ml-auto text-purple-600 border-purple-300 hover:bg-purple-50"
+                className="ml-auto text-primary border-primary/30 hover:bg-primary/10"
               >
                 {batchSuggesting ? (
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -676,8 +676,8 @@ export function GenerateThreeFormsDialog({
             <Card
               className={
                 blockingIssues.length > 0
-                  ? "border-amber-300 bg-amber-50/60"
-                  : "border-emerald-200 bg-emerald-50/60"
+                  ? "border-status-amber/30 bg-status-amber-soft/60"
+                  : "border-status-green/30 bg-status-green-soft/60"
               }
             >
               <CardContent className="grid gap-3 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -686,8 +686,8 @@ export function GenerateThreeFormsDialog({
                   <p
                     className={
                       readiness.customsReady
-                        ? "font-medium text-emerald-700"
-                        : "font-medium text-amber-800"
+                        ? "font-medium text-status-green"
+                        : "font-medium text-status-amber"
                     }
                   >
                     {readiness.customsReady ? "完整" : "有阻塞项"}
@@ -698,8 +698,8 @@ export function GenerateThreeFormsDialog({
                   <p
                     className={
                       readiness.taxRefundReady
-                        ? "font-medium text-emerald-700"
-                        : "font-medium text-amber-800"
+                        ? "font-medium text-status-green"
+                        : "font-medium text-status-amber"
                     }
                   >
                     {readiness.taxRefundReady ? "完整" : "有阻塞项"}
@@ -720,10 +720,10 @@ export function GenerateThreeFormsDialog({
                 </div>
                 {blockingIssues.length > 0 ? (
                   <div className="sm:col-span-2 lg:col-span-4">
-                    <p className="text-xs font-medium text-amber-900">
+                    <p className="text-xs font-medium text-status-amber">
                       生成前必须处理
                     </p>
-                    <ul className="mt-1 space-y-1 text-xs text-amber-900">
+                    <ul className="mt-1 space-y-1 text-xs text-status-amber">
                       {blockingIssues.slice(0, 4).map((issue, index) => (
                         <li
                           key={`${issue.packingItemId || "global"}-${issue.code}-${index}`}
@@ -741,9 +741,9 @@ export function GenerateThreeFormsDialog({
 
           {/* 提示：HS 编码应在商品档案中维护 */}
           {missingCount > 0 && (
-            <Card className="border-amber-200 bg-amber-50">
+            <Card className="border-status-amber/30 bg-status-amber-soft">
               <CardContent className="py-2 px-4">
-                <div className="flex items-start gap-2 text-sm text-amber-800">
+                <div className="flex items-start gap-2 text-sm text-status-amber">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   <p>
                     系统优先使用该商品最近一次正式报关的 HS
@@ -758,9 +758,9 @@ export function GenerateThreeFormsDialog({
 
           {/* 警示：无出口退税商品（退税率为 0） */}
           {noRefundRows.length > 0 && (
-            <Card className="border-red-200 bg-red-50">
+            <Card className="border-status-red/30 bg-status-red-soft">
               <CardContent className="py-2 px-4">
-                <div className="flex items-start gap-2 text-sm text-red-700">
+                <div className="flex items-start gap-2 text-sm text-status-red">
                   <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                   <p>
                     <strong>{noRefundRows.length} 个商品无出口退税</strong>
@@ -794,9 +794,9 @@ export function GenerateThreeFormsDialog({
                       key={row.packingItem.id}
                       className={
                         !row.hsCode.trim()
-                          ? "bg-red-50"
+                          ? "bg-status-red-soft"
                           : row.refundRate === 0
-                            ? "bg-amber-50/70"
+                            ? "bg-status-amber-soft/70"
                             : ""
                       }
                     >
@@ -808,7 +808,7 @@ export function GenerateThreeFormsDialog({
                         {row.readinessLine?.issues.some(
                           (issue) => issue.severity === "error",
                         ) ? (
-                          <p className="mt-1 whitespace-normal text-[11px] font-normal leading-4 text-amber-700">
+                          <p className="mt-1 whitespace-normal text-[11px] font-normal leading-4 text-status-amber">
                             {
                               row.readinessLine.issues.find(
                                 (issue) => issue.severity === "error",
@@ -827,7 +827,7 @@ export function GenerateThreeFormsDialog({
                         {row.readinessLine?.totalPriceUsd ? (
                           `$${row.readinessLine.totalPriceUsd.toFixed(2)}`
                         ) : row.readinessLine?.recommendedUnitPriceUsd ? (
-                          <span className="text-amber-700">
+                          <span className="text-status-amber">
                             待录入
                             <br />
                             建议单价 $
@@ -856,7 +856,7 @@ export function GenerateThreeFormsDialog({
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {row.refundRate === 0 ? (
-                          <span className="inline-flex items-center gap-1 font-medium text-red-600">
+                          <span className="inline-flex items-center gap-1 font-medium text-status-red">
                             <AlertCircle className="h-3.5 w-3.5" />
                             0%（无退税）
                           </span>
@@ -881,7 +881,7 @@ export function GenerateThreeFormsDialog({
                           size="sm"
                           onClick={() => handleSuggestOne(index)}
                           disabled={row.suggesting || batchSuggesting}
-                          className="h-7 px-2 text-purple-600 hover:text-purple-700"
+                          className="h-7 px-2 text-primary hover:text-primary"
                           title="查询其他 HS 编码建议"
                           aria-label={`为 ${row.productName} 查询 HS 编码建议`}
                         >

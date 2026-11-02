@@ -25,7 +25,7 @@ export function LoadingValue({
       role="status"
       aria-label="加载中"
       className={cn(
-        "inline-block h-4 w-8 animate-pulse rounded-md bg-gray-200 align-middle dark:bg-gray-700",
+        "inline-block h-4 w-8 animate-pulse rounded-md bg-muted align-middle",
         className,
       )}
     />

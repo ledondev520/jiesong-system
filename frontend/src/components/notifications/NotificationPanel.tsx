@@ -6,15 +6,25 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useRouter } from 'next/navigation';
-import { FileText, Ship, TrendingUp, AlertTriangle, Check, CheckCheck, Loader2, ReceiptText, Landmark } from 'lucide-react';
-import { notificationLink } from '@/lib/notification-link';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import type { Notification, NotificationType } from '@/types';
+import { useRouter } from "next/navigation";
+import {
+  FileText,
+  Ship,
+  TrendingUp,
+  AlertTriangle,
+  Check,
+  CheckCheck,
+  Loader2,
+  ReceiptText,
+  Landmark,
+} from "lucide-react";
+import { notificationLink } from "@/lib/notification-link";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import type { Notification, NotificationType } from "@/types";
 
 const typeIconMap: Record<NotificationType, typeof FileText> = {
   PURCHASE_DRAFT: FileText,
@@ -26,12 +36,12 @@ const typeIconMap: Record<NotificationType, typeof FileText> = {
 };
 
 const typeColorMap: Record<NotificationType, string> = {
-  PURCHASE_DRAFT: 'bg-blue-500/10 text-blue-600',
-  SALES_DRAFT: 'bg-amber-500/10 text-amber-600',
-  OVERDUE_RECEIVABLE: 'bg-rose-500/10 text-rose-600',
-  LOW_STOCK: 'bg-orange-500/10 text-orange-600',
-  TAX_REFUND_MONTHLY: 'bg-emerald-500/10 text-emerald-600',
-  INVOICE_MISSING: 'bg-violet-500/10 text-violet-600',
+  PURCHASE_DRAFT: "bg-status-blue-soft text-status-blue",
+  SALES_DRAFT: "bg-status-amber-soft text-status-amber",
+  OVERDUE_RECEIVABLE: "bg-status-red-soft text-status-red",
+  LOW_STOCK: "bg-status-amber-soft text-status-amber",
+  TAX_REFUND_MONTHLY: "bg-status-green-soft text-status-green",
+  INVOICE_MISSING: "bg-status-amber-soft text-status-amber",
 };
 
 interface NotificationPanelProps {
@@ -110,35 +120,39 @@ export function NotificationPanel({
               <button
                 key={n.id}
                 className={cn(
-                  'flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent',
-                  !n.isRead && 'bg-accent/40',
+                  "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent",
+                  !n.isRead && "bg-accent/40",
                 )}
                 onClick={() => handleClick(n)}
               >
                 <span
                   className={cn(
-                    'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-                    typeColorMap[n.type] || 'bg-muted text-muted-foreground',
+                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                    typeColorMap[n.type] || "bg-muted text-muted-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground">{n.title}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {n.title}
+                    </p>
                     {!n.isRead && (
                       <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
                     )}
                   </div>
                   {n.content && (
-                    <p className="text-xs text-muted-foreground truncate">{n.content}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {n.content}
+                    </p>
                   )}
                   <p className="text-[11px] text-muted-foreground/70 mt-0.5">
-                    {new Date(n.createdAt).toLocaleString('zh-CN', {
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
+                    {new Date(n.createdAt).toLocaleString("zh-CN", {
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
                     })}
                   </p>
                 </div>

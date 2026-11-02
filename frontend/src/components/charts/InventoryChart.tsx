@@ -1,7 +1,7 @@
 /**
  * 库存统计图表
  */
-'use client';
+"use client";
 
 import {
   BarChart,
@@ -21,11 +21,18 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
   Radar,
-} from 'recharts';
-import { ChartCard } from './ChartCard';
-import { ChartSkeleton } from './ChartSkeleton';
+} from "recharts";
+import { ChartCard } from "./ChartCard";
+import { ChartSkeleton } from "./ChartSkeleton";
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B'];
+const COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--status-red)",
+];
 
 interface InventoryChartProps {
   data?: {
@@ -75,19 +82,32 @@ export default function InventoryChart({
         className="md:col-span-2"
       >
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={monthlyData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+          <BarChart
+            data={monthlyData}
+            margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
             <YAxis />
             <Tooltip />
             <Legend />
-            <Bar dataKey="inbound" name="入库" fill="#00C49F" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="outbound" name="出库" fill="#FF8042" radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="inbound"
+              name="入库"
+              fill="var(--chart-2)"
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey="outbound"
+              name="出库"
+              fill="var(--chart-4)"
+              radius={[4, 4, 0, 0]}
+            />
             <Line
               type="monotone"
               dataKey="stock"
               name="库存"
-              stroke="#0088FE"
+              stroke="var(--chart-1)"
               strokeWidth={2}
               dot={{ r: 4 }}
             />
@@ -106,10 +126,15 @@ export default function InventoryChart({
               innerRadius={50}
               outerRadius={80}
               dataKey="value"
-              label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+              label={({ name, percent }) =>
+                `${name} ${((percent || 0) * 100).toFixed(0)}%`
+              }
             >
               {categoryData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Pie>
             <Tooltip />
@@ -125,9 +150,17 @@ export default function InventoryChart({
             <XAxis type="number" />
             <YAxis dataKey="name" type="category" width={80} />
             <Tooltip />
-            <Bar dataKey="value" name="库存数量" fill="#8884D8" radius={[0, 4, 4, 0]}>
+            <Bar
+              dataKey="value"
+              name="库存数量"
+              fill="var(--chart-5)"
+              radius={[0, 4, 4, 0]}
+            >
               {storeData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Bar>
           </BarChart>
@@ -136,17 +169,21 @@ export default function InventoryChart({
 
       {/* 库存周转率 */}
       {turnoverData.length > 0 && (
-        <ChartCard title="库存周转率" description="各品类周转率对比" className="md:col-span-2">
+        <ChartCard
+          title="库存周转率"
+          description="各品类周转率对比"
+          className="md:col-span-2"
+        >
           <ResponsiveContainer width="100%" height={250}>
             <RadarChart cx="50%" cy="50%" outerRadius="80%" data={turnoverData}>
               <PolarGrid />
               <PolarAngleAxis dataKey="name" />
-              <PolarRadiusAxis angle={30} domain={[0, 'auto']} />
+              <PolarRadiusAxis angle={30} domain={[0, "auto"]} />
               <Radar
                 name="周转率"
                 dataKey="rate"
-                stroke="#0088FE"
-                fill="#0088FE"
+                stroke="var(--chart-1)"
+                fill="var(--chart-1)"
                 fillOpacity={0.6}
               />
               <Tooltip />

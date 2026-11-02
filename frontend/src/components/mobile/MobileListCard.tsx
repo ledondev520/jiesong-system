@@ -6,10 +6,10 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // ==================== 类型定义 ====================
 
@@ -19,7 +19,7 @@ interface MobileListCardField {
   /** 字段值 */
   value: React.ReactNode;
   /** 强调样式：primary（蓝色）、danger（红色）、success（绿色） */
-  emphasis?: 'primary' | 'danger' | 'success';
+  emphasis?: "primary" | "danger" | "success";
 }
 
 interface MobileListCardProps {
@@ -35,7 +35,7 @@ interface MobileListCardProps {
   amount?: {
     label: string;
     value: string;
-    emphasis?: 'primary' | 'danger' | 'success' | 'default';
+    emphasis?: "primary" | "danger" | "success" | "default";
   };
   /** 点击整张卡片的回调 */
   onClick?: () => void;
@@ -50,10 +50,10 @@ interface MobileListCardProps {
 // ==================== 样式映射 ====================
 
 const emphasisClasses = {
-  primary: 'text-primary',
-  danger: 'text-destructive',
-  success: 'text-emerald-600 dark:text-emerald-400',
-  default: 'text-foreground',
+  primary: "text-primary",
+  danger: "text-destructive",
+  success: "text-status-green",
+  default: "text-foreground",
 };
 
 // ==================== 主组件 ====================
@@ -80,30 +80,35 @@ export function MobileListCard({
   const isClickable = Boolean(onClick);
   const displayArrow = showArrow ?? isClickable;
 
-  const Wrapper = isClickable ? 'button' : 'div';
+  const Wrapper = isClickable ? "button" : "div";
 
   return (
-    <div className={cn('mobile-card overflow-hidden', className)}>
+    <div className={cn("mobile-card overflow-hidden", className)}>
       {/* ---- 主体区域（可点击） ---- */}
       <Wrapper
         className={cn(
-          'w-full text-left',
-          isClickable && 'cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80',
+          "w-full text-left",
+          isClickable &&
+            "cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring active:opacity-80",
         )}
         onClick={onClick}
-        type={isClickable ? 'button' : undefined}
+        type={isClickable ? "button" : undefined}
       >
         {/* 顶行：标题 + 状态 + 金额 */}
         <div className="mb-2 flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 break-words text-sm font-semibold text-foreground">{title}</span>
+              <span className="min-w-0 flex-1 break-words text-sm font-semibold text-foreground">
+                {title}
+              </span>
               {displayArrow && (
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
               )}
             </div>
             {subtitle && (
-              <p className="mt-0.5 break-words text-xs text-muted-foreground">{subtitle}</p>
+              <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                {subtitle}
+              </p>
             )}
           </div>
 
@@ -112,13 +117,15 @@ export function MobileListCard({
             <div className="max-w-[45%] shrink-0 break-words text-right">
               <div
                 className={cn(
-                  'text-base font-bold',
-                  emphasisClasses[amount.emphasis ?? 'default'],
+                  "text-base font-bold",
+                  emphasisClasses[amount.emphasis ?? "default"],
                 )}
               >
                 {amount.value}
               </div>
-              <div className="text-[11px] text-muted-foreground">{amount.label}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {amount.label}
+              </div>
             </div>
           )}
         </div>
@@ -131,11 +138,15 @@ export function MobileListCard({
           <div className="grid grid-cols-2 gap-x-4 gap-y-1">
             {fields.map((field, i) => (
               <div key={i} className="min-w-0 space-y-0.5">
-                <div className="break-words text-[11px] text-muted-foreground">{field.label}</div>
+                <div className="break-words text-[11px] text-muted-foreground">
+                  {field.label}
+                </div>
                 <span
                   className={cn(
-                    'block break-words text-xs font-medium',
-                    field.emphasis ? emphasisClasses[field.emphasis] : 'text-foreground',
+                    "block break-words text-xs font-medium",
+                    field.emphasis
+                      ? emphasisClasses[field.emphasis]
+                      : "text-foreground",
                   )}
                 >
                   {field.value}
@@ -148,9 +159,7 @@ export function MobileListCard({
 
       {/* ---- 操作区域 ---- */}
       {action && (
-        <div className="mt-3 border-t border-border/60 pt-3">
-          {action}
-        </div>
+        <div className="mt-3 border-t border-border/60 pt-3">{action}</div>
       )}
     </div>
   );

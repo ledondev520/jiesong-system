@@ -169,7 +169,7 @@ export function PriceGuard({
 
   if (isDrop) {
     return (
-      <Badge className="text-xs gap-1 bg-green-600 hover:bg-green-600">
+      <Badge className="text-xs gap-1 bg-status-green text-background hover:bg-status-green/90">
         <TrendingDown className="h-3 w-3" />
         价格优异 {diffPct.toFixed(1)}%
         {baseSupplierName && (

@@ -60,23 +60,23 @@ const STATUS_META: Record<
 > = {
   PASSED: {
     label: "自动核对通过",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    className: "border-status-green/30 bg-status-green-soft text-status-green",
   },
   DIFFERENCE: {
     label: "存在差异",
-    className: "border-red-200 bg-red-50 text-red-700",
+    className: "border-status-red/30 bg-status-red-soft text-status-red",
   },
   NEEDS_MANUAL_REVIEW: {
     label: "待人工核对",
-    className: "border-amber-200 bg-amber-50 text-amber-700",
+    className: "border-status-amber/30 bg-status-amber-soft text-status-amber",
   },
   APPROVED: {
     label: "人工确认通过",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    className: "border-status-green/30 bg-status-green-soft text-status-green",
   },
   REJECTED: {
     label: "人工复核未通过",
-    className: "border-red-200 bg-red-50 text-red-700",
+    className: "border-status-red/30 bg-status-red-soft text-status-red",
   },
 };
 
@@ -84,9 +84,9 @@ function MatchIcon({ matched }: { matched: boolean | null }) {
   if (matched === null)
     return <MinusCircle className="h-4 w-4 text-muted-foreground/50" />;
   return matched ? (
-    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+    <CheckCircle2 className="h-4 w-4 text-status-green" />
   ) : (
-    <AlertCircle className="h-4 w-4 text-red-600" />
+    <AlertCircle className="h-4 w-4 text-status-red" />
   );
 }
 
@@ -404,7 +404,7 @@ export function PackingListCheckDialog({
                 </div>
 
                 {result?.summary.manualReviewRequired && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <div className="rounded-lg border border-status-amber/30 bg-status-amber-soft px-4 py-3 text-sm text-status-amber">
                     该 PDF
                     可能是扫描件或图片型文件，系统未提取到足够文本。原件已保留，请下载原件后填写人工核对结论。
                   </div>
@@ -432,7 +432,9 @@ export function PackingListCheckDialog({
                           <TableRow
                             key={field.key}
                             className={
-                              field.matched === false ? "bg-red-50/70" : ""
+                              field.matched === false
+                                ? "bg-status-red-soft/70"
+                                : ""
                             }
                           >
                             <TableCell className="text-sm">
@@ -491,7 +493,7 @@ export function PackingListCheckDialog({
                               item.identity.matched === false ||
                               item.boxes.matched === false ||
                               item.quantity.matched === false
-                                ? "bg-red-50/70"
+                                ? "bg-status-red-soft/70"
                                 : ""
                             }
                           >

@@ -4,17 +4,16 @@
  * Pos: 全局网络状态监听，断网时显示提示横幅
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { WifiOff, Wifi } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { WifiOff, Wifi } from "lucide-react";
 
 export function NetworkStatus() {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [showReconnected, setShowReconnected] = useState(false);
 
   useEffect(() => {
-
     const handleOnline = () => {
       setIsOnline(true);
       setShowReconnected(true);
@@ -27,12 +26,12 @@ export function NetworkStatus() {
       setShowReconnected(false);
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
@@ -40,7 +39,7 @@ export function NetworkStatus() {
   if (isOnline) {
     if (!showReconnected) return null;
     return (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-emerald-500 text-white px-4 py-2 text-center text-sm animate-in slide-in-from-top">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-status-green text-background px-4 py-2 text-center text-sm animate-in slide-in-from-top">
         <Wifi className="inline-block h-4 w-4 mr-2" />
         网络已恢复
       </div>
@@ -49,7 +48,7 @@ export function NetworkStatus() {
 
   // 离线时显示警告横幅
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white px-4 py-2 text-center text-sm">
+    <div className="fixed top-0 left-0 right-0 z-50 bg-status-amber text-background px-4 py-2 text-center text-sm">
       <WifiOff className="inline-block h-4 w-4 mr-2" />
       网络连接已断开，部分功能可能不可用
     </div>

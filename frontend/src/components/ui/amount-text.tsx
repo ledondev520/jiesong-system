@@ -2,7 +2,7 @@
  * Input: 金额文本、语义状态
  * Output: 统一金额文本组件
  * Pos: UI基础组件层，统一金额正负/风险语义色
- * 
+ *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
@@ -14,8 +14,8 @@ const amountTextVariants = cva("font-medium tabular-nums", {
     tone: {
       neutral: "text-foreground",
       info: "text-primary",
-      warning: "text-amber-600 dark:text-amber-300",
-      success: "text-emerald-600 dark:text-emerald-300",
+      warning: "text-status-amber",
+      success: "text-status-green",
       danger: "text-destructive",
     },
     size: {
@@ -32,7 +32,8 @@ const amountTextVariants = cva("font-medium tabular-nums", {
 });
 
 interface AmountTextProps
-  extends React.ComponentProps<"span">,
+  extends
+    React.ComponentProps<"span">,
     VariantProps<typeof amountTextVariants> {}
 
 /**
@@ -45,5 +46,10 @@ export function AmountText({
   className,
   ...props
 }: AmountTextProps) {
-  return <span className={cn(amountTextVariants({ tone, size }), className)} {...props} />;
+  return (
+    <span
+      className={cn(amountTextVariants({ tone, size }), className)}
+      {...props}
+    />
+  );
 }

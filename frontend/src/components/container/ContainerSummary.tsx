@@ -85,7 +85,7 @@ export default function ContainerSummary({
             {check.blockers.map((item) => (
               <li
                 key={`b-${item.code}-${item.message}`}
-                className="text-red-700 dark:text-red-400"
+                className="text-status-red"
               >
                 {item.message}
               </li>
@@ -93,7 +93,7 @@ export default function ContainerSummary({
             {check.warnings.map((item) => (
               <li
                 key={`w-${item.code}-${item.message}`}
-                className="text-amber-700 dark:text-amber-400"
+                className="text-status-amber"
               >
                 ⚠ {item.message}
               </li>

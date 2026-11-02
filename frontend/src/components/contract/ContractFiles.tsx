@@ -98,15 +98,15 @@ function FileTypeIcon({
 }) {
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
   if (["pdf", "doc", "docx"].includes(ext)) {
-    return <FileText className={cn("text-blue-600", className)} />;
+    return <FileText className={cn("text-status-blue", className)} />;
   }
   if (["xls", "xlsx", "csv"].includes(ext)) {
-    return <FileSpreadsheet className={cn("text-emerald-600", className)} />;
+    return <FileSpreadsheet className={cn("text-status-green", className)} />;
   }
   if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
-    return <FileImage className={cn("text-violet-600", className)} />;
+    return <FileImage className={cn("text-primary", className)} />;
   }
-  return <File className={cn("text-slate-500", className)} />;
+  return <File className={cn("text-muted-foreground", className)} />;
 }
 
 /**
@@ -115,15 +115,15 @@ function FileTypeIcon({
 function FileTypeBg({ fileName }: { fileName: string }) {
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
   if (["pdf", "doc", "docx"].includes(ext)) {
-    return "bg-blue-50 dark:bg-blue-950";
+    return "bg-status-blue-soft";
   }
   if (["xls", "xlsx", "csv"].includes(ext)) {
-    return "bg-emerald-50 dark:bg-emerald-950";
+    return "bg-status-green-soft";
   }
   if (["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
-    return "bg-violet-50 dark:bg-violet-950";
+    return "bg-primary/10";
   }
-  return "bg-slate-50 dark:bg-slate-900";
+  return "bg-muted";
 }
 
 export default function ContractFiles({
@@ -214,7 +214,7 @@ export default function ContractFiles({
 
   return (
     <>
-      <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+      <Card className="overflow-hidden rounded-xl border-border/40 shadow-sm">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -291,7 +291,7 @@ export default function ContractFiles({
               {files.map((file) => (
                 <div
                   key={file.id}
-                  className="group flex items-center gap-3 rounded-lg border border-border/40 bg-card p-3 transition-all hover:border-border/80 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+                  className="group flex items-center gap-3 rounded-lg border border-border/40 bg-card p-3 transition-all hover:border-border/80 hover:shadow-md"
                 >
                   <div
                     className={cn(
