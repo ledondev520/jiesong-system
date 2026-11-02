@@ -4,27 +4,38 @@
  * Pos: 商品详情页测试
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ProductDetailPage from "./page";
 
 const mocks = vi.hoisted(() => ({
   getById: vi.fn(),
   getHistory: vi.fn(),
+  remove: vi.fn(),
+  push: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "product-1" }),
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push: mocks.push, back: vi.fn() }),
 }));
 vi.mock("@/services/product.service", () => ({
-  productService: { getById: mocks.getById },
+  productService: { getById: mocks.getById, delete: mocks.remove },
 }));
 vi.mock("@/services/purchase.service", () => ({
   purchaseService: { getProductPriceHistory: mocks.getHistory },
 }));
 
-const product = { id: "product-1", customsName: "合成商品", unit: "件" };
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+const product = {
+  id: "product-1",
+  customsName: "合成商品",
+  unit: "件",
+  grossWeight: 0,
+  volume: 0.5,
+  availableStock: 9,
+};
 const history = {
   count: 2,
   history: [],
@@ -67,5 +78,36 @@ describe("商品详情", () => {
     render(<ProductDetailPage />);
     await user.click(await screen.findByRole("button", { name: "重试" }));
     expect(await screen.findByText("合成商品")).toBeInTheDocument();
+  });
+
+  it("未维护的重量显示「未维护」，有值的体积带单位 (B40)", async () => {
+    render(<ProductDetailPage />);
+    await screen.findByText("合成商品");
+    expect(screen.getAllByText("未维护").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("0.5 CBM")).toBeInTheDocument();
+    expect(screen.queryByText("0 kg")).toBeNull();
+  });
+
+  it("删除放在危险操作区，确认弹窗命名商品，确认后才删除并回到列表 (B40)", async () => {
+    mocks.remove.mockResolvedValue({});
+    const user = userEvent.setup();
+    render(<ProductDetailPage />);
+    const zone = await screen.findByRole("region", { name: "危险操作" });
+    expect(zone).toHaveTextContent("合成商品");
+    await user.click(within(zone).getByRole("button", { name: "删除商品" }));
+    expect(mocks.remove).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("合成商品");
+    await user.click(within(dialog).getByRole("button", { name: "取消" }));
+    expect(mocks.remove).not.toHaveBeenCalled();
+
+    await user.click(within(zone).getByRole("button", { name: "删除商品" }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "确认删除",
+      }),
+    );
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith("product-1"));
+    expect(mocks.push).toHaveBeenCalledWith("/dashboard/products");
   });
 });

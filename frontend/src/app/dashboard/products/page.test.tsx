@@ -78,6 +78,45 @@ describe("ProductsPage 交互逻辑", () => {
     );
   });
 
+  it("卡片没有删除按钮，显示可用库存，未维护的重量/体积显示「未维护」而不是 0 (B40)", async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "p1",
+            customsName: "合成商品甲",
+            hsCode: "69072290",
+            grossWeight: 0,
+            netWeight: null,
+            volume: 0,
+            availableStock: 12,
+          },
+          {
+            id: "p2",
+            customsName: "合成商品乙",
+            grossWeight: 3.5,
+            netWeight: 3,
+            volume: 0.2,
+            availableStock: 0,
+          },
+        ],
+      },
+    });
+    render(<ProductsPage />);
+    await screen.findAllByText("合成商品甲");
+    expect(screen.queryByRole("button", { name: /删除/ })).toBeNull();
+    // 手机卡片 + 桌面卡片各渲染一份
+    expect((await screen.findAllByText(/可用库存 12/)).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText(/可用库存 0/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("未维护").length).toBeGreaterThanOrEqual(6);
+    expect(screen.queryByText(/^0\s?kg$/)).toBeNull();
+    expect(screen.queryByText(/^0\s?CBM$/)).toBeNull();
+    expect(screen.getAllByText("3.5 kg").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.2 CBM").length).toBeGreaterThan(0);
+  });
+
   it("仅含空白的 HS 编码按未填写处理", async () => {
     mockGetAll.mockResolvedValue({
       data: {

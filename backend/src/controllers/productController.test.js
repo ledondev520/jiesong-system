@@ -229,3 +229,34 @@ test('请求体不是普通对象（null/数组/字符串）时 create 与 updat
     }
   }
 });
+
+test('list: 普通列表每个商品带可用库存(已入库合计)，无库存记录为 0', async () => {
+  const originalInventory = prisma.inventory;
+  const res = createMockRes();
+  let stockWhere;
+  prisma.inventory = { groupBy: async ({ where }) => {
+    stockWhere = where;
+    return [{ productId: 'a', _sum: { quantity: 12 } }];
+  } };
+  try {
+    await withMockProductDelegate({
+      findMany: async () => [{ id: 'a', customsName: '有库存' }, { id: 'b', customsName: '无库存记录' }],
+      count: async () => 2,
+    }, async () => productController.list({ query: { page: '1', pageSize: '20' } }, res, (error) => { throw error; }));
+    assert.equal(stockWhere.status, 'INBOUND');
+    assert.deepEqual(stockWhere.productId.in, ['a', 'b']);
+    assert.deepEqual(res.payload.data.items.map(item => item.availableStock), [12, 0]);
+  } finally { prisma.inventory = originalInventory; }
+});
+
+test('getById: 详情带可用库存', async () => {
+  const originalInventory = prisma.inventory;
+  const res = createMockRes();
+  prisma.inventory = { groupBy: async () => [{ productId: 'a', _sum: { quantity: 7 } }] };
+  try {
+    await withMockProductDelegate({
+      findUnique: async () => ({ id: 'a', customsName: '详情商品' }),
+    }, async () => productController.getById({ params: { id: 'a' } }, res, (error) => { throw error; }));
+    assert.equal(res.payload.data.availableStock, 7);
+  } finally { prisma.inventory = originalInventory; }
+});
