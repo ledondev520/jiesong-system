@@ -4,6 +4,7 @@
  * Pos: 财务报表主分析区
  */
 
+import { formatAmount } from "@/lib/format";
 import { useBusinessReadOnly } from "@/lib/hooks/useBusinessReadOnly";
 import {
   Building2,
@@ -954,15 +955,15 @@ export function FinancialStatementsTabsSection({
                         >
                           <td className="py-1.5 font-medium">{m.label}</td>
                           <td className="py-1.5 text-right tabular-nums">
-                            ¥{m.revenue.toLocaleString()}
+                            ¥{formatAmount(m.revenue)}
                           </td>
                           <td className="py-1.5 text-right tabular-nums text-status-red">
-                            ¥{m.cost.toLocaleString()}
+                            ¥{formatAmount(m.cost)}
                           </td>
                           <td
                             className={`py-1.5 text-right tabular-nums font-semibold ${m.profit >= 0 ? "text-status-green" : "text-status-red"}`}
                           >
-                            ¥{m.profit.toLocaleString()}
+                            ¥{formatAmount(m.profit)}
                           </td>
                           <td className="py-1.5 text-right tabular-nums">
                             {m.profitRate.toFixed(1)}%

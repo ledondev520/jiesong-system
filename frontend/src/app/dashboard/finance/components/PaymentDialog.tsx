@@ -1,5 +1,6 @@
 "use client";
 
+import { formatAmount } from "@/lib/format";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from "react-hook-form";
@@ -151,7 +152,7 @@ export function PaymentDialog({
           待结金额:{" "}
           <span className="font-medium text-foreground">
             {resolvedCurrency} {currencySymbol}
-            {remainingAmount.toLocaleString()}
+            {formatAmount(remainingAmount)}
           </span>
         </div>
         <Form {...form}>

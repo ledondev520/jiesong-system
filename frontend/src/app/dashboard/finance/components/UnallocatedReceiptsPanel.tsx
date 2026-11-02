@@ -5,6 +5,7 @@
  */
 "use client";
 
+import { formatAmount } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 import { Plus, RefreshCw, Split } from "lucide-react";
 import { toast } from "sonner";
@@ -176,7 +177,7 @@ export function UnallocatedReceiptsPanel({
                       </span>
                       <Badge variant="outline" className="text-[10px]">
                         剩余待分配 {p.currency}{" "}
-                        {(p.remainingAmount ?? p.amount).toLocaleString()}
+                        {formatAmount(p.remainingAmount ?? p.amount)}
                       </Badge>
                     </div>
                     <span className="text-xs text-muted-foreground">

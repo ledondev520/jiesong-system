@@ -8,6 +8,7 @@
 
 "use client";
 
+import { formatAmount } from "@/lib/format";
 import { useState, useMemo, useEffect } from "react";
 import { financeService } from "@/services/finance.service";
 import { loadPaginatedCatalog } from "@/services/paginatedCatalog";
@@ -186,7 +187,7 @@ export function AllocateDialog({
             {payment.customerName ? `${payment.customerName} · ` : ""}
             到账{" "}
             <span className="font-semibold text-foreground">
-              {currency} {totalAmount.toLocaleString()}
+              {currency} {formatAmount(totalAmount)}
             </span>
             {payment.note && ` · ${payment.note}`}
           </DialogDescription>
@@ -271,7 +272,7 @@ export function AllocateDialog({
                       {row.contractNo}
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      待收 {currency} {row.unreceiveAmount.toLocaleString()}
+                      待收 {currency} {formatAmount(row.unreceiveAmount)}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">

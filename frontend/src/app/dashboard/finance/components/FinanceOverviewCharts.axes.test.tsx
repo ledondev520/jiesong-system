@@ -71,3 +71,28 @@ it("点数少时 X 轴保持水平", () => {
   renderCharts(5);
   expect(axes.x[0]).toMatchObject({ angle: 0, textAnchor: "middle" });
 });
+
+it("近期没有收付款时给出明确空状态和原因，汇率不可用时说明无法折算 (B41)", () => {
+  const { rerender } = render(
+    <FinanceOverviewCharts
+      cnyTrends={[]}
+      cashFlowForecast={[]}
+      trendDays={90}
+      effectiveRate={7.1}
+      onTrendDaysChange={() => {}}
+    />,
+  );
+  expect(screen.getByText("近期没有收付款记录")).toBeInTheDocument();
+  expect(screen.getByText(/近 90 天内没有登记收付款/)).toBeInTheDocument();
+  rerender(
+    <FinanceOverviewCharts
+      cnyTrends={[]}
+      cashFlowForecast={[]}
+      trendDays={30}
+      effectiveRate={null}
+      onTrendDaysChange={() => {}}
+    />,
+  );
+  expect(screen.getByText("结算汇率不可用")).toBeInTheDocument();
+  expect(screen.getByText(/汇率暂不可用/)).toBeInTheDocument();
+});
