@@ -170,7 +170,7 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
     [PurchaseStatus.RECEIVED]: {
       label: "已收货",
       icon: <PackageCheck className="h-3 w-3" />,
-      className: "bg-primary/10 text-primary border-primary/30",
+      className: "bg-status-green-soft text-status-green border-status-green/30",
     },
     [PurchaseStatus.COMPLETED]: {
       label: "已完成",

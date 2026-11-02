@@ -15,8 +15,12 @@ const AREAS = [
   "inventory",
   "inventory-status",
 ];
-const PALETTE =
-  /(?<![\w:-])(?:dark:)?(?:bg|text|border|ring|fill|stroke|from|to|via)-(?:red|green|emerald|amber|yellow|orange|blue|sky|cyan|slate|gray|violet)-\d{2,3}\b|#[0-9a-fA-F]{6}\b|\btext-white\b/;
+const FAMILIES =
+  "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
+// 含 hover:/md:/dark: 等变体前缀；#abc 与 #aabbcc 两种十六进制写法
+const PALETTE = new RegExp(
+  `(?<![\\w-])(?:[a-z0-9]+:)*(?:bg|text|border|ring|fill|stroke|from|to|via|divide|outline|decoration|accent|shadow)-(?:${FAMILIES})-\\d{2,3}\\b|#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?\\b|\\btext-white\\b`,
+);
 
 const sources = (dir: string): string[] =>
   fs.existsSync(dir)
