@@ -65,6 +65,14 @@ vi.mock("@/lib/api-cache", () => ({
   clearAllCache: vi.fn(),
 }));
 
+// 空状态与页头各有一个入口；取第一个即可，点击后空状态消失。
+async function openNewSupplier(user: ReturnType<typeof userEvent.setup>) {
+  const [button] = await screen.findAllByRole("button", {
+    name: "新建供应商档案",
+  });
+  await user.click(button);
+}
+
 describe("SuppliersPage 表单页交互逻辑", () => {
   beforeEach(() => {
     mockIsMobile.mockReturnValue(false);
@@ -76,8 +84,9 @@ describe("SuppliersPage 表单页交互逻辑", () => {
     mockToastSuccess.mockReset();
   });
 
-  it("无数据时展示供应商档案表单", async () => {
+  it("无数据时不渲染可编辑表单，点击新建后才展示供应商档案表单", async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
+    const user = userEvent.setup();
 
     render(<SuppliersPage />);
 
@@ -85,9 +94,16 @@ describe("SuppliersPage 表单页交互逻辑", () => {
       await screen.findByRole("heading", { name: "供应商管理" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "供应商档案表单" }),
+      screen.getByRole("heading", { name: "供应商档案" }),
     ).toBeInTheDocument();
     expect(await screen.findByText("暂无供应商")).toBeInTheDocument();
+    expect(screen.getByTestId("supplier-empty-state")).toBeInTheDocument();
+    expect(screen.queryByLabelText("公司名称 *")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "创建供应商" }),
+    ).not.toBeInTheDocument();
+
+    await openNewSupplier(user);
     expect(screen.getByLabelText("公司名称 *")).toBeInTheDocument();
     expect(screen.getByLabelText("收款户名")).toBeInTheDocument();
     expect(screen.getByLabelText("开户支行")).toBeInTheDocument();
@@ -136,6 +152,7 @@ describe("SuppliersPage 表单页交互逻辑", () => {
 
     render(<SuppliersPage />);
 
+    await openNewSupplier(user);
     await user.type(
       await screen.findByLabelText("公司名称 *"),
       "广州玻璃制品有限公司",
@@ -352,10 +369,13 @@ describe("supplier editor interrupted sessions (synthetic fixtures)", () => {
     const user = userEvent.setup();
     render(<SuppliersPage />);
     await screen.findByRole("button", { name: "选择供应商 合成供应商甲" });
+    await openNewSupplier(user);
     await user.type(screen.getByLabelText("公司名称 *"), created.name);
     await user.click(screen.getByRole("button", { name: "创建供应商" }));
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
-    await user.click(screen.getByRole("button", { name: "取消并新建" }));
+    await user.click(screen.getByRole("button", { name: "取消新建" }));
+    expect(screen.queryByLabelText("公司名称 *")).not.toBeInTheDocument();
+    await openNewSupplier(user);
     await user.type(screen.getByLabelText("公司名称 *"), "合成新草稿");
     await act(async () => pending.resolve({ data: created }));
     await waitFor(() => expect(mockGetAll).toHaveBeenCalledTimes(2));
@@ -392,7 +412,8 @@ describe("supplier editor interrupted sessions (synthetic fixtures)", () => {
     await user.click(screen.getByRole("button", { name: "编辑" }));
     await user.click(screen.getByRole("button", { name: "保存修改" }));
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
-    await user.click(screen.getByRole("button", { name: "取消并新建" }));
+    await user.click(screen.getByRole("button", { name: "放弃修改" }));
+    expect(screen.getByTestId("supplier-summary")).toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
@@ -595,22 +616,116 @@ describe("supplier click lands on a read-only summary (B17)", () => {
       .mockResolvedValue({ data: { items: syntheticSuppliers } });
   });
 
-  it("shows the summary without save/archive/permanent-delete until 编辑 is chosen", async () => {
+  it("opens on a no-selection state, not an editable form (B39)", async () => {
+    render(<SuppliersPage />);
+    await screen.findByRole("button", { name: "选择供应商 合成供应商甲" });
+    expect(screen.getByTestId("supplier-empty-state")).toBeInTheDocument();
+    expect(screen.queryByLabelText("公司名称 *")).not.toBeInTheDocument();
+    for (const name of ["创建供应商", "保存修改", "归档当前", "永久删除"]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole("region", { name: "危险操作" })).toBeNull();
+  });
+
+  it("shows the summary and a visible danger zone before 编辑; save stays hidden until 编辑", async () => {
     const user = userEvent.setup();
     render(<SuppliersPage />);
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
     expect(screen.getByTestId("supplier-summary")).toBeInTheDocument();
-    for (const name of ["保存修改", "归档当前", "永久删除"]) {
-      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
-    }
+    const zone = screen.getByRole("region", { name: "危险操作" });
+    expect(zone).toHaveTextContent("合成供应商甲");
+    expect(
+      within(zone).getByRole("button", { name: "归档当前" }),
+    ).toBeInTheDocument();
+    expect(
+      within(zone).getByRole("button", { name: "永久删除" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "保存修改" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText("公司名称 *")).not.toBeInTheDocument();
     expect(mockUpdate).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "编辑" }));
     expect(screen.getByLabelText("公司名称 *")).toHaveValue("合成供应商甲");
     expect(screen.queryByTestId("supplier-summary")).not.toBeInTheDocument();
+    // 编辑态同样保留危险区
+    expect(
+      screen.getByRole("region", { name: "危险操作" }),
+    ).toBeInTheDocument();
+  });
+
+  it("has no 清空新建 button on the record; 新建 starts only from the explicit button and 取消新建 returns to the empty state", async () => {
+    const user = userEvent.setup();
+    render(<SuppliersPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
+    );
+    expect(
+      screen.queryByRole("button", { name: /清空新建|取消并新建/ }),
+    ).not.toBeInTheDocument();
+
+    await openNewSupplier(user);
+    expect(screen.getByLabelText("公司名称 *")).toHaveValue("");
+    expect(screen.getByText("新建档案")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "危险操作" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "取消新建" }));
+    expect(screen.getByTestId("supplier-empty-state")).toBeInTheDocument();
+    expect(screen.queryByLabelText("公司名称 *")).not.toBeInTheDocument();
+  });
+
+  it("放弃修改 returns to the read-only summary without saving", async () => {
+    const user = userEvent.setup();
+    render(<SuppliersPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
+    );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
+    await user.clear(screen.getByLabelText("联系人"));
+    await user.type(screen.getByLabelText("联系人"), "临时改动");
+    await user.click(screen.getByRole("button", { name: "放弃修改" }));
+    expect(screen.getByTestId("supplier-summary")).toHaveTextContent(
+      "合成甲联系人",
+    );
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("explains 待完善 by naming the missing fields on the list card and the summary", async () => {
+    const user = userEvent.setup();
+    render(<SuppliersPage />);
+    const card = await screen.findByRole("button", {
+      name: "选择供应商 合成供应商甲",
+    });
+    expect(within(card).getByText(/待完善 6 项/)).toBeInTheDocument();
+    expect(within(card).getByTestId("supplier-missing")).toHaveTextContent(
+      "缺：联系电话、公司地址、纳税人识别号、收款户名、开户银行、银行账号",
+    );
+    await user.click(card);
+    const note = within(screen.getByTestId("supplier-summary")).getByTestId(
+      "supplier-missing",
+    );
+    expect(note).toHaveTextContent("待完善：联系电话、公司地址");
+  });
+
+  it("archive from the read-only summary asks for confirmation and then shows the empty state", async () => {
+    mockDelete.mockResolvedValue({});
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<SuppliersPage />);
+    await user.click(
+      await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
+    );
+    await user.click(screen.getByRole("button", { name: "归档当前" }));
+    expect(confirmSpy).toHaveBeenCalledWith(
+      expect.stringContaining("合成供应商甲"),
+    );
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith("synthetic-a"));
+    await waitFor(() =>
+      expect(screen.getByTestId("supplier-empty-state")).toBeInTheDocument(),
+    );
+    confirmSpy.mockRestore();
   });
 
   it("keeps archive and permanent delete in a separate danger zone that names the record", async () => {
@@ -622,13 +737,6 @@ describe("supplier click lands on a read-only summary (B17)", () => {
     await user.click(screen.getByRole("button", { name: "编辑" }));
     const zone = screen.getByRole("region", { name: "危险操作" });
     expect(zone).toHaveTextContent("合成供应商甲");
-    expect(
-      within(zone).getByRole("button", { name: "归档当前" }),
-    ).toBeInTheDocument();
-    expect(
-      within(zone).getByRole("button", { name: "永久删除" }),
-    ).toBeInTheDocument();
-    // 保存按钮不在危险区内
     expect(
       within(zone).queryByRole("button", { name: "保存修改" }),
     ).not.toBeInTheDocument();

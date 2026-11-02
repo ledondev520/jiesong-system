@@ -1,6 +1,6 @@
 /**
  * Input: 供应商服务API、React Hook Form
- * Output: 独立供应商编辑会话，失败保留草稿，晚到保存与目录响应不覆盖新选择
+ * Output: 独立供应商编辑会话，失败保留草稿，晚到保存与目录响应不覆盖新选择；初始为未选择空状态，危险区在只读摘要与编辑态均可见
  * Pos: 采购模块基础档案表单页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -43,6 +43,7 @@ import {
 import { countSuppliers } from "./supplierCounts";
 import { HardDeleteSupplierDialog } from "./components/HardDeleteSupplierDialog";
 import { SupplierSummary } from "./components/SupplierSummary";
+import { MissingFields } from "./components/MissingFields";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
 import { useMobile } from "@/lib/hooks/useMobile";
@@ -182,6 +183,8 @@ export default function SuppliersPage() {
   const activeSupplierId = activeSupplier?.id || null;
   // 点击列表只进入只读摘要；「编辑」是显式动作，避免误触生产数据。
   const [viewing, setViewing] = useState(false);
+  // 空白新建表单只在点击「新建供应商档案」后出现；初始/取消/删除后回到「未选择」空状态。
+  const [creating, setCreating] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<SupplierStatusFilter>("all");
   const editorSession = useRef(0);
@@ -302,6 +305,7 @@ export default function SuppliersPage() {
     beginEditorSession();
     setActiveSupplier(null);
     setViewing(false);
+    setCreating(true);
     form.reset(emptySupplierValues);
     if (isMobile)
       formSectionRef.current?.scrollIntoView({
@@ -310,10 +314,20 @@ export default function SuppliersPage() {
       });
   };
 
+  // 放弃当前新建/编辑草稿，回到「未选择」空状态；已完成的写入保持不变。
+  const closeEditor = () => {
+    beginEditorSession();
+    setActiveSupplier(null);
+    setViewing(false);
+    setCreating(false);
+    form.reset(emptySupplierValues);
+  };
+
   const selectSupplier = (supplier: SupplierDisplay) => {
     beginEditorSession();
     setActiveSupplier(supplier);
     setViewing(true);
+    setCreating(false);
     form.reset(supplierToFormValues(supplier));
     if (isMobile)
       formSectionRef.current?.scrollIntoView({
@@ -346,6 +360,7 @@ export default function SuppliersPage() {
       // A completed write remains saved even if the user has started another editor session.
       invalidateCache("suppliers-list");
       if (isCurrent()) {
+        if (response.data?.id) setCreating(false);
         if (response.data?.id)
           setActiveSupplier({
             ...supplier,
@@ -379,6 +394,7 @@ export default function SuppliersPage() {
       invalidateCache("suppliers-list");
       if (isCurrent()) {
         setActiveSupplier(null);
+        setCreating(false);
         form.reset(emptySupplierValues);
         toast.success("供应商已恢复");
       }
@@ -415,6 +431,7 @@ export default function SuppliersPage() {
       if (mounted.current) {
         beginEditorSession();
         setActiveSupplier(null);
+        setCreating(false);
         form.reset(emptySupplierValues);
         toast.success("供应商已永久删除");
         await loadSuppliers();
@@ -448,6 +465,7 @@ export default function SuppliersPage() {
       invalidateCache("suppliers-list");
       if (isCurrent()) {
         setActiveSupplier(null);
+        setCreating(false);
         form.reset(emptySupplierValues);
         toast.success("供应商已归档");
       }
@@ -617,6 +635,7 @@ export default function SuppliersPage() {
                               {supplier.contactPhone || "—"}
                             </span>
                           </p>
+                          <MissingFields supplier={supplier} compact />
                         </div>
                       </div>
                     </div>
@@ -635,30 +654,25 @@ export default function SuppliersPage() {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <Building2 className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">供应商档案表单</h2>
-                <Badge
-                  variant={activeSupplier ? "outline" : "secondary"}
-                  className="rounded-full"
-                >
-                  {activeSupplier ? "编辑现有档案" : "新建档案"}
-                </Badge>
+                <h2 className="text-lg font-semibold">供应商档案</h2>
+                {(activeSupplier || creating) && (
+                  <Badge
+                    variant={activeSupplier ? "outline" : "secondary"}
+                    className="rounded-full"
+                  >
+                    {creating
+                      ? "新建档案"
+                      : viewing
+                        ? "只读查看"
+                        : "编辑现有档案"}
+                  </Badge>
+                )}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 维护合同生成、联系人、税号和收款账户信息。
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <BusinessWrite>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 rounded-lg text-sm"
-                  onClick={startNewSupplier}
-                >
-                  <RotateCcw className="mr-1.5 h-4 w-4" />
-                  清空新建
-                </Button>
-              </BusinessWrite>
               {isAdmin && activeSupplier?.isActive === false && (
                 <BusinessWrite>
                   <Button
@@ -676,7 +690,28 @@ export default function SuppliersPage() {
             </div>
           </div>
 
-          {viewing && activeSupplier ? (
+          {!activeSupplier && !creating ? (
+            <div
+              className="space-y-3 px-5 py-14 text-center"
+              data-testid="supplier-empty-state"
+            >
+              <p className="text-sm font-medium">未选择供应商</p>
+              <p className="text-sm text-muted-foreground">
+                请从左侧索引选择一家供应商查看档案，或新建一份档案。
+              </p>
+              <BusinessWrite>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 rounded-lg text-sm"
+                  onClick={startNewSupplier}
+                >
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  新建供应商档案
+                </Button>
+              </BusinessWrite>
+            </div>
+          ) : viewing && activeSupplier ? (
             <SupplierSummary
               supplier={activeSupplier}
               onEdit={() => setViewing(false)}
@@ -1016,9 +1051,13 @@ export default function SuppliersPage() {
                         type="button"
                         variant="outline"
                         className="h-10 rounded-lg"
-                        onClick={startNewSupplier}
+                        onClick={() =>
+                          activeSupplier
+                            ? selectSupplier(activeSupplier)
+                            : closeEditor()
+                        }
                       >
-                        取消并新建
+                        {activeSupplier ? "放弃修改" : "取消新建"}
                       </Button>
                     </BusinessWrite>
                     <BusinessWrite>
@@ -1038,55 +1077,55 @@ export default function SuppliersPage() {
                   </div>
                 </form>
               </Form>
-              {activeSupplier && (canArchive || isAdmin) && (
-                <section
-                  aria-label="危险操作"
-                  className="mx-5 mb-5 space-y-3 rounded-lg border border-destructive/30 p-4"
-                >
-                  <h3 className="text-sm font-semibold text-destructive">
-                    危险操作
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    以下操作针对「{activeSupplier.name}
-                    」，与保存无关。归档可由管理员恢复；永久删除须先预览关联记录并输入供应商名称确认。
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {canArchive && (
-                      <BusinessWrite>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
-                          disabled={
-                            !activeSupplier ||
-                            activeSupplier.isActive === false ||
-                            saving
-                          }
-                          onClick={handleDeleteActive}
-                        >
-                          <Trash2 className="mr-1.5 h-4 w-4" />
-                          归档当前
-                        </Button>
-                      </BusinessWrite>
-                    )}
-                    {isAdmin && (
-                      <BusinessWrite>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
-                          disabled={!activeSupplier || saving}
-                          onClick={openHardDelete}
-                        >
-                          <Trash2 className="mr-1.5 h-4 w-4" />
-                          永久删除
-                        </Button>
-                      </BusinessWrite>
-                    )}
-                  </div>
-                </section>
-              )}
             </>
+          )}
+          {activeSupplier && (canArchive || isAdmin) && (
+            <section
+              aria-label="危险操作"
+              className="mx-5 mb-5 space-y-3 rounded-lg border border-destructive/30 p-4"
+            >
+              <h3 className="text-sm font-semibold text-destructive">
+                危险操作
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                以下操作针对「{activeSupplier.name}
+                」，与保存无关。归档可由管理员恢复；永久删除须先预览关联记录并输入供应商名称确认。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {canArchive && (
+                  <BusinessWrite>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
+                      disabled={
+                        !activeSupplier ||
+                        activeSupplier.isActive === false ||
+                        saving
+                      }
+                      onClick={handleDeleteActive}
+                    >
+                      <Trash2 className="mr-1.5 h-4 w-4" />
+                      归档当前
+                    </Button>
+                  </BusinessWrite>
+                )}
+                {isAdmin && (
+                  <BusinessWrite>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded-lg border-destructive/30 text-sm text-destructive hover:bg-destructive/5 hover:text-destructive"
+                      disabled={!activeSupplier || saving}
+                      onClick={openHardDelete}
+                    >
+                      <Trash2 className="mr-1.5 h-4 w-4" />
+                      永久删除
+                    </Button>
+                  </BusinessWrite>
+                )}
+              </div>
+            </section>
           )}
         </section>
       </div>
