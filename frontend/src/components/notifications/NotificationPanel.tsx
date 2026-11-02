@@ -41,7 +41,7 @@ const typeColorMap: Record<NotificationType, string> = {
   OVERDUE_RECEIVABLE: "bg-status-red-soft text-status-red",
   LOW_STOCK: "bg-status-amber-soft text-status-amber",
   TAX_REFUND_MONTHLY: "bg-status-green-soft text-status-green",
-  INVOICE_MISSING: "bg-primary/10 text-primary",
+  INVOICE_MISSING: "bg-status-amber-soft text-status-amber",
 };
 
 interface NotificationPanelProps {

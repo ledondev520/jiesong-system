@@ -149,7 +149,9 @@ function BlockMesh({
               {block.cartons} 箱 · {c.length}×{c.width}×{c.height} mm
             </div>
             {estimated && (
-              <div className="text-amber-500 mt-0.5">⚠ 尺寸已根据体积预估</div>
+              <div className="text-status-amber mt-0.5">
+                ⚠ 尺寸已根据体积预估
+              </div>
             )}
           </div>
         </Html>
@@ -315,7 +317,7 @@ export default function Container3DView({
           </div>
         )}
         {estimatedCount > 0 && (
-          <div className="text-xs text-amber-500 mt-1 border-t border-border/40 pt-1">
+          <div className="text-xs text-status-amber mt-1 border-t border-border/40 pt-1">
             ⚠ {estimatedCount} 项尺寸已预估
           </div>
         )}

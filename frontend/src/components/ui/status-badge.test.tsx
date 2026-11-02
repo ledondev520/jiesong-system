@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   StatusBadge,
   getStatusBadgeConfig,
+  SemanticBadge,
   registerStatusBadgeMap,
 } from "./status-badge";
 
@@ -70,6 +71,16 @@ describe("status-badge", () => {
     render(<StatusBadge status="arrived" domain="salesOrder" />);
     const badge = screen.getByText("已到港");
     expect(badge.className).toContain("text-status-amber");
+  });
+});
+
+describe("SemanticBadge danger", () => {
+  it("danger 用红色状态 token 的文字色，不是近白的 destructive-foreground（对比度）", () => {
+    render(<SemanticBadge tone="danger">失败</SemanticBadge>);
+    const cls = screen.getByText("失败").className;
+    expect(cls).toContain("text-status-red");
+    expect(cls).toContain("bg-status-red-soft");
+    expect(cls).not.toContain("text-destructive-foreground");
   });
 });
 
