@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getAuthToken, clearAuthToken } from "@/lib/auth-token";
 import { Input } from "@/components/ui/input";
+import { AuthShell } from "@/components/auth/AuthShell";
 import {
   Form,
   FormControl,
@@ -46,15 +47,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  UserPlus,
-  KeyRound,
-  Eye,
-  EyeOff,
-  Ship,
-  AlertCircle,
-  Loader2,
-} from "lucide-react";
+import { Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 import { authService, type LoginResponse } from "@/services/auth.service";
 import { RegistrationReceiptPanel } from "@/components/auth/RegistrationReceiptPanel";
 import {
@@ -258,182 +251,143 @@ function LoginFormClient() {
   }
 
   return (
-    <div className="auth-shell">
-      <div className="flex w-full max-w-md flex-col items-center">
-        {/* 品牌标识 */}
-        <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="relative">
-            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20">
-              <Ship className="h-8 w-8" strokeWidth={1.5} />
-            </div>
-          </div>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight">捷淞国际物流</h1>
-          </div>
-        </div>
-
-        <Card className="auth-card w-full">
-          <CardHeader className="space-y-2 pb-5">
-            <CardTitle className="text-lg font-semibold">系统登录</CardTitle>
-            <CardDescription className="text-sm leading-relaxed">
-              请输入账号密码登录捷淞进销存系统。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 pb-5">
-            {registrationReceipt && (
-              <RegistrationReceiptPanel receipt={registrationReceipt} />
-            )}
-            <Form {...form}>
-              <form
-                method="post"
-                onSubmit={(event) => form.handleSubmit(onSubmit)(event)}
-                className="space-y-4"
-              >
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem className="space-y-2">
-                      <FormLabel className="text-sm font-medium">
-                        用户名或邮箱
-                      </FormLabel>
+    <AuthShell brandHeading>
+      <Card className="auth-card w-full">
+        <CardHeader className="space-y-2 pb-5">
+          <CardTitle className="text-lg font-semibold">系统登录</CardTitle>
+          <CardDescription className="text-sm leading-relaxed">
+            请输入账号密码登录捷淞进销存系统。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 pb-5">
+          {registrationReceipt && (
+            <RegistrationReceiptPanel receipt={registrationReceipt} />
+          )}
+          <Form {...form}>
+            <form
+              method="post"
+              onSubmit={(event) => form.handleSubmit(onSubmit)(event)}
+              className="space-y-4"
+            >
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel className="text-sm font-medium">
+                      用户名或邮箱
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        autoComplete="username"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        disabled={checkingSession || isLoading}
+                        placeholder="请输入用户名或邮箱"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel className="text-sm font-medium">密码</FormLabel>
+                    <div className="relative">
                       <FormControl>
                         <Input
-                          autoComplete="username"
-                          autoCapitalize="none"
-                          spellCheck={false}
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="current-password"
                           disabled={checkingSession || isLoading}
-                          placeholder="请输入用户名或邮箱"
-                          className="h-11 rounded-xl border-border/40 bg-background/50 shadow-sm transition-all duration-200 focus:bg-background focus:shadow-md focus:ring-2 focus:ring-primary/15"
+                          aria-label="密码"
+                          placeholder="请输入密码"
+                          className="pr-10"
                           {...field}
                         />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem className="space-y-2">
-                      <FormLabel className="text-sm font-medium">
-                        密码
-                      </FormLabel>
-                      <div className="relative">
-                        <FormControl>
-                          <Input
-                            type={showPassword ? "text" : "password"}
-                            autoComplete="current-password"
-                            disabled={checkingSession || isLoading}
-                            aria-label="密码"
-                            placeholder="请输入密码"
-                            className="h-11 rounded-xl border-border/40 bg-background/50 pr-10 shadow-sm transition-all duration-200 focus:bg-background focus:shadow-md focus:ring-2 focus:ring-primary/15"
-                            {...field}
-                          />
-                        </FormControl>
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          aria-label={showPassword ? "隐藏密码" : "显示密码"}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
-                          aria-pressed={showPassword}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
-                        </button>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="remember-login"
-                      checked={rememberMe}
-                      disabled={checkingSession || isLoading}
-                      onCheckedChange={(value) => setRememberMe(value === true)}
-                      aria-describedby="remember-login-description"
-                    />
-                    <label htmlFor="remember-login" className="text-sm">
-                      保持登录
-                    </label>
-                  </div>
-                  <p
-                    id="remember-login-description"
-                    className="text-xs leading-relaxed text-muted-foreground"
-                  >
-                    在本机保持登录（公用电脑请勿勾选）
-                  </p>
-                </div>
-                {error && (
-                  <div className="flex items-start gap-2.5 rounded-xl border border-destructive/20 bg-destructive/[0.06] px-4 py-3 text-sm text-destructive">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <p>{error}</p>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "隐藏密码" : "显示密码"}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+                        aria-pressed={showPassword}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
                 )}
+              />
 
-                <Button
-                  type="submit"
-                  className="h-11 w-full rounded-xl text-sm font-medium shadow-md shadow-primary/20 transition-all duration-200 hover:shadow-lg hover:shadow-primary/25 hover:brightness-105 active:scale-[0.985]"
-                  disabled={!isClientReady || isLoading || checkingSession}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="remember-login"
+                    checked={rememberMe}
+                    disabled={checkingSession || isLoading}
+                    onCheckedChange={(value) => setRememberMe(value === true)}
+                    aria-describedby="remember-login-description"
+                  />
+                  <label htmlFor="remember-login" className="text-sm">
+                    保持登录
+                  </label>
+                </div>
+                <p
+                  id="remember-login-description"
+                  className="text-xs leading-relaxed text-muted-foreground"
                 >
-                  {isLoading || checkingSession ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {checkingSession ? "正在确认登录状态..." : "登录中..."}
-                    </>
-                  ) : (
-                    "登录"
-                  )}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-3 pt-0">
-            <div className="relative flex w-full items-center gap-3">
-              <div className="h-px flex-1 bg-border/40" />
-              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
-                或
-              </span>
-              <div className="h-px flex-1 bg-border/40" />
-            </div>
-            <div className="flex w-full gap-2">
-              <Button
-                asChild
-                variant="outline"
-                className="h-10 flex-1 gap-2 rounded-xl border-border/30 bg-background/40 text-sm font-medium transition-all hover:bg-accent/40 hover:border-border/50"
-              >
-                <Link href="/register">
-                  <UserPlus className="h-4 w-4" />
-                  立即注册
-                </Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="h-10 flex-1 gap-2 rounded-xl border-border/30 bg-background/40 text-sm font-medium transition-all hover:bg-accent/40 hover:border-border/50"
-              >
-                <Link href="/forgot-password">
-                  <KeyRound className="h-4 w-4" />
-                  忘记密码
-                </Link>
-              </Button>
-            </div>
-          </CardFooter>
-        </Card>
+                  在本机保持登录（公用电脑请勿勾选）
+                </p>
+              </div>
+              {error && (
+                <div className="flex items-start gap-2.5 rounded-md border border-destructive/20 bg-destructive/[0.06] px-4 py-3 text-sm text-destructive">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>{error}</p>
+                </div>
+              )}
 
-        {/* 底部版权 */}
-        <p className="mt-6 text-[11px] text-muted-foreground/50">
-          © 捷淞国际物流 · JIESONG
-        </p>
-      </div>
-    </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={!isClientReady || isLoading || checkingSession}
+              >
+                {isLoading || checkingSession ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {checkingSession ? "正在确认登录状态..." : "登录中..."}
+                  </>
+                ) : (
+                  "登录"
+                )}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+        <CardFooter className="flex w-full justify-between pt-0 text-sm">
+          <Link
+            href="/register"
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            立即注册
+          </Link>
+          <Link
+            href="/forgot-password"
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            忘记密码
+          </Link>
+        </CardFooter>
+      </Card>
+    </AuthShell>
   );
 }
 
@@ -441,27 +395,12 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="auth-shell">
-          <div className="flex w-full max-w-md flex-col items-center">
-            <div className="mb-8 flex flex-col items-center gap-3">
-              <div className="relative">
-                <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg">
-                  <Ship className="h-8 w-8" strokeWidth={1.5} />
-                </div>
-              </div>
-              <div className="text-center">
-                <h1 className="text-2xl font-bold tracking-tight">
-                  捷淞国际物流
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground/80">JIESONG</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground/60">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              加载中...
-            </div>
+        <AuthShell brandHeading>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            加载中...
           </div>
-        </div>
+        </AuthShell>
       }
     >
       <LoginFormClient />

@@ -173,6 +173,8 @@ describe("text contrast (WCAG AA = 4.5)", () => {
     ["sidebar text", "--sidebar-foreground", "--sidebar"],
     ["sidebar active", "--sidebar-primary", "--sidebar-accent"],
     ["destructive on card", "--destructive", "--card"],
+    ["gold text on card", "--brand-gold-text", "--card"],
+    ["gold text on canvas", "--brand-gold-text", "--background"],
   ];
   for (const [label, fg, bg] of pairs) {
     it(`light: ${label}`, () => {
