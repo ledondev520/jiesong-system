@@ -19,7 +19,10 @@ const statusMap: Record<
     label: "已批准",
     className: "bg-status-green/10 text-status-green",
   },
-  REFUNDED: { label: "已退税", className: "bg-status-green/10 text-status-green" },
+  REFUNDED: {
+    label: "已退税",
+    className: "bg-status-green/10 text-status-green",
+  },
   REJECTED: {
     label: "已驳回",
     className: "bg-destructive/10 text-destructive",
