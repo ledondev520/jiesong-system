@@ -71,7 +71,9 @@ describe("ContainerLoadingPanel", () => {
     expect(
       within(details).getByText(/模拟结果（历史数据）/),
     ).toBeInTheDocument();
-    expect(summary.querySelector(".text-red-700, .text-amber-700")).toBeNull();
+    expect(
+      summary.querySelector(".text-status-red, .text-status-amber"),
+    ).toBeNull();
 
     rerender(
       <ContainerLoadingPanel
@@ -81,7 +83,7 @@ describe("ContainerLoadingPanel", () => {
       />,
     );
     expect(summary.querySelector("details")).toBeNull();
-    expect(summary.querySelector(".text-red-700")).not.toBeNull();
+    expect(summary.querySelector(".text-status-red")).not.toBeNull();
   });
 
   it("摘要显示柜数、每柜体积/毛重利用率、检查状态与警告", () => {

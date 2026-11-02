@@ -69,7 +69,7 @@ describe("status-badge", () => {
   it("StatusBadge 接受 domain 并渲染对应文案和配色", () => {
     render(<StatusBadge status="arrived" domain="salesOrder" />);
     const badge = screen.getByText("已到港");
-    expect(badge.className).toContain("text-amber-800");
+    expect(badge.className).toContain("text-status-amber");
   });
 });
 

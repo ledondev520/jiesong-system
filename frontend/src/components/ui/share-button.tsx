@@ -3,18 +3,18 @@
  * 思路：复制当前页面链接到剪贴板，支持分享给其他用户
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Share2, Link2, Check } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/dropdown-menu";
+import { Share2, Link2, Check } from "lucide-react";
+import { toast } from "sonner";
 
 interface ShareButtonProps {
   /** 自定义分享链接 */
@@ -22,34 +22,36 @@ interface ShareButtonProps {
   /** 分享标题 */
   title?: string;
   /** 按钮样式变体 */
-  variant?: 'default' | 'outline' | 'ghost';
+  variant?: "default" | "outline" | "ghost";
   /** 按钮尺寸 */
-  size?: 'default' | 'sm' | 'icon';
+  size?: "default" | "sm" | "icon";
 }
 
 export function ShareButton({
   url,
-  title = '捷淞国际物流',
-  variant = 'outline',
-  size = 'sm',
+  title = "捷淞国际物流",
+  variant = "outline",
+  size = "sm",
 }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopyLink = async () => {
-    const shareUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
+    const shareUrl =
+      url || (typeof window !== "undefined" ? window.location.href : "");
 
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      toast.success('链接已复制到剪贴板');
+      toast.success("链接已复制到剪贴板");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error('复制失败，请手动复制');
+      toast.error("复制失败，请手动复制");
     }
   };
 
   const handleShare = async () => {
-    const shareUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
+    const shareUrl =
+      url || (typeof window !== "undefined" ? window.location.href : "");
 
     if (navigator.share) {
       try {
@@ -77,7 +79,7 @@ export function ShareButton({
         <DropdownMenuItem onClick={handleCopyLink}>
           {copied ? (
             <>
-              <Check className="h-4 w-4 mr-2 text-green-500" />
+              <Check className="h-4 w-4 mr-2 text-status-green" />
               已复制
             </>
           ) : (
@@ -87,7 +89,7 @@ export function ShareButton({
             </>
           )}
         </DropdownMenuItem>
-        {typeof navigator !== 'undefined' && !!navigator.share && (
+        {typeof navigator !== "undefined" && !!navigator.share && (
           <DropdownMenuItem onClick={handleShare}>
             <Share2 className="h-4 w-4 mr-2" />
             系统分享

@@ -140,7 +140,7 @@ export function SupplierPriceComparison({
                   <span
                     className={
                       row.lastPrice === lowest
-                        ? "font-semibold text-emerald-600"
+                        ? "font-semibold text-status-green"
                         : undefined
                     }
                   >

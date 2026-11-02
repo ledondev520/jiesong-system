@@ -998,32 +998,32 @@ export function AIAssistant({
                               className={cn(
                                 "rounded-lg border p-2.5 text-xs",
                                 action.status === "pending" &&
-                                  "border-amber-400/60 bg-amber-50/80 dark:bg-amber-950/20",
+                                  "border-status-amber/30 bg-status-amber-soft/80",
                                 action.status === "executing" &&
-                                  "border-blue-400/60 bg-blue-50/80 dark:bg-blue-950/20",
+                                  "border-status-blue/30 bg-status-blue-soft/80",
                                 action.status === "executed" &&
-                                  "border-green-400/60 bg-green-50/80 dark:bg-green-950/20",
+                                  "border-status-green/30 bg-status-green-soft/80",
                                 action.status === "cancelled" &&
                                   "border-muted bg-muted/50 opacity-60",
                                 action.status === "failed" &&
-                                  "border-red-400/60 bg-red-50/80 dark:bg-red-950/20",
+                                  "border-status-red/30 bg-status-red-soft/80",
                               )}
                             >
                               <div className="flex items-start gap-2">
                                 {action.status === "pending" && (
-                                  <ShieldCheck className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                  <ShieldCheck className="h-3.5 w-3.5 text-status-amber shrink-0 mt-0.5" />
                                 )}
                                 {action.status === "executing" && (
-                                  <Loader2 className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5 animate-spin" />
+                                  <Loader2 className="h-3.5 w-3.5 text-status-blue shrink-0 mt-0.5 animate-spin" />
                                 )}
                                 {action.status === "executed" && (
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0 mt-0.5" />
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-status-green shrink-0 mt-0.5" />
                                 )}
                                 {action.status === "cancelled" && (
                                   <XOctagon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                                 )}
                                 {action.status === "failed" && (
-                                  <XOctagon className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
+                                  <XOctagon className="h-3.5 w-3.5 text-status-red shrink-0 mt-0.5" />
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium leading-snug">

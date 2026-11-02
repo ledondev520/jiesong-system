@@ -77,19 +77,19 @@ const STATUS_META: Record<
 > = {
   ready: {
     label: "已齐",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    className: "border-status-green/30 bg-status-green-soft text-status-green",
   },
   missing: {
     label: "缺失",
-    className: "border-red-200 bg-red-50 text-red-700",
+    className: "border-status-red/30 bg-status-red-soft text-status-red",
   },
   review: {
     label: "待复核",
-    className: "border-amber-200 bg-amber-50 text-amber-700",
+    className: "border-status-amber/30 bg-status-amber-soft text-status-amber",
   },
   not_applicable: {
     label: "未触发",
-    className: "border-slate-200 bg-slate-50 text-slate-600",
+    className: "border-border bg-muted text-muted-foreground",
   },
 };
 
@@ -101,14 +101,14 @@ const REQUIREMENT_LABELS = {
 
 function StatusIcon({ status }: { status: TaxPreparationStatus }) {
   if (status === "ready")
-    return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+    return <CheckCircle2 className="h-4 w-4 text-status-green" />;
   if (status === "not_applicable")
     return <MinusCircle className="h-4 w-4 text-muted-foreground" />;
   return (
     <AlertTriangle
       className={cn(
         "h-4 w-4",
-        status === "missing" ? "text-red-600" : "text-amber-600",
+        status === "missing" ? "text-status-red" : "text-status-amber",
       )}
     />
   );
@@ -325,17 +325,17 @@ export function TaxRefundPreparationDialog({
             <Alert
               className={
                 ready
-                  ? "border-emerald-200 bg-emerald-50"
-                  : "border-red-200 bg-red-50"
+                  ? "border-status-green/30 bg-status-green-soft"
+                  : "border-status-red/30 bg-status-red-soft"
               }
             >
               {ready ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                <CheckCircle2 className="h-4 w-4 text-status-green" />
               ) : (
-                <AlertTriangle className="h-4 w-4 text-red-700" />
+                <AlertTriangle className="h-4 w-4 text-status-red" />
               )}
               <AlertDescription
-                className={ready ? "text-emerald-800" : "text-red-800"}
+                className={ready ? "text-status-green" : "text-status-red"}
               >
                 {ready ? (
                   preparation.confirmationStatus === "CONFIRMED" ? (
@@ -499,7 +499,9 @@ export function TaxRefundPreparationDialog({
                         <TableRow
                           key={item.id}
                           className={
-                            item.status === "missing" ? "bg-red-50/50" : ""
+                            item.status === "missing"
+                              ? "bg-status-red-soft/50"
+                              : ""
                           }
                         >
                           <TableCell className="text-xs text-muted-foreground">

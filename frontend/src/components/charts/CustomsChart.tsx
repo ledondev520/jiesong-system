@@ -1,7 +1,7 @@
 /**
  * 报关统计图表
  */
-'use client';
+"use client";
 
 import {
   BarChart,
@@ -17,11 +17,18 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-} from 'recharts';
-import { ChartCard } from './ChartCard';
-import { ChartSkeleton } from './ChartSkeleton';
+} from "recharts";
+import { ChartCard } from "./ChartCard";
+import { ChartSkeleton } from "./ChartSkeleton";
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B'];
+const COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--status-red)",
+];
 
 interface CustomsChartProps {
   data?: {
@@ -66,7 +73,10 @@ export default function CustomsChart({
         className="md:col-span-2"
       >
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={monthlyData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+          <LineChart
+            data={monthlyData}
+            margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+          >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
             <YAxis yAxisId="left" />
@@ -77,7 +87,7 @@ export default function CustomsChart({
               yAxisId="left"
               dataKey="declarations"
               name="报关单数"
-              fill="#0088FE"
+              fill="var(--chart-1)"
               radius={[4, 4, 0, 0]}
             />
             <Line
@@ -85,7 +95,7 @@ export default function CustomsChart({
               type="monotone"
               dataKey="value"
               name="货值 (USD)"
-              stroke="#00C49F"
+              stroke="var(--chart-2)"
               strokeWidth={2}
               dot={{ r: 4 }}
             />
@@ -106,7 +116,10 @@ export default function CustomsChart({
               label={({ name, value }) => `${name}: ${value}`}
             >
               {statusData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Pie>
             <Tooltip />
@@ -123,9 +136,17 @@ export default function CustomsChart({
             <XAxis type="number" />
             <YAxis dataKey="name" type="category" width={80} />
             <Tooltip />
-            <Bar dataKey="declarations" name="报关单数" fill="#8884D8" radius={[0, 4, 4, 0]}>
+            <Bar
+              dataKey="declarations"
+              name="报关单数"
+              fill="var(--chart-5)"
+              radius={[0, 4, 4, 0]}
+            >
               {portData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                />
               ))}
             </Bar>
           </BarChart>

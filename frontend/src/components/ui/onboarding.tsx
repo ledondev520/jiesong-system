@@ -3,9 +3,9 @@
  * 思路：首次登录时显示引导弹窗，介绍系统主要功能
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,43 +13,50 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { ChevronRight, ChevronLeft, Ship, FileText, DollarSign, CheckCircle } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import {
+  ChevronRight,
+  ChevronLeft,
+  Ship,
+  FileText,
+  DollarSign,
+  CheckCircle,
+} from "lucide-react";
 
-const ONBOARDING_KEY = 'jiesong_onboarding_completed';
+const ONBOARDING_KEY = "jiesong_onboarding_completed";
 
 const ONBOARDING_STEPS = [
   {
-    title: '欢迎使用捷淞国际物流',
-    description: 'JIESONG，让采购、出口、财务协同更高效。',
+    title: "欢迎使用捷淞国际物流",
+    description: "JIESONG，让采购、出口、财务协同更高效。",
     icon: Ship,
-    color: 'text-blue-500',
+    color: "text-status-blue",
   },
   {
-    title: '采购管理',
-    description: '创建采购合同，跟踪付款进度，管理供应商信息。',
+    title: "采购管理",
+    description: "创建采购合同，跟踪付款进度，管理供应商信息。",
     icon: FileText,
-    color: 'text-green-500',
+    color: "text-status-green",
   },
   {
-    title: '出口管理',
-    description: '管理出口合同，生成报关单据，跟踪退税进度。',
+    title: "出口管理",
+    description: "管理出口合同，生成报关单据，跟踪退税进度。",
     icon: DollarSign,
-    color: 'text-orange-500',
+    color: "text-status-amber",
   },
   {
-    title: '开始使用',
+    title: "开始使用",
     description: '点击"开始使用"进入工作台，开始您的业务管理。',
     icon: CheckCircle,
-    color: 'text-purple-500',
+    color: "text-primary",
   },
 ];
 
 export function OnboardingDialog() {
   const [open, setOpen] = useState(() => {
     // 检查是否已完成引导
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const completed = localStorage.getItem(ONBOARDING_KEY);
       return !completed;
     }
@@ -58,7 +65,7 @@ export function OnboardingDialog() {
   const [step, setStep] = useState(0);
 
   const handleComplete = () => {
-    localStorage.setItem(ONBOARDING_KEY, 'true');
+    localStorage.setItem(ONBOARDING_KEY, "true");
     setOpen(false);
   };
 
@@ -70,9 +77,13 @@ export function OnboardingDialog() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-            <Icon className={`h-8 w-8 ${currentStep?.color || 'text-blue-500'}`} />
+            <Icon
+              className={`h-8 w-8 ${currentStep?.color || "text-status-blue"}`}
+            />
           </div>
-          <DialogTitle className="text-center">{currentStep?.title}</DialogTitle>
+          <DialogTitle className="text-center">
+            {currentStep?.title}
+          </DialogTitle>
           <DialogDescription className="text-center">
             {currentStep?.description}
           </DialogDescription>
@@ -83,7 +94,7 @@ export function OnboardingDialog() {
             <div
               key={index}
               className={`h-2 w-2 rounded-full transition-colors ${
-                index === step ? 'bg-primary' : 'bg-muted'
+                index === step ? "bg-primary" : "bg-muted"
               }`}
             />
           ))}

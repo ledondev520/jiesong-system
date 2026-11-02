@@ -126,7 +126,7 @@ export default function ContainerLoadingPanel({
           </SelectContent>
         </Select>
         {simulating && (
-          <span className="text-xs text-amber-700 dark:text-amber-400">
+          <span className="text-xs text-status-amber">
             柜型切换仅用于模拟，确认发运按 {plan.containerType} 校验
           </span>
         )}

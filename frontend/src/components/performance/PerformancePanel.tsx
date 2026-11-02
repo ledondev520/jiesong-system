@@ -1,13 +1,16 @@
 /**
  * 性能监控面板组件
  */
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { getPerformanceMetrics, type PerformanceMetrics } from '@/lib/performance-monitor';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Activity, Clock, Zap, Gauge } from 'lucide-react';
+import { useEffect, useState } from "react";
+import {
+  getPerformanceMetrics,
+  type PerformanceMetrics,
+} from "@/lib/performance-monitor";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Activity, Clock, Zap, Gauge } from "lucide-react";
 
 interface PerformancePanelProps {
   className?: string;
@@ -21,21 +24,27 @@ interface MetricItemProps {
   icon?: React.ReactNode;
 }
 
-function MetricItem({ label, value, unit = 'ms', threshold, icon }: MetricItemProps) {
+function MetricItem({
+  label,
+  value,
+  unit = "ms",
+  threshold,
+  icon,
+}: MetricItemProps) {
   const getStatus = (val: number) => {
-    if (!threshold) return 'neutral';
-    if (val <= threshold.good) return 'good';
-    if (val <= threshold.poor) return 'fair';
-    return 'poor';
+    if (!threshold) return "neutral";
+    if (val <= threshold.good) return "good";
+    if (val <= threshold.poor) return "fair";
+    return "poor";
   };
 
-  const status = value !== undefined ? getStatus(value) : 'neutral';
+  const status = value !== undefined ? getStatus(value) : "neutral";
 
   const statusColors = {
-    good: 'bg-green-500',
-    fair: 'bg-yellow-500',
-    poor: 'bg-red-500',
-    neutral: 'bg-gray-400',
+    good: "bg-status-green",
+    fair: "bg-status-amber",
+    poor: "bg-status-red",
+    neutral: "bg-muted-foreground",
   };
 
   return (
@@ -46,7 +55,11 @@ function MetricItem({ label, value, unit = 'ms', threshold, icon }: MetricItemPr
       </div>
       <div className="flex items-center gap-2">
         <span className="font-mono text-lg font-semibold">
-          {value !== undefined ? (unit === 'ms' ? `${value.toFixed(0)}ms` : value.toFixed(3)) : '-'}
+          {value !== undefined
+            ? unit === "ms"
+              ? `${value.toFixed(0)}ms`
+              : value.toFixed(3)
+            : "-"}
         </span>
         <div className={`w-2 h-2 rounded-full ${statusColors[status]}`} />
       </div>
@@ -55,7 +68,9 @@ function MetricItem({ label, value, unit = 'ms', threshold, icon }: MetricItemPr
 }
 
 export default function PerformancePanel({ className }: PerformancePanelProps) {
-  const [metrics, setMetrics] = useState<PerformanceMetrics>(() => getPerformanceMetrics());
+  const [metrics, setMetrics] = useState<PerformanceMetrics>(() =>
+    getPerformanceMetrics(),
+  );
 
   useEffect(() => {
     // 定期更新
