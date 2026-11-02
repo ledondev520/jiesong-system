@@ -1,12 +1,10 @@
 /**
  * Input: 无（服务端渲染，所有访客都能看到，没有空白闪屏）
- * Output: 公开落地页：顶栏、首屏、业务链、功能卡、收尾带、页脚；已登录者由 AuthRedirect 转去 /dashboard
+ * Output: 公开落地页：顶栏、首屏、业务链、页脚；已登录者由 AuthRedirect 转去 /dashboard
  * Pos: app/page.tsx 的页面主体；Montserrat 变量只在本页与认证页挂载
  */
 import { montserrat } from "@/app/fonts/montserrat";
 import { AuthRedirect } from "./AuthRedirect";
-import { ClosingBand } from "./ClosingBand";
-import { FeatureCards } from "./FeatureCards";
 import { FlowStrip } from "./FlowStrip";
 import { LandingFooter } from "./LandingFooter";
 import { LandingHero } from "./LandingHero";
@@ -20,8 +18,6 @@ export function LandingPage() {
       <main>
         <LandingHero />
         <FlowStrip />
-        <FeatureCards />
-        <ClosingBand />
       </main>
       <LandingFooter />
     </div>

@@ -88,21 +88,21 @@ describe("RootPage 公开落地页", () => {
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
 
-  it("登录与申请账号入口指向 /login 和 /register；页脚带找回密码", () => {
+  it("整页只有首屏一对登录/申请账号入口，页脚只剩版权", () => {
     render(<RootPage />);
-    for (const link of screen.getAllByRole("link", { name: /^登录/ })) {
-      expect(link).toHaveAttribute("href", "/login");
-    }
-    for (const link of screen.getAllByRole("link", { name: "申请账号" })) {
-      expect(link).toHaveAttribute("href", "/register");
-    }
-    expect(screen.getByRole("link", { name: "忘记密码" })).toHaveAttribute(
-      "href",
-      "/forgot-password",
-    );
+    const login = screen.getAllByRole("link", { name: /^登录/ });
+    const register = screen.getAllByRole("link", { name: "申请账号" });
+    expect(login).toHaveLength(1);
+    expect(register).toHaveLength(1);
+    expect(login[0]).toHaveAttribute("href", "/login");
+    expect(register[0]).toHaveAttribute("href", "/register");
+    expect(screen.getByRole("main")).toContainElement(login[0]);
+    expect(screen.getByRole("main")).toContainElement(register[0]);
+    expect(screen.queryByRole("link", { name: "忘记密码" })).toBeNull();
+    expect(screen.getByRole("contentinfo")).toHaveTextContent("© 2026");
   });
 
-  it("业务链八个环节、三张功能卡都在", () => {
+  it("业务链八个环节都在；功能卡与页中收尾带已移除", () => {
     render(<RootPage />);
     for (const step of [
       "报价",
@@ -117,10 +117,11 @@ describe("RootPage 公开落地页", () => {
       expect(screen.getAllByText(step).length).toBeGreaterThan(0);
     }
     for (const title of ["全程可追溯", "权限分明", "AI 助手随页可用"]) {
-      expect(
-        screen.getByRole("heading", { level: 3, name: title }),
-      ).toBeInTheDocument();
+      expect(screen.queryByText(title)).toBeNull();
     }
+    expect(screen.queryByText("系统特点")).toBeNull();
+    expect(screen.queryByText("已有账号？")).toBeNull();
+    expect(screen.queryByText("需要开通？")).toBeNull();
   });
 
   it("内容规则：所有链接与资源都是站内地址，没有外部字体、脚本或框架", () => {
@@ -130,20 +131,5 @@ describe("RootPage 公开落地页", () => {
       expect(url, el.outerHTML.slice(0, 80)).toMatch(/^\//);
     }
     expect(container.querySelectorAll("script, iframe, link")).toHaveLength(0);
-  });
-
-  it("权限卡片只声称后端真实做到的：账簿明细与凭证仅财务/管理员，不声称整个财务数据", () => {
-    render(<RootPage />);
-    expect(
-      screen.getByText(/账簿明细与财务凭证仅财务和管理员可见/),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/财务数据只对财务和管理员可见/)).toBeNull();
-  });
-
-  it("功能卡的 h3 在一个 h2 之下（屏幕阅读器标题层级不跳级）", () => {
-    render(<RootPage />);
-    expect(
-      screen.getByRole("heading", { level: 2, name: "系统特点" }),
-    ).toBeInTheDocument();
   });
 });
