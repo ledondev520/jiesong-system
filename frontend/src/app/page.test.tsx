@@ -88,18 +88,18 @@ describe("RootPage 公开落地页", () => {
     expect(screen.getByRole("contentinfo")).toBeInTheDocument();
   });
 
-  it("登录与申请账号入口指向 /login 和 /register；页脚带找回密码", () => {
+  it("整页只有首屏一对登录/申请账号入口，页脚只剩版权", () => {
     render(<RootPage />);
-    for (const link of screen.getAllByRole("link", { name: /^登录/ })) {
-      expect(link).toHaveAttribute("href", "/login");
-    }
-    for (const link of screen.getAllByRole("link", { name: "申请账号" })) {
-      expect(link).toHaveAttribute("href", "/register");
-    }
-    expect(screen.getByRole("link", { name: "忘记密码" })).toHaveAttribute(
-      "href",
-      "/forgot-password",
-    );
+    const login = screen.getAllByRole("link", { name: /^登录/ });
+    const register = screen.getAllByRole("link", { name: "申请账号" });
+    expect(login).toHaveLength(1);
+    expect(register).toHaveLength(1);
+    expect(login[0]).toHaveAttribute("href", "/login");
+    expect(register[0]).toHaveAttribute("href", "/register");
+    expect(screen.getByRole("main")).toContainElement(login[0]);
+    expect(screen.getByRole("main")).toContainElement(register[0]);
+    expect(screen.queryByRole("link", { name: "忘记密码" })).toBeNull();
+    expect(screen.getByRole("contentinfo")).toHaveTextContent("© 2026");
   });
 
   it("业务链八个环节都在；功能卡与页中收尾带已移除", () => {
@@ -122,9 +122,6 @@ describe("RootPage 公开落地页", () => {
     expect(screen.queryByText("系统特点")).toBeNull();
     expect(screen.queryByText("已有账号？")).toBeNull();
     expect(screen.queryByText("需要开通？")).toBeNull();
-    // 入口只剩顶栏、首屏、页脚三处：登录 3、申请账号 3
-    expect(screen.getAllByRole("link", { name: /^登录/ })).toHaveLength(3);
-    expect(screen.getAllByRole("link", { name: "申请账号" })).toHaveLength(3);
   });
 
   it("内容规则：所有链接与资源都是站内地址，没有外部字体、脚本或框架", () => {

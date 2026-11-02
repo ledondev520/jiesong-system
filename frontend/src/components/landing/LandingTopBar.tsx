@@ -1,11 +1,10 @@
 /**
  * Input: 无
- * Output: 吸顶顶栏（64px，纸色，底部 1px 金色发丝线）：标志 + 名称；登录、申请账号
- * Pos: 落地页；手机只显示「登录」
+ * Output: 吸顶顶栏（64px，纸色，底部 1px 金色发丝线）：仅标志 + 名称（登录/申请账号入口只在首屏）
+ * Pos: 落地页
  */
 import Link from "next/link";
 import { BrandMark } from "@/components/brand/BrandMark";
-import { Button } from "@/components/ui/button";
 
 export function LandingTopBar() {
   return (
@@ -22,14 +21,6 @@ export function LandingTopBar() {
             JIESONG
           </span>
         </Link>
-        <nav className="flex items-center gap-2" aria-label="账号">
-          <Button asChild variant="ghost">
-            <Link href="/login">登录</Link>
-          </Button>
-          <Button asChild variant="outline" className="hidden sm:inline-flex">
-            <Link href="/register">申请账号</Link>
-          </Button>
-        </nav>
       </div>
     </header>
   );
