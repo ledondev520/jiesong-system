@@ -240,7 +240,7 @@ describe("SystemConfigTab", () => {
     expect(screen.queryByRole("slider")).toBeNull();
     expect(screen.queryByLabelText(/最大输出长度/)).toBeNull();
     expect(screen.getByTestId("sampling-not-applicable")).toHaveTextContent(
-      "由服务器统一设置",
+      "回复风格由服务器统一设置",
     );
     // 页面任何位置都不暴露环境变量名或内部模型 ID
     const text = document.body.textContent ?? "";

@@ -704,7 +704,8 @@ export function SystemConfigTab({
                   data-testid="sampling-not-applicable"
                 >
                   OpenAI
-                  模式下，回复风格与输出长度由服务器统一设置，此页不提供调节。
+                  模式下，回复风格由服务器统一设置；输出长度沿用已保存的值并受服务器上限约束，此页在
+                  OpenAI 模式下不修改这两项。
                 </p>
               ) : (
                 <div className="border-t pt-4 space-y-4">
