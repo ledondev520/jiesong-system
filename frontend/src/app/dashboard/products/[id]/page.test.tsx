@@ -117,6 +117,7 @@ describe("商品详情", () => {
     expect(zone).toHaveTextContent("停用");
     expect(zone).not.toHaveTextContent("无法撤销");
     expect(zone).not.toHaveTextContent("拒绝");
+    expect(zone).not.toHaveTextContent("不再用于新建单据");
   });
 
   it("已停用商品显示「已停用」徽标且不再提供删除入口", async () => {

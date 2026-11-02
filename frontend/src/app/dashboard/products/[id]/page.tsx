@@ -153,7 +153,7 @@ export default function ProductDetailPage() {
             <h3 className="text-sm font-semibold text-destructive">危险操作</h3>
             <p className="text-xs text-muted-foreground">
               商品是订单、库存和报关共用的基础档案。删除「{product.customsName}
-              」后该商品停用：不再用于新建单据，已有订单、库存和报关单据中的引用保持不变。
+              」后该商品标记为已停用（列表显示「已停用」），已有订单、库存和报关单据中的引用保持不变。
             </p>
             <Button
               type="button"
@@ -175,7 +175,7 @@ export default function ProductDetailPage() {
             <AlertDialogDescription>
               确定要删除商品 <strong>{product.customsName}</strong> 吗？
               <br />
-              删除后该商品停用，不再用于新建单据；已有单据中的引用保持不变。
+              删除后该商品标记为已停用（列表显示「已停用」）；已有订单、库存和报关单据中的引用保持不变。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
