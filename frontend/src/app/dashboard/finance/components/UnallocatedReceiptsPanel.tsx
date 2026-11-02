@@ -139,9 +139,9 @@ export function UnallocatedReceiptsPanel({
       ) : null}
 
       {payments.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/20">
+        <Card className="border-status-amber/40 bg-status-amber-soft/50">
           <CardHeader className="flex flex-row items-center justify-between gap-3 pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-orange-700 dark:text-orange-400">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium text-status-amber">
               <Split className="h-4 w-4" />
               待分配款项（{payments.length} 笔）
             </CardTitle>
@@ -149,7 +149,7 @@ export function UnallocatedReceiptsPanel({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 border-orange-300 bg-background text-xs text-orange-700 hover:bg-orange-100 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-950"
+                className="h-8 border-status-amber/40 bg-background text-xs text-status-amber hover:bg-status-amber-soft"
                 onClick={() => void handleAutoMatch()}
                 disabled={autoMatching}
               >
@@ -167,7 +167,7 @@ export function UnallocatedReceiptsPanel({
               (p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between rounded-lg border border-orange-200 bg-background px-3 py-2 dark:border-orange-900"
+                  className="flex items-center justify-between rounded-lg border border-status-amber/40 bg-background px-3 py-2"
                 >
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -201,7 +201,7 @@ export function UnallocatedReceiptsPanel({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-full text-xs text-orange-700 dark:text-orange-300"
+                className="h-8 w-full text-xs text-status-amber"
                 aria-expanded={expanded}
                 onClick={() => setExpanded((value) => !value)}
               >

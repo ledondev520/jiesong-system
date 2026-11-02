@@ -214,20 +214,20 @@ export function InvoiceImportDialog({ open, onOpenChange, onSuccess }: Props) {
               <p className="text-sm font-medium">导入结果</p>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
-                  <p className="text-lg font-bold text-emerald-600">{result.success}</p>
+                  <p className="text-lg font-bold text-status-green">{result.success}</p>
                   <p className="text-[10px] text-muted-foreground">成功导入</p>
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-orange-500">{result.skipped}</p>
+                  <p className="text-lg font-bold text-status-amber">{result.skipped}</p>
                   <p className="text-[10px] text-muted-foreground">重复跳过</p>
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-red-600">{result.failed}</p>
+                  <p className="text-lg font-bold text-status-red">{result.failed}</p>
                   <p className="text-[10px] text-muted-foreground">失败</p>
                 </div>
               </div>
               {result.parseErrors && result.parseErrors.length > 0 && (
-                <div className="max-h-[120px] overflow-y-auto text-xs text-red-600 space-y-1">
+                <div className="max-h-[120px] overflow-y-auto text-xs text-status-red space-y-1">
                   {result.parseErrors.slice(0, 10).map((e, i) => (
                     <p key={i}>第{e.row}行：{e.reason}</p>
                   ))}
@@ -238,7 +238,7 @@ export function InvoiceImportDialog({ open, onOpenChange, onSuccess }: Props) {
           )}
 
           {preview && preview.errorRows > 0 && !result && (
-            <div className="max-h-[120px] overflow-y-auto rounded-md border p-2 text-xs text-red-600 space-y-1">
+            <div className="max-h-[120px] overflow-y-auto rounded-md border p-2 text-xs text-status-red space-y-1">
               {preview.errors.map((e, i) => (
                 <p key={i}>第{e.row}行：{e.reason}</p>
               ))}

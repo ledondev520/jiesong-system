@@ -14,8 +14,8 @@ const statusMap: Record<
   { label: string; className: string }
 > = {
   DRAFT: { label: '草稿', className: 'bg-muted text-muted-foreground' },
-  APPLIED: { label: '已申报', className: 'bg-blue-500/10 text-blue-700 dark:text-blue-300' },
-  APPROVED: { label: '已批准', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' },
+  APPLIED: { label: '已申报', className: 'bg-status-blue/10 text-status-blue' },
+  APPROVED: { label: '已批准', className: 'bg-status-green/10 text-status-green' },
   REFUNDED: { label: '已退税', className: 'bg-primary/12 text-primary' },
   REJECTED: { label: '已驳回', className: 'bg-destructive/10 text-destructive' },
 };

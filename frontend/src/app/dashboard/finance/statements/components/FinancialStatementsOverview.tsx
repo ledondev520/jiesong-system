@@ -334,37 +334,37 @@ export function FinancialStatementsOverview({
                       label: "应收账款",
                       value: latestBalanceSheet?.accountsReceivable,
                       icon: TrendingUp,
-                      color: "text-blue-600 dark:text-blue-400",
+                      color: "text-status-blue",
                     },
                     {
                       label: "预付账款",
                       value: latestBalanceSheet?.prepaidExpenses,
                       icon: ArrowRightLeft,
-                      color: "text-purple-600 dark:text-purple-400",
+                      color: "text-chart-5",
                     },
                     {
                       label: "其他应收款",
                       value: latestBalanceSheet?.otherReceivables,
                       icon: ArrowRightLeft,
-                      color: "text-indigo-600 dark:text-indigo-400",
+                      color: "text-chart-2",
                     },
                     {
                       label: "存货",
                       value: latestBalanceSheet?.inventory,
                       icon: Package,
-                      color: "text-amber-600 dark:text-amber-400",
+                      color: "text-status-amber",
                     },
                     {
                       label: "应付账款",
                       value: latestBalanceSheet?.accountsPayable,
                       icon: TrendingDown,
-                      color: "text-rose-600 dark:text-rose-400",
+                      color: "text-status-red",
                     },
                     {
                       label: "其他应付款",
                       value: latestBalanceSheet?.otherPayables,
                       icon: TrendingDown,
-                      color: "text-orange-600 dark:text-orange-400",
+                      color: "text-status-amber",
                     },
                   ].map((item) => (
                     <div

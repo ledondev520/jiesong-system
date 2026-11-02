@@ -79,7 +79,7 @@ function statusBadge(status: string, isPositive: string) {
   return (
     <Badge
       variant="outline"
-      className="text-green-600 border-green-200 text-[10px]"
+      className="text-status-green border-status-green/40 text-[10px]"
     >
       正常
     </Badge>
@@ -230,7 +230,7 @@ export default function InvoicesPage() {
                 <p className="text-xs text-muted-foreground mb-1">
                   有效发票金额
                 </p>
-                <p className="text-lg font-bold text-blue-600">
+                <p className="text-lg font-bold text-status-blue">
                   {fmt(stats.validTotal)}
                 </p>
               </CardContent>
@@ -238,7 +238,7 @@ export default function InvoicesPage() {
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
                 <p className="text-xs text-muted-foreground mb-1">可抵扣税额</p>
-                <p className="text-lg font-bold text-green-600">
+                <p className="text-lg font-bold text-status-green">
                   {fmt(stats.validTax)}
                 </p>
               </CardContent>
@@ -256,7 +256,7 @@ export default function InvoicesPage() {
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
                 <p className="text-xs text-muted-foreground mb-1">已红冲</p>
-                <p className="text-lg font-bold text-orange-500">
+                <p className="text-lg font-bold text-status-amber">
                   {stats.reversedCount}
                 </p>
               </CardContent>

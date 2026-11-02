@@ -335,7 +335,7 @@ export function TaxRefundListPageContent() {
 
         <TabsContent value="refunds" className="mt-0 space-y-6">
           {/* 说明：退税单由出口合同流程自动生成 */}
-          <div className="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+          <div className="flex items-start gap-2 rounded-lg border border-status-blue/40 bg-status-blue-soft p-3 text-sm text-status-blue">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               退税单通过<strong>出口合同 → 一键生成三张表</strong>

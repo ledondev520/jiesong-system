@@ -25,9 +25,9 @@ interface Props {
 }
 
 const statusMeta = {
-  PASS: { label: '通过', className: 'border-emerald-200 bg-emerald-50 text-emerald-700', icon: CheckCircle2 },
-  REVIEW: { label: '复核', className: 'border-amber-200 bg-amber-50 text-amber-700', icon: AlertTriangle },
-  MISSING: { label: '缺票', className: 'border-red-200 bg-red-50 text-red-700', icon: XCircle },
+  PASS: { label: '通过', className: 'border-status-green/40 bg-status-green-soft text-status-green', icon: CheckCircle2 },
+  REVIEW: { label: '复核', className: 'border-status-amber/40 bg-status-amber-soft text-status-amber', icon: AlertTriangle },
+  MISSING: { label: '缺票', className: 'border-status-red/40 bg-status-red-soft text-status-red', icon: XCircle },
 } as const;
 
 export function InvoiceVerificationDialog({ open, onOpenChange, salesContractId, contractNo }: Props) {
@@ -65,9 +65,9 @@ export function InvoiceVerificationDialog({ open, onOpenChange, salesContractId,
         ) : (
           <div className="min-h-0 flex-1 space-y-4 overflow-auto">
             <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-lg border bg-emerald-50 p-3"><p className="text-xs text-emerald-700">通过</p><p className="text-2xl font-semibold text-emerald-800">{verification.summary.pass}</p></div>
-              <div className="rounded-lg border bg-amber-50 p-3"><p className="text-xs text-amber-700">待复核</p><p className="text-2xl font-semibold text-amber-800">{verification.summary.review}</p></div>
-              <div className="rounded-lg border bg-red-50 p-3"><p className="text-xs text-red-700">缺票</p><p className="text-2xl font-semibold text-red-800">{verification.summary.missing}</p></div>
+              <div className="rounded-lg border bg-status-green-soft p-3"><p className="text-xs text-status-green">通过</p><p className="text-2xl font-semibold text-status-green">{verification.summary.pass}</p></div>
+              <div className="rounded-lg border bg-status-amber-soft p-3"><p className="text-xs text-status-amber">待复核</p><p className="text-2xl font-semibold text-status-amber">{verification.summary.review}</p></div>
+              <div className="rounded-lg border bg-status-red-soft p-3"><p className="text-xs text-status-red">缺票</p><p className="text-2xl font-semibold text-status-red">{verification.summary.missing}</p></div>
             </div>
 
             <div className="overflow-x-auto rounded-lg border">

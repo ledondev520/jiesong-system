@@ -19,12 +19,12 @@ import {
 } from "recharts";
 
 const MODEL_COLORS = [
-  "#6366f1",
-  "#f59e0b",
-  "#10b981",
-  "#ef4444",
-  "#8b5cf6",
-  "#14b8a6",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-5)",
+  "var(--chart-4)",
+  "var(--status-green)",
 ];
 
 const SHANGHAI_HOUR_BUCKET = /^(\d{4}-\d{2}-\d{2}) (\d{2}):00$/;

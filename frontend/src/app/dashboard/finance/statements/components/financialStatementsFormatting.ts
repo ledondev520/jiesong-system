@@ -23,7 +23,7 @@ export function fmtPercent(val: number | null | undefined): string {
 export function profitColor(val: number | null | undefined): string {
   if (val === null || val === undefined) return "text-muted-foreground";
   return val >= 0
-    ? "text-emerald-600 dark:text-emerald-400"
+    ? "text-status-green"
     : "text-destructive";
 }
 

@@ -416,26 +416,26 @@ export default function ReconciliationPage() {
                 </p>
               </CardContent>
             </Card>
-            <Card className="border-red-200 bg-red-50/30 dark:bg-red-950/10">
+            <Card className="border-status-red/40 bg-status-red-soft/30">
               <CardContent className="pt-4 pb-3 px-4">
                 <p className="text-xs text-muted-foreground mb-1">缺票供应商</p>
-                <p className="text-lg font-bold text-red-600">
+                <p className="text-lg font-bold text-status-red">
                   {s.underInvoicedCount}
                 </p>
-                <p className="text-[10px] text-red-600">
+                <p className="text-[10px] text-status-red">
                   缺票总额 ¥{fmt(s.underInvoicedGap)}
                 </p>
               </CardContent>
             </Card>
-            <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10">
+            <Card className="border-status-amber/40 bg-status-amber-soft/30">
               <CardContent className="pt-4 pb-3 px-4">
                 <p className="text-xs text-muted-foreground mb-1">
                   多开票供应商
                 </p>
-                <p className="text-lg font-bold text-amber-600">
+                <p className="text-lg font-bold text-status-amber">
                   {s.overInvoicedCount}
                 </p>
-                <p className="text-[10px] text-amber-600">
+                <p className="text-[10px] text-status-amber">
                   多开总额 ¥{fmt(s.overInvoicedGap)}
                 </p>
               </CardContent>
@@ -548,7 +548,7 @@ export default function ReconciliationPage() {
               <Card className="flex flex-col max-h-[70vh]">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
-                    <Landmark className="h-4 w-4 text-blue-500" />
+                    <Landmark className="h-4 w-4 text-status-blue" />
                     <CardTitle className="text-sm">未匹配银行流水</CardTitle>
                     <Badge variant="secondary" className="text-[10px]">
                       {bankTotal}
@@ -589,7 +589,7 @@ export default function ReconciliationPage() {
                               {txn.counterpart || "-"}
                             </span>
                             <span
-                              className={`text-sm font-bold tabular-nums ${txn.direction === "OUT" ? "text-red-600" : "text-green-600"}`}
+                              className={`text-sm font-bold tabular-nums ${txn.direction === "OUT" ? "text-status-red" : "text-status-green"}`}
                             >
                               {txn.direction === "OUT" ? "-" : "+"}¥
                               {fmt(Math.abs(txn.amount))}
@@ -631,9 +631,9 @@ export default function ReconciliationPage() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     {contractType === "PURCHASE" ? (
-                      <Package className="h-4 w-4 text-orange-500" />
+                      <Package className="h-4 w-4 text-status-amber" />
                     ) : (
-                      <Ship className="h-4 w-4 text-teal-500" />
+                      <Ship className="h-4 w-4 text-chart-2" />
                     )}
                     <CardTitle className="text-sm">合同列表</CardTitle>
                   </div>
@@ -703,7 +703,7 @@ export default function ReconciliationPage() {
                             <span className="text-[10px] text-muted-foreground">
                               总额 ¥{fmt(c.totalAmount)}
                             </span>
-                            <span className="text-[10px] font-medium text-orange-600">
+                            <span className="text-[10px] font-medium text-status-amber">
                               未收/付 ¥{fmt(contractUnpaid(c))}
                             </span>
                           </div>
@@ -718,7 +718,7 @@ export default function ReconciliationPage() {
               <Card className="flex flex-col max-h-[70vh]">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-violet-500" />
+                    <FileText className="h-4 w-4 text-chart-5" />
                     <CardTitle className="text-sm">未匹配发票</CardTitle>
                     <Badge variant="secondary" className="text-[10px]">
                       {invoiceTotal}
@@ -878,9 +878,9 @@ function ReconciliationAnalysisView({
                       key={m.payName}
                       className={
                         m.category === "under_invoiced"
-                          ? "bg-red-50/30 dark:bg-red-950/5"
+                          ? "bg-status-red-soft/30"
                           : m.category === "over_invoiced"
-                            ? "bg-amber-50/30 dark:bg-amber-950/5"
+                            ? "bg-status-amber-soft/30"
                             : ""
                       }
                     >
@@ -901,7 +901,7 @@ function ReconciliationAnalysisView({
                         {fmt(m.totalInvoice)}
                       </TableCell>
                       <TableCell
-                        className={`text-right tabular-nums font-medium ${m.gap > 0 ? "text-red-600" : m.gap < 0 ? "text-amber-600" : ""}`}
+                        className={`text-right tabular-nums font-medium ${m.gap > 0 ? "text-status-red" : m.gap < 0 ? "text-status-amber" : ""}`}
                       >
                         {m.gap > 0 ? "+" : ""}
                         {fmt(m.gap)}
@@ -912,13 +912,13 @@ function ReconciliationAnalysisView({
                             缺票 ¥{fmt(m.gap)}
                           </Badge>
                         ) : m.category === "over_invoiced" ? (
-                          <Badge className="text-[10px] bg-amber-500 hover:bg-amber-500">
+                          <Badge className="text-[10px] bg-status-amber hover:bg-status-amber">
                             多开 ¥{fmt(Math.abs(m.gap))}
                           </Badge>
                         ) : (
                           <Badge
                             variant="outline"
-                            className="text-green-600 border-green-200 text-[10px]"
+                            className="text-status-green border-status-green/40 text-[10px]"
                           >
                             已匹配
                           </Badge>
@@ -965,7 +965,7 @@ function ReconciliationAnalysisView({
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <FileWarning className="h-4 w-4 text-red-500" />
+              <FileWarning className="h-4 w-4 text-status-red" />
               <CardTitle className="text-sm">
                 无票付款 ({filteredUnmatchedPay.length})
               </CardTitle>
@@ -997,7 +997,7 @@ function ReconciliationAnalysisView({
                       <TableCell className="font-medium">
                         {p.counterpart}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-red-600 font-medium">
+                      <TableCell className="text-right tabular-nums text-status-red font-medium">
                         {fmt(p.netPaid)}
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
@@ -1030,7 +1030,7 @@ function ReconciliationAnalysisView({
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertTriangle className="h-4 w-4 text-status-amber" />
               <CardTitle className="text-sm">
                 无流水发票 ({filteredUnmatchedInv.length})
               </CardTitle>
