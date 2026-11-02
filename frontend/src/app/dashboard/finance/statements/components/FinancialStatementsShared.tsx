@@ -65,9 +65,7 @@ export function fmtPercent(val: number | null | undefined): string {
 
 export function profitColor(val: number | null | undefined): string {
   if (val === null || val === undefined) return "text-muted-foreground";
-  return val >= 0
-    ? "text-status-green"
-    : "text-destructive";
+  return val >= 0 ? "text-status-green" : "text-destructive";
 }
 
 export function KpiCard({
@@ -122,10 +120,8 @@ export function KpiCard({
             <span
               className={cn(
                 "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
-                isUp &&
-                  "bg-status-green-soft text-status-green",
-                isDown &&
-                  "bg-status-red-soft text-status-red",
+                isUp && "bg-status-green-soft text-status-green",
+                isDown && "bg-status-red-soft text-status-red",
                 !isUp && !isDown && "bg-muted text-muted-foreground",
               )}
             >
@@ -229,9 +225,7 @@ export function FinancialHealthAlert({
   return (
     <Alert className="border-status-green/50 bg-status-green-soft/50">
       <CheckCircle2 className="h-4 w-4 text-status-green" />
-      <AlertTitle className="text-status-green">
-        财务状况良好
-      </AlertTitle>
+      <AlertTitle className="text-status-green">财务状况良好</AlertTitle>
       <AlertDescription className="text-xs text-status-green/80">
         {periodLabel} 各项财务指标均在安全范围内
       </AlertDescription>

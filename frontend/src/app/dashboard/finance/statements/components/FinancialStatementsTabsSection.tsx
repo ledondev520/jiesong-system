@@ -68,7 +68,12 @@ const COLORS = {
   cash: "var(--status-amber)",
 };
 
-const PIE_COLORS = ["var(--status-amber)", "var(--chart-5)", "var(--chart-2)", "var(--status-blue)"];
+const PIE_COLORS = [
+  "var(--status-amber)",
+  "var(--chart-5)",
+  "var(--chart-2)",
+  "var(--status-blue)",
+];
 const PIE_COLOR_BY_NAME: Record<string, string> = {
   营业成本: PIE_COLORS[0],
   管理费用: PIE_COLORS[1],

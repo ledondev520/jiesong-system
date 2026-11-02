@@ -69,8 +69,7 @@ function getLogLevel(action: string) {
     case "DELETE":
       return {
         label: "错误",
-        className:
-          "bg-status-red-soft text-status-red border-status-red/40",
+        className: "bg-status-red-soft text-status-red border-status-red/40",
       };
     case "UPDATE":
       return {
@@ -81,8 +80,7 @@ function getLogLevel(action: string) {
     default:
       return {
         label: "信息",
-        className:
-          "bg-status-blue-soft text-status-blue border-status-blue/40",
+        className: "bg-status-blue-soft text-status-blue border-status-blue/40",
       };
   }
 }

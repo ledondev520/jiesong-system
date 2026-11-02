@@ -4,33 +4,47 @@
  * Pos: 退税管理共享展示组件
  */
 
-'use client';
+"use client";
 
-import { Badge } from '@/components/ui/badge';
-import type { TaxRefundStatus } from '@/types';
+import { Badge } from "@/components/ui/badge";
+import type { TaxRefundStatus } from "@/types";
 
 const statusMap: Record<
-  Exclude<TaxRefundStatus, 'ALL'>,
+  Exclude<TaxRefundStatus, "ALL">,
   { label: string; className: string }
 > = {
-  DRAFT: { label: '草稿', className: 'bg-muted text-muted-foreground' },
-  APPLIED: { label: '已申报', className: 'bg-status-blue/10 text-status-blue' },
-  APPROVED: { label: '已批准', className: 'bg-status-green/10 text-status-green' },
-  REFUNDED: { label: '已退税', className: 'bg-primary/12 text-primary' },
-  REJECTED: { label: '已驳回', className: 'bg-destructive/10 text-destructive' },
+  DRAFT: { label: "草稿", className: "bg-muted text-muted-foreground" },
+  APPLIED: { label: "已申报", className: "bg-status-blue/10 text-status-blue" },
+  APPROVED: {
+    label: "已批准",
+    className: "bg-status-green/10 text-status-green",
+  },
+  REFUNDED: { label: "已退税", className: "bg-primary/12 text-primary" },
+  REJECTED: {
+    label: "已驳回",
+    className: "bg-destructive/10 text-destructive",
+  },
 };
 
-export const taxRefundStatusOptions: Array<{ value: TaxRefundStatus; label: string }> = [
-  { value: 'ALL', label: '全部状态' },
-  { value: 'DRAFT', label: '草稿' },
-  { value: 'APPLIED', label: '已申报' },
-  { value: 'APPROVED', label: '已批准' },
-  { value: 'REFUNDED', label: '已退税' },
-  { value: 'REJECTED', label: '已驳回' },
+export const taxRefundStatusOptions: Array<{
+  value: TaxRefundStatus;
+  label: string;
+}> = [
+  { value: "ALL", label: "全部状态" },
+  { value: "DRAFT", label: "草稿" },
+  { value: "APPLIED", label: "已申报" },
+  { value: "APPROVED", label: "已批准" },
+  { value: "REFUNDED", label: "已退税" },
+  { value: "REJECTED", label: "已驳回" },
 ];
 
-export function TaxRefundStatusBadge({ status }: { status: Exclude<TaxRefundStatus, 'ALL'> | string }) {
-  const meta = statusMap[status as Exclude<TaxRefundStatus, 'ALL'>] || statusMap.DRAFT;
+export function TaxRefundStatusBadge({
+  status,
+}: {
+  status: Exclude<TaxRefundStatus, "ALL"> | string;
+}) {
+  const meta =
+    statusMap[status as Exclude<TaxRefundStatus, "ALL">] || statusMap.DRAFT;
 
   return (
     <Badge variant="outline" className={meta.className}>
