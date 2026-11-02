@@ -145,14 +145,15 @@ describe("SystemConfigTab", () => {
       "https://platform.deepseek.com/api_keys",
     );
     expect(screen.getByText(/思考模式已开启.*high/)).toBeInTheDocument();
-    expect(screen.getByText(/0\.7 — 均衡/)).toBeInTheDocument();
-    expect(screen.getByRole("slider")).toHaveAttribute("data-disabled");
+    // 思考模式不使用温度：滑杆不渲染，而不是留一个禁用的摆设
+    expect(screen.queryByRole("slider")).toBeNull();
+    expect(screen.queryByText(/采样温度/)).toBeNull();
     const keyInput = screen.getByPlaceholderText("输入新 Key 以覆盖");
     expect(keyInput).toHaveValue("");
     await user.click(screen.getAllByRole("combobox")[0]);
     expect(screen.getAllByRole("option")).toHaveLength(1);
     expect(
-      screen.getByRole("option", { name: /deepseek-flash/ }),
+      screen.getByRole("option", { name: "DeepSeek 思考模式" }),
     ).toBeInTheDocument();
     await user.keyboard("{Escape}");
     await user.type(keyInput, newKey);
@@ -195,7 +196,9 @@ describe("SystemConfigTab", () => {
     expect(screen.getByText("服务器已配置")).toBeInTheDocument();
     expect(screen.queryByText(/Kimi/)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/API Key/)).not.toBeInTheDocument();
-    expect(screen.getAllByText("gpt-6.1-terra").length).toBeGreaterThan(0);
+    // 内部模型 ID 不出现在页面上，只显示业务名称
+    expect(screen.queryByText("gpt-6.1-terra")).toBeNull();
+    expect(screen.getAllByText("OpenAI 智能模型").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: /保存配置/ }));
     await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalled());
@@ -230,20 +233,41 @@ describe("SystemConfigTab", () => {
     render(<SystemConfigTab />);
 
     const effective = await screen.findByTestId("effective-models");
-    await waitFor(() => expect(effective).toHaveTextContent("gpt-6.1-terra"));
-    expect(effective).toHaveTextContent("来源：服务器环境变量 OPENAI_MODEL");
+    await waitFor(() => expect(effective).toHaveTextContent("OpenAI 智能模型"));
+    expect(effective).toHaveTextContent("来源：服务器配置");
     expect(screen.queryByText(/kimi-k2-turbo-preview/)).toBeNull();
-    // 温度对 OpenAI 不适用；输出长度仍会发送，所以不再说「长度参数不生效」
-    expect(screen.getByText("不适用")).toBeInTheDocument();
-    expect(
-      screen.getByText(/OpenAI 请求会丢弃温度参数，此处的值不生效/),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/温度与长度参数/)).toBeNull();
-    const lengthHint = screen.getByText(/max_completion_tokens/);
-    expect(lengthHint).toHaveTextContent("OpenAI 普通问答按此处显示的已保存值");
-    expect(lengthHint).toHaveTextContent("思考模式和 Agent 不使用此值");
-    expect(lengthHint).toHaveTextContent("服务器上限 16,000");
-    expect(screen.getByLabelText(/最大输出长度/)).toBeDisabled();
+    // 温度/输出长度对 OpenAI 不适用：控件直接不渲染，只留一句说明
+    expect(screen.queryByRole("slider")).toBeNull();
+    expect(screen.queryByLabelText(/最大输出长度/)).toBeNull();
+    expect(screen.getByTestId("sampling-not-applicable")).toHaveTextContent(
+      "由服务器统一设置",
+    );
+    // 页面任何位置都不暴露环境变量名或内部模型 ID
+    const text = document.body.textContent ?? "";
+    for (const leaked of [
+      "OPENAI_MODEL",
+      "max_completion_tokens",
+      "gpt-6.1-terra",
+      "OPENAI_MAX_OUTPUT_TOKENS",
+    ]) {
+      expect(text).not.toContain(leaked);
+    }
+  });
+
+  it("OpenAI 读不到服务器模型时，不显示空白的「当前实际使用」行", async () => {
+    mockGetSystemConfig.mockResolvedValueOnce({
+      data: {
+        exchangeRate: 7.2,
+        profitRate: 1.3,
+        aiProvider: "openai",
+        openaiConfigured: true,
+        aiChatModel: "kimi-k2-turbo-preview",
+      },
+    });
+    render(<SystemConfigTab />);
+    expect(await screen.findByText("OpenAI API Key")).toBeInTheDocument();
+    expect(screen.queryByTestId("effective-models")).toBeNull();
+    expect(screen.queryByText("未读取到服务器模型")).toBeNull();
   });
 
   it("Kimi：实际使用的模型就是此页保存的设置，并标明来源", async () => {
@@ -261,10 +285,12 @@ describe("SystemConfigTab", () => {
     render(<SystemConfigTab />);
 
     const effective = await screen.findByTestId("effective-models");
-    await waitFor(() =>
-      expect(effective).toHaveTextContent("kimi-k2-thinking-turbo"),
-    );
-    expect(effective).toHaveTextContent("moonshot-v1-8k");
+    await waitFor(() => expect(effective).toHaveTextContent("Kimi 深度推理"));
+    expect(effective).toHaveTextContent("Kimi 快速");
+    expect(effective).not.toHaveTextContent("kimi-k2-thinking-turbo");
+    expect(effective).not.toHaveTextContent("moonshot-v1-8k");
+    // Kimi 才有温度滑杆
+    expect(screen.getByRole("slider")).not.toHaveAttribute("data-disabled");
     expect(effective).toHaveTextContent("来源：此页保存的设置");
     expect(screen.getByLabelText(/最大输出长度/)).not.toBeDisabled();
   });
@@ -283,8 +309,11 @@ describe("SystemConfigTab", () => {
     render(<SystemConfigTab />);
 
     const effective = await screen.findByTestId("effective-models");
-    await waitFor(() => expect(effective).toHaveTextContent("deepseek-flash"));
-    expect(effective).toHaveTextContent("来源：系统固定为 deepseek-flash");
+    await waitFor(() =>
+      expect(effective).toHaveTextContent("DeepSeek 思考模式"),
+    );
+    expect(effective).toHaveTextContent("来源：系统固定为 DeepSeek 思考模式");
+    expect(effective).not.toHaveTextContent("deepseek-flash");
     expect(screen.queryByText(/kimi-k2-turbo-preview/)).toBeNull();
   });
 });
