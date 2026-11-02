@@ -86,7 +86,7 @@ export function StepIndicator({
                   isCurrent
                     ? "bg-primary text-primary-foreground"
                     : isCompleted
-                      ? "bg-emerald-500 text-white"
+                      ? "bg-status-green text-background"
                       : "bg-muted text-muted-foreground",
                 )}
               >
@@ -108,7 +108,7 @@ export function StepIndicator({
               <div
                 className={cn(
                   "mx-1 h-px w-4 sm:mx-2 sm:w-8",
-                  isCompleted ? "bg-emerald-500" : "bg-border",
+                  isCompleted ? "bg-status-green" : "bg-border",
                 )}
               />
             )}
@@ -154,7 +154,7 @@ export function PriceSummary({
         <div className="border-t border-border/40 pt-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">合计</span>
-            <span className="font-mono text-lg font-bold tabular-nums text-emerald-600">
+            <span className="font-mono text-lg font-bold tabular-nums text-status-green">
               ¥{total.toLocaleString()}
             </span>
           </div>

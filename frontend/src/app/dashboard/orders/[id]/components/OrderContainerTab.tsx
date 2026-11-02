@@ -34,16 +34,16 @@ import { PackingItemDialog } from "./PackingItemDialog";
 
 const TONE = {
   blocking: {
-    box: "border-red-200 bg-red-50/70 dark:border-red-900 dark:bg-red-950/40",
-    text: "text-red-700 dark:text-red-400",
+    box: "border-status-red/30 bg-status-red-soft",
+    text: "text-status-red",
   },
   ready: {
-    box: "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/40",
-    text: "text-emerald-700 dark:text-emerald-400",
+    box: "border-status-green/30 bg-status-green-soft",
+    text: "text-status-green",
   },
   pending: {
-    box: "border-amber-200 bg-amber-50/70 dark:border-amber-900 dark:bg-amber-950/40",
-    text: "text-amber-700 dark:text-amber-400",
+    box: "border-status-amber/30 bg-status-amber-soft",
+    text: "text-status-amber",
   },
   // 已发运订单：排柜结果只是对当前资料的模拟，不用红/琥珀告警色。
   historical: {
@@ -114,7 +114,7 @@ export function OrderContainerTab({
 
   const pctClass = (pct: number) =>
     !hasShipped && pct >= thresholdPct
-      ? "font-semibold tabular-nums text-emerald-700 dark:text-emerald-400"
+      ? "font-semibold tabular-nums text-status-green"
       : "font-semibold tabular-nums";
 
   return (
@@ -128,11 +128,11 @@ export function OrderContainerTab({
             {hasShipped ? (
               <CircleDashed className="h-5 w-5 text-muted-foreground" />
             ) : isBlocking ? (
-              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <AlertTriangle className="h-5 w-5 text-status-red" />
             ) : readiness.ready ? (
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <CheckCircle2 className="h-5 w-5 text-status-green" />
             ) : (
-              <CircleDashed className="h-5 w-5 text-amber-600" />
+              <CircleDashed className="h-5 w-5 text-status-amber" />
             )}
             <span className={`text-sm font-semibold ${tone.text}`}>
               {result.headline}
@@ -184,7 +184,7 @@ export function OrderContainerTab({
           </div>
           {result.estimatedDimensionCount > 0 && (
             <div
-              className={`flex items-center gap-2 text-xs ${hasShipped ? TONE.historical.text : "text-amber-700 dark:text-amber-400"}`}
+              className={`flex items-center gap-2 text-xs ${hasShipped ? TONE.historical.text : "text-status-amber"}`}
             >
               <AlertTriangle className="h-3.5 w-3.5" />
               {result.estimatedDimensionCount} 项尺寸由体积推算，
@@ -225,7 +225,7 @@ export function OrderContainerTab({
           </Card>
         </div>
         {contract.isFumigated && (
-          <div className="flex items-center gap-2 text-xs text-amber-700">
+          <div className="flex items-center gap-2 text-xs text-status-amber">
             <PackageCheck className="h-3.5 w-3.5" />
             <span>已熏蒸处理</span>
           </div>

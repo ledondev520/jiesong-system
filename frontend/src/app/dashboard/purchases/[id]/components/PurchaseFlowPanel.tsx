@@ -402,14 +402,14 @@ export function PurchaseFlowPanel({
             {invoiceNumbers.length > 0 ? (
               <Badge
                 variant="outline"
-                className="ml-2 border-emerald-300 bg-emerald-50 text-emerald-700"
+                className="ml-2 border-status-green/30 bg-status-green-soft text-status-green"
               >
                 已登记 {invoiceNumbers.length} 个发票号
               </Badge>
             ) : (
               <Badge
                 variant="outline"
-                className="ml-2 border-amber-300 bg-amber-50 text-amber-700"
+                className="ml-2 border-status-amber/30 bg-status-amber-soft text-status-amber"
               >
                 未登记发票
               </Badge>
@@ -571,7 +571,7 @@ export function PurchaseFlowPanel({
               !supplier?.bankBranch ||
               !supplier?.bankCode ||
               !supplier?.bankAccount) && (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-status-amber">
                 供应商收款信息不完整，请先在「供应商管理」补录户名、银行、支行、联行号和账号。
               </p>
             )}
@@ -633,7 +633,7 @@ export function PurchaseFlowPanel({
             ) : invoicePreparation?.issues.some(
                 (issue) => issue.code !== "MISSING_INVOICE_NUMBER",
               ) ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <div className="rounded-lg border border-status-amber/30 bg-status-amber-soft p-3 text-xs text-status-amber">
                 {invoicePreparation.issues
                   .filter((issue) => issue.code !== "MISSING_INVOICE_NUMBER")
                   .map((issue) => issue.message)

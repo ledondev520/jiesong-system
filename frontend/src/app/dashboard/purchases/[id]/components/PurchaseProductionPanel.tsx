@@ -297,7 +297,7 @@ export function PurchaseProductionPanel({
           {!readiness?.ready && readiness?.items?.length ? (
             <div
               role="alert"
-              className="rounded-lg border border-amber-300/70 bg-amber-50/70 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+              className="rounded-lg border border-status-amber/30 bg-status-amber-soft p-3 text-sm text-status-amber"
             >
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />

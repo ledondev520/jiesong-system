@@ -726,8 +726,8 @@ export default function ContractsPageContent() {
                     : procurementOverview.producingContracts}
                 </p>
               </div>
-              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-amber-500/10">
-                <Package className="h-4 w-4 text-amber-600" />
+              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-status-amber-soft">
+                <Package className="h-4 w-4 text-status-amber" />
               </div>
             </CardContent>
           </Card>
@@ -743,8 +743,8 @@ export default function ContractsPageContent() {
                     : procurementOverview.shippedPendingReceipt}
                 </p>
               </div>
-              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-emerald-500/10">
-                <Truck className="h-4 w-4 text-emerald-600" />
+              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-status-green-soft">
+                <Truck className="h-4 w-4 text-status-green" />
               </div>
             </CardContent>
           </Card>
@@ -760,8 +760,8 @@ export default function ContractsPageContent() {
                     : procurementOverview.activeStores}
                 </p>
               </div>
-              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-sky-500/10">
-                <Store className="h-4 w-4 text-sky-600" />
+              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-status-blue-soft">
+                <Store className="h-4 w-4 text-status-blue" />
               </div>
             </CardContent>
           </Card>
@@ -897,7 +897,7 @@ export default function ContractsPageContent() {
                         <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                           合同总额
                         </p>
-                        <p className="text-sm font-semibold tabular-nums text-emerald-600">
+                        <p className="text-sm font-semibold tabular-nums text-status-green">
                           ¥{contract.totalAmount.toLocaleString()}
                         </p>
                         {!isPayable(contract) && (

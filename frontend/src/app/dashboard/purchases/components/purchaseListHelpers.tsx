@@ -61,50 +61,45 @@ export function StatusPill({ status }: { status: PurchaseStatus }) {
     [PurchaseStatus.DRAFT]: {
       label: "草稿",
       icon: <Circle className="h-3 w-3 fill-current" />,
-      className:
-        "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800",
+      className: "bg-status-gray-soft text-status-gray border-status-gray/30",
     },
     [PurchaseStatus.SIGNED]: {
       label: PURCHASE_STATUS_LABELS.SIGNED,
       icon: <CheckCircle2 className="h-3 w-3" />,
       className:
-        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+        "bg-status-green-soft text-status-green border-status-green/30",
     },
     [PurchaseStatus.PRODUCING]: {
       label: "生产中",
       icon: <Loader2 className="h-3 w-3 animate-spin" />,
-      className:
-        "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+      className: "bg-status-blue-soft text-status-blue border-status-blue/30",
     },
     [PurchaseStatus.READY]: {
       label: "生产完成",
       icon: <PackageCheck className="h-3 w-3" />,
-      className:
-        "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-400 dark:border-cyan-800",
+      className: "bg-status-blue-soft text-status-blue border-status-blue/30",
     },
     [PurchaseStatus.SHIPPED]: {
       label: "已发货",
       icon: <Truck className="h-3 w-3" />,
       className:
-        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+        "bg-status-amber-soft text-status-amber border-status-amber/30",
     },
     [PurchaseStatus.RECEIVED]: {
       label: "已收货",
       icon: <PackageCheck className="h-3 w-3" />,
-      className:
-        "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-400 dark:border-violet-800",
+      className: "bg-primary/10 text-primary border-primary/30",
     },
     [PurchaseStatus.COMPLETED]: {
       label: "已完成",
       icon: <CheckCircle2 className="h-3 w-3" />,
       className:
-        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+        "bg-status-green-soft text-status-green border-status-green/30",
     },
     [PurchaseStatus.CANCELLED]: {
       label: "已取消",
       icon: <X className="h-3 w-3" />,
-      className:
-        "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
+      className: "bg-status-red-soft text-status-red border-status-red/30",
     },
   };
 
@@ -135,18 +130,18 @@ export const getPurchaseStatusColor = (status: PurchaseStatus) => {
   switch (status) {
     case PurchaseStatus.DRAFT:
     case PurchaseStatus.SIGNED:
-      return "#3b82f6";
+      return "var(--status-blue)";
     case PurchaseStatus.PRODUCING:
     case PurchaseStatus.READY:
     case PurchaseStatus.SHIPPED:
-      return "#f59e0b";
+      return "var(--status-amber)";
     case PurchaseStatus.RECEIVED:
     case PurchaseStatus.COMPLETED:
-      return "#10b981";
+      return "var(--status-green)";
     case PurchaseStatus.CANCELLED:
-      return "#ef4444";
+      return "var(--status-red)";
     default:
-      return "#10b981";
+      return "var(--status-green)";
   }
 };
 
@@ -155,7 +150,7 @@ export const getPurchaseStatusColor = (status: PurchaseStatus) => {
  */
 export function formatAmount(amount: number) {
   return (
-    <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+    <span className="font-medium tabular-nums text-status-green">
       ¥{amount.toLocaleString()}
     </span>
   );

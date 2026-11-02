@@ -270,7 +270,7 @@ export function PurchaseItemsStep({
               </div>
               <div className="md:col-span-1 text-right">
                 <p className="text-[11px] text-muted-foreground">小计</p>
-                <p className="font-mono text-sm font-semibold tabular-nums text-emerald-600">
+                <p className="font-mono text-sm font-semibold tabular-nums text-status-green">
                   ¥
                   {(
                     (watchItems[index]?.quantity || 0) *

@@ -535,7 +535,7 @@ export default function CreateSalesPage() {
                           预估利润 (¥)
                         </p>
                         <p
-                          className={`text-lg font-bold tabular-nums ${totalProfit >= 0 ? "text-emerald-600" : "text-destructive"}`}
+                          className={`text-lg font-bold tabular-nums ${totalProfit >= 0 ? "text-status-green" : "text-destructive"}`}
                         >
                           ¥{Math.round(totalProfit).toLocaleString()}
                         </p>
@@ -545,7 +545,7 @@ export default function CreateSalesPage() {
                           利润率（按报价汇率）
                         </p>
                         <p
-                          className={`text-lg font-bold tabular-nums ${orderMargin?.warning ? "text-amber-600" : "text-emerald-600"}`}
+                          className={`text-lg font-bold tabular-nums ${orderMargin?.warning ? "text-status-amber" : "text-status-green"}`}
                         >
                           {orderMargin?.marginPct == null
                             ? "—"
@@ -836,7 +836,7 @@ export default function CreateSalesPage() {
                                         (watchItems[index]?.quantity *
                                           watchItems[index]?.costPrice || 0) >=
                                       0
-                                        ? "text-emerald-600"
+                                        ? "text-status-green"
                                         : "text-destructive"
                                     }`}
                                   >

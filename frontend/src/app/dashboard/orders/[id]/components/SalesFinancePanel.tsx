@@ -478,7 +478,7 @@ export function SalesFinancePanel({
                           : ""}
                       </p>
                     </div>
-                    <span className="font-semibold tabular-nums text-emerald-600">
+                    <span className="font-semibold tabular-nums text-status-green">
                       +{formatAmount("USD", receipt.amountUsd)}
                     </span>
                   </div>
