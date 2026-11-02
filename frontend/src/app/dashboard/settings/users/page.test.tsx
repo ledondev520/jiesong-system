@@ -221,13 +221,13 @@ describe("UsersPage 交互逻辑", () => {
       useAuthStore.setState({ user: { id: "me", role: "ADMIN" } as never });
     });
 
-    it("默认只列在用账号；停用账号在「未开通/已停用」或「全部」里，置灰并带「已停用」徽标", async () => {
+    it("默认只列在用账号；停用账号在「未开通/已停用」或「全部」里，置灰并如实标「未开通/已停用」", async () => {
       const user = userEvent.setup();
       render(<UsersPage />);
       await screen.findByRole("button", { name: "在用账号（4）" });
       expect(screen.getAllByText("账号s1").length).toBeGreaterThan(0);
       expect(screen.queryByText("停用管理员")).toBeNull();
-      expect(screen.queryByText("已停用")).toBeNull();
+      expect(screen.queryByText("未开通/已停用")).toBeNull();
 
       await user.click(screen.getByRole("button", { name: "全部账号（6）" }));
       // 手机卡片在前、桌面表格在后：取表格行
@@ -238,7 +238,9 @@ describe("UsersPage 交互逻辑", () => {
           .find(Boolean)!;
       const row = rowOf("停用管理员");
       expect(row).toHaveClass("opacity-60");
-      expect(within(row).getByText("已停用")).toBeInTheDocument();
+      // 注册后尚未开通的同事同样是 isActive=false，不能把他们标成「已停用」
+      expect(within(row).getByText("未开通/已停用")).toBeInTheDocument();
+      expect(within(row).queryByText("已停用")).toBeNull();
       const activeRow = rowOf("账号s1");
       expect(activeRow).not.toHaveClass("opacity-60");
 

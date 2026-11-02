@@ -541,7 +541,7 @@ export default function UsersPage() {
                 fields={[
                   {
                     label: "状态",
-                    value: user.isActive ? "正常" : "已停用",
+                    value: user.isActive ? "正常" : "未开通/已停用",
                     emphasis: user.isActive ? "primary" : undefined,
                   },
                   {
@@ -681,7 +681,7 @@ export default function UsersPage() {
                             : ""
                         }
                       >
-                        {user.isActive ? "正常" : "已停用"}
+                        {user.isActive ? "正常" : "未开通/已停用"}
                       </Badge>
                     </TableCell>
                     <TableCell>
