@@ -56,6 +56,7 @@ import {
 import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
 import { runAwait } from "@/lib/run-await";
+import { txnKind } from "@/lib/finance-ledger";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { PaymentListCard } from "@/components/finance/PaymentListCard";
 import { BankFlowImportDialog } from "./components/BankFlowImportDialog";
@@ -491,13 +492,14 @@ export default function BankFlowPage() {
                   >
                     交易类型
                   </SortableTableHead>
+                  <TableHead>账户</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center py-8 text-muted-foreground"
                     >
                       加载中...
@@ -506,7 +508,7 @@ export default function BankFlowPage() {
                 ) : loadError ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center py-8 text-destructive"
                     >
                       读取失败，请重试
@@ -515,7 +517,7 @@ export default function BankFlowPage() {
                 ) : filteredByAmount.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center py-8 text-muted-foreground"
                     >
                       {hasFilters ? "没有匹配当前筛选条件的记录" : "暂无数据"}
@@ -579,7 +581,19 @@ export default function BankFlowPage() {
                         {item.summary || "-"}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {item.txnType || "-"}
+                        <span className="inline-flex flex-wrap items-center gap-1">
+                          {item.txnType || "-"}
+                          {txnKind(item) ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {txnKind(item)}
+                            </Badge>
+                          ) : null}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {item.accountNoMasked
+                          ? `${item.bankName ? `${item.bankName} ` : ""}${item.accountNoMasked}`
+                          : "-"}
                       </TableCell>
                     </TableRow>
                   ))

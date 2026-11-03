@@ -10,6 +10,8 @@
 
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { useCallback, useEffect, useState } from "react";
+import { PageSizeSelect } from "@/components/ui/page-size-select";
+import { negativeInvoiceCount } from "@/lib/finance-ledger";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { useSearchParams } from "next/navigation";
@@ -94,7 +96,7 @@ export default function InvoicesPage() {
   const [items, setItems] = useState<InvoiceRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState(urlSearch);
   const [status, setStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -225,7 +227,7 @@ export default function InvoicesPage() {
       <div className="px-1">
         {/* KPI */}
         {stats && !loadError && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
                 <p className="text-xs text-muted-foreground mb-1">
@@ -259,6 +261,19 @@ export default function InvoicesPage() {
                 <p className="text-xs text-muted-foreground mb-1">已红冲</p>
                 <p className="text-lg font-bold text-status-amber">
                   {stats.reversedCount}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3 px-4">
+                <p className="text-xs text-muted-foreground mb-1">负数及其他</p>
+                <p className="text-lg font-bold" data-testid="negative-count">
+                  {negativeInvoiceCount(stats).toLocaleString()}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  有效 {stats.validCount.toLocaleString()} + 已红冲{" "}
+                  {stats.reversedCount.toLocaleString()} + 负数及其他 = 共{" "}
+                  {stats.totalCount.toLocaleString()}
                 </p>
               </CardContent>
             </Card>
@@ -336,6 +351,13 @@ export default function InvoicesPage() {
             }}
             placeholder="结束日期"
             className="h-9 w-[140px]"
+          />
+          <PageSizeSelect
+            value={pageSize}
+            onChange={(value) => {
+              setPageSize(value);
+              setPage(1);
+            }}
           />
           {(search || status || dateFrom || dateTo) && (
             <Button variant="ghost" size="sm" onClick={resetFilters}>
@@ -478,13 +500,14 @@ export default function InvoicesPage() {
                   <TableHead>发票号码</TableHead>
                   <TableHead className="w-[70px]">状态</TableHead>
                   <TableHead className="w-[80px]">票种</TableHead>
+                  <TableHead className="w-[70px]">流水</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={10}
                       className="text-center py-8 text-muted-foreground"
                     >
                       加载中...
@@ -493,7 +516,7 @@ export default function InvoicesPage() {
                 ) : loadError ? (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={10}
                       className="text-center py-8 text-destructive"
                     >
                       读取失败，请重试
@@ -502,7 +525,7 @@ export default function InvoicesPage() {
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={9}
+                      colSpan={10}
                       className="text-center py-8 text-muted-foreground"
                     >
                       暂无数据
@@ -515,25 +538,16 @@ export default function InvoicesPage() {
                         {item.invDate}
                       </TableCell>
                       <TableCell className="max-w-[180px]">
-                        <span className="flex items-center gap-1 group">
-                          <button
-                            className="truncate text-left text-sm hover:text-primary hover:underline underline-offset-2 transition-colors"
-                            onClick={() => {
-                              setSearch(item.seller);
-                              setPage(1);
-                            }}
-                            title={`筛选"${item.seller}"`}
-                          >
-                            {item.seller}
-                          </button>
-                          <Link
-                            href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(item.seller)}`}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
-                            title="查看相关银行流水"
-                          >
-                            <Landmark className="h-3.5 w-3.5" />
-                          </Link>
-                        </span>
+                        <button
+                          className="truncate text-left text-sm hover:text-primary hover:underline underline-offset-2 transition-colors"
+                          onClick={() => {
+                            setSearch(item.seller);
+                            setPage(1);
+                          }}
+                          title={`筛选"${item.seller}"`}
+                        >
+                          {item.seller}
+                        </button>
                       </TableCell>
                       <TableCell className="max-w-[150px] truncate text-xs text-muted-foreground">
                         {item.itemName || "-"}
@@ -561,6 +575,16 @@ export default function InvoicesPage() {
                         ) : (
                           <span>普票</span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Link
+                          href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(item.seller)}`}
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+                          title="查看该销方的相关银行流水"
+                        >
+                          <Landmark className="h-3.5 w-3.5" />
+                          流水
+                        </Link>
                       </TableCell>
                     </TableRow>
                   ))
