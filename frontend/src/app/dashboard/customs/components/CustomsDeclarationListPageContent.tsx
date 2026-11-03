@@ -56,6 +56,8 @@ import {
 } from "./CustomsDeclarationStatusBadge";
 
 import { resolveCustomsReturnTo } from "./customs-return-context";
+import { splitDraftSuffix } from "./declarationNo";
+import { SemanticBadge } from "@/components/ui/status-badge";
 
 const formatAmount = (amount: number, currency: string) =>
   `${currency} ${amount.toLocaleString()}`;
@@ -329,10 +331,15 @@ export function CustomsDeclarationListPageContent({
           sort.sortedData.map((declaration) => (
             <MobileListCard
               key={declaration.id}
-              title={declaration.declarationNo}
+              title={splitDraftSuffix(declaration.declarationNo).displayNo}
               subtitle={declaration.customsBroker || "未填写报关行"}
               badge={
-                <CustomsDeclarationStatusBadge status={declaration.status} />
+                <span className="inline-flex items-center gap-1">
+                  {splitDraftSuffix(declaration.declarationNo).isDraft ? (
+                    <SemanticBadge tone="neutral">草稿</SemanticBadge>
+                  ) : null}
+                  <CustomsDeclarationStatusBadge status={declaration.status} />
+                </span>
               }
               fields={[
                 { label: "币种", value: declaration.currency },
@@ -447,7 +454,12 @@ export function CustomsDeclarationListPageContent({
                     data-testid={`declaration-row-${declaration.declarationNo}`}
                   >
                     <TableCell className="font-medium">
-                      {declaration.declarationNo}
+                      {splitDraftSuffix(declaration.declarationNo).displayNo}
+                      {splitDraftSuffix(declaration.declarationNo).isDraft ? (
+                        <SemanticBadge tone="neutral" className="ml-2">
+                          草稿
+                        </SemanticBadge>
+                      ) : null}
                     </TableCell>
                     <TableCell>{declaration.customsBroker || "-"}</TableCell>
                     <TableCell>{declaration.currency}</TableCell>

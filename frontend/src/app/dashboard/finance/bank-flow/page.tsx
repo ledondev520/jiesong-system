@@ -44,6 +44,7 @@ import {
   Upload,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuthStore } from "@/store/auth.store";
 import {
   getTransactions,
   getTransactionStats,
@@ -83,6 +84,9 @@ export default function BankFlowPage() {
   const [amountMin, setAmountMin] = useState("");
   const [amountMax, setAmountMax] = useState("");
   const [stats, setStats] = useState<BankFlowStats | null>(null);
+  const canSeeSourceFile = useAuthStore((state) =>
+    ["ADMIN", "FINANCE"].includes(state.user?.role ?? ""),
+  );
   const [batches, setBatches] = useState<FinanceDataBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [importOpen, setImportOpen] = useState(false);
@@ -300,17 +304,18 @@ export default function BankFlowPage() {
         {/* 导入批次信息 */}
         {batches.length > 0 && (
           <div className="text-xs text-muted-foreground mb-3">
-            数据来源：
-            {batches.map((b) => (
+            导入批次：
+            {batches.map((b, index) => (
               <span
                 key={b.id}
                 className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1 mr-3"
               >
+                {/* 来源文件名属 Confidential 财务资料，仅 ADMIN/FINANCE 可见 */}
                 <Badge
                   variant="outline"
                   className="max-w-full whitespace-normal break-all text-[10px]"
                 >
-                  {b.fileName}
+                  {canSeeSourceFile ? b.fileName : `第${index + 1}批`}
                 </Badge>
                 {b.dataStartDate}~{b.dataEndDate}
                 ・导入于 {new Date(b.importedAt).toLocaleDateString("zh-CN")}

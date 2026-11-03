@@ -121,11 +121,11 @@ function compareInvoiceGroup(invoiceNo, shipmentRows, actualRecords, amountToler
     : null;
   const issues = [];
 
-  if (!invoiceNo) issues.push('源表缺少发票号码');
+  if (!invoiceNo) issues.push('采购台账缺少发票号码');
   else if (!isValidInvoiceNumber(invoiceNo)) issues.push(`发票号码格式异常（${invoiceNo.length}位）`);
-  if (missingExpectedSeller) issues.push('源表缺少厂家/预期销方');
+  if (missingExpectedSeller) issues.push('采购台账缺少厂家/预期销方');
   if (expectedSellers.length > 1) issues.push('同一发票号码对应多个预期销方');
-  if (expectedTotal == null) issues.push('源表采购金额缺失或无法识别');
+  if (expectedTotal == null) issues.push('采购台账的采购金额缺失或无法识别');
 
   if (actualRecords.length === 0) {
     issues.push('当前发票数据源未查到该号码');
@@ -168,9 +168,9 @@ function compareInvoiceGroup(invoiceNo, shipmentRows, actualRecords, amountToler
   const normalMatch = cleanText(actual.status) === '正常';
   const positiveMatch = cleanText(actual.isPositive) === '是';
 
-  if (!sellerMatch) issues.push('销方名称与源表厂家不一致');
-  if (!totalMatch) issues.push('价税合计与源表采购金额不一致');
-  if (!itemMatch) issues.push('发票品名未覆盖源表报关品名');
+  if (!sellerMatch) issues.push('销方名称与采购台账厂家不一致');
+  if (!totalMatch) issues.push('价税合计与采购台账采购金额不一致');
+  if (!itemMatch) issues.push('发票品名未覆盖采购台账报关品名');
   if (!normalMatch) issues.push('发票状态不是正常');
   if (!positiveMatch) issues.push('不是正数发票');
 
