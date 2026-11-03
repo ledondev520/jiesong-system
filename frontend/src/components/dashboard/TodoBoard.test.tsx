@@ -102,9 +102,11 @@ describe("TodoBoard scope labels at the number (B13)", () => {
     );
   });
 
-  it("shows no scope label when nothing is excluded", () => {
+  it("keeps the base scope note but no exclusion when nothing is excluded", () => {
     render(<TodoBoard todos={historicalTodos(0)} />);
-    expect(screen.queryByTestId("paymentsDue-scope")).toBeNull();
+    const note = screen.getByTestId("paymentsDue-scope");
+    expect(note).toHaveTextContent("已生效采购合同，应付金额大于 0");
+    expect(note).not.toHaveTextContent("历史");
   });
 
   it("shows the rebate workbench pending total beside the ready count", () => {
@@ -124,7 +126,53 @@ describe("TodoBoard scope labels at the number (B13)", () => {
       />,
     );
     expect(screen.getByTestId("refundable-scope")).toHaveTextContent(
-      "材料核验通过；工作台共 46 个待处理出口",
+      "退税工作台本月共 46 个待处理出口",
     );
+    expect(screen.getByRole("link", { name: "去退税工作台" })).toHaveAttribute(
+      "href",
+      "/dashboard/tax-refunds",
+    );
+  });
+});
+
+describe("TodoBoard credibility (B49)", () => {
+  const list = (label: string, count: number, party: string | null = null) => ({
+    label,
+    count,
+    items: count
+      ? [{ id: "x", contractNo: "N1", party, amount: null, date: null }]
+      : [],
+  });
+  const board: DashboardTodos = {
+    role: "ADMIN",
+    lists: {
+      quotesToSend: list("报价待发送", 0),
+      toShip: list("待发运", 1),
+      paymentsDue: list("待付款", 10),
+      overdueReceivables: list("逾期未收款", 25),
+    },
+  };
+
+  it("header total equals the sum of the card counts", () => {
+    render(<TodoBoard todos={board} />);
+    expect(screen.getByTestId("todo-total")).toHaveTextContent("共 36 项待办");
+  });
+
+  it("every card carries a scope note", () => {
+    render(<TodoBoard todos={board} />);
+    for (const key of Object.keys(board.lists)) {
+      expect(screen.getByTestId(`${key}-scope`)).not.toBeEmptyDOMElement();
+    }
+  });
+
+  it("falls back to a labelled placeholder for a missing party", () => {
+    render(<TodoBoard todos={board} />);
+    expect(screen.getByText("未登记供应商")).toBeInTheDocument();
+  });
+
+  it("does not call a party unregistered when the backend never sends one", () => {
+    render(<TodoBoard todos={board} />);
+    // toShip 与 overdueReceivables 后端恒为 party=null
+    expect(screen.queryByText("未登记客户")).toBeNull();
   });
 });
