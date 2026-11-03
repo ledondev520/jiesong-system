@@ -170,3 +170,25 @@ it("新增用户不能缺少密码，超72字节密码也不会提交，修正�
   fireEvent.click(screen.getByRole("button", { name: "保存" }));
   await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
 });
+
+it("编辑当前登录账号时不能停用自己：开关禁用并说明原因 (B43)", () => {
+  render(
+    <UserDialog
+      open
+      isSelf
+      onOpenChange={() => {}}
+      onSubmit={vi.fn()}
+      user={
+        {
+          id: "me",
+          username: "me@example.com",
+          name: "当前用户",
+          role: Role.ADMIN,
+          isActive: true,
+        } as User
+      }
+    />,
+  );
+  expect(screen.getByRole("switch", { name: "账号开通" })).toBeDisabled();
+  expect(screen.getByText(/不能在这里停用自己/)).toBeInTheDocument();
+});
