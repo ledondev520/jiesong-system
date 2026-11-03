@@ -82,16 +82,30 @@ interface DateStringPickerProps extends Omit<
 > {
   value: string;
   onChange: (value: string) => void;
+  // 表单控件（react-hook-form 的 FormControl）会注入这三项：转给触发按钮，标签才能关联到它。
+  id?: string;
+  "aria-invalid"?: boolean | "true" | "false";
+  "aria-describedby"?: string;
 }
 
 export function DateStringPicker({
   value,
   onChange,
+  id,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedBy,
+  triggerProps,
   ...rest
 }: DateStringPickerProps) {
   return (
     <DatePicker
       {...rest}
+      triggerProps={{
+        id,
+        "aria-invalid": ariaInvalid,
+        "aria-describedby": ariaDescribedBy,
+        ...triggerProps,
+      }}
       date={parseLocalDate(value)}
       setDate={(date) => onChange(date ? format(date, "yyyy-MM-dd") : "")}
     />

@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import HsCodesPage from "./page";
 
+vi.mock(
+  "@/components/ui/date-picker",
+  () => import("@/test/date-string-picker-mock"),
+);
+
 const mockList = vi.fn();
 const mockUpdate = vi.fn();
 
