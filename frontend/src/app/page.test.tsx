@@ -108,10 +108,10 @@ describe("RootPage 公开落地页", () => {
       "报价",
       "出口订单",
       "采购",
-      "收货入库",
+      "库存",
       "装柜发运",
-      "单证报关",
-      "发票与财务",
+      "报关单",
+      "财务",
       "出口退税",
     ]) {
       expect(screen.getAllByText(step).length).toBeGreaterThan(0);

@@ -8,6 +8,7 @@
 
 "use client";
 
+import { useState } from "react";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import type { HsCodeRecord } from "@/types";
 import { toast } from "sonner";
@@ -30,6 +31,7 @@ import {
   formatPercent,
   isExpiredHsCode,
   parseDeclarationElements,
+  formatDeclarationElementsList,
   parseStructuredItems,
   type DeclarationFillResult,
 } from "../hs-code-helpers";
@@ -63,6 +65,7 @@ export function HsCodeDetailCard({
   fillCopied: boolean;
   setFillCopied: (copied: boolean) => void;
 }) {
+  const [elementsCopied, setElementsCopied] = useState(false);
   const declarationElements = parseDeclarationElements(
     selectedRecord.declarationElements,
   );
@@ -163,24 +166,37 @@ export function HsCodeDetailCard({
                   {declarationElements.length} 项
                 </Badge>
               </div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <ol className="space-y-1.5 rounded-lg border bg-muted/30 p-3 text-sm leading-6">
                 {declarationElements.map((item, index) => (
-                  <div
-                    key={`${item}-${index}`}
-                    className="rounded-lg border bg-muted/30 p-3"
-                  >
-                    <div className="mb-2 flex items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className="min-w-8 justify-center"
-                      >
-                        {String(index + 1).padStart(2, "0")}
-                      </Badge>
-                    </div>
-                    <p className="text-sm leading-6">{item}</p>
-                  </div>
+                  <li key={`${item}-${index}`} className="flex gap-2">
+                    <span className="w-6 shrink-0 text-right tabular-nums text-muted-foreground">
+                      {index + 1}.
+                    </span>
+                    <span>{item}</span>
+                  </li>
                 ))}
-              </div>
+              </ol>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard
+                    .writeText(
+                      formatDeclarationElementsList(declarationElements),
+                    )
+                    .then(() => {
+                      setElementsCopied(true);
+                      setTimeout(() => setElementsCopied(false), 2000);
+                    });
+                }}
+                className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                {elementsCopied ? (
+                  <Check className="h-3 w-3" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+                {elementsCopied ? "已复制" : "复制要素清单"}
+              </button>
             </div>
           )}
 
@@ -284,7 +300,7 @@ export function HsCodeDetailCard({
                     className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
                     {fillCopied ? (
-                      <Check className="h-3 w-3 text-green-500" />
+                      <Check className="h-3 w-3 text-status-green" />
                     ) : (
                       <Copy className="h-3 w-3" />
                     )}
@@ -306,8 +322,7 @@ export function HsCodeDetailCard({
                       <span
                         className={cn(
                           "min-w-0 flex-1 break-words font-medium",
-                          item.uncertain &&
-                            "text-amber-600 dark:text-amber-400",
+                          item.uncertain && "text-status-amber",
                         )}
                       >
                         {item.value}

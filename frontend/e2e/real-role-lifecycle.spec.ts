@@ -1,5 +1,6 @@
 /** Real role UI + Express/SQLite acceptance. Hosted Playwright is the browser gate. */
 import { test, expect, type Page } from "@playwright/test";
+import { expectField, fillField, pickDate } from "./helpers";
 import {
   startRoleFixture,
   stopRoleFixture,
@@ -141,7 +142,7 @@ test("PURCHASE arrival survives reload and stays pending until inspection", asyn
   expect(readDomain(fixture).receipts).toHaveLength(0);
   await page.getByRole("button", { name: "登记分批到货" }).click();
   await expect(dialog.getByLabel("到货备注")).toHaveValue("");
-  await dialog.getByLabel("到货日期").fill("2026-10-01");
+  await pickDate(page, dialog.getByLabel("到货日期"), "2026-10-01");
   await dialog.getByLabel(`${productName} 本批到货量`).fill("40");
   await dialog.getByLabel("到货备注").fill("合成采购登记40件");
   const saved = mutation(page, `/purchases/${fixture.purchaseId}/receipts`);
@@ -439,7 +440,7 @@ const refundDraft = {
 };
 async function assertFormValues(page: Page, values: Record<string, string>) {
   for (const [label, value] of Object.entries(values)) {
-    await expect(page.getByLabel(label, { exact: true })).toHaveValue(value);
+    await expectField(page.getByLabel(label, { exact: true }), value);
   }
 }
 async function fillTaxRecordDraft(
@@ -472,7 +473,7 @@ async function fillTaxRecordDraft(
       ? { ...customsDraft, 报关单号: number || customsDraft.报关单号 }
       : { ...refundDraft, 退税单号: number || refundDraft.退税单号 };
   for (const [label, value] of Object.entries(values)) {
-    await page.getByLabel(label, { exact: true }).fill(value);
+    await fillField(page, page.getByLabel(label, { exact: true }), value);
   }
   await assertFormValues(page, values);
   await expect(
@@ -705,16 +706,22 @@ for (const kind of ["customs", "refunds"] as const) {
     const dateLabel = kind === "customs" ? "申报日期" : "申请日期";
     const originalNote =
       kind === "customs" ? "合成报关已保存备注" : "合成退税已保存备注";
-    await expect(page.getByLabel(dateLabel, { exact: true })).toHaveValue(
+    await expectField(
+      page.getByLabel(dateLabel, { exact: true }),
       "2026-10-01",
     );
-    await expect(
+    await expectField(
       page.getByLabel(kind === "customs" ? "出口日期" : "到账日期", {
         exact: true,
       }),
-    ).toHaveValue("");
+      "",
+    );
     await page.getByLabel("备注", { exact: true }).fill("合成编辑取消草稿");
-    await page.getByLabel(dateLabel, { exact: true }).fill("2026-10-04");
+    await fillField(
+      page,
+      page.getByLabel(dateLabel, { exact: true }),
+      "2026-10-04",
+    );
     await page
       .getByLabel(kind === "customs" ? "货值总额" : "申报金额", { exact: true })
       .fill("999");
@@ -728,7 +735,8 @@ for (const kind of ["customs", "refunds"] as const) {
     await expect(page.getByLabel("备注", { exact: true })).toHaveValue(
       originalNote,
     );
-    await expect(page.getByLabel(dateLabel, { exact: true })).toHaveValue(
+    await expectField(
+      page.getByLabel(dateLabel, { exact: true }),
       "2026-10-01",
     );
     await expect(

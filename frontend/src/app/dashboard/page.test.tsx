@@ -126,7 +126,7 @@ describe("DashboardPage 待办首页", () => {
     expect(within(figures).getByText(/草稿\/已取消不计/)).toBeInTheDocument();
     expect(screen.getByText("全部处理完毕")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /新建采购合同/ }),
+      screen.queryByRole("button", { name: "新建" }),
     ).not.toBeInTheDocument();
   });
 
@@ -192,11 +192,16 @@ describe("DashboardPage 待办首页", () => {
     const user = userEvent.setup();
     render(<DashboardPage />);
 
+    // 创建动作收进一个次要「新建」菜单，不再作为页头主按钮。
+    await user.click(await screen.findByRole("button", { name: "新建" }));
     await user.click(
-      await screen.findByRole("button", { name: /新建采购合同/ }),
+      await screen.findByRole("menuitem", { name: /新建采购合同/ }),
     );
     expect(mockPush).toHaveBeenCalledWith("/dashboard/purchases/new");
-    await user.click(screen.getByRole("button", { name: /新建出口合同/ }));
+    await user.click(screen.getByRole("button", { name: "新建" }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: /新建出口合同/ }),
+    );
     expect(mockPush).toHaveBeenCalledWith("/dashboard/sales/create");
   });
 });

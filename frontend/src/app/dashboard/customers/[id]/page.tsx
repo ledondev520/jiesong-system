@@ -54,6 +54,20 @@ interface OrderRow {
   createdAt?: string;
 }
 
+/** 下面 7 项里空了 4 项及以上，视为档案还没建好 */
+function isProfileSparse(customer: Customer) {
+  const fields = [
+    customer.defaultPaymentTerms,
+    customer.defaultPortOfLoading,
+    customer.contactName,
+    customer.contactPhone,
+    customer.contactEmail,
+    customer.country,
+    customer.address,
+  ];
+  return fields.filter((value) => !value?.trim()).length >= 4;
+}
+
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -150,7 +164,11 @@ export default function CustomerDetailPage() {
       ),
       hideable: false,
     },
-    { key: "status", header: "状态", cell: (o) => o.status },
+    {
+      key: "status",
+      header: "状态",
+      cell: (o) => <StatusBadge status={o.status} domain="salesOrder" />,
+    },
     {
       key: "totalAmount",
       header: "金额 (USD)",
@@ -204,6 +222,11 @@ export default function CustomerDetailPage() {
             />
             {!customer.isActive ? (
               <Info label="状态" value="已归档（不能新增门店）" />
+            ) : null}
+            {isProfileSparse(customer) ? (
+              <p className="text-muted-foreground sm:col-span-2 lg:col-span-3">
+                档案待完善：联系人、联系方式、地址等信息大多还没有填写。
+              </p>
             ) : null}
           </CardContent>
         </Card>
@@ -285,7 +308,9 @@ export default function CustomerDetailPage() {
                 <MobileListCard
                   key={order.id}
                   title={order.contractNo}
-                  badge={order.status}
+                  badge={
+                    <StatusBadge status={order.status} domain="salesOrder" />
+                  }
                   amount={{
                     label: "金额 (USD)",
                     value: (order.totalAmount ?? 0).toLocaleString("en-US", {

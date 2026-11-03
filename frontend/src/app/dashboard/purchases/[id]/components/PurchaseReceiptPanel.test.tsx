@@ -4,6 +4,11 @@ import { toast } from "sonner";
 import { PurchaseReceiptPanel } from "./PurchaseReceiptPanel";
 import type { PurchaseReceiptList } from "@/services/purchaseReceipt.service";
 
+vi.mock(
+  "@/components/ui/date-picker",
+  () => import("@/test/date-string-picker-mock"),
+);
+
 const list = vi.fn();
 const create = vi.fn();
 const inspect = vi.fn();

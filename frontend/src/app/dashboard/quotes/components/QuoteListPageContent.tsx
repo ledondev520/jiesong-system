@@ -52,6 +52,7 @@ export function QuoteListPageContent() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     // 过期响应（筛选已变）不得覆盖当前结果。
@@ -68,8 +69,14 @@ export function QuoteListPageContent() {
         if (!current) return;
         setQuotes(response.data?.items ?? []);
         setTotal(response.data?.pagination?.total ?? 0);
+        setLoadFailed(false);
       })
-      .catch(() => current && toast.error("加载报价失败"))
+      .catch(() => {
+        if (!current) return;
+        setQuotes([]);
+        setLoadFailed(true);
+        toast.error("加载报价失败");
+      })
       .finally(() => current && setLoading(false));
     return () => {
       current = false;
@@ -78,6 +85,14 @@ export function QuoteListPageContent() {
 
   const open = (id: string) => router.push(`/dashboard/quotes/${id}`);
   const filtered = Boolean(keyword) || status !== "ALL";
+  // 空态分三种：加载失败（不是没数据）、筛选无结果（可重置）、真的还没有报价（引导新建）。
+  const emptyMessage = loadFailed
+    ? "加载失败，请刷新页面或稍后重试。"
+    : filtered
+      ? "没有符合条件的报价，可调整搜索词或点「重置」清除筛选。"
+      : canCreate
+        ? "还没有报价。点击右上角「新建报价」开始第一份。"
+        : "还没有报价。";
 
   return (
     <div className="space-y-6 pb-10">
@@ -146,7 +161,7 @@ export function QuoteListPageContent() {
           </div>
         ) : quotes.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
-            暂无报价。
+            {emptyMessage}
           </div>
         ) : (
           quotes.map((quote) => (
@@ -201,7 +216,7 @@ export function QuoteListPageContent() {
                     colSpan={7}
                     className="py-14 text-center text-muted-foreground"
                   >
-                    暂无报价。
+                    {emptyMessage}
                   </TableCell>
                 </TableRow>
               ) : (

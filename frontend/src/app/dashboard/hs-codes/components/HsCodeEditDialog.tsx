@@ -10,6 +10,7 @@
 
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { Input } from "@/components/ui/input";
+import { DateStringPicker } from "@/components/ui/date-picker";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -104,16 +105,12 @@ export function HsCodeEditDialog({
             </div>
             <div className="space-y-2 sm:col-span-1">
               <Label htmlFor="hs-effective-date">生效日期</Label>
-              <Input
-                id="hs-effective-date"
-                type="date"
+              <DateStringPicker
                 value={editForm.effectiveDate}
-                onChange={(event) =>
-                  setEditForm((form) => ({
-                    ...form,
-                    effectiveDate: event.target.value,
-                  }))
+                onChange={(effectiveDate) =>
+                  setEditForm((form) => ({ ...form, effectiveDate }))
                 }
+                triggerProps={{ id: "hs-effective-date" }}
               />
             </div>
             <div className="space-y-2 sm:col-span-2">

@@ -16,6 +16,11 @@ import {
 } from "@testing-library/react";
 import HsCodesPage from "./page";
 
+vi.mock(
+  "@/components/ui/date-picker",
+  () => import("@/test/date-string-picker-mock"),
+);
+
 const mockList = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const toastCalls = vi.hoisted(() => [] as string[]);
