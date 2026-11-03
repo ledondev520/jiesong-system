@@ -129,7 +129,6 @@
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.04), 0 2px 4px -2px rgb(0 0 0 / 0.04);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.04), 0 4px 6px -4px rgb(0 0 0 / 0.04);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.04), 0 8px 10px -6px rgb(0 0 0 / 0.04);
-    --shadow-glow: 0 0 20px -5px color-mix(in oklch, var(--primary) 15%, transparent);
   }
 
   .dark {
@@ -186,7 +185,6 @@
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.2), 0 2px 4px -2px rgb(0 0 0 / 0.2);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.2), 0 4px 6px -4px rgb(0 0 0 / 0.2);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.2);
-    --shadow-glow: 0 0 25px -5px color-mix(in oklch, var(--primary) 25%, transparent);
   }
 }
 
@@ -319,47 +317,9 @@
 }
 
 @layer components {
+  /* 静态面板：只有边框，无阴影、无悬浮效果（B51 G3/G5） */
   .surface-panel {
-    @apply rounded-2xl border border-border/60 bg-card text-card-foreground;
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
-  }
-  .surface-panel:hover {
-    box-shadow: var(--shadow-md);
-    border-color: color-mix(in oklch, var(--border) 80%, var(--primary) 10%);
-  }
-
-  .surface-mesh {
-    background-image:
-      linear-gradient(180deg, var(--foreground) / 0.015, transparent 5rem),
-      radial-gradient(circle at top left, var(--foreground) / 0.02, transparent 40%);
-  }
-
-  .dark .surface-mesh {
-    background-image:
-      linear-gradient(180deg, var(--foreground) / 0.025, transparent 5rem),
-      radial-gradient(circle at top left, var(--foreground) / 0.035, transparent 40%);
-  }
-
-  .kpi-card {
-    @apply relative rounded-2xl border border-border/50 bg-card text-card-foreground overflow-hidden;
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.25s ease, transform 0.2s ease, border-color 0.2s ease;
-  }
-  .kpi-card::before {
-    content: "";
-    @apply absolute inset-x-0 top-0 h-px;
-    background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--primary) 20%, transparent), transparent);
-    opacity: 0;
-    transition: opacity 0.25s ease;
-  }
-  .kpi-card:hover {
-    box-shadow: var(--shadow-md);
-    border-color: color-mix(in oklch, var(--border) 70%, var(--primary) 15%);
-    transform: translateY(-1px);
-  }
-  .kpi-card:hover::before {
-    opacity: 1;
+    @apply rounded-lg border border-border bg-card text-card-foreground;
   }
 
   /* 公开页/认证页的拉丁字母与数字用 Montserrat（montserrat.ts 提供 --font-montserrat）；中文回落系统字体 */
@@ -399,33 +359,6 @@
   }
 }
 
-/* 精致卡片效果 */
-.card-premium {
-  @apply relative rounded-2xl border border-border/40 bg-card overflow-hidden;
-  box-shadow:
-    0 1px 2px 0 rgb(0 0 0 / 0.03),
-    0 1px 3px 0 rgb(0 0 0 / 0.05),
-    0 4px 12px -2px rgb(0 0 0 / 0.04);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.card-premium:hover {
-  box-shadow:
-    0 4px 6px -1px rgb(0 0 0 / 0.05),
-    0 10px 20px -3px rgb(0 0 0 / 0.08),
-    0 20px 40px -6px rgb(0 0 0 / 0.05);
-  transform: translateY(-2px);
-  border-color: rgb(0 0 0 / 0.08);
-}
-
-/* 数据指标卡片 */
-.metric-card {
-  @apply relative rounded-xl border border-border/30 bg-gradient-to-br from-card to-card/80 p-4;
-  background-image:
-    radial-gradient(circle at 100% 0%, rgb(var(--primary) / 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 0% 100%, rgb(var(--primary) / 0.02) 0%, transparent 50%);
-}
-
 /* 状态标签增强 */
 .status-badge {
   @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
@@ -440,19 +373,6 @@
 .animate-fade-in-up {
   animation: fadeInUp 0.4s ease-out forwards;
 }
-
-/* 列表项交错动画 */
-.stagger-children > * {
-  opacity: 0;
-  animation: fadeInUp 0.35s ease-out forwards;
-}
-
-.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
-.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
-.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
 
 /* === 触感层级 === */
 @layer base {

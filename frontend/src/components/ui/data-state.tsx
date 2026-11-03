@@ -41,11 +41,11 @@ export function LoadingState({
     <div
       role="status"
       className={cn(
-        "flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-muted/20 px-6 py-12 text-center",
+        "flex min-h-[12rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border/70 bg-muted/20 px-6 py-12 text-center",
         className,
       )}
     >
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-background shadow-sm">
+      <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-background shadow-sm">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
       <div className="space-y-1">
@@ -81,11 +81,11 @@ export function ErrorState({
   return (
     <div
       className={cn(
-        "flex min-h-[12rem] flex-col items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/5 px-6 py-12 text-center",
+        "flex min-h-[12rem] flex-col items-center justify-center rounded-lg border border-destructive/30 bg-destructive/5 px-6 py-12 text-center",
         className,
       )}
     >
-      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10">
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-destructive/10">
         <Icon className="h-6 w-6 text-destructive" />
       </div>
       <h3 className="text-base font-semibold text-foreground">{title}</h3>

@@ -285,7 +285,7 @@ export default function CustomsBrokersPage() {
       <div className="grid grid-cols-2 gap-3 md:hidden">
         <Button
           variant="outline"
-          className="h-11 rounded-2xl"
+          className="h-11 rounded-lg"
           onClick={() => setIsDialogOpen(true)}
         >
           <Plus className="mr-2 h-4 w-4" />
@@ -470,7 +470,7 @@ export default function CustomsBrokersPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant="outline"
-                    className="h-11 rounded-2xl"
+                    className="h-11 rounded-lg"
                     onClick={() => handleEdit(broker)}
                   >
                     <Pencil className="mr-2 h-4 w-4" />
@@ -478,7 +478,7 @@ export default function CustomsBrokersPage() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-11 rounded-2xl border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                    className="h-11 rounded-lg border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
                     onClick={() => handleDelete(broker.id)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />

@@ -342,12 +342,12 @@ function BusinessReportsContent() {
       <section aria-label="经营概览" className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">经营概览</h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card className="kpi-card group">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 发运销售额（CNY）
               </CardTitle>
-              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12 transition-all duration-200 group-hover:bg-primary/12">
+              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12">
                 <DollarSign className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -364,12 +364,12 @@ function BusinessReportsContent() {
             </CardContent>
           </Card>
 
-          <Card className="kpi-card group">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 匹配已售采购成本（CNY）
               </CardTitle>
-              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12 transition-all duration-200 group-hover:bg-primary/12">
+              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12">
                 <ShoppingCart className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -386,12 +386,12 @@ function BusinessReportsContent() {
             </CardContent>
           </Card>
 
-          <Card className="kpi-card group">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 商品毛利（CNY）
               </CardTitle>
-              <span className="rounded-xl bg-status-green/8 p-2 text-status-green ring-1 ring-status-green/12 transition-all duration-200 group-hover:bg-status-green/12">
+              <span className="rounded-xl bg-status-green/8 p-2 text-status-green ring-1 ring-status-green/12">
                 <TrendingUp className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -408,12 +408,12 @@ function BusinessReportsContent() {
             </CardContent>
           </Card>
 
-          <Card className="kpi-card group">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 利润率
               </CardTitle>
-              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12 transition-all duration-200 group-hover:bg-primary/12">
+              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12">
                 <Percent className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -441,12 +441,12 @@ function BusinessReportsContent() {
           {funds.overdueRule}。超过交期待付按采购交期判断，不代表付款到期。
         </p>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card className="kpi-card group">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 应收总额
               </CardTitle>
-              <span className="rounded-xl bg-status-blue/8 p-2 text-status-blue ring-1 ring-status-blue/12 transition-all duration-200 group-hover:bg-status-blue/12">
+              <span className="rounded-xl bg-status-blue/8 p-2 text-status-blue ring-1 ring-status-blue/12">
                 <ArrowUpRight className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -463,12 +463,12 @@ function BusinessReportsContent() {
             </CardContent>
           </Card>
 
-          <Card className="kpi-card group">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 应付总额
               </CardTitle>
-              <span className="rounded-xl bg-status-amber/8 p-2 text-status-amber ring-1 ring-status-amber/12 transition-all duration-200 group-hover:bg-status-amber/12">
+              <span className="rounded-xl bg-status-amber/8 p-2 text-status-amber ring-1 ring-status-amber/12">
                 <ArrowDownLeft className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -485,12 +485,12 @@ function BusinessReportsContent() {
             </CardContent>
           </Card>
 
-          <Card className="kpi-card group border-destructive/20">
+          <Card className="border-destructive/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-destructive/80">
                 发运超过30天未收
               </CardTitle>
-              <span className="rounded-xl bg-destructive/8 p-2 text-destructive ring-1 ring-destructive/12 transition-all duration-200 group-hover:bg-destructive/12">
+              <span className="rounded-xl bg-destructive/8 p-2 text-destructive ring-1 ring-destructive/12">
                 <AlertTriangle className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -507,12 +507,12 @@ function BusinessReportsContent() {
             </CardContent>
           </Card>
 
-          <Card className="kpi-card group border-destructive/20">
+          <Card className="border-destructive/20">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-destructive/80">
                 超过交期待付
               </CardTitle>
-              <span className="rounded-xl bg-destructive/8 p-2 text-destructive ring-1 ring-destructive/12 transition-all duration-200 group-hover:bg-destructive/12">
+              <span className="rounded-xl bg-destructive/8 p-2 text-destructive ring-1 ring-destructive/12">
                 <AlertTriangle className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -535,12 +535,12 @@ function BusinessReportsContent() {
       <section aria-label="库存与物流" className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">库存与物流</h2>
         <div className="grid gap-4 md:grid-cols-3">
-          <Card className="kpi-card group">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 活跃商品总数
               </CardTitle>
-              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12 transition-all duration-200 group-hover:bg-primary/12">
+              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12">
                 <Package className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -557,12 +557,12 @@ function BusinessReportsContent() {
             </CardContent>
           </Card>
 
-          <Card className="kpi-card group">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 低库存预警
               </CardTitle>
-              <span className="rounded-xl bg-status-amber/8 p-2 text-status-amber ring-1 ring-status-amber/12 transition-all duration-200 group-hover:bg-status-amber/12">
+              <span className="rounded-xl bg-status-amber/8 p-2 text-status-amber ring-1 ring-status-amber/12">
                 <AlertTriangle className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -579,12 +579,12 @@ function BusinessReportsContent() {
             </CardContent>
           </Card>
 
-          <Card className="kpi-card group">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 在途货柜
               </CardTitle>
-              <span className="rounded-xl bg-status-blue/8 p-2 text-status-blue ring-1 ring-status-blue/12 transition-all duration-200 group-hover:bg-status-blue/12">
+              <span className="rounded-xl bg-status-blue/8 p-2 text-status-blue ring-1 ring-status-blue/12">
                 <Ship className="h-4 w-4" />
               </span>
             </CardHeader>
