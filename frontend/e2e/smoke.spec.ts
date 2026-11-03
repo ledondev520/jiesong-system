@@ -125,7 +125,8 @@ test.describe("关键按钮交互", () => {
   test("工作台快捷入口：新建采购 / 新建出口", async ({ page }) => {
     await signInAsAdmin(page, "/dashboard");
 
-    await safeClick(page.getByRole("button", { name: /^新建采购合同/ }));
+    await safeClick(page.getByRole("button", { name: "新建", exact: true }));
+    await safeClick(page.getByRole("menuitem", { name: /^新建采购合同/ }));
     await expect(page).toHaveURL(/\/dashboard\/purchases\/new$/);
     await expect(
       page.getByRole("heading", { name: "新增采购合同" }),
@@ -133,7 +134,8 @@ test.describe("关键按钮交互", () => {
 
     await page.goto("/dashboard");
     await page.waitForLoadState("domcontentloaded");
-    await safeClick(page.getByRole("button", { name: /^新建出口合同/ }));
+    await safeClick(page.getByRole("button", { name: "新建", exact: true }));
+    await safeClick(page.getByRole("menuitem", { name: /^新建出口合同/ }));
     await expect(page).toHaveURL(/\/dashboard\/sales\/create$/);
     await expect(
       page.getByRole("heading", { name: "创建出口合同" }),

@@ -11,11 +11,17 @@
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Ship, ShoppingCart } from "lucide-react";
+import { FileText, Plus, Ship, ShoppingCart } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TodoBoard } from "@/components/dashboard/TodoBoard";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   dashboardTodosService,
   type DashboardTodos,
@@ -68,23 +74,28 @@ function DashboardContent() {
         actions={
           <div className="flex flex-wrap gap-2">
             <BusinessWrite>
-              <Button
-                className="justify-start rounded-md"
-                onClick={() => router.push("/dashboard/purchases/new")}
-              >
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                新建采购合同
-              </Button>
-            </BusinessWrite>
-            <BusinessWrite>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => router.push("/dashboard/sales/create")}
-              >
-                <Ship className="mr-2 h-4 w-4" />
-                新建出口合同
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Plus className="mr-2 h-4 w-4" />
+                    新建
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onSelect={() => router.push("/dashboard/purchases/new")}
+                  >
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    新建采购合同
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => router.push("/dashboard/sales/create")}
+                  >
+                    <Ship className="mr-2 h-4 w-4" />
+                    新建出口合同
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </BusinessWrite>
             <Button
               size="sm"
