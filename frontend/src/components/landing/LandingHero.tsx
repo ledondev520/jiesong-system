@@ -20,7 +20,7 @@ export function LandingHero() {
             <span className="inline-block">出口业务一站走完</span>
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-7 text-muted-foreground">
-            报价、出口订单、采购、收货入库、装柜发运、单证、发票与财务、出口退税，在同一套系统里协同完成。
+            报价、出口订单、采购、库存、装柜发运、报关单、财务、出口退税，在同一套系统里协同完成。
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg" className="h-11 px-6">

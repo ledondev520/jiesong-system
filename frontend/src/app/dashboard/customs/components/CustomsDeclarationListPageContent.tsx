@@ -56,6 +56,7 @@ import {
 } from "./CustomsDeclarationStatusBadge";
 
 import { resolveCustomsReturnTo } from "./customs-return-context";
+import { splitDraftSuffix } from "./declarationNo";
 
 const formatAmount = (amount: number, currency: string) =>
   `${currency} ${amount.toLocaleString()}`;
@@ -329,7 +330,7 @@ export function CustomsDeclarationListPageContent({
           sort.sortedData.map((declaration) => (
             <MobileListCard
               key={declaration.id}
-              title={declaration.declarationNo}
+              title={splitDraftSuffix(declaration.declarationNo).displayNo}
               subtitle={declaration.customsBroker || "未填写报关行"}
               badge={
                 <CustomsDeclarationStatusBadge status={declaration.status} />
@@ -446,8 +447,11 @@ export function CustomsDeclarationListPageContent({
                     onClick={() => openDetail(declaration.id)}
                     data-testid={`declaration-row-${declaration.declarationNo}`}
                   >
-                    <TableCell className="font-medium">
-                      {declaration.declarationNo}
+                    <TableCell
+                      className="font-medium"
+                      title={declaration.declarationNo}
+                    >
+                      {splitDraftSuffix(declaration.declarationNo).displayNo}
                     </TableCell>
                     <TableCell>{declaration.customsBroker || "-"}</TableCell>
                     <TableCell>{declaration.currency}</TableCell>

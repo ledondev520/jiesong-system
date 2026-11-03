@@ -122,6 +122,32 @@ describe("HsCodesPage", () => {
     expect(screen.getByText("加工程度")).toBeInTheDocument();
   });
 
+  it("副标题和列表不出现 trim/hsCode 等内部词，申报要素为编号清单并可复制 (B46)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    render(<HsCodesPage />);
+
+    await screen.findByRole("cell", { name: "抛光瓷砖" });
+    expect(document.body.textContent).not.toMatch(/trim|hsCode/);
+    expect(screen.getByText("4 项要素")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/品牌类型\|出口享惠情况/),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("cell", { name: "抛光瓷砖" }));
+    const list = (await screen.findByText("品牌类型")).closest("ol")!;
+    expect(list.querySelectorAll("li")).toHaveLength(4);
+    fireEvent.click(screen.getByRole("button", { name: "复制要素清单" }));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        "1. 品牌类型\n2. 出口享惠情况\n3. 用途\n4. 加工程度",
+      ),
+    );
+  });
+
   it("详情页将监管条件与检验检疫拆分为可视化条目", async () => {
     render(<HsCodesPage />);
 
