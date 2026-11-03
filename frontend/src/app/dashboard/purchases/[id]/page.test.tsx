@@ -17,6 +17,7 @@ const mockIsMobile = vi.fn(() => false);
 vi.mock("@/lib/hooks/useMobile", () => ({ useMobile: () => mockIsMobile() }));
 
 const mockGetById = vi.fn();
+const mockToastInfo = vi.fn();
 const mockToastError = vi.fn();
 const mockExportPurchasePdf = vi.fn();
 const mockUpdatePurchaseStatus = vi.fn();
@@ -64,7 +65,7 @@ vi.mock("sonner", () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),
     success: vi.fn(),
-    info: vi.fn(),
+    info: (...args: unknown[]) => mockToastInfo(...args),
   },
 }));
 
@@ -117,6 +118,7 @@ vi.mock("./components/PurchaseReceiptPanel", () => ({
 
 describe("PurchaseDetailPage 交互逻辑", () => {
   beforeEach(() => {
+    mockToastInfo.mockReset();
     mockIsMobile.mockReturnValue(false);
     mockReadOnly = false;
     mockReceiptSummary.mockResolvedValue({
@@ -203,31 +205,106 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     },
   );
 
-  it("点击生成购销合同会打开弹窗", async () => {
-    mockGetById.mockResolvedValue({
-      data: {
-        id: "p-1",
-        contractNo: "PO2500001",
-        status: "DRAFT",
-        totalAmount: 0,
-        paidAmount: 0,
-        supplier: { name: "供应商A" },
-        items: [],
-      },
-    });
+  const draftContract = {
+    id: "p-1",
+    contractNo: "PO2500001",
+    status: "DRAFT",
+    totalAmount: 0,
+    paidAmount: 0,
+    supplier: { name: "供应商A" },
+    items: [],
+  };
 
+  it("生成购销合同先确认对外法律文件，确认后才打开收货信息弹窗", async () => {
+    mockGetById.mockResolvedValue({ data: draftContract });
     const user = userEvent.setup();
     renderPage("p-1");
 
-    await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /生成购销合同/ }),
-      ).toBeInTheDocument();
-    });
-    await user.click(screen.getByRole("button", { name: /生成购销合同/ }));
+    await user.click(await screen.findByRole("button", { name: /单证/ }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: /生成购销合同/ }),
+    );
+    const confirm = await screen.findByRole("alertdialog");
+    expect(confirm).toHaveTextContent("PO2500001");
+    expect(confirm).toHaveTextContent("对外");
     expect(
-      screen.getByText("填写收货信息后，系统将自动生成标准购销合同文档"),
+      screen.queryByText("填写收货信息后，系统将自动生成标准购销合同文档"),
+    ).not.toBeInTheDocument();
+    await user.click(within(confirm).getByRole("button", { name: "继续" }));
+    expect(
+      await screen.findByText("填写收货信息后，系统将自动生成标准购销合同文档"),
     ).toBeInTheDocument();
+  });
+
+  it("在线盖章与生成购销合同收进同一个「单证」菜单，不再是页头独立按钮", async () => {
+    mockGetById.mockResolvedValue({ data: draftContract });
+    const user = userEvent.setup();
+    renderPage("p-1");
+
+    await screen.findByRole("button", { name: /单证/ });
+    expect(
+      screen.queryByRole("button", { name: /在线盖章/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /生成购销合同/ }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /单证/ }));
+    expect(
+      await screen.findByRole("menuitem", { name: /在线盖章/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("取消盖章或生成确认不会打开外部平台、也不会打开生成弹窗", async () => {
+    mockGetById.mockResolvedValue({ data: draftContract });
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+    const user = userEvent.setup();
+    renderPage("p-1");
+
+    await user.click(await screen.findByRole("button", { name: /单证/ }));
+    await user.click(await screen.findByRole("menuitem", { name: /在线盖章/ }));
+    const stamp = await screen.findByRole("alertdialog");
+    expect(stamp).toHaveTextContent("外部");
+    expect(stamp).toHaveTextContent("PO2500001");
+    await user.click(within(stamp).getByRole("button", { name: "取消" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+    );
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(mockToastInfo).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /单证/ }));
+    await user.click(
+      await screen.findByRole("menuitem", { name: /生成购销合同/ }),
+    );
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "取消",
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByText("填写收货信息后，系统将自动生成标准购销合同文档"),
+    ).not.toBeInTheDocument();
+    openSpy.mockRestore();
+  });
+
+  it("确认盖章后才走盖章入口（未配置平台时提示去设置）", async () => {
+    mockGetById.mockResolvedValue({ data: draftContract });
+    const user = userEvent.setup();
+    renderPage("p-1");
+
+    await user.click(await screen.findByRole("button", { name: /单证/ }));
+    await user.click(await screen.findByRole("menuitem", { name: /在线盖章/ }));
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "前往盖章",
+      }),
+    );
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      expect.stringContaining("尚未配置线上盖章平台链接"),
+    );
   });
 
   it("加载失败时提示错误", async () => {

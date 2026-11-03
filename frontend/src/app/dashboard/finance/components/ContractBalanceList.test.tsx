@@ -23,6 +23,7 @@ vi.mock("./PaymentDialog", () => ({
     contractNo: string;
     remainingAmount: number;
     currency: string;
+    confirmStep?: boolean;
   }) => {
     dialog(props);
     return (
@@ -81,6 +82,70 @@ describe("应付页签", () => {
     expect(screen.getAllByRole("button", { name: "登记付款" })).toHaveLength(1);
     expect(mocks.getPayables).toHaveBeenCalledWith(
       expect.objectContaining({ page: 1, pageSize: 20, outstandingOnly: true }),
+    );
+  });
+
+  it("应付状态拆成独立列；到货计数带单位；不再叠在一个单元格里", async () => {
+    mocks.getPayables.mockResolvedValue(
+      page([
+        {
+          id: "p1",
+          contractNo: "CG2600001",
+          status: "SIGNED",
+          totalAmount: 1000,
+          paidAmount: 400,
+          unpaidAmount: 600,
+          subStatus: {
+            payment: "PARTIAL",
+            arrival: {
+              state: "NONE",
+              ordered: 1400,
+              arrived: 0,
+              registered: false,
+            },
+            docsComplete: false,
+          },
+        },
+      ]),
+    );
+    render(<ContractBalanceList kind="payable" />);
+    await screen.findByText("CG2600001");
+    for (const name of ["合同状态", "付款", "到货", "生产资料"]) {
+      expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
+    }
+    expect(screen.getByText("部分付款")).toBeInTheDocument();
+    expect(screen.getByText("未到货 0/1,400 件")).toBeInTheDocument();
+    expect(screen.getByText("生产资料未齐")).toBeInTheDocument();
+  });
+
+  it("待结不超过 1 的残额带「尾差」标签，其余不带；登记走确认步骤", async () => {
+    const user = userEvent.setup();
+    mocks.getPayables.mockResolvedValue(
+      page([
+        {
+          id: "a",
+          contractNo: "CG1",
+          status: "SIGNED",
+          totalAmount: 100,
+          paidAmount: 99.5,
+          unpaidAmount: 0.5,
+        },
+        {
+          id: "b",
+          contractNo: "CG2",
+          status: "SIGNED",
+          totalAmount: 100,
+          paidAmount: 90,
+          unpaidAmount: 10,
+        },
+      ]),
+    );
+    render(<ContractBalanceList kind="payable" />);
+    await screen.findByText("CG1");
+    expect(screen.getAllByText("尾差")).toHaveLength(1);
+    await user.click(screen.getAllByRole("button", { name: "登记付款" })[0]);
+    expect(dialog).toHaveBeenLastCalledWith(
+      expect.objectContaining({ confirmStep: true }),
     );
   });
 

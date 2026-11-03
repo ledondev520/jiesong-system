@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useBusinessReadOnly } from "@/lib/hooks/useBusinessReadOnly";
+import { isResidual } from "@/lib/finance-ledger";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -53,6 +54,8 @@ interface PaymentDialogProps {
   contractId: string;
   remainingAmount: number;
   currency?: string;
+  /** 台账行内登记：提交前先给出范围与对账影响的确认页（其他入口保持原一步提交）。 */
+  confirmStep?: boolean;
   /** Resolve only after saving; reject on failure so the dialog can preserve inputs. */
   onSubmit: (data: PaymentSubmitData) => Promise<void>;
 }
@@ -65,6 +68,7 @@ export function PaymentDialog({
   contractId,
   remainingAmount,
   currency,
+  confirmStep = false,
   onSubmit,
 }: PaymentDialogProps) {
   const readOnly = useBusinessReadOnly();
@@ -72,6 +76,7 @@ export function PaymentDialog({
   const [isSaving, setIsSaving] = useState(false);
   const previousSession = useRef({ open: false, contractId });
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [pending, setPending] = useState<PaymentFormValues | null>(null);
   const resolvedCurrency =
     currency || (type === PaymentType.PAYABLE ? "CNY" : "USD");
   const currencySymbol =
@@ -102,6 +107,7 @@ export function PaymentDialog({
       note: "",
     });
     setSubmitError(null);
+    setPending(null);
   }, [form, open, contractId, remainingAmount]);
 
   const handleOpenChange = (next: boolean) => {
@@ -130,6 +136,7 @@ export function PaymentDialog({
   };
 
   const isSubmitting = isSaving || form.formState.isSubmitting;
+  const afterOpen = pending ? remainingAmount - pending.amount : 0;
 
   const title = type === PaymentType.PAYABLE ? "录入付款" : "录入收款";
   const label = type === PaymentType.PAYABLE ? "付款金额" : "收款金额";
@@ -155,9 +162,61 @@ export function PaymentDialog({
             {formatAmount(remainingAmount)}
           </span>
         </div>
+        {pending ? (
+          <div className="space-y-4" data-testid="payment-confirm">
+            {submitError && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  {submitError}
+                  。已保留本次填写内容；请保持原内容重试，避免重复登记。
+                </AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-1 rounded-md border bg-muted/40 p-3 text-sm">
+              <p>
+                本次登记 <strong>1 笔</strong>：合同 {contractNo}，{label}{" "}
+                {resolvedCurrency} {currencySymbol}
+                {pending.amount.toLocaleString()}
+              </p>
+              <p className="text-muted-foreground">
+                {afterOpen < -0.005
+                  ? `超出待结金额 ${resolvedCurrency} ${currencySymbol}${Math.abs(afterOpen).toLocaleString()}，该合同将多${type === PaymentType.PAYABLE ? "付" : "收"}。`
+                  : afterOpen <= 0.005
+                    ? "登记后该合同待结金额为 0，将视为结清。"
+                    : `登记后该合同待结 ${resolvedCurrency} ${currencySymbol}${afterOpen.toLocaleString()}${isResidual(afterOpen) ? "（尾差，不会自动核销）" : ""}。`}
+              </p>
+              <p className="text-muted-foreground">
+                保存后立即计入{type === PaymentType.PAYABLE ? "应付" : "应收"}
+                合计。对账页按银行流水与发票计算，不受本次登记影响。
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={() => setPending(null)}
+              >
+                返回修改
+              </Button>
+              <Button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => void handleSubmit(pending)}
+              >
+                {isSubmitting ? "提交中..." : "确认登记"}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : null}
         <Form {...form}>
           <form
-            onSubmit={(event) => form.handleSubmit(handleSubmit)(event)}
+            hidden={!!pending}
+            onSubmit={(event) =>
+              form.handleSubmit((data) =>
+                confirmStep ? setPending(data) : handleSubmit(data),
+              )(event)
+            }
             className="space-y-4"
           >
             {submitError && (
@@ -260,7 +319,11 @@ export function PaymentDialog({
                 type="submit"
                 disabled={!form.formState.isValid || isSubmitting}
               >
-                {isSubmitting ? "提交中..." : "确认记录"}
+                {isSubmitting
+                  ? "提交中..."
+                  : confirmStep
+                    ? "下一步：确认"
+                    : "确认记录"}
               </Button>
             </DialogFooter>
           </form>

@@ -1,7 +1,7 @@
 /**
  * Input: 合同状态 status 与后端派生的 subStatus（付款/到货/生产资料）
  * Output: 紧挨主状态的子状态徽章，让「已完成」不再冒充已付清或已到货
- * Pos: 采购列表、采购详情、应付列表、订单采购页共用；只做语义文案，沿用 SemanticBadge 色调，不新增样式
+ * Pos: 采购列表、采购详情、应付列表、订单采购页共用；只做语义文案，沿用 SemanticBadge 色调，不新增样式；到货徽章的「0/2」带 title「已到货数量 / 订购数量」
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -9,7 +9,15 @@ import { SemanticBadge } from "@/components/ui/status-badge";
 import type { PurchaseSubStatus as SubStatus } from "@/types";
 
 type Tone = "success" | "warning" | "danger" | "neutral";
-export type SubStatusBadge = { key: string; label: string; tone: Tone };
+export type SubStatusBadge = {
+  key: string;
+  label: string;
+  tone: Tone;
+  title?: string;
+};
+
+/** 到货徽章里的「0/2」：已到货数量 / 订购数量（取自明细数量合计，不是批次数）。 */
+const COUNTS_TITLE = "已到货数量 / 订购数量";
 
 const PAYMENT: Record<string, SubStatusBadge | undefined> = {
   UNPAID: { key: "payment", label: "未付款", tone: "warning" },
@@ -40,15 +48,22 @@ export function getSubStatusBadges(
       key: "arrival",
       label: `到货未登记 ${counts}`,
       tone: "danger",
+      title: COUNTS_TITLE,
     });
   } else if (state === "PARTIAL") {
     badges.push({
       key: "arrival",
       label: `部分到货 ${counts}`,
       tone: "warning",
+      title: COUNTS_TITLE,
     });
   } else {
-    badges.push({ key: "arrival", label: `未到货 ${counts}`, tone: "warning" });
+    badges.push({
+      key: "arrival",
+      label: `未到货 ${counts}`,
+      tone: "warning",
+      title: COUNTS_TITLE,
+    });
   }
 
   if (!sub.docsComplete) {
@@ -69,7 +84,7 @@ export function PurchaseSubStatus({
   return (
     <span className="flex flex-wrap gap-1" data-testid="purchase-sub-status">
       {badges.map((badge) => (
-        <SemanticBadge key={badge.key} tone={badge.tone}>
+        <SemanticBadge key={badge.key} tone={badge.tone} title={badge.title}>
           {badge.label}
         </SemanticBadge>
       ))}

@@ -9,6 +9,16 @@ import { formatAmount } from "@/lib/format";
 import { useCallback, useEffect, useState } from "react";
 import { Plus, RefreshCw, Split } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +34,20 @@ import { ReceiptDialog, type ReceiptSubmitData } from "./ReceiptDialog";
 // 待分配款项很多时只先展示前几笔，主表（合同未收余额）才是页面主体。
 const PREVIEW_COUNT = 5;
 
+/** 按币种分别合计剩余待分配金额（不同币种不相加）。 */
+function unallocatedTotals(payments: Payment[]): string {
+  const byCurrency = new Map<string, number>();
+  for (const p of payments) {
+    byCurrency.set(
+      p.currency,
+      (byCurrency.get(p.currency) ?? 0) + (p.remainingAmount ?? p.amount),
+    );
+  }
+  return [...byCurrency]
+    .map(([currency, sum]) => `${currency} ${sum.toLocaleString()}`)
+    .join("、");
+}
+
 export function UnallocatedReceiptsPanel({
   onChanged,
 }: {
@@ -35,6 +59,7 @@ export function UnallocatedReceiptsPanel({
   const [allocateTarget, setAllocateTarget] = useState<Payment | null>(null);
   const [autoMatching, setAutoMatching] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [confirmAutoMatch, setConfirmAutoMatch] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -151,7 +176,7 @@ export function UnallocatedReceiptsPanel({
                 size="sm"
                 variant="outline"
                 className="h-8 border-status-amber/40 bg-background text-xs text-status-amber hover:bg-status-amber-soft"
-                onClick={() => void handleAutoMatch()}
+                onClick={() => setConfirmAutoMatch(true)}
                 disabled={autoMatching}
               >
                 <RefreshCw
@@ -215,6 +240,31 @@ export function UnallocatedReceiptsPanel({
         </Card>
       )}
 
+      <AlertDialog open={confirmAutoMatch} onOpenChange={setConfirmAutoMatch}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认自动匹配？</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1">
+                <p>
+                  范围：当前待分配的全部 {payments.length} 笔（
+                  {unallocatedTotals(payments)}）。
+                </p>
+                <p>
+                  规则：备注里含唯一的出口合同号，且到账金额与该合同待收金额完全一致，才会分配到该合同（对应合同未收余额随之减少、应收合计同步下降）；其余继续留在收款池。
+                </p>
+                <p>分配结果请在应收列表中逐笔核对。</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleAutoMatch()}>
+              开始自动匹配
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <ReceiptDialog
         open={receiptOpen}
         onOpenChange={setReceiptOpen}

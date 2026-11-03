@@ -41,7 +41,10 @@ import { formatDate } from "@/lib/date-format";
 import type { LoadingPlan } from "@/lib/containerLoading";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  StatusBadge,
+  getStatusBadgeConfig,
+} from "@/components/ui/status-badge";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -112,6 +115,9 @@ const errorMessage = (error: unknown, fallback: string) =>
   error.message.trim()
     ? error.message
     : fallback;
+
+const orderStatusLabel = (status: unknown) =>
+  getStatusBadgeConfig(status, {}, "salesOrder").label;
 
 export function OrderDetailPage({ id }: { id: string }) {
   const router = useRouter();
@@ -351,8 +357,8 @@ export function OrderDetailPage({ id }: { id: string }) {
                   onOpenChange={(open) => {
                     if (!open) setAdvanceTarget(null);
                   }}
-                  title="确认推进合同状态"
-                  description={`将出口合同 ${contract.contractNo} 推进到「${nextStep.label}」阶段，确认后立即生效。`}
+                  title="确认变更订单状态"
+                  description={`出口订单 ${contract.contractNo} 的状态将从「${orderStatusLabel(contract.status)}」改为「${orderStatusLabel(advanceTarget ?? nextStep.status)}」，确认后立即生效。`}
                   onConfirm={() => {
                     const target = advanceTarget;
                     setAdvanceTarget(null);

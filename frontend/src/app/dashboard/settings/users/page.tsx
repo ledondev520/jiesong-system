@@ -63,6 +63,18 @@ import { UserDialog } from "./components/UserDialog";
 import { AgentAccountDialog } from "@/components/dialog/AgentAccountDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/input";
+import { useAuthStore } from "@/store/auth.store";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { runAwait } from "@/lib/run-await";
 import { MobileListCard } from "@/components/mobile";
@@ -76,7 +88,13 @@ export default function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState("");
-  const [inactiveOnly, setInactiveOnly] = useState(false);
+  // 默认只看在用账号；停用账号用「未开通/已停用」或「全部」查看
+  const [statusFilter, setStatusFilter] = useState<
+    "active" | "inactive" | "all"
+  >("active");
+  const currentUserId = useAuthStore((state) => state.user?.id);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [usersError, setUsersError] = useState(false);
 
   // ── Agent 账号状态 ──
@@ -183,16 +201,25 @@ export default function UsersPage() {
     setEditingUser(user);
     setIsDialogOpen(true);
   };
-  const handleDelete = async (id: string) => {
-    if (confirm("确定要删除此用户吗？")) {
-      try {
-        await userService.delete(id);
-        setUsers(users.filter((u) => u.id !== id));
-        setCurrentPage(1);
-        toast.success("用户已删除");
-      } catch {
-        toast.error("删除失败");
-      }
+  // 不能删除当前登录账号：入口不渲染，这里再兜底一次。
+  const requestDelete = (user: User) => {
+    if (user.id === currentUserId) return;
+    setUserToDelete(user);
+  };
+  const handleDelete = async () => {
+    const target = userToDelete;
+    if (!target || deleting || target.id === currentUserId) return;
+    setDeleting(true);
+    try {
+      await userService.delete(target.id);
+      setUsers((current) => current.filter((u) => u.id !== target.id));
+      setCurrentPage(1);
+      setUserToDelete(null);
+      toast.success("用户已删除");
+    } catch {
+      toast.error("删除失败");
+    } finally {
+      setDeleting(false);
     }
   };
   const handleSubmit = async (data: Partial<User>) => {
@@ -304,9 +331,12 @@ export default function UsersPage() {
 
   // ── 用户筛选与分页 ──
   const filteredUsers = useMemo(() => {
-    const candidates = inactiveOnly
-      ? users.filter((user) => !user.isActive)
-      : users;
+    const candidates =
+      statusFilter === "all"
+        ? users
+        : users.filter((user) =>
+            statusFilter === "active" ? user.isActive : !user.isActive,
+          );
     if (!keyword.trim()) return candidates;
     const q = keyword.toLowerCase().trim();
     return candidates.filter(
@@ -318,7 +348,7 @@ export default function UsersPage() {
           .toLowerCase()
           .includes(q),
     );
-  }, [users, keyword, inactiveOnly]);
+  }, [users, keyword, statusFilter]);
 
   const userSort = useTableSort<User, string>(
     filteredUsers,
@@ -337,6 +367,16 @@ export default function UsersPage() {
       }
     }, []),
   );
+
+  // 头部统计与表格同源（同一份 users）；加载中显示「—」，不先闪一个 0
+  const activeUsers = users.filter((u) => u.isActive);
+  const stats = {
+    total: users.length,
+    active: activeUsers.length,
+    inactive: users.length - activeUsers.length,
+    admins: activeUsers.filter((u) => u.role === Role.ADMIN).length,
+  };
+  const statText = (n: number) => (loading || usersError ? "—" : String(n));
 
   const totalPages = Math.ceil(userSort.sortedData.length / pageSize);
   const pagedUsers = userSort.sortedData.slice(
@@ -375,9 +415,18 @@ export default function UsersPage() {
           <UserCog className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-medium">系统用户</h3>
           <Badge variant="outline" className="text-[10px]">
-            {filteredUsers.length}
+            {loading ? "—" : filteredUsers.length}
           </Badge>
         </div>
+
+        <p className="text-xs text-muted-foreground" data-testid="user-stats">
+          共 {statText(stats.total)} 个账号 · 在用 {statText(stats.active)} ·
+          已停用 {statText(stats.inactive)} · 在用管理员{" "}
+          {statText(stats.admins)}
+          {!loading && !usersError && (
+            <> · 当前列表显示 {filteredUsers.length} 个</>
+          )}
+        </p>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
@@ -420,31 +469,27 @@ export default function UsersPage() {
             此列表也包含已停用账号，请核对停用原因；不会自动恢复或批量开通。
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant={!inactiveOnly ? "default" : "outline"}
-              aria-pressed={!inactiveOnly}
-              onClick={() => {
-                setInactiveOnly(false);
-                setCurrentPage(1);
-              }}
-            >
-              全部账号
-            </Button>
-            <Button
-              type="button"
-              variant={inactiveOnly ? "default" : "outline"}
-              aria-pressed={inactiveOnly}
-              onClick={() => {
-                setInactiveOnly(true);
-                setCurrentPage(1);
-              }}
-            >
-              未开通/已停用
-              {!loading && !usersError
-                ? `（${users.filter((user) => !user.isActive).length}）`
-                : ""}
-            </Button>
+            {(
+              [
+                ["active", "在用账号", stats.active],
+                ["inactive", "未开通/已停用", stats.inactive],
+                ["all", "全部账号", stats.total],
+              ] as const
+            ).map(([value, label, count]) => (
+              <Button
+                key={value}
+                type="button"
+                variant={statusFilter === value ? "default" : "outline"}
+                aria-pressed={statusFilter === value}
+                onClick={() => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}
+              >
+                {label}
+                {!loading && !usersError ? `（${count}）` : ""}
+              </Button>
+            ))}
             <Button
               type="button"
               variant="outline"
@@ -475,7 +520,7 @@ export default function UsersPage() {
             <div className="surface-panel py-10 text-center text-sm text-muted-foreground">
               {usersError
                 ? "列表加载失败，请刷新重试"
-                : inactiveOnly
+                : statusFilter === "inactive"
                   ? "没有匹配的未开通/已停用账号"
                   : keyword
                     ? "没有匹配的用户"
@@ -485,13 +530,18 @@ export default function UsersPage() {
             pagedUsers.map((user) => (
               <MobileListCard
                 key={user.id}
-                title={user.name}
+                title={
+                  user.id === currentUserId
+                    ? `${user.name}（当前账号）`
+                    : user.name
+                }
                 subtitle={user.username}
                 badge={getRoleBadge(user.role)}
+                className={cn(!user.isActive && "opacity-60")}
                 fields={[
                   {
                     label: "状态",
-                    value: user.isActive ? "正常" : "未开通/停用",
+                    value: user.isActive ? "正常" : "未开通/已停用",
                     emphasis: user.isActive ? "primary" : undefined,
                   },
                   {
@@ -512,14 +562,17 @@ export default function UsersPage() {
                       <Pencil className="mr-1 h-4 w-4" />{" "}
                       {user.isActive ? "编辑" : "核对并开通"}
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-10 rounded-xl px-3"
-                      onClick={() => handleDelete(user.id)}
-                    >
-                      <Trash className="h-4 w-4 text-destructive" />
-                    </Button>
+                    {user.id !== currentUserId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-10 rounded-xl px-3"
+                        aria-label={`删除 ${user.username}`}
+                        onClick={() => requestDelete(user)}
+                      >
+                        <Trash className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 }
               />
@@ -586,7 +639,7 @@ export default function UsersPage() {
                   >
                     {usersError
                       ? "列表加载失败，请刷新重试"
-                      : inactiveOnly
+                      : statusFilter === "inactive"
                         ? "没有匹配的未开通/已停用账号"
                         : keyword
                           ? "没有匹配的用户"
@@ -595,7 +648,10 @@ export default function UsersPage() {
                 </TableRow>
               ) : (
                 pagedUsers.map((user) => (
-                  <TableRow key={user.id}>
+                  <TableRow
+                    key={user.id}
+                    className={cn(!user.isActive && "bg-muted/30 opacity-60")}
+                  >
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <Avatar className="h-8 w-8 border border-border/60">
@@ -607,6 +663,11 @@ export default function UsersPage() {
                           </AvatarFallback>
                         </Avatar>
                         {user.name}
+                        {user.id === currentUserId && (
+                          <Badge variant="outline" className="text-[10px]">
+                            当前账号
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>{user.username}</TableCell>
@@ -620,7 +681,7 @@ export default function UsersPage() {
                             : ""
                         }
                       >
-                        {user.isActive ? "正常" : "未开通/停用"}
+                        {user.isActive ? "正常" : "未开通/已停用"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -638,14 +699,17 @@ export default function UsersPage() {
                         <Pencil className="h-4 w-4" />
                         {user.isActive ? "编辑" : "核对并开通"}
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-xl border border-border/65 bg-background/55"
-                        onClick={() => handleDelete(user.id)}
-                      >
-                        <Trash className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {user.id !== currentUserId && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-xl border border-border/65 bg-background/55"
+                          aria-label={`删除 ${user.username}`}
+                          onClick={() => requestDelete(user)}
+                        >
+                          <Trash className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -853,8 +917,40 @@ export default function UsersPage() {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         user={editingUser}
+        isSelf={Boolean(editingUser && editingUser.id === currentUserId)}
         onSubmit={handleSubmit}
       />
+      <AlertDialog
+        open={userToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setUserToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除账号</AlertDialogTitle>
+            <AlertDialogDescription>
+              将永久删除账号 <strong>{userToDelete?.name}</strong>（
+              {userToDelete?.username}），无法撤销。
+              <br />
+              只是不想让对方登录？请取消，改在「编辑」里关闭「账号开通」。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+              disabled={deleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleting ? "删除中..." : "确认删除"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AgentAccountDialog
         open={agentDialogOpen}
         onOpenChange={setAgentDialogOpen}

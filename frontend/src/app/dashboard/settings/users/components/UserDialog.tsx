@@ -51,6 +51,8 @@ interface UserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user?: User | null;
+  /** 正在编辑当前登录账号：不允许在此停用自己 */
+  isSelf?: boolean;
   onSubmit: (data: UserFormValues) => Promise<void>;
 }
 
@@ -66,6 +68,7 @@ function UserDialogSession({
   open,
   onOpenChange,
   user,
+  isSelf = false,
   onSubmit,
 }: UserDialogProps) {
   const [submitError, setSubmitError] = useState("");
@@ -213,13 +216,16 @@ function UserDialogSession({
                     <div>
                       <FormLabel>账号开通</FormLabel>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        确认身份与角色后开启，关闭后无法登录。
+                        {isSelf
+                          ? "这是当前登录账号，不能在这里停用自己。"
+                          : "确认身份与角色后开启，关闭后无法登录。"}
                       </p>
                     </div>
                     <FormControl>
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
+                        disabled={isSelf}
                       />
                     </FormControl>
                   </FormItem>
