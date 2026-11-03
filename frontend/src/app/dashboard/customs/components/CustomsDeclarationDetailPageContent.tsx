@@ -14,11 +14,7 @@ import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useBrowserQuery } from "@/lib/hooks/useBrowserQuery";
-import {
-  CustomsDeclarationStatus,
-  type CustomsDeclaration,
-  type CustomsDeclarationItem,
-} from "@/types";
+import type { CustomsDeclaration, CustomsDeclarationItem } from "@/types";
 import { customsDeclarationService } from "@/services/customsDeclaration.service";
 import { MobileListCard } from "@/components/mobile";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -36,7 +32,6 @@ import { useTableSort } from "@/lib/hooks/useTableSort";
 import { FilePenLine } from "lucide-react";
 import { toast } from "sonner";
 import { CustomsDeclarationStatusBadge } from "./CustomsDeclarationStatusBadge";
-import { SemanticBadge } from "@/components/ui/status-badge";
 import { splitDraftSuffix } from "./declarationNo";
 
 import {
@@ -149,10 +144,6 @@ export function CustomsDeclarationDetailPageContent({
         onBack={() => navigateToCustomsList(backHref)}
         actions={
           <>
-            {splitDraftSuffix(declaration.declarationNo).isDraft &&
-            declaration.status !== CustomsDeclarationStatus.DRAFT ? (
-              <SemanticBadge tone="neutral">草稿</SemanticBadge>
-            ) : null}
             <CustomsDeclarationStatusBadge status={declaration.status} />
             <BusinessWrite>
               <Button

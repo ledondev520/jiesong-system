@@ -57,7 +57,6 @@ import {
 
 import { resolveCustomsReturnTo } from "./customs-return-context";
 import { splitDraftSuffix } from "./declarationNo";
-import { SemanticBadge } from "@/components/ui/status-badge";
 
 const formatAmount = (amount: number, currency: string) =>
   `${currency} ${amount.toLocaleString()}`;
@@ -334,12 +333,7 @@ export function CustomsDeclarationListPageContent({
               title={splitDraftSuffix(declaration.declarationNo).displayNo}
               subtitle={declaration.customsBroker || "未填写报关行"}
               badge={
-                <span className="inline-flex items-center gap-1">
-                  {splitDraftSuffix(declaration.declarationNo).isDraft ? (
-                    <SemanticBadge tone="neutral">草稿</SemanticBadge>
-                  ) : null}
-                  <CustomsDeclarationStatusBadge status={declaration.status} />
-                </span>
+                <CustomsDeclarationStatusBadge status={declaration.status} />
               }
               fields={[
                 { label: "币种", value: declaration.currency },
@@ -453,13 +447,11 @@ export function CustomsDeclarationListPageContent({
                     onClick={() => openDetail(declaration.id)}
                     data-testid={`declaration-row-${declaration.declarationNo}`}
                   >
-                    <TableCell className="font-medium">
+                    <TableCell
+                      className="font-medium"
+                      title={declaration.declarationNo}
+                    >
                       {splitDraftSuffix(declaration.declarationNo).displayNo}
-                      {splitDraftSuffix(declaration.declarationNo).isDraft ? (
-                        <SemanticBadge tone="neutral" className="ml-2">
-                          草稿
-                        </SemanticBadge>
-                      ) : null}
                     </TableCell>
                     <TableCell>{declaration.customsBroker || "-"}</TableCell>
                     <TableCell>{declaration.currency}</TableCell>
