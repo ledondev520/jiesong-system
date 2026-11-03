@@ -47,3 +47,5 @@
 | `/dashboard/system` | 删除，重定向到 `/dashboard/settings` |
 
 旧地址由 `frontend/next.config.ts` 永久重定向；`e2e/settings-sections.spec.ts` 覆盖分区链接与重定向。
+
+B42: AI 模型配置不再暴露环境变量名或内部模型 ID（`SystemConfigTab.tsx` 的 `MODEL_LABELS` 业务名称：Kimi 均衡/快速/深度推理、DeepSeek 思考模式、OpenAI 智能模型）；温度/输出长度在不适用时不渲染（OpenAI 只留一句说明，DeepSeek 无温度滑杆）；服务器模型读不到时隐藏「当前实际使用」行。`PricingConfigCard.tsx` 的加载占位 15 秒后改为可重试提示，加载失败也有重试。

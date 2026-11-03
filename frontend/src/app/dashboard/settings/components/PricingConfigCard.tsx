@@ -4,6 +4,7 @@ import { formatUnitPrice } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import {
   Card,
   CardContent,
@@ -101,6 +102,9 @@ function AdminPricingConfigCard() {
   }>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  // 超过 15 秒仍无响应就不再显示无限「加载中」，改为可重试的提示
+  const [slow, setSlow] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -123,8 +127,18 @@ function AdminPricingConfigCard() {
     );
   };
 
+  const retry = () => {
+    setSlow(false);
+    setError("");
+    setLoading(true);
+    setAttempt((count) => count + 1);
+  };
+
   useEffect(() => {
     let active = true;
+    const slowTimer = window.setTimeout(() => {
+      if (active) setSlow(true);
+    }, 15000);
     pricingService
       .get()
       .then((response) => {
@@ -134,6 +148,7 @@ function AdminPricingConfigCard() {
         if (active) setError("报价配置加载失败，请刷新页面重试");
       })
       .finally(() => {
+        window.clearTimeout(slowTimer);
         if (active) setLoading(false);
       });
     // 分类下拉只是编辑辅助，加载失败不影响其余配置
@@ -144,8 +159,9 @@ function AdminPricingConfigCard() {
       .catch(() => undefined);
     return () => {
       active = false;
+      window.clearTimeout(slowTimer);
     };
-  }, []);
+  }, [attempt]);
 
   const draft = useMemo(() => buildConfig(values, rows), [values, rows]);
   const sample = rows[0];
@@ -233,7 +249,15 @@ function AdminPricingConfigCard() {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p role="status">加载报价配置...</p>
+          slow ? (
+            <ErrorState
+              title="报价规则加载较慢"
+              description="已等待超过 15 秒仍无响应，请重试；多次失败请联系管理员。"
+              onRetry={retry}
+            />
+          ) : (
+            <LoadingState title="正在读取报价规则" className="min-h-[8rem]" />
+          )
         ) : (
           <form onSubmit={save} noValidate className="space-y-4">
             {snapshot && (
@@ -377,9 +401,21 @@ function AdminPricingConfigCard() {
               </>
             )}
             {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+                {!snapshot && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={retry}
+                  >
+                    重试
+                  </Button>
+                )}
+              </div>
             )}
             {saved && (
               <p role="status" className="text-sm text-muted-foreground">

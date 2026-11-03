@@ -154,7 +154,7 @@ test.describe("手机核心操作", () => {
     await page.goto("/dashboard/suppliers");
     await page.getByRole("button", { name: /供应商A/ }).click();
     await expect(
-      page.getByRole("heading", { name: "供应商档案表单" }),
+      page.getByRole("heading", { name: "供应商档案", exact: true }),
     ).toBeInViewport();
   });
 
