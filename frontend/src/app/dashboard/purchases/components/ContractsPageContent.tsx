@@ -89,6 +89,7 @@ import {
   formatAmount,
   getPageNumbers,
   isPayable,
+  OverpaidFlag,
   getPurchaseStatusColor,
   StatusPill,
   type PurchaseContractDetail,
@@ -898,7 +899,11 @@ export default function ContractsPageContent() {
                           合同总额
                         </p>
                         <p className="text-sm font-semibold tabular-nums text-status-green">
-                          ¥{contract.totalAmount.toLocaleString()}
+                          {contract.totalAmount > 0 ? (
+                            `¥${contract.totalAmount.toLocaleString()}`
+                          ) : (
+                            <span className="text-status-amber">未录入</span>
+                          )}
                         </p>
                         {!isPayable(contract) && (
                           <p className="text-[11px] text-muted-foreground">
@@ -924,6 +929,7 @@ export default function ContractsPageContent() {
                       >
                         ¥{contract.paidAmount.toLocaleString()}
                       </AmountText>
+                      <OverpaidFlag contract={contract} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -1112,7 +1118,16 @@ export default function ContractsPageContent() {
                             : "—"}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {formatAmount(contract.totalAmount)}
+                          {contract.totalAmount > 0 ? (
+                            formatAmount(contract.totalAmount)
+                          ) : (
+                            <span
+                              className="text-status-amber"
+                              title="合同金额未录入，请到详情页核对"
+                            >
+                              未录入
+                            </span>
+                          )}
                           {!isPayable(contract) && (
                             <span className="block text-[11px] text-muted-foreground">
                               不计应付
@@ -1123,6 +1138,7 @@ export default function ContractsPageContent() {
                           <AmountText tone={isUnpaid ? "warning" : "success"}>
                             ¥{contract.paidAmount.toLocaleString()}
                           </AmountText>
+                          <OverpaidFlag contract={contract} />
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col items-start gap-1">

@@ -180,3 +180,33 @@ export const nonPayableNotice = (status: PurchaseStatus) =>
   status === PurchaseStatus.CANCELLED
     ? { title: "已取消 · 不计应付", hint: "已取消的合同不计入待付金额" }
     : { title: "草稿 · 不计应付", hint: "合同生效后才计入待付金额" };
+
+/** 职责：已付超过合同金额的差额（0 表示未超付）；与详情页同口径，仅在合同金额已录入时比较 */
+export function getOverpaidAmount(
+  contract: Pick<PurchaseContract, "totalAmount" | "paidAmount">,
+): number {
+  // 合同金额为 0 时详情页改比明细合计，列表因 items.take(1) 没有明细合计；该行已显示「未录入」，不在此误报超付
+  if (contract.totalAmount <= 0) return 0;
+  const diff =
+    Math.round((contract.paidAmount - contract.totalAmount) * 100) / 100;
+  return diff > 0.02 ? diff : 0;
+}
+
+/** 职责：列表中醒目的超付标记，替代只在详情页小字提示 */
+export function OverpaidFlag({
+  contract,
+}: {
+  contract: Pick<PurchaseContract, "totalAmount" | "paidAmount">;
+}) {
+  const overpaid = getOverpaidAmount(contract);
+  if (overpaid === 0) return null;
+  return (
+    <span
+      className="mt-0.5 inline-flex w-fit items-center rounded border border-status-red/30 bg-status-red-soft px-1.5 py-0.5 text-[11px] font-medium text-status-red"
+      data-testid="overpaid-flag"
+      title="已付金额超过合同金额，请核对合同金额或付款记录"
+    >
+      超付 ¥{overpaid.toLocaleString()}
+    </span>
+  );
+}

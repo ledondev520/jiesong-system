@@ -892,6 +892,43 @@ describe("OrderDetailPage 交互逻辑", () => {
     expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled();
   });
 
+  it("登记到港先确认：写明订单号和状态变化，取消不调用接口，确认才推进", async () => {
+    mockGetLoadingPlan.mockResolvedValue({ data: BLOCKED_OVERSIZE });
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "s-1",
+        contractNo: "SYNTHETIC-ARRIVE",
+        status: "SHIPPED",
+        totalAmount: 100,
+        packingItems: [],
+        port: { name: "Synthetic Port" },
+      },
+    });
+    mockUpdateSalesStatus.mockResolvedValue({ data: { status: "ARRIVED" } });
+    const user = userEvent.setup();
+    renderPage("s-1");
+
+    const arrive = await screen.findByRole("button", { name: "登记到港" });
+    await user.click(arrive);
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("SYNTHETIC-ARRIVE");
+    expect(dialog).toHaveTextContent("「已发运」改为「已到港」");
+    expect(mockUpdateSalesStatus).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "取消" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+    );
+    expect(mockUpdateSalesStatus).not.toHaveBeenCalled();
+
+    await user.click(arrive);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "确认",
+      }),
+    );
+    expect(mockUpdateSalesStatus).toHaveBeenCalledWith("s-1", "ARRIVED");
+  });
+
   it.each(["SHIPPED", "ARRIVED", "COMPLETED"])(
     "已发运阶段 %s 的模拟异常明确标为历史核对",
     async (status) => {
