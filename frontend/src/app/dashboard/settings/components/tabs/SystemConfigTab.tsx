@@ -63,6 +63,15 @@ function getTemperatureStyleLabel(t: number): string {
  *   3. 数据字典（单位/报关公司）增删实时生效（即时 API 写入），无需手动保存
  * @param showDictOnly 若为 true，只渲染数据字典区块（用于独立 Tab）
  */
+// 业务名称：页面不暴露内部模型 ID 与环境变量名。
+const MODEL_LABELS: Record<string, string> = {
+  "kimi-k2-turbo-preview": "Kimi 均衡",
+  "moonshot-v1-8k": "Kimi 快速",
+  "kimi-k2-thinking-turbo": "Kimi 深度推理",
+  "deepseek-flash": "DeepSeek 思考模式",
+};
+const modelLabel = (id: string) => MODEL_LABELS[id] ?? "自定义模型";
+
 export function SystemConfigTab({
   showDictOnly = false,
 }: {
@@ -98,12 +107,20 @@ export function SystemConfigTab({
   const [temperature, setTemperature] = useState<number>(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(4096);
   // 页面展示「实际生效」的模型：OpenAI 只看服务器环境，库里残留的 Kimi 选择对它不生效
-  const effectiveChatModel = isOpenAI ? openaiModel : chatModel;
-  const effectiveHsCodeModel = isOpenAI ? openaiModel : hsCodeModel;
+  const effectiveChatModel = isOpenAI
+    ? openaiModel
+      ? "OpenAI 智能模型"
+      : ""
+    : modelLabel(isDeepSeek ? "deepseek-flash" : chatModel);
+  const effectiveHsCodeModel = isOpenAI
+    ? openaiModel
+      ? "OpenAI 智能模型"
+      : ""
+    : modelLabel(isDeepSeek ? "deepseek-flash" : hsCodeModel);
   const modelSource = isOpenAI
-    ? "来源：服务器环境变量 OPENAI_MODEL"
+    ? "来源：服务器配置"
     : isDeepSeek
-      ? "来源：系统固定为 deepseek-flash"
+      ? "来源：系统固定为 DeepSeek 思考模式"
       : "来源：此页保存的设置";
   // HSCIQ 海关归类 API
   const [hsciqEnabled, setHsciqEnabled] = useState(false);
@@ -515,7 +532,7 @@ export function SystemConfigTab({
               </CardTitle>
               <CardDescription>
                 {isOpenAI
-                  ? "OpenAI 的密钥与模型取自服务器环境（OPENAI_MODEL），不在此保存；问答、HS 推荐、视觉与 Agent 使用同一个模型。此前为其他供应商保存的模型选择对 OpenAI 不生效。"
+                  ? "OpenAI 的密钥与模型由服务器统一配置，不在此保存；问答、HS 推荐、视觉与 Agent 使用同一个模型。此前为其他供应商保存的模型选择在 OpenAI 下不起作用。"
                   : isDeepSeek
                     ? "DeepSeek Flash 思考模式已开启，推理强度 high；问答与 HS 推荐使用同一模型。"
                     : "为不同使用场景选择合适的模型，配置采样参数与 API 密钥。每个场景内置自动降级，无需手动配置备用模型。"}
@@ -539,22 +556,24 @@ export function SystemConfigTab({
                       <SelectContent>
                         {isOpenAI ? (
                           <SelectItem value={openaiModel || "openai"}>
-                            {openaiModel || "由服务器环境决定"}
+                            {openaiModel
+                              ? "OpenAI 智能模型（服务器配置）"
+                              : "由服务器配置决定"}
                           </SelectItem>
                         ) : isDeepSeek ? (
                           <SelectItem value="deepseek-flash">
-                            deepseek-flash（思考模式）
+                            DeepSeek 思考模式
                           </SelectItem>
                         ) : (
                           <>
                             <SelectItem value="kimi-k2-turbo-preview">
-                              kimi-k2-turbo-preview（均衡）
+                              Kimi 均衡（推荐）
                             </SelectItem>
                             <SelectItem value="moonshot-v1-8k">
-                              moonshot-v1-8k（快速）
+                              Kimi 快速
                             </SelectItem>
                             <SelectItem value="kimi-k2-thinking-turbo">
-                              kimi-k2-thinking-turbo（深度推理）
+                              Kimi 深度推理
                             </SelectItem>
                           </>
                         )}
@@ -579,22 +598,24 @@ export function SystemConfigTab({
                       <SelectContent>
                         {isOpenAI ? (
                           <SelectItem value={openaiModel || "openai"}>
-                            {openaiModel || "由服务器环境决定"}
+                            {openaiModel
+                              ? "OpenAI 智能模型（服务器配置）"
+                              : "由服务器配置决定"}
                           </SelectItem>
                         ) : isDeepSeek ? (
                           <SelectItem value="deepseek-flash">
-                            deepseek-flash（思考模式）
+                            DeepSeek 思考模式
                           </SelectItem>
                         ) : (
                           <>
                             <SelectItem value="kimi-k2-turbo-preview">
-                              kimi-k2-turbo-preview（均衡）
+                              Kimi 均衡（推荐）
                             </SelectItem>
                             <SelectItem value="moonshot-v1-8k">
-                              moonshot-v1-8k（快速）
+                              Kimi 快速
                             </SelectItem>
                             <SelectItem value="kimi-k2-thinking-turbo">
-                              kimi-k2-thinking-turbo（深度推理）
+                              Kimi 深度推理
                             </SelectItem>
                           </>
                         )}
@@ -676,86 +697,100 @@ export function SystemConfigTab({
                 </div>
               </div>
 
-              {/* 下半区：采样参数 */}
-              <div className="border-t pt-4 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+              {/* 下半区：采样参数；不适用的控件直接不渲染，不留「此处的值不生效」的摆设 */}
+              {isOpenAI ? (
+                <p
+                  className="border-t pt-4 text-xs text-muted-foreground"
+                  data-testid="sampling-not-applicable"
+                >
+                  OpenAI
+                  模式下，回复风格由服务器统一设置；输出长度沿用已保存的值并受服务器上限约束，此页在
+                  OpenAI 模式下不修改这两项。
+                </p>
+              ) : (
+                <div className="border-t pt-4 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {!isDeepSeek && (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <label
+                            className="text-sm font-medium"
+                            htmlFor="ai-temperature"
+                          >
+                            采样温度（Temperature）
+                          </label>
+                          <span className="text-sm tabular-nums text-muted-foreground">
+                            {`${(temperature ?? 0.7).toFixed(1)} — ${getTemperatureStyleLabel(temperature ?? 0.7)}`}
+                          </span>
+                        </div>
+                        <Slider
+                          id="ai-temperature"
+                          min={0}
+                          max={1}
+                          step={0.1}
+                          value={[temperature ?? 0.7]}
+                          onValueChange={([v]) => setTemperature(v ?? 0.7)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
                       <label
                         className="text-sm font-medium"
-                        htmlFor="ai-temperature"
+                        htmlFor="ai-max-tokens"
                       >
-                        采样温度（Temperature）
+                        最大输出长度（Max tokens）
                       </label>
-                      <span className="text-sm tabular-nums text-muted-foreground">
-                        {isOpenAI
-                          ? "不适用"
-                          : `${(temperature ?? 0.7).toFixed(1)} — ${getTemperatureStyleLabel(temperature ?? 0.7)}`}
-                      </span>
+                      <Input
+                        id="ai-max-tokens"
+                        type="number"
+                        min={256}
+                        max={8192}
+                        step={256}
+                        value={maxTokens}
+                        onChange={(e) => {
+                          const v = e.target.valueAsNumber;
+                          if (!Number.isFinite(v)) return;
+                          const stepped = Math.round(v / 256) * 256;
+                          setMaxTokens(Math.min(8192, Math.max(256, stepped)));
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        影响 AI 回复的最大长度。
+                      </p>
                     </div>
-                    <Slider
-                      id="ai-temperature"
-                      min={0}
-                      max={1}
-                      step={0.1}
-                      value={[temperature ?? 0.7]}
-                      onValueChange={([v]) => setTemperature(v ?? 0.7)}
-                      disabled={isDeepSeek || isOpenAI}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {isOpenAI
-                        ? "OpenAI 请求会丢弃温度参数，此处的值不生效。"
-                        : isDeepSeek
-                          ? "DeepSeek 思考模式不使用温度参数；保留原配置值。"
-                          : "0–0.3 偏保守，0.4–0.7 均衡，0.8–1 更富创意。"}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label
-                      className="text-sm font-medium"
-                      htmlFor="ai-max-tokens"
-                    >
-                      最大输出长度（Max tokens）
-                    </label>
-                    <Input
-                      id="ai-max-tokens"
-                      type="number"
-                      min={256}
-                      max={8192}
-                      step={256}
-                      value={maxTokens}
-                      disabled={isOpenAI}
-                      onChange={(e) => {
-                        const v = e.target.valueAsNumber;
-                        if (!Number.isFinite(v)) return;
-                        const stepped = Math.round(v / 256) * 256;
-                        setMaxTokens(Math.min(8192, Math.max(256, stepped)));
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {isOpenAI
-                        ? `OpenAI 普通问答按此处显示的已保存值限制回复长度（作为 max_completion_tokens 发送）；思考模式和 Agent 不使用此值；均受服务器上限${openaiMaxOutput ? ` ${openaiMaxOutput.toLocaleString()}` : ""}约束。OpenAI 模式下页面不保存此项。`
-                        : "影响 AI 回复的最大长度。"}
-                    </p>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div
-                className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground border-t pt-4"
-                data-testid="effective-models"
-              >
-                <span>当前实际使用 · 问答：</span>
-                <Badge variant="outline" className="font-mono text-[10px]">
-                  {effectiveChatModel || "未读取到服务器模型"}
-                </Badge>
-                <span className="ml-2">HS推荐：</span>
-                <Badge variant="outline" className="font-mono text-[10px]">
-                  {effectiveHsCodeModel || "未读取到服务器模型"}
-                </Badge>
-                <span className="ml-2">{modelSource}</span>
-              </div>
+              {(effectiveChatModel || effectiveHsCodeModel) && (
+                <div
+                  className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground border-t pt-4"
+                  data-testid="effective-models"
+                >
+                  <span>当前实际使用</span>
+                  {effectiveChatModel && (
+                    <>
+                      <span>· 问答：</span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {effectiveChatModel}
+                      </Badge>
+                    </>
+                  )}
+                  {effectiveHsCodeModel && (
+                    <>
+                      <span className="ml-2">HS推荐：</span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {effectiveHsCodeModel}
+                      </Badge>
+                    </>
+                  )}
+                  <span className="ml-2">{modelSource}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import BusinessReportsPage from "./page";
+
+vi.mock(
+  "@/components/ui/date-picker",
+  () => import("@/test/date-string-picker-mock"),
+);
 const overview = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ back: vi.fn() }),

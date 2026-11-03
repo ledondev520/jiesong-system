@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PricingConfigCard } from "./PricingConfigCard";
 import { pricingConfigFixture as defaults } from "@/test/fixtures/pricing-config";
@@ -122,5 +128,40 @@ describe("报价规则卡片", () => {
       "报价配置加载失败，请刷新页面重试",
     );
     expect(screen.queryByLabelText("默认加价 (%)")).toBeNull();
+  });
+
+  it("加载超过 15 秒不再无限显示「加载中」，改为可重试的提示 (B42)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mocks.get.mockReset().mockReturnValueOnce(new Promise(() => {}));
+      render(<PricingConfigCard />);
+      expect(screen.getByText("正在读取报价规则")).toBeInTheDocument();
+      expect(screen.queryByText("报价规则加载较慢")).toBeNull();
+
+      await act(async () => {
+        vi.advanceTimersByTime(15000);
+      });
+      expect(screen.getByText("报价规则加载较慢")).toBeInTheDocument();
+      expect(screen.queryByText("正在读取报价规则")).toBeNull();
+
+      mocks.get.mockResolvedValue(ok(snapshot));
+      fireEvent.click(screen.getByRole("button", { name: "重试" }));
+      expect(await screen.findByLabelText("默认加价 (%)")).toHaveValue(30);
+      expect(mocks.get).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("加载失败时给出重试按钮，重试成功后显示表单 (B42)", async () => {
+    mocks.get.mockReset().mockRejectedValueOnce(new Error("boom"));
+    const user = userEvent.setup();
+    render(<PricingConfigCard />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "报价配置加载失败",
+    );
+    mocks.get.mockResolvedValue(ok(snapshot));
+    await user.click(screen.getByRole("button", { name: "重试" }));
+    expect(await screen.findByLabelText("默认加价 (%)")).toBeInTheDocument();
   });
 });

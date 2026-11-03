@@ -24,6 +24,11 @@ import {
 import BusinessReportsPage from "./finance/analysis/page";
 import type { BusinessOverview } from "@/services/reports.service";
 
+vi.mock(
+  "@/components/ui/date-picker",
+  () => import("@/test/date-string-picker-mock"),
+);
+
 const mocks = vi.hoisted(() => {
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((listener) => listener());

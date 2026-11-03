@@ -19,6 +19,7 @@ import { ProductPicker } from "@/components/orders/ProductPicker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DateStringPicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { SemanticBadge } from "@/components/ui/status-badge";
 import { describeFailure } from "@/lib/error-reason";
@@ -263,11 +264,10 @@ export function QuoteEditor({ quote, onSaved }: Props) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="quote-valid">报价有效期</Label>
-            <Input
-              id="quote-valid"
-              type="date"
+            <DateStringPicker
               value={validUntil}
-              onChange={(e) => setValidUntil(e.target.value)}
+              onChange={setValidUntil}
+              triggerProps={{ id: "quote-valid" }}
             />
           </div>
           <div className="space-y-2">

@@ -8,6 +8,7 @@
 
 "use client";
 
+import { LoadingValue } from "@/components/ui/loading-value";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -454,7 +455,9 @@ function HsCodesPageContent() {
 
       {/* 数据说明 */}
       <div className="mt-4 text-xs text-muted-foreground">
-        数据来源：海关总署 - 当前列表 {results.length} 条 / 总计 {total} 条
+        数据来源：海关总署 - 当前列表{" "}
+        <LoadingValue loading={loading}>{results.length}</LoadingValue> 条 /
+        总计 <LoadingValue loading={loading}>{total}</LoadingValue> 条
         {keyword.trim() || hsCodeInput.trim()
           ? `（${[keyword.trim() && `名称：${keyword}`, hsCodeInput.trim() && `编码：${hsCodeInput}`].filter(Boolean).join("，")}）`
           : "（默认全量列表）"}

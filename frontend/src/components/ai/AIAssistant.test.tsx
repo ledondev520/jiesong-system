@@ -147,6 +147,17 @@ describe("AIAssistant", () => {
     ).toBeInTheDocument();
   });
 
+  it("开场白如实说明能做什么：不声称能改汇率/系统配置，写明付款等需确认 (B42)", () => {
+    render(<AIAssistant presentation="docked" onClose={() => {}} />);
+    const panel = screen.getByRole("complementary", { name: "AI 助手面板" });
+    expect(panel).toHaveTextContent("起草采购单、报关单、核销和退税草稿");
+    expect(panel).toHaveTextContent("异常处理的操作，会先请你确认后才执行");
+    expect(panel).toHaveTextContent("汇率和报价参数不能在这里修改");
+    expect(panel).not.toHaveTextContent(
+      "可以帮你查财务数据、出口合同、修改汇率",
+    );
+  });
+
   it("停靠模式填满宿主、没有悬浮触发器，关闭交给宿主", async () => {
     const onClose = vi.fn();
     render(<AIAssistant presentation="docked" onClose={onClose} />);

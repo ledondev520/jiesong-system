@@ -4,7 +4,7 @@
  * Pos: 经营中台筛选返回上下文回归；不访问生产数据或写入业务
  */
 import { test, expect, type Page } from "@playwright/test";
-import { mockApiRoutes, signInAsAdmin } from "./helpers";
+import { mockApiRoutes, pickDate, signInAsAdmin } from "./helpers";
 
 async function mockContext(page: Page) {
   const writes: string[] = [];
@@ -110,8 +110,8 @@ for (const width of [390, 1440]) {
     const summary = page.getByText(/^发运期间：/);
     await expect(summary).toContainText("共 46 笔");
     const initialReads = periods.length;
-    await start.fill("2026-10-05");
-    await end.fill("2026-10-05");
+    await pickDate(page, start, "2026-10-05");
+    await pickDate(page, end, "2026-10-05");
     await expect(page).toHaveURL(
       /\/dashboard\/finance\/analysis\?source=qa#report$/,
     );
@@ -135,23 +135,23 @@ for (const width of [390, 1440]) {
       /\/dashboard\/orders\?shipped=true&shippedFrom=2026-10-05&shippedTo=2026-10-05$/,
     );
     await page.goBack();
-    await expect(start).toHaveValue("2026-10-05");
-    await expect(end).toHaveValue("2026-10-05");
+    await expect(start).toContainText("2026-10-05");
+    await expect(end).toContainText("2026-10-05");
     await expect(summary).toContainText("共 1 笔");
     await page.goForward();
     await expect(page).toHaveURL(/\/dashboard\/orders\?/);
     await page.goBack();
-    await expect(start).toHaveValue("2026-10-05");
+    await expect(start).toContainText("2026-10-05");
     await page.reload();
-    await expect(start).toHaveValue("2026-10-05");
+    await expect(start).toContainText("2026-10-05");
     await expect(summary).toContainText("共 1 笔");
-    await start.fill("2026-10-06");
+    await pickDate(page, start, "2026-10-06");
     await expect(
       page.getByRole("button", { name: "应用期间", exact: true }),
     ).toBeDisabled();
     await page.getByRole("button", { name: "全部期间", exact: true }).click();
-    await expect(start).toHaveValue("");
-    await expect(end).toHaveValue("");
+    await expect(start).toContainText("选择日期");
+    await expect(end).toContainText("选择日期");
     await expect(summary).toContainText("最早 至 当前，共 46 笔");
     await expect(page).toHaveURL(
       /\/dashboard\/finance\/analysis\?source=qa#report$/,
