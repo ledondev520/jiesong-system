@@ -89,8 +89,14 @@ function subStatusColumn(
           </SemanticBadge>
         );
       }
-      const none = !row.subStatus || getSubStatusBadges(row.status, row.subStatus).length === 0;
-      return <span className="text-muted-foreground">{none || key !== "docs" ? "—" : "齐全"}</span>;
+      const none =
+        !row.subStatus ||
+        getSubStatusBadges(row.status, row.subStatus).length === 0;
+      return (
+        <span className="text-muted-foreground">
+          {none || key !== "docs" ? "—" : "齐全"}
+        </span>
+      );
     },
   };
 }

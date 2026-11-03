@@ -4,6 +4,7 @@ import ReconciliationPage from "./page";
 const unmatched = vi.fn();
 const contractsFor = vi.fn(async (..._args: unknown[]) => []);
 const recon = vi.fn();
+const autoMatch = vi.fn(async (..._args: unknown[]) => {});
 const emptyRecon = {
   matched: [],
   unmatchedPayments: [],
@@ -28,11 +29,12 @@ vi.mock("@/services/bankFlow.service", () => ({
   getFullReconciliation: (...args: unknown[]) => recon(...args),
   getUnmatchedItems: (...args: unknown[]) => unmatched(...args),
   getContractsForMatch: (...args: unknown[]) => contractsFor(...args),
-  postAutoMatch: async () => {},
+  postAutoMatch: (...args: unknown[]) => autoMatch(...args),
   postManualMatch: async () => {},
   postIgnore: async () => {},
 }));
 beforeEach(() => {
+  autoMatch.mockClear();
   unmatched.mockReset();
   recon.mockReset();
   recon.mockResolvedValue(emptyRecon);
@@ -116,4 +118,60 @@ it("已匹配供应商上百行时按页显示，翻页和搜索都按筛选结�
   });
   expect(await screen.findByText("供应商110")).toBeInTheDocument();
   expect(screen.queryByText(/共 120 条/)).toBeNull();
+});
+
+const withSummary = (matchedCount: number, unmatchedPaymentCount: number) => ({
+  ...emptyRecon,
+  summary: { ...emptyRecon.summary, matchedCount, unmatchedPaymentCount },
+});
+it("匹配率低于 50% 时显示琥珀提示和计数；达到 50% 不提示", async () => {
+  recon.mockResolvedValue(withSummary(4, 6));
+  const { unmount } = render(<ReconciliationPage />);
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("付款对方共 10 家，仅 4 家已匹配到发票（40%");
+  unmount();
+  recon.mockResolvedValue(withSummary(5, 5));
+  render(<ReconciliationPage />);
+  await screen.findByText("已匹配供应商");
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+it("三张表是三个页签，各自带分页器，一次只显示一张", async () => {
+  const unpaid = Array.from({ length: 45 }, (_, i) => ({
+    counterpart: `付款对方${String(i).padStart(2, "0")}`,
+    netPaid: 10,
+    txnCount: 1,
+  }));
+  recon.mockResolvedValue({ ...emptyRecon, unmatchedPayments: unpaid });
+  render(<ReconciliationPage />);
+  const matchedTab = await screen.findByRole("tab", { name: /供应商汇总/ });
+  expect(matchedTab).toHaveAttribute("aria-selected", "true");
+  expect(screen.queryByText("付款对方00")).toBeNull();
+  fireEvent.mouseDown(screen.getByRole("tab", { name: /无票付款 \(45\)/ }));
+  fireEvent.click(screen.getByRole("tab", { name: /无票付款 \(45\)/ }));
+  expect(await screen.findByText("付款对方00")).toBeInTheDocument();
+  expect(screen.queryByText("付款对方20")).toBeNull();
+  expect(screen.getByText(/共 45 条，第 1\/3 页/)).toBeInTheDocument();
+});
+it("差额符号图例与净付款定义说明显示在供应商汇总上", async () => {
+  recon.mockResolvedValue(withSummary(1, 0));
+  render(<ReconciliationPage />);
+  expect(await screen.findByText(/净付款 = 付款流水合计/)).toBeInTheDocument();
+  expect(screen.getByText("差额为正：缺票")).toBeInTheDocument();
+  expect(screen.getByText("差额为负：多开")).toBeInTheDocument();
+});
+it("标题「对账中心」在筛选栏之前；自动匹配先确认范围，取消不调用", async () => {
+  render(<ReconciliationPage />);
+  const title = await screen.findByRole("heading", { name: "对账中心" });
+  const search = screen.getByPlaceholderText("搜索未匹配对手方、发票号或摘要");
+  expect(
+    title.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /自动匹配/ }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toHaveTextContent("未匹配的银行流水 41 条、发票 25 张");
+  fireEvent.click(screen.getByRole("button", { name: "取消" }));
+  expect(autoMatch).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: /自动匹配/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "开始自动匹配" }));
+  await waitFor(() => expect(autoMatch).toHaveBeenCalledTimes(1));
 });

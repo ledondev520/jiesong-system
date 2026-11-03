@@ -14,6 +14,17 @@ import Link from "next/link";
 import { ErrorState } from "@/components/ui/data-state";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { ListPager, sliceByPager } from "@/components/ui/list-pager";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { matchRate } from "@/lib/finance-ledger";
 import { usePagination } from "@/lib/hooks/usePagination";
 import { clearApiGetCache } from "@/lib/axios";
 import { runAwait } from "@/lib/run-await";
@@ -97,6 +108,7 @@ export default function ReconciliationPage() {
   );
   const [reconLoading, setReconLoading] = useState(true);
   const [tab, setTab] = useState("analysis");
+  const [confirmAutoMatch, setConfirmAutoMatch] = useState(false);
   const [reconError, setReconError] = useState(false);
   const [unmatchedError, setUnmatchedError] = useState(false);
   const [contractsError, setContractsError] = useState(false);
@@ -318,6 +330,42 @@ export default function ReconciliationPage() {
         />
       )}
       <div className="px-1 space-y-4">
+        {/* 操作栏 */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">对账中心</h2>
+            <p className="text-xs text-muted-foreground">
+              银行流水与发票自动匹配 + 合同智能关联引擎
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                clearApiGetCache();
+                void loadAll();
+              }}
+              disabled={matchLoading || reconLoading}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${matchLoading || reconLoading ? "animate-spin" : ""}`}
+              />
+              刷新
+            </Button>
+            <BusinessWrite>
+              <Button
+                size="sm"
+                onClick={() => setConfirmAutoMatch(true)}
+                disabled={matchLoading}
+              >
+                <Zap className="h-4 w-4 mr-1" />
+                自动匹配
+              </Button>
+            </BusinessWrite>
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <Input
             className="max-w-sm"
@@ -366,42 +414,6 @@ export default function ReconciliationPage() {
             下一页
           </Button>
         </div>
-        {/* 操作栏 */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">对账分析</h2>
-            <p className="text-xs text-muted-foreground">
-              银行流水与发票自动匹配 + 合同智能关联引擎
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                clearApiGetCache();
-                void loadAll();
-              }}
-              disabled={matchLoading || reconLoading}
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-1 ${matchLoading || reconLoading ? "animate-spin" : ""}`}
-              />
-              刷新
-            </Button>
-            <BusinessWrite>
-              <Button
-                size="sm"
-                onClick={handleAutoMatch}
-                disabled={matchLoading}
-              >
-                <Zap className="h-4 w-4 mr-1" />
-                自动匹配
-              </Button>
-            </BusinessWrite>
-          </div>
-        </div>
-
         {/* 汇总卡片 */}
         {s && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -454,6 +466,21 @@ export default function ReconciliationPage() {
                 <p className="text-[10px] text-muted-foreground">待人工核对</p>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {s && matchRate(s).low && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-lg border border-status-amber/40 bg-status-amber-soft p-3 text-sm text-status-amber"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              匹配率偏低：付款对方共 {matchRate(s).total} 家，仅{" "}
+              {matchRate(s).matched} 家已匹配到发票（
+              {Math.round(matchRate(s).rate * 100)}%，低于 50%）。另有未匹配流水{" "}
+              {bankTotal} 条、未匹配发票 {invoiceTotal} 张待核对。
+            </span>
           </div>
         )}
 
@@ -794,6 +821,30 @@ export default function ReconciliationPage() {
           </TabsContent>
         </Tabs>
       </div>
+      <AlertDialog open={confirmAutoMatch} onOpenChange={setConfirmAutoMatch}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认自动匹配？</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1">
+                <p>
+                  范围：全部未匹配的银行流水 {bankTotal} 条、发票 {invoiceTotal}{" "}
+                  张。
+                </p>
+                <p>
+                  命中规则的流水和发票会自动关联到合同，匹配结果写入对账数据，汇总数字随之变化；未命中的保留在未匹配列表。
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleAutoMatch()}>
+              开始自动匹配
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -806,6 +857,7 @@ function ReconciliationAnalysisView({
   data: FullReconciliationResult;
 }) {
   const [search, setSearch] = useState("");
+  const [section, setSection] = useState("matched");
   const q = search.toLowerCase().trim();
   // 供应商表可达上百行，三张表各自客户端分页；搜索条件变化回到第 1 页。
   const matchedPager = usePagination(data.matched.length);
@@ -842,90 +894,192 @@ function ReconciliationAnalysisView({
         />
       </div>
 
-      <div className="space-y-4">
+      <Tabs value={section} onValueChange={setSection}>
+        <TabsList>
+          <TabsTrigger value="matched" className="text-xs">
+            供应商汇总 ({filteredMatched.length})
+          </TabsTrigger>
+          <TabsTrigger value="unpaid-invoice" className="text-xs">
+            无票付款 ({filteredUnmatchedPay.length})
+          </TabsTrigger>
+          <TabsTrigger value="unmatched-invoice" className="text-xs">
+            无流水发票 ({filteredUnmatchedInv.length})
+          </TabsTrigger>
+        </TabsList>
         {/* 已匹配供应商 */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">
-              已匹配供应商 ({filteredMatched.length})
-            </CardTitle>
-          </CardHeader>
-          <div className="overflow-x-auto px-4 pb-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>供应商</TableHead>
-                  <TableHead className="text-right">净付款</TableHead>
-                  <TableHead className="text-right">有效发票</TableHead>
-                  <TableHead className="text-right">差额</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead className="w-[80px]">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMatched.length === 0 ? (
+        <TabsContent value="matched">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">
+                已匹配供应商 ({filteredMatched.length})
+              </CardTitle>
+            </CardHeader>
+            <p className="px-4 pb-2 text-xs text-muted-foreground">
+              净付款 = 付款流水合计 − 收回流水合计；差额 = 净付款 − 有效发票。
+              <span className="text-status-red">差额为正：缺票</span>
+              （付款多于发票）；
+              <span className="text-status-amber">差额为负：多开</span>
+              （发票多于付款）。
+            </p>
+            <div className="overflow-x-auto px-4 pb-4">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      暂无匹配数据
-                    </TableCell>
+                    <TableHead>供应商</TableHead>
+                    <TableHead className="text-right">净付款</TableHead>
+                    <TableHead className="text-right">有效发票</TableHead>
+                    <TableHead className="text-right">差额</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead className="w-[80px]">操作</TableHead>
                   </TableRow>
-                ) : (
-                  sliceByPager(filteredMatched, matchedPager).map((m) => (
-                    <TableRow
-                      key={m.payName}
-                      className={
-                        m.category === "under_invoiced"
-                          ? "bg-status-red-soft/30"
-                          : m.category === "over_invoiced"
-                            ? "bg-status-amber-soft/30"
-                            : ""
-                      }
-                    >
-                      <TableCell className="max-w-[200px]">
-                        <span className="text-sm font-medium truncate block">
-                          {m.payName}
-                        </span>
-                        {m.invName && (
-                          <span className="text-[10px] text-muted-foreground">
-                            发票名: {m.invName}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {fmt(m.netPaid)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {fmt(m.totalInvoice)}
-                      </TableCell>
+                </TableHeader>
+                <TableBody>
+                  {filteredMatched.length === 0 ? (
+                    <TableRow>
                       <TableCell
-                        className={`text-right tabular-nums font-medium ${m.gap > 0 ? "text-status-red" : m.gap < 0 ? "text-status-amber" : ""}`}
+                        colSpan={6}
+                        className="text-center py-8 text-muted-foreground"
                       >
-                        {m.gap > 0 ? "+" : ""}
-                        {fmt(m.gap)}
+                        暂无匹配数据
                       </TableCell>
-                      <TableCell>
-                        {m.category === "under_invoiced" ? (
-                          <Badge variant="destructive" className="text-[10px]">
-                            缺票 ¥{fmt(m.gap)}
-                          </Badge>
-                        ) : m.category === "over_invoiced" ? (
-                          <Badge className="text-[10px] bg-status-amber hover:bg-status-amber">
-                            多开 ¥{fmt(Math.abs(m.gap))}
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="text-status-green border-status-green/40 text-[10px]"
-                          >
-                            已匹配
-                          </Badge>
-                        )}
+                    </TableRow>
+                  ) : (
+                    sliceByPager(filteredMatched, matchedPager).map((m) => (
+                      <TableRow
+                        key={m.payName}
+                        className={
+                          m.category === "under_invoiced"
+                            ? "bg-status-red-soft/30"
+                            : m.category === "over_invoiced"
+                              ? "bg-status-amber-soft/30"
+                              : ""
+                        }
+                      >
+                        <TableCell className="max-w-[200px]">
+                          <span className="text-sm font-medium truncate block">
+                            {m.payName}
+                          </span>
+                          {m.invName && (
+                            <span className="text-[10px] text-muted-foreground">
+                              发票名: {m.invName}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">
+                          {fmt(m.netPaid)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {fmt(m.totalInvoice)}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right tabular-nums font-medium ${m.gap > 0 ? "text-status-red" : m.gap < 0 ? "text-status-amber" : ""}`}
+                        >
+                          {m.gap > 0 ? "+" : ""}
+                          {fmt(m.gap)}
+                        </TableCell>
+                        <TableCell>
+                          {m.category === "under_invoiced" ? (
+                            <Badge
+                              variant="destructive"
+                              className="text-[10px]"
+                            >
+                              缺票 ¥{fmt(m.gap)}
+                            </Badge>
+                          ) : m.category === "over_invoiced" ? (
+                            <Badge className="text-[10px] bg-status-amber hover:bg-status-amber">
+                              多开 ¥{fmt(Math.abs(m.gap))}
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="text-status-green border-status-green/40 text-[10px]"
+                            >
+                              已匹配
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              asChild
+                            >
+                              <Link
+                                href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(m.payName)}`}
+                              >
+                                <Landmark className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              asChild
+                            >
+                              <Link
+                                href={`/dashboard/finance/invoices?search=${encodeURIComponent(m.invName || m.payName)}`}
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <ListPager pager={matchedPager} total={filteredMatched.length} />
+          </Card>
+        </TabsContent>
+
+        {/* 无票付款 */}
+        <TabsContent value="unpaid-invoice">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <FileWarning className="h-4 w-4 text-status-red" />
+                <CardTitle className="text-sm">
+                  无票付款 ({filteredUnmatchedPay.length})
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <div className="overflow-x-auto px-4 pb-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>付款对方</TableHead>
+                    <TableHead className="text-right">净付款</TableHead>
+                    <TableHead className="text-right">交易笔数</TableHead>
+                    <TableHead className="w-[80px]">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUnmatchedPay.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="text-center py-8 text-muted-foreground"
+                      >
+                        暂无数据
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
+                    </TableRow>
+                  ) : (
+                    sliceByPager(filteredUnmatchedPay, payPager).map((p) => (
+                      <TableRow key={p.counterpart}>
+                        <TableCell className="font-medium">
+                          {p.counterpart}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-status-red font-medium">
+                          {fmt(p.netPaid)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {p.txnCount}
+                        </TableCell>
+                        <TableCell>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -933,11 +1087,66 @@ function ReconciliationAnalysisView({
                             asChild
                           >
                             <Link
-                              href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(m.payName)}`}
+                              href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(p.counterpart)}`}
                             >
                               <Landmark className="h-3.5 w-3.5" />
                             </Link>
                           </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <ListPager pager={payPager} total={filteredUnmatchedPay.length} />
+          </Card>
+        </TabsContent>
+
+        {/* 无流水发票 */}
+        <TabsContent value="unmatched-invoice">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-status-amber" />
+                <CardTitle className="text-sm">
+                  无流水发票 ({filteredUnmatchedInv.length})
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <div className="overflow-x-auto px-4 pb-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>发票销方</TableHead>
+                    <TableHead className="text-right">有效发票金额</TableHead>
+                    <TableHead className="text-right">发票张数</TableHead>
+                    <TableHead className="w-[80px]">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUnmatchedInv.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="text-center py-8 text-muted-foreground"
+                      >
+                        暂无数据
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    sliceByPager(filteredUnmatchedInv, invPager).map((i) => (
+                      <TableRow key={i.seller}>
+                        <TableCell className="font-medium">
+                          {i.seller}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">
+                          {fmt(i.totalInvoice)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {i.invCount}
+                        </TableCell>
+                        <TableCell>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -945,150 +1154,22 @@ function ReconciliationAnalysisView({
                             asChild
                           >
                             <Link
-                              href={`/dashboard/finance/invoices?search=${encodeURIComponent(m.invName || m.payName)}`}
+                              href={`/dashboard/finance/invoices?search=${encodeURIComponent(i.seller)}`}
                             >
                               <FileText className="h-3.5 w-3.5" />
                             </Link>
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <ListPager pager={matchedPager} total={filteredMatched.length} />
-        </Card>
-
-        {/* 无票付款 */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <FileWarning className="h-4 w-4 text-status-red" />
-              <CardTitle className="text-sm">
-                无票付款 ({filteredUnmatchedPay.length})
-              </CardTitle>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          </CardHeader>
-          <div className="overflow-x-auto px-4 pb-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>付款对方</TableHead>
-                  <TableHead className="text-right">净付款</TableHead>
-                  <TableHead className="text-right">交易笔数</TableHead>
-                  <TableHead className="w-[80px]">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUnmatchedPay.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={4}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      暂无数据
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sliceByPager(filteredUnmatchedPay, payPager).map((p) => (
-                    <TableRow key={p.counterpart}>
-                      <TableCell className="font-medium">
-                        {p.counterpart}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-status-red font-medium">
-                        {fmt(p.netPaid)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {p.txnCount}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0"
-                          asChild
-                        >
-                          <Link
-                            href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(p.counterpart)}`}
-                          >
-                            <Landmark className="h-3.5 w-3.5" />
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <ListPager pager={payPager} total={filteredUnmatchedPay.length} />
-        </Card>
-
-        {/* 无流水发票 */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-status-amber" />
-              <CardTitle className="text-sm">
-                无流水发票 ({filteredUnmatchedInv.length})
-              </CardTitle>
-            </div>
-          </CardHeader>
-          <div className="overflow-x-auto px-4 pb-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>发票销方</TableHead>
-                  <TableHead className="text-right">有效发票金额</TableHead>
-                  <TableHead className="text-right">发票张数</TableHead>
-                  <TableHead className="w-[80px]">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUnmatchedInv.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={4}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      暂无数据
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sliceByPager(filteredUnmatchedInv, invPager).map((i) => (
-                    <TableRow key={i.seller}>
-                      <TableCell className="font-medium">{i.seller}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {fmt(i.totalInvoice)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {i.invCount}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0"
-                          asChild
-                        >
-                          <Link
-                            href={`/dashboard/finance/invoices?search=${encodeURIComponent(i.seller)}`}
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <ListPager pager={invPager} total={filteredUnmatchedInv.length} />
-        </Card>
-      </div>
+            <ListPager pager={invPager} total={filteredUnmatchedInv.length} />
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

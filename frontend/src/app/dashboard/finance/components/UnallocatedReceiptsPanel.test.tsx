@@ -128,7 +128,9 @@ describe("UnallocatedReceiptsPanel", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: /自动匹配/ }),
     );
-    expect(await screen.findByText(/范围：当前待分配的全部 1 笔/)).toBeVisible();
+    expect(
+      await screen.findByText(/范围：当前待分配的全部 1 笔/),
+    ).toBeVisible();
     const dialog = screen.getByRole("alertdialog");
     expect(dialog).toHaveTextContent("USD 3,000");
     expect(dialog).toHaveTextContent("未收余额随之减少");

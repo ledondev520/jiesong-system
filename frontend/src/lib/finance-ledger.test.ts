@@ -17,22 +17,36 @@ describe("isResidual", () => {
 
 describe("matchRate", () => {
   it("低于 50% 告警，恰好 50% 不告警", () => {
-    expect(matchRate({ matchedCount: 4, unmatchedPaymentCount: 6 })).toMatchObject({
+    expect(
+      matchRate({ matchedCount: 4, unmatchedPaymentCount: 6 }),
+    ).toMatchObject({
       total: 10,
       rate: 0.4,
       low: true,
     });
-    expect(matchRate({ matchedCount: 5, unmatchedPaymentCount: 5 }).low).toBe(false);
+    expect(matchRate({ matchedCount: 5, unmatchedPaymentCount: 5 }).low).toBe(
+      false,
+    );
   });
   it("没有付款对方时不告警", () => {
-    expect(matchRate({ matchedCount: 0, unmatchedPaymentCount: 0 }).low).toBe(false);
+    expect(matchRate({ matchedCount: 0, unmatchedPaymentCount: 0 }).low).toBe(
+      false,
+    );
   });
 });
 
 describe("negativeInvoiceCount", () => {
   it("总数 - 有效 - 已红冲，不为负", () => {
-    expect(negativeInvoiceCount({ totalCount: 300, validCount: 200, reversedCount: 19 })).toBe(81);
-    expect(negativeInvoiceCount({ totalCount: 1, validCount: 1, reversedCount: 1 })).toBe(0);
+    expect(
+      negativeInvoiceCount({
+        totalCount: 300,
+        validCount: 200,
+        reversedCount: 19,
+      }),
+    ).toBe(81);
+    expect(
+      negativeInvoiceCount({ totalCount: 1, validCount: 1, reversedCount: 1 }),
+    ).toBe(0);
   });
 });
 

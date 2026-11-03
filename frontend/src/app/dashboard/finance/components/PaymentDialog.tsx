@@ -173,8 +173,8 @@ export function PaymentDialog({
             )}
             <div className="space-y-1 rounded-md border bg-muted/40 p-3 text-sm">
               <p>
-                本次登记 <strong>1 笔</strong>：合同 {contractNo}，
-                {label} {resolvedCurrency} {currencySymbol}
+                本次登记 <strong>1 笔</strong>：合同 {contractNo}，{label}{" "}
+                {resolvedCurrency} {currencySymbol}
                 {pending.amount.toLocaleString()}
               </p>
               <p className="text-muted-foreground">

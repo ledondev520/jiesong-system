@@ -97,7 +97,12 @@ describe("应付页签", () => {
           unpaidAmount: 600,
           subStatus: {
             payment: "PARTIAL",
-            arrival: { state: "NONE", ordered: 1400, arrived: 0, registered: false },
+            arrival: {
+              state: "NONE",
+              ordered: 1400,
+              arrived: 0,
+              registered: false,
+            },
             docsComplete: false,
           },
         },
@@ -117,8 +122,22 @@ describe("应付页签", () => {
     const user = userEvent.setup();
     mocks.getPayables.mockResolvedValue(
       page([
-        { id: "a", contractNo: "CG1", status: "SIGNED", totalAmount: 100, paidAmount: 99.5, unpaidAmount: 0.5 },
-        { id: "b", contractNo: "CG2", status: "SIGNED", totalAmount: 100, paidAmount: 90, unpaidAmount: 10 },
+        {
+          id: "a",
+          contractNo: "CG1",
+          status: "SIGNED",
+          totalAmount: 100,
+          paidAmount: 99.5,
+          unpaidAmount: 0.5,
+        },
+        {
+          id: "b",
+          contractNo: "CG2",
+          status: "SIGNED",
+          totalAmount: 100,
+          paidAmount: 90,
+          unpaidAmount: 10,
+        },
       ]),
     );
     render(<ContractBalanceList kind="payable" />);

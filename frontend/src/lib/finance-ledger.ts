@@ -30,7 +30,12 @@ export function matchRate(summary: {
 }): MatchRate {
   const total = summary.matchedCount + summary.unmatchedPaymentCount;
   const rate = total > 0 ? summary.matchedCount / total : 1;
-  return { matched: summary.matchedCount, total, rate, low: rate < MATCH_RATE_ALERT };
+  return {
+    matched: summary.matchedCount,
+    total,
+    rate,
+    low: rate < MATCH_RATE_ALERT,
+  };
 }
 
 /** 总数 = 有效 + 已红冲 + 负数/其他；后端未单独返回负数张数，这里由差值得出。 */
