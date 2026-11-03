@@ -518,7 +518,7 @@ export function InventoryTab() {
           <SheetTrigger asChild>
             <Button
               variant="outline"
-              className="h-11 rounded-2xl px-3 text-xs sm:text-sm"
+              className="h-11 rounded-lg px-3 text-xs sm:text-sm"
             >
               <Search className="mr-2 h-4 w-4" />
               搜索与批量操作
@@ -540,14 +540,14 @@ export function InventoryTab() {
                   onChange={(event) => {
                     setListState({ keyword: event.target.value });
                   }}
-                  className="h-11 rounded-2xl border-border/70 bg-background/80 pl-9"
+                  className="h-11 rounded-lg border-border/70 bg-background/80 pl-9"
                 />
               </div>
-              {renderStoreSelect("h-11 w-full rounded-2xl")}
+              {renderStoreSelect("h-11 w-full rounded-lg")}
               {(keyword || store) && (
                 <Button
                   variant="outline"
-                  className="h-11 w-full rounded-2xl"
+                  className="h-11 w-full rounded-lg"
                   onClick={() => {
                     setListState({ keyword: "", store: "" });
                     setDebouncedKeyword("");
@@ -557,7 +557,7 @@ export function InventoryTab() {
                   清空搜索
                 </Button>
               )}
-              <div className="rounded-2xl bg-muted/50 p-4 text-sm text-muted-foreground">
+              <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
                 当前已选 {selectedIds.length} 条库存记录
               </div>
               <div className="grid grid-cols-1 gap-3">
@@ -565,7 +565,7 @@ export function InventoryTab() {
                   <BusinessWrite>
                     <Button
                       variant="outline"
-                      className="h-11 rounded-2xl"
+                      className="h-11 rounded-lg"
                       disabled={batchUpdating || selectedIds.length === 0}
                       onClick={() =>
                         requestBatchChange(InventoryStatus.INBOUND)
@@ -579,7 +579,7 @@ export function InventoryTab() {
                   <BusinessWrite>
                     <Button
                       variant="outline"
-                      className="h-11 rounded-2xl"
+                      className="h-11 rounded-lg"
                       disabled={batchUpdating || selectedIds.length === 0}
                       onClick={() =>
                         requestBatchChange(InventoryStatus.OUTBOUND)
@@ -594,7 +594,7 @@ export function InventoryTab() {
             <div className="border-t px-5 py-4">
               <Button
                 variant="outline"
-                className="h-11 w-full rounded-2xl"
+                className="h-11 w-full rounded-lg"
                 onClick={() => setMobileActionsOpen(false)}
               >
                 查看结果
@@ -602,7 +602,7 @@ export function InventoryTab() {
             </div>
           </SheetContent>
         </Sheet>
-        <div className="flex h-11 items-center justify-center rounded-2xl px-3 border border-border/70 bg-muted/35 text-sm font-medium text-foreground">
+        <div className="flex h-11 items-center justify-center rounded-lg px-3 border border-border/70 bg-muted/35 text-sm font-medium text-foreground">
           已选 {selectedIds.length} 条
         </div>
       </div>
@@ -629,7 +629,7 @@ export function InventoryTab() {
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-2xl"
+                className="rounded-lg"
                 onClick={() => void loadInventory(debouncedKeyword)}
               >
                 <RefreshCw className="mr-1 h-4 w-4" />
@@ -681,7 +681,7 @@ export function InventoryTab() {
                     {getStatusBadge(item.status)}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 rounded-2xl bg-muted/55 p-3">
+                  <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/55 p-3">
                     <div className="space-y-1">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                         数量
@@ -702,7 +702,7 @@ export function InventoryTab() {
 
                   <Button
                     variant="outline"
-                    className="h-11 w-full rounded-2xl"
+                    className="h-11 w-full rounded-lg"
                     onClick={() => setDetailItem(item)}
                     aria-label={`查看 ${itemLabel} 详情`}
                   >
@@ -710,7 +710,7 @@ export function InventoryTab() {
                   </Button>
 
                   {nextStatuses.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
+                    <div className="rounded-lg border border-dashed border-border/70 px-4 py-3 text-sm text-muted-foreground">
                       {item.purchaseItemId || item.receiptInspectionId
                         ? "库存随到货验货、出口发运自动更新"
                         : "当前记录没有可用下一状态"}
@@ -721,7 +721,7 @@ export function InventoryTab() {
                         <BusinessWrite key={`${item.id}-${nextStatus}-mobile`}>
                           <Button
                             variant="outline"
-                            className="h-11 rounded-2xl"
+                            className="h-11 rounded-lg"
                             onClick={() =>
                               requestSingleChange(item, nextStatus)
                             }

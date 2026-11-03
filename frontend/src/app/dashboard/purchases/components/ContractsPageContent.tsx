@@ -609,7 +609,7 @@ export default function ContractsPageContent() {
       <div className="grid grid-cols-2 gap-3 md:hidden">
         <BusinessWrite>
           <Button
-            className="h-11 rounded-2xl"
+            className="h-11 rounded-lg"
             onClick={() => router.push("/dashboard/purchases/new")}
           >
             <Plus className="mr-2 h-4 w-4" /> 新增采购
@@ -635,7 +635,7 @@ export default function ContractsPageContent() {
                 <BusinessWrite>
                   <Button
                     variant="outline"
-                    className="h-11 rounded-2xl"
+                    className="h-11 rounded-lg"
                     onClick={handleExport}
                   >
                     <Download className="mr-2 h-4 w-4" /> 导出 Excel
@@ -644,7 +644,7 @@ export default function ContractsPageContent() {
                 <BusinessWrite>
                   <Button
                     variant="outline"
-                    className="h-11 rounded-2xl"
+                    className="h-11 rounded-lg"
                     onClick={handleImportClick}
                     disabled={importLoading}
                   >
@@ -654,7 +654,7 @@ export default function ContractsPageContent() {
                 <BusinessWrite>
                   <Button
                     variant="outline"
-                    className="h-11 rounded-2xl"
+                    className="h-11 rounded-lg"
                     onClick={openTemplateDialog}
                   >
                     <FileText className="mr-2 h-4 w-4" /> 合同模板
@@ -665,13 +665,13 @@ export default function ContractsPageContent() {
             <div className="flex gap-3 border-t px-5 py-4">
               <Button
                 variant="outline"
-                className="h-11 flex-1 rounded-2xl"
+                className="h-11 flex-1 rounded-lg"
                 onClick={resetFilters}
               >
                 重置
               </Button>
               <Button
-                className="h-11 flex-1 rounded-2xl"
+                className="h-11 flex-1 rounded-lg"
                 onClick={() => setMobileFiltersOpen(false)}
               >
                 查看结果
