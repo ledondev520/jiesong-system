@@ -11,10 +11,12 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
   eyebrow?: string; // 标题上方的小引导词，用于标明工作场景
   title: string;
+  titleClassName?: string; // 标题附加样式，如单号用等宽字体
   description?: string;
   backHref?: string; // 默认指定返回链接，不指定则使用router.back()
   onBack?: () => void; // 显式提供时只执行调用方返回动作
@@ -33,6 +35,7 @@ interface PageHeaderProps {
 export function PageHeader({
   eyebrow,
   title,
+  titleClassName,
   description,
   backHref,
   onBack,
@@ -78,7 +81,12 @@ export function PageHeader({
               {eyebrow}
             </p>
           )}
-          <h2 className="break-words text-xl font-semibold tracking-tight md:text-2xl">
+          <h2
+            className={cn(
+              "break-words text-xl font-semibold tracking-tight md:text-2xl",
+              titleClassName,
+            )}
+          >
             {title}
           </h2>
           {/* 描述可能包含操作提示，手机端同样完整显示 */}

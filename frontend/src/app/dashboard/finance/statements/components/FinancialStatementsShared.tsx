@@ -9,19 +9,9 @@
 import type { ComponentType } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiStat } from "@/components/ui/kpi-stat";
 import { Separator } from "@/components/ui/separator";
-import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  TrendingDown,
-  TrendingUp,
-  Minus,
-  ArrowUpRight,
-  ArrowDownRight,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 import type {
   FinancialAlert,
   FinancialPeriod,
@@ -85,55 +75,17 @@ export function KpiCard({
   trendValue?: string;
   valueClass?: string;
 }) {
-  const isUp = trend === "up";
-  const isDown = trend === "down";
-
+  // 统一用 KpiStat（B51）；本包装只保留这一页原有的参数名
   return (
-    <Card className="kpi-card relative overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {title}
-        </CardTitle>
-        <div className="rounded-lg bg-primary/5 p-2 text-primary/70">
-          <Icon className="h-4 w-4" />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div
-          className={`text-2xl font-bold tracking-tight ${valueClass ?? ""}`}
-        >
-          {value}
-        </div>
-        {subValue && (
-          <div className="mt-1 flex items-center gap-1">
-            {trend === "up" && (
-              <TrendingUp className="h-3 w-3 text-status-green" />
-            )}
-            {trend === "down" && (
-              <TrendingDown className="h-3 w-3 text-destructive" />
-            )}
-            <p className="text-xs text-muted-foreground">{subValue}</p>
-          </div>
-        )}
-        {trendValue && (
-          <div className="mt-2 flex items-center gap-1.5">
-            <span
-              className={cn(
-                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
-                isUp && "bg-status-green-soft text-status-green",
-                isDown && "bg-status-red-soft text-status-red",
-                !isUp && !isDown && "bg-muted text-muted-foreground",
-              )}
-            >
-              {isUp && <ArrowUpRight className="h-3 w-3" />}
-              {isDown && <ArrowDownRight className="h-3 w-3" />}
-              {!isUp && !isDown && <Minus className="h-3 w-3" />}
-              {trendValue}
-            </span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <KpiStat
+      label={title}
+      value={value}
+      subLabel={subValue}
+      icon={<Icon className="h-4 w-4" />}
+      trend={trend}
+      trendValue={trendValue}
+      valueClassName={valueClass}
+    />
   );
 }
 
