@@ -181,10 +181,12 @@ export const nonPayableNotice = (status: PurchaseStatus) =>
     ? { title: "已取消 · 不计应付", hint: "已取消的合同不计入待付金额" }
     : { title: "草稿 · 不计应付", hint: "合同生效后才计入待付金额" };
 
-/** 职责：已付超过合同金额的差额（0 表示未超付）；合同金额为 0 而已有付款时整笔视为超付，与详情页 summarizePurchaseAmounts 同口径 */
+/** 职责：已付超过合同金额的差额（0 表示未超付）；与详情页同口径，仅在合同金额已录入时比较 */
 export function getOverpaidAmount(
   contract: Pick<PurchaseContract, "totalAmount" | "paidAmount">,
 ): number {
+  // 合同金额为 0 时详情页改比明细合计，列表因 items.take(1) 没有明细合计；该行已显示「未录入」，不在此误报超付
+  if (contract.totalAmount <= 0) return 0;
   const diff =
     Math.round((contract.paidAmount - contract.totalAmount) * 100) / 100;
   return diff > 0.02 ? diff : 0;

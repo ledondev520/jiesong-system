@@ -899,9 +899,11 @@ export default function ContractsPageContent() {
                           合同总额
                         </p>
                         <p className="text-sm font-semibold tabular-nums text-status-green">
-                          {contract.totalAmount > 0
-                            ? `¥${contract.totalAmount.toLocaleString()}`
-                            : "未录入"}
+                          {contract.totalAmount > 0 ? (
+                            `¥${contract.totalAmount.toLocaleString()}`
+                          ) : (
+                            <span className="text-status-amber">未录入</span>
+                          )}
                         </p>
                         {!isPayable(contract) && (
                           <p className="text-[11px] text-muted-foreground">

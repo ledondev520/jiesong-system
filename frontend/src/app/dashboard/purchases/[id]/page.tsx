@@ -850,7 +850,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 }
                 description={
                   docConfirm === "stamp"
-                    ? `将在新窗口打开外部盖章平台，对采购合同 ${contract.contractNo} 生成具有法律效力的电子合同文件。`
+                    ? `将在新窗口打开外部盖章平台；在平台完成盖章后会形成具有法律效力的电子合同（采购合同 ${contract.contractNo}）。`
                     : `将为采购合同 ${contract.contractNo} 生成一份对外的购销合同文档（具有法律效力的外部文件），下一步填写收货信息。`
                 }
                 confirmLabel={docConfirm === "stamp" ? "前往盖章" : "继续"}
