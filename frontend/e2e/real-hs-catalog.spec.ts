@@ -6,6 +6,7 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { pickDate } from "./helpers";
 import {
   forwardHsApi,
   loginHsAs,
@@ -41,7 +42,10 @@ test.afterEach(async () => {
  */
 async function enterHs(page: Page, role: HsRole = "PURCHASE") {
   const token = await loginHsAs(page, fixture, role);
-  await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
+  await page
+    .getByRole("link", { name: "出口订单", exact: true })
+    .first()
+    .click();
   await expect(page).toHaveURL(/\/dashboard\/orders$/);
   await page.getByRole("link", { name: "HS 编码", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/hs-codes/);
@@ -104,7 +108,7 @@ async function expectValues(dialog: Locator, values: EvidenceValues) {
   await expect(dialog.getByLabel("出口退税率（%）")).toHaveValue(values.refund);
   await expect(dialog.getByLabel("出口税率（%）")).toHaveValue(values.export);
   await expect(dialog.getByLabel("增值税率（%）")).toHaveValue(values.vat);
-  await expect(dialog.getByLabel("生效日期")).toHaveValue(values.date);
+  await expect(dialog.getByLabel("生效日期")).toContainText(values.date);
   await expect(dialog.getByLabel("官方来源链接")).toHaveValue(values.source);
   await expect(dialog.getByLabel("申报要素模板")).toHaveValue(values.elements);
   await expect(dialog.getByLabel("复核备注")).toHaveValue(values.note);
@@ -121,7 +125,7 @@ async function fillEvidence(page: Page, source = revisedValues.source) {
   await dialog.getByLabel("出口退税率（%）").fill(revisedValues.refund);
   await dialog.getByLabel("出口税率（%）").fill(revisedValues.export);
   await dialog.getByLabel("增值税率（%）").fill(revisedValues.vat);
-  await dialog.getByLabel("生效日期").fill(revisedValues.date);
+  await pickDate(page, dialog.getByLabel("生效日期"), revisedValues.date);
   await dialog.getByLabel("官方来源链接").fill(source);
   await dialog.getByLabel("申报要素模板").fill(revisedValues.elements);
   await dialog.getByLabel("复核备注").fill(revisedValues.note);

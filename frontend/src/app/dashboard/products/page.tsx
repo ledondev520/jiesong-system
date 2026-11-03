@@ -486,7 +486,7 @@ function ProductsPageContent() {
                     </div>
 
                     {incomplete && (
-                      <p className="text-sm text-amber-600">
+                      <p className="text-sm text-status-amber">
                         缺少：{missingFields(product).join("、") || "-"}
                       </p>
                     )}

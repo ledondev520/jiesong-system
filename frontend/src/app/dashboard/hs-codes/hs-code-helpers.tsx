@@ -18,10 +18,18 @@ import { Badge } from "@/components/ui/badge";
 export function parseDeclarationElements(value: string | null | undefined) {
   if (!value) return [];
 
-  return value
-    .split(/[|｜]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return (
+    value
+      .split(/[|｜]/)
+      // 库内要素带「0:品牌类型」形式的序号前缀，展示时序号由列表自己给
+      .map((item) => item.trim().replace(/^\d+\s*[:：]\s*/, ""))
+      .filter(Boolean)
+  );
+}
+
+/** 复制用的编号清单：1. 品牌类型 */
+export function formatDeclarationElementsList(items: string[]) {
+  return items.map((item, index) => `${index + 1}. ${item}`).join("\n");
 }
 
 /** HSCIQ 编码详情（API 返回 camelCase 字段） */

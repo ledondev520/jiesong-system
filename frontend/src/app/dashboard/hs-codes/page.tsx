@@ -8,6 +8,7 @@
 
 "use client";
 
+import { LoadingValue } from "@/components/ui/loading-value";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -384,7 +385,7 @@ function HsCodesPageContent() {
     <div className="flex flex-col h-full">
       <PageHeader
         title="HS 编码查询"
-        description="默认展示全量列表。输入商品名称（中文或常见英文名，可模糊）或 4–12 位纯数字 HS 编码（支持首尾空格，自动 trim）即可检索；编码按库内 hsCode 前缀精确匹配。"
+        description="默认展示全量列表。可输入商品名称（中文或常见英文名，支持模糊）或 4–12 位纯数字 HS 编码检索；编码按前缀匹配，首尾空格会自动忽略。"
         actions={
           <BusinessWrite>
             <Button
@@ -454,7 +455,9 @@ function HsCodesPageContent() {
 
       {/* 数据说明 */}
       <div className="mt-4 text-xs text-muted-foreground">
-        数据来源：海关总署 - 当前列表 {results.length} 条 / 总计 {total} 条
+        数据来源：海关总署 - 当前列表{" "}
+        <LoadingValue loading={loading}>{results.length}</LoadingValue> 条 /
+        总计 <LoadingValue loading={loading}>{total}</LoadingValue> 条
         {keyword.trim() || hsCodeInput.trim()
           ? `（${[keyword.trim() && `名称：${keyword}`, hsCodeInput.trim() && `编码：${hsCodeInput}`].filter(Boolean).join("，")}）`
           : "（默认全量列表）"}

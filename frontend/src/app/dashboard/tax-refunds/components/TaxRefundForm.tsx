@@ -28,6 +28,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateStringPicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -354,7 +355,11 @@ export function TaxRefundForm({
                 <FormItem>
                   <FormLabel>申请日期</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <DateStringPicker
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      triggerProps={{ onBlur: field.onBlur }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -410,7 +415,11 @@ export function TaxRefundForm({
                 <FormItem>
                   <FormLabel>到账日期</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <DateStringPicker
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      triggerProps={{ onBlur: field.onBlur }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

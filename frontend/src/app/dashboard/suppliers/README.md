@@ -5,10 +5,13 @@ The active editor is `page.tsx`; the legacy `components/SupplierDialog.tsx` has 
 Failed saves retain all entered values for an explicit retry. Pending inputs are disabled for the submitting session; selection, search, and cancel/new remain available. Catalog responses use request ordering so an older response cannot replace a newer result. `page.test.tsx` covers the actual editor with generated synthetic suppliers.
 
 Quality flags, notes, and aliases are saved by the existing backend supplier commands. Alias replacement is one nested atomic write; omitted aliases preserve existing ones, while an explicit empty list clears them. HTTP/SQLite coverage lives in `backend/src/integration/supplier-editor.integration.js`.
+
 - `[id]/page.tsx`：供应商详情（只读「供货商品」，显示本供应商的最近价/最低/均价/次数，单商品比价失败不影响整页）；`[id]/page.test.tsx` 回归
 
 Archive: 删除 is a soft archive (`isActive=false`); the page loads `status=all` and hides archived suppliers unless the 「已归档」 filter is chosen. ADMIN sees 「恢复当前」 for an archived supplier. Rules and the production plan: `docs/operations/archive-test-data.md`.
 
 Permanent delete (ADMIN only, 「永久删除」): `components/HardDeleteSupplierDialog.tsx` shows the server preview (counts per record type, or the blocking reasons when money/customs records exist) and requires typing the supplier name; the page then sends the preview's `confirmToken` to `POST /suppliers/:id/hard-delete`. Archive (「归档当前」, ADMIN/PURCHASE) has no contract check.
+
 - `supplierCounts.ts`: index summary counts; total = normal + quality issue + archived (mutually exclusive), regression in `supplierCounts.test.ts` and `page.test.tsx` (B20).
-B17: clicking a supplier opens the read-only `components/SupplierSummary.tsx` (no bank details); 「编辑」 is an explicit action that loads the form. 「归档当前」/「永久删除」 live in a separate 「危险操作」 section under the edit form (naming the supplier); the permanent-delete dialog is unchanged (preview + typed name). Write endpoints are untouched.
+  B17: clicking a supplier opens the read-only `components/SupplierSummary.tsx` (no bank details); 「编辑」 is an explicit action that loads the form. 「归档当前」/「永久删除」 live in a separate 「危险操作」 section under the edit form (naming the supplier); the permanent-delete dialog is unchanged (preview + typed name). Write endpoints are untouched.
+B39: the page opens on a no-selection empty state (`supplier-empty-state`), never on an editable form; the blank create form appears only after 「新建供应商档案」 (`creating`), and 「取消新建」 returns to the empty state. The record-level 「清空新建」 is gone; editing offers 「放弃修改」 (back to the summary). The 「危险操作」 section now renders under the read-only summary as well as under the edit form. `supplierCompleteness.ts` + `components/MissingFields.tsx` explain 「待完善」: card and summary list the missing contract/payment fields (联系人、联系电话、公司地址、纳税人识别号、收款户名、开户银行、银行账号).

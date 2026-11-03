@@ -32,6 +32,7 @@ import { useTableSort } from "@/lib/hooks/useTableSort";
 import { FilePenLine } from "lucide-react";
 import { toast } from "sonner";
 import { CustomsDeclarationStatusBadge } from "./CustomsDeclarationStatusBadge";
+import { splitDraftSuffix } from "./declarationNo";
 
 import {
   navigateToCustomsList,
@@ -137,7 +138,7 @@ export function CustomsDeclarationDetailPageContent({
   return (
     <div className="space-y-6 pb-10">
       <PageHeader
-        title={declaration.declarationNo}
+        title={splitDraftSuffix(declaration.declarationNo).displayNo}
         description={declaration.customsBroker || "未填写报关行"}
         backHref={backHref}
         onBack={() => navigateToCustomsList(backHref)}

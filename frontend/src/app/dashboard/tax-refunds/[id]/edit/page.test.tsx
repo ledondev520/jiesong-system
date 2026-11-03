@@ -10,6 +10,11 @@ import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import EditTaxRefundPage from "./page";
 
+vi.mock(
+  "@/components/ui/date-picker",
+  () => import("@/test/date-string-picker-mock"),
+);
+
 const mockGetById = vi.fn();
 const mockUpdate = vi.fn();
 const mockToastError = vi.fn();

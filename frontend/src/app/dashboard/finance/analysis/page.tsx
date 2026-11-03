@@ -11,7 +11,7 @@
 import { formatAmount } from "@/lib/format";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Input } from "@/components/ui/input";
+import { DateStringPicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Suspense,
@@ -285,20 +285,18 @@ function BusinessReportsContent() {
         <CardContent className="flex flex-wrap items-end gap-3 pt-4">
           <div className="space-y-1">
             <Label htmlFor="report-start">发运开始日期</Label>
-            <Input
-              id="report-start"
-              type="date"
+            <DateStringPicker
               value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
+              onChange={setStartDate}
+              triggerProps={{ id: "report-start" }}
             />
           </div>
           <div className="space-y-1">
             <Label htmlFor="report-end">发运结束日期</Label>
-            <Input
-              id="report-end"
-              type="date"
+            <DateStringPicker
               value={endDate}
-              onChange={(event) => setEndDate(event.target.value)}
+              onChange={setEndDate}
+              triggerProps={{ id: "report-end" }}
             />
           </div>
           <Button
