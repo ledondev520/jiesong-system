@@ -1,7 +1,7 @@
 /**
  * Input: 采购合同详情API、购销合同生成服务、系统配置（盖章平台/开票抬头）、PurchaseFlowPanel、SortableTableHead、useTableSort
  * Output: 支持手机商品明细卡片的采购合同详情页面（商品明细、合同归档、付款、生产资料、分批到货验货与发票面板）
- * Pos: 采购管理子页面，承载「签合同→盖章→付款→生产完工→催票」的单合同主线路
+ * Pos: 采购管理子页面，承载「签合同→盖章→付款→生产完工→催票」的单合同主线路；在线盖章与生成购销合同收进「单证」菜单，两者都先确认对外法律文件
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -35,6 +35,12 @@ import { invalidateCache } from "@/lib/api-cache";
 import { Button } from "@/components/ui/button";
 import { MobileListCard } from "@/components/mobile";
 import { useMobile } from "@/lib/hooks/useMobile";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -66,6 +72,7 @@ import {
   Package,
   DollarSign,
   Building2,
+  ChevronDown,
   FileDown,
   Loader2,
   Eye,
@@ -335,6 +342,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
 
   // 生成合同文档弹窗状态
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [docConfirm, setDocConfirm] = useState<"stamp" | "generate" | null>(
+    null,
+  );
   const [generateLoading, setGenerateLoading] = useState(false);
   const [generateForm, setGenerateForm] = useState({
     storeName: "",
@@ -809,23 +819,48 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               </Button>
             </BusinessWrite>
             <BusinessWrite>
-              <Button
-                variant="outline"
-                className="h-9 rounded-md text-xs"
-                onClick={handleOpenStampPlatform}
-              >
-                <Stamp className="mr-1.5 h-3.5 w-3.5" />
-                在线盖章
-              </Button>
-            </BusinessWrite>
-            <BusinessWrite>
-              <Button
-                className="h-9 rounded-md text-xs"
-                onClick={() => setGenerateOpen(true)}
-              >
-                <FileDown className="mr-1.5 h-3.5 w-3.5" />
-                生成购销合同
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="h-9 rounded-md text-xs">
+                    <FileDown className="mr-1.5 h-3.5 w-3.5" />
+                    单证
+                    <ChevronDown className="ml-1 h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setDocConfirm("stamp")}>
+                    <Stamp className="mr-2 h-3.5 w-3.5" />
+                    在线盖章
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setDocConfirm("generate")}>
+                    <FileDown className="mr-2 h-3.5 w-3.5" />
+                    生成购销合同
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <ConfirmActionDialog
+                open={docConfirm !== null}
+                onOpenChange={(open) => {
+                  if (!open) setDocConfirm(null);
+                }}
+                title={
+                  docConfirm === "stamp"
+                    ? "确认前往在线盖章"
+                    : "确认生成购销合同"
+                }
+                description={
+                  docConfirm === "stamp"
+                    ? `将在新窗口打开外部盖章平台，对采购合同 ${contract.contractNo} 生成具有法律效力的电子合同文件。`
+                    : `将为采购合同 ${contract.contractNo} 生成一份对外的购销合同文档（具有法律效力的外部文件），下一步填写收货信息。`
+                }
+                confirmLabel={docConfirm === "stamp" ? "前往盖章" : "继续"}
+                onConfirm={() => {
+                  const action = docConfirm;
+                  setDocConfirm(null);
+                  if (action === "stamp") handleOpenStampPlatform();
+                  else if (action === "generate") setGenerateOpen(true);
+                }}
+              />
             </BusinessWrite>
           </div>
         }

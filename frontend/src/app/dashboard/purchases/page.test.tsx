@@ -257,6 +257,42 @@ describe("ContractsPage 交互逻辑", () => {
     expect(screen.getAllByText("不计应付")).toHaveLength(4);
   });
 
+  it("已付超过合同金额的行显示醒目超付标记；合同金额为 0 显示未录入而不是 ¥0", async () => {
+    const base = {
+      status: "SIGNED",
+      supplier: { name: "供应商甲", hasQualityIssue: false },
+      items: [],
+    };
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            ...base,
+            id: "p-over",
+            contractNo: "CG-OVER",
+            totalAmount: 0,
+            paidAmount: 6060,
+          },
+          {
+            ...base,
+            id: "p-ok",
+            contractNo: "CG-OK",
+            totalAmount: 1000,
+            paidAmount: 1000,
+          },
+        ],
+      },
+    });
+    render(<ContractsPage />);
+
+    await screen.findAllByText("CG-OVER");
+    // 桌面表格与移动卡片各一份，只有超付那一行有标记
+    const flags = screen.getAllByTestId("overpaid-flag");
+    expect(flags).toHaveLength(2);
+    expect(flags[0]).toHaveTextContent("超付 ¥6,060");
+    expect(screen.getAllByText("未录入").length).toBeGreaterThan(0);
+  });
+
   it("管理员每次导入默认正常，明确勾选历史确认才提交historical", async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     render(<ContractsPage />);

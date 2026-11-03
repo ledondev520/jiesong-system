@@ -81,4 +81,19 @@ describe("PurchaseSubStatus", () => {
     );
     expect(screen.getByText("未付款")).toBeInTheDocument();
   });
+
+  it("arrival counts carry a tooltip that explains the 0/2 numbers", () => {
+    render(
+      <PurchaseSubStatus
+        status="SHIPPED"
+        subStatus={sub({
+          arrival: { state: "NONE", ordered: 2, arrived: 0, registered: true },
+        })}
+      />,
+    );
+    expect(screen.getByText("未到货 0/2")).toHaveAttribute(
+      "title",
+      "已到货数量 / 订购数量",
+    );
+  });
 });
