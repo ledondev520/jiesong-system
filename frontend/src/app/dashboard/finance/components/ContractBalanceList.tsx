@@ -13,8 +13,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { PurchaseSubStatus } from "@/components/purchase/PurchaseSubStatus";
+import { SemanticBadge, StatusBadge } from "@/components/ui/status-badge";
+import { getSubStatusBadges } from "@/components/purchase/PurchaseSubStatus";
+import { isResidual } from "@/lib/finance-ledger";
 import { describeFailure } from "@/lib/error-reason";
 import { formatMoney } from "@/lib/format";
 import { useLatestRequest } from "@/lib/hooks/useLatestRequest";
@@ -68,6 +69,31 @@ const KIND = {
     pastLabel: "已逾期",
   },
 };
+
+/** 应付子状态各占一列；到货计数补「件」单位（采购明细数量无其他单位字段）。草稿/已取消没有子状态，显示「—」。 */
+function subStatusColumn(
+  key: "payment" | "arrival" | "docs",
+  header: string,
+): DataTableColumn<BalanceRow> {
+  return {
+    key: `sub-${key}`,
+    header,
+    cell: (row) => {
+      const badge = getSubStatusBadges(row.status, row.subStatus).find(
+        (b) => b.key === key,
+      );
+      if (badge) {
+        return (
+          <SemanticBadge tone={badge.tone}>
+            {badge.label.replace(/(\d[\d,]*\/\d[\d,]*)$/, "$1 件")}
+          </SemanticBadge>
+        );
+      }
+      const none = !row.subStatus || getSubStatusBadges(row.status, row.subStatus).length === 0;
+      return <span className="text-muted-foreground">{none || key !== "docs" ? "—" : "齐全"}</span>;
+    },
+  };
+}
 
 export function ContractBalanceList({
   kind,
@@ -183,17 +209,21 @@ export function ContractBalanceList({
     },
     {
       key: "status",
-      header: "状态",
-      cell: (row) =>
-        kind === "payable" ? (
-          <div className="flex flex-col items-start gap-1">
-            <StatusBadge status={row.status} domain="purchaseContract" />
-            <PurchaseSubStatus status={row.status} subStatus={row.subStatus} />
-          </div>
-        ) : (
-          <StatusBadge status={row.status} />
-        ),
+      header: kind === "payable" ? "合同状态" : "状态",
+      cell: (row) => (
+        <StatusBadge
+          status={row.status}
+          domain={kind === "payable" ? "purchaseContract" : undefined}
+        />
+      ),
     },
+    ...(kind === "payable"
+      ? [
+          subStatusColumn("payment", "付款"),
+          subStatusColumn("arrival", "到货"),
+          subStatusColumn("docs", "生产资料"),
+        ]
+      : []),
     {
       key: "total",
       header: "合同金额",
@@ -210,7 +240,12 @@ export function ContractBalanceList({
       key: "open",
       header: config.openLabel,
       cell: (row) => (
-        <strong>{formatMoney(config.open(row), config.currency)}</strong>
+        <span className="inline-flex items-center justify-end gap-1.5">
+          {isResidual(config.open(row)) ? (
+            <SemanticBadge tone="neutral">尾差</SemanticBadge>
+          ) : null}
+          <strong>{formatMoney(config.open(row), config.currency)}</strong>
+        </span>
       ),
       className: "text-right",
     },
@@ -308,6 +343,7 @@ export function ContractBalanceList({
           contractId={selected.id}
           remainingAmount={config.open(selected)}
           currency={config.currency}
+          confirmStep
           onSubmit={submit}
         />
       ) : null}

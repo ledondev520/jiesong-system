@@ -113,10 +113,28 @@ describe("UnallocatedReceiptsPanel", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: /自动匹配/ }),
     );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "开始自动匹配" }),
+    );
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     expect(mocks.autoMatchUnallocatedPayments).toHaveBeenCalledTimes(1);
     expect(mocks.getUnallocatedPayments.mock.calls.length).toBeGreaterThan(1);
     expect(toasts.success).toHaveBeenCalled();
+  });
+
+  it("auto-match asks for confirmation first, showing scope and effect, and cancel calls nothing", async () => {
+    const onChanged = vi.fn();
+    render(<UnallocatedReceiptsPanel onChanged={onChanged} />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: /自动匹配/ }),
+    );
+    expect(await screen.findByText(/范围：当前待分配的全部 1 笔/)).toBeVisible();
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent("USD 3,000");
+    expect(dialog).toHaveTextContent("未收余额随之减少");
+    await userEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(mocks.autoMatchUnallocatedPayments).not.toHaveBeenCalled();
+    expect(onChanged).not.toHaveBeenCalled();
   });
 
   it("a failed auto-match reports the error and does not refresh", async () => {
@@ -125,6 +143,9 @@ describe("UnallocatedReceiptsPanel", () => {
     render(<UnallocatedReceiptsPanel onChanged={onChanged} />);
     await userEvent.click(
       await screen.findByRole("button", { name: /自动匹配/ }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "开始自动匹配" }),
     );
     await waitFor(() => expect(toasts.error).toHaveBeenCalled());
     expect(onChanged).not.toHaveBeenCalled();

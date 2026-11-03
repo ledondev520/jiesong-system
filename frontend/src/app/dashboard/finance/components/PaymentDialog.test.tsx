@@ -50,9 +50,11 @@ vi.mock("@/components/ui/select", () => ({
 function Harness({
   submit,
   remaining = 100,
+  confirmStep = false,
 }: {
   submit: (data: unknown) => Promise<void>;
   remaining?: number;
+  confirmStep?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   return (
@@ -65,6 +67,7 @@ function Harness({
         contractId="synthetic"
         contractNo="测试"
         remainingAmount={remaining}
+        confirmStep={confirmStep}
         onSubmit={async (data) => {
           await submit(data);
           setOpen(false);
@@ -74,7 +77,7 @@ function Harness({
   );
 }
 
-const fillDraft = async () => {
+const fillDraft = async (button = "确认记录") => {
   fireEvent.click(screen.getByText("其他"));
   fireEvent.change(screen.getByRole("spinbutton"), {
     target: { value: "22.6" },
@@ -82,7 +85,7 @@ const fillDraft = async () => {
   fireEvent.change(screen.getByLabelText("备注"), {
     target: { value: "内部付款测试，仅合成数据" },
   });
-  await waitFor(() => expect(screen.getByText("确认记录")).toBeEnabled());
+  await waitFor(() => expect(screen.getByText(button)).toBeEnabled());
 };
 
 it("submits numeric partial amounts; empty amounts cannot submit", async () => {
@@ -167,4 +170,35 @@ it("cancel sends nothing and starts a fresh draft on reopen", async () => {
   expect(screen.getByLabelText("备注")).toHaveValue("");
   expect(screen.getByTestId("method")).toHaveTextContent("");
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("confirmStep: shows scope and reconciliation effect first; nothing is saved until 确认登记", async () => {
+  const submit = vi.fn().mockResolvedValue(undefined);
+  render(<Harness submit={submit} confirmStep remaining={100} />);
+  await fillDraft("下一步：确认");
+  fireEvent.click(screen.getByText("下一步：确认"));
+  const confirm = await screen.findByTestId("payment-confirm");
+  expect(confirm).toHaveTextContent("合同 测试");
+  expect(confirm).toHaveTextContent("22.6");
+  expect(confirm).toHaveTextContent("登记后该合同待结 CNY ¥77.4");
+  expect(confirm).toHaveTextContent("计入应付合计和对账数据");
+  expect(submit).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("返回修改"));
+  expect(screen.queryByTestId("payment-confirm")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText("下一步：确认"));
+  fireEvent.click(await screen.findByText("确认登记"));
+  await waitFor(() =>
+    expect(submit).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 22.6 }),
+    ),
+  );
+});
+
+it("confirmStep: flags a leftover of 1 or less as 尾差 (no write-off)", async () => {
+  render(<Harness submit={vi.fn()} confirmStep remaining={23} />);
+  await fillDraft("下一步：确认");
+  fireEvent.click(screen.getByText("下一步：确认"));
+  expect(await screen.findByTestId("payment-confirm")).toHaveTextContent(
+    "尾差，不会自动核销",
+  );
 });
