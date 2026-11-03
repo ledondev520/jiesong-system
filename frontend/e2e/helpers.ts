@@ -4,7 +4,7 @@
  * Pos: 浏览器验收共用辅助；注册仅申请审核，采购汇总遵循 receipts DTO
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
-import { expect, type Page, type Route } from "@playwright/test";
+import { expect, type Locator, type Page, type Route } from "@playwright/test";
 import { createHash } from "node:crypto";
 import type { PurchaseReceiptList } from "../src/services/purchaseReceipt.service";
 import { pricingConfigFixture as pricingDefaults } from "../src/test/fixtures/pricing-config";
@@ -2413,3 +2413,65 @@ export const signInAsAdmin = async (page: Page, targetPath = "/dashboard") => {
   await expect(page).toHaveURL(new RegExp(`${escapeForRegex(targetPath)}$`));
   await expect(page).not.toHaveURL(/\/login$/);
 };
+
+/**
+ * 职责：在 DateStringPicker（弹层日历）里选 yyyy-MM-dd；取代原生 type=date 的 fill。
+ * @param page 当前页面（弹层挂在 body 下，不在对话框内）
+ * @param trigger 日期触发按钮（用 getByLabel/getByRole 取得）
+ * @param iso 目标日期 yyyy-MM-dd
+ * @returns 选定并弹层关闭后的 Promise<void>
+ */
+export async function pickDate(page: Page, trigger: Locator, iso: string) {
+  const [year, month, day] = iso.split("-").map(Number);
+  await trigger.click();
+  const popover = page.locator('[data-slot="popover-content"]');
+  await expect(popover).toBeVisible();
+  const caption = popover.locator(".rdp-caption_label");
+  for (let step = 0; step < 240; step += 1) {
+    const shown = new Date(`1 ${(await caption.innerText()).trim()} UTC`);
+    const diff =
+      (year - shown.getUTCFullYear()) * 12 + (month - 1 - shown.getUTCMonth());
+    if (diff === 0) break;
+    await popover
+      .locator(diff > 0 ? ".rdp-button_next" : ".rdp-button_previous")
+      .click();
+  }
+  await popover
+    .locator("td.rdp-day:not(.rdp-outside) button")
+    .getByText(String(day), { exact: true })
+    .click();
+  // 选日期后弹层不会自动关闭（DatePicker 不受控），按 Esc 关闭，避免遮住后续字段。
+  await page.keyboard.press("Escape");
+  await expect(popover).toBeHidden();
+}
+
+/**
+ * 职责：对「可能是原生输入、也可能是日期选择按钮」的字段统一填值（日期按钮走 pickDate，空串表示不选）。
+ * @param page 当前页面
+ * @param field 字段定位器
+ * @param value 要填的值（日期为 yyyy-MM-dd）
+ * @returns 填写完成的 Promise<void>
+ */
+export async function fillField(page: Page, field: Locator, value: string) {
+  const tag = await field.evaluate((node) => node.tagName);
+  if (tag === "BUTTON") {
+    if (value) await pickDate(page, field, value);
+    return;
+  }
+  await field.fill(value);
+}
+
+/**
+ * 职责：断言字段值；日期选择按钮显示 yyyy-MM-dd，未选择显示占位「选择日期」。
+ * @param field 字段定位器
+ * @param value 期望值
+ * @returns 断言完成的 Promise<void>
+ */
+export async function expectField(field: Locator, value: string) {
+  const tag = await field.evaluate((node) => node.tagName);
+  if (tag === "BUTTON") {
+    await expect(field).toContainText(value || "选择日期");
+    return;
+  }
+  await expect(field).toHaveValue(value);
+}

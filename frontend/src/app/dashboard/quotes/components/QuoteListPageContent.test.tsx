@@ -135,4 +135,36 @@ describe("quote list", () => {
     await screen.findAllByText("QT2610-001");
     expect(screen.getByText("新建报价")).toBeTruthy();
   });
+
+  describe("空态区分（B45）", () => {
+    const empty = { data: { items: [], pagination: { total: 0 } } };
+
+    it("真的还没有报价：引导新建（有新建权限时）", async () => {
+      mocks.getAll.mockResolvedValue(empty);
+      render(<QuoteListPageContent />);
+      expect(
+        (await screen.findAllByText(/还没有报价。点击右上角「新建报价」/))
+          .length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByText("暂无报价。")).toBeNull();
+    });
+
+    it("筛选无结果：提示调整或重置，而不是「没有报价」", async () => {
+      window.history.replaceState({}, "", "/dashboard/quotes?keyword=zzz");
+      mocks.getAll.mockResolvedValue(empty);
+      render(<QuoteListPageContent />);
+      expect(
+        (await screen.findAllByText(/没有符合条件的报价/)).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it("加载失败：显示失败提示，不冒充「暂无报价」", async () => {
+      mocks.getAll.mockRejectedValue(new Error("boom"));
+      render(<QuoteListPageContent />);
+      expect(
+        (await screen.findAllByText(/加载失败，请刷新/)).length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByText(/还没有报价/)).toBeNull();
+    });
+  });
 });

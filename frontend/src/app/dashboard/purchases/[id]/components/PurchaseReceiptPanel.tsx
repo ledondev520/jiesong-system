@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateStringPicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -641,14 +642,10 @@ export function PurchaseReceiptPanel({
             >
               <fieldset disabled={saving} className="space-y-4">
                 <Label htmlFor="receipt-date">到货日期</Label>
-                <Input
-                  id="receipt-date"
-                  type="date"
-                  required
+                <DateStringPicker
                   value={arrival.date}
-                  onChange={(event) =>
-                    changeArrival({ date: event.target.value })
-                  }
+                  onChange={(date) => changeArrival({ date })}
+                  triggerProps={{ id: "receipt-date" }}
                 />
                 {remainingItems.map((item) => (
                   <div key={item.purchaseItemId} className="space-y-2">

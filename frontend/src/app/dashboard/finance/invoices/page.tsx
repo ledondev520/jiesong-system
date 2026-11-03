@@ -15,6 +15,7 @@ import { useTableSort } from "@/lib/hooks/useTableSort";
 import { useSearchParams } from "next/navigation";
 import { MobileListCard } from "@/components/mobile";
 import { Input } from "@/components/ui/input";
+import { DateStringPicker } from "@/components/ui/date-picker";
 import {
   Select,
   SelectContent,
@@ -317,24 +318,24 @@ export default function InvoicesPage() {
               <SelectItem value="已红冲-全额">已红冲</SelectItem>
             </SelectContent>
           </Select>
-          <Input
-            type="date"
+          <DateStringPicker
             value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
+            onChange={(value) => {
+              setDateFrom(value);
               setPage(1);
             }}
-            className="w-[140px] h-9"
+            placeholder="开始日期"
+            className="h-9 w-[140px]"
           />
           <span className="text-muted-foreground text-sm">~</span>
-          <Input
-            type="date"
+          <DateStringPicker
             value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
+            onChange={(value) => {
+              setDateTo(value);
               setPage(1);
             }}
-            className="w-[140px] h-9"
+            placeholder="结束日期"
+            className="h-9 w-[140px]"
           />
           {(search || status || dateFrom || dateTo) && (
             <Button variant="ghost" size="sm" onClick={resetFilters}>

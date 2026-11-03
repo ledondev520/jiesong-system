@@ -6,11 +6,16 @@
 
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MISSING_VALUE, isMissing } from "@/lib/missing-value";
 import { cn } from "@/lib/utils";
 
 interface KpiCardProps {
   label: string;
-  value: string;
+  /** 缺失（null/undefined）显示「—」，不是 0；加载中请传 loading。 */
+  value: string | null | undefined;
+  /** 加载中：显示骨架，不显示 0 或「—」（避免把没加载完误读成空系统）。 */
+  loading?: boolean;
   subLabel?: string;
   trend?: "up" | "down" | "neutral";
   trendValue?: string;
@@ -22,6 +27,7 @@ interface KpiCardProps {
 export function KpiCard({
   label,
   value,
+  loading = false,
   subLabel,
   trend = "neutral",
   trendValue,
@@ -39,26 +45,37 @@ export function KpiCard({
         className,
       )}
     >
-      <CardContent className="p-5">
+      <CardContent className="p-5" aria-busy={loading || undefined}>
         <div className="flex items-start justify-between">
           <div className="space-y-3 flex-1">
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80">
               {label}
             </p>
             <div className="space-y-1">
-              <p
-                className={cn(
-                  "text-2xl font-bold tabular-nums tracking-tight text-foreground",
-                  valueClassName,
-                )}
-              >
-                {value}
-              </p>
-              {subLabel && (
-                <p className="text-xs text-muted-foreground">{subLabel}</p>
+              {loading ? (
+                <>
+                  <div role="status" aria-label="加载中">
+                    <Skeleton className="h-8 w-28" />
+                  </div>
+                  {subLabel && <Skeleton className="h-3 w-36" />}
+                </>
+              ) : (
+                <>
+                  <p
+                    className={cn(
+                      "text-2xl font-bold tabular-nums tracking-tight text-foreground",
+                      valueClassName,
+                    )}
+                  >
+                    {isMissing(value) ? MISSING_VALUE : value}
+                  </p>
+                  {subLabel && (
+                    <p className="text-xs text-muted-foreground">{subLabel}</p>
+                  )}
+                </>
               )}
             </div>
-            {trendValue && (
+            {!loading && trendValue && (
               <div className="flex items-center gap-1.5">
                 <span
                   className={cn(
