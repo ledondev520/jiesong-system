@@ -267,7 +267,7 @@ export function HsCodeAiRecommendDialog({
                         {aiRecommendResult.evidence.pendingConfirmationFields &&
                         aiRecommendResult.evidence.pendingConfirmationFields
                           .length > 0 ? (
-                          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                          <div className="rounded-md border border-status-amber/30 bg-status-amber-soft px-3 py-2 text-xs text-status-amber">
                             仍需确认：
                             {aiRecommendResult.evidence.pendingConfirmationFields.join(
                               "、",
@@ -279,9 +279,9 @@ export function HsCodeAiRecommendDialog({
 
                     {/* HSCIQ 权威数据（税率、监管条件等） */}
                     {aiRecommendResult.hsciqDetail?.taxes && (
-                      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4 space-y-2">
+                      <div className="rounded-lg border border-status-blue/30 bg-status-blue-soft p-4 space-y-2">
                         <p className="text-sm font-medium flex items-center gap-1.5">
-                          <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
+                          <span className="inline-block w-2 h-2 rounded-full bg-status-blue" />
                           官方税率信息
                         </p>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
@@ -369,7 +369,7 @@ export function HsCodeAiRecommendDialog({
                               className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                             >
                               {copied ? (
-                                <Check className="h-3 w-3 text-green-500" />
+                                <Check className="h-3 w-3 text-status-green" />
                               ) : (
                                 <Copy className="h-3 w-3" />
                               )}
@@ -392,8 +392,7 @@ export function HsCodeAiRecommendDialog({
                                   <span
                                     className={cn(
                                       "flex-1",
-                                      item.uncertain &&
-                                        "text-amber-600 dark:text-amber-400",
+                                      item.uncertain && "text-status-amber",
                                     )}
                                   >
                                     {item.value}

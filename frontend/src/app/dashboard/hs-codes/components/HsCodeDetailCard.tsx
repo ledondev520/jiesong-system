@@ -300,7 +300,7 @@ export function HsCodeDetailCard({
                     className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
                     {fillCopied ? (
-                      <Check className="h-3 w-3 text-green-500" />
+                      <Check className="h-3 w-3 text-status-green" />
                     ) : (
                       <Copy className="h-3 w-3" />
                     )}
@@ -322,8 +322,7 @@ export function HsCodeDetailCard({
                       <span
                         className={cn(
                           "min-w-0 flex-1 break-words font-medium",
-                          item.uncertain &&
-                            "text-amber-600 dark:text-amber-400",
+                          item.uncertain && "text-status-amber",
                         )}
                       >
                         {item.value}
