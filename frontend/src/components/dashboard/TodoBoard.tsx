@@ -69,7 +69,28 @@ const LIST_META: Record<
   refundable: { all: "/dashboard/tax-refunds", currency: "CNY" },
 };
 
+/** 对方名称为空时的占位：采购类卡片是供应商，其余是客户。 */
+const SUPPLIER_LISTS: TodoKey[] = [
+  "paymentsDue",
+  "receiptsToInspect",
+  "missingInvoice",
+];
+
 const KEYS = Object.keys(LIST_META) as TodoKey[];
+
+/** 每张卡片的统一口径说明（与 dashboardTodosService 的口径注释一致）；「可申报退税」另按 pending 单独写。 */
+const SCOPE: Record<TodoKey, string> = {
+  quotesToSend: "报价为草稿，尚未发送",
+  quotesAwaitingCustomer: "报价已发送，等待客户回复",
+  ordersToPurchase: "已确认订单中，仍有订单行未采购且库存未覆盖",
+  paymentsDue: "已生效采购合同，应付金额大于 0",
+  receiptsToInspect: "采购合同已发货，尚未收货",
+  toLoad: "出口合同已确认，待装柜",
+  toShip: "出口合同装柜中，待发运",
+  missingInvoice: "货已出，未登记发票号也无已关联发票的采购合同",
+  overdueReceivables: "发运超过 30 天仍有未收余额的出口合同",
+  refundable: "本申报月退税工作台中材料核验通过的出口",
+};
 
 const money = (value: number | null, currency: Currency = "CNY") =>
   value === null
@@ -84,8 +105,15 @@ const FIGURES: Array<[keyof BossFigures["definitions"], string, Currency]> = [
 
 export function TodoBoard({ todos }: { todos: DashboardTodos }) {
   const keys = KEYS.filter((key) => todos.lists[key]);
+  // 页头数字取各卡片数量之和，不另起口径（退税工作台的「待处理出口」只在退税卡片上单独说明）。
+  const total = keys.reduce((sum, key) => sum + todos.lists[key]!.count, 0);
   return (
     <div className="space-y-5">
+      {keys.length > 0 && (
+        <p className="text-sm text-muted-foreground" data-testid="todo-total">
+          共 {total} 项待办 · 为下方各卡片数量之和
+        </p>
+      )}
       {todos.figures && (
         <section
           className="grid grid-cols-1 gap-3 sm:grid-cols-3"
@@ -124,24 +152,30 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                 <CardHeader className="flex-row items-center justify-between space-y-0">
                   <div className="min-w-0">
                     <CardTitle className="text-base">{list.label}</CardTitle>
-                    {list.historical && list.historical.count > 0 && (
-                      <p
-                        className="mt-0.5 text-xs text-muted-foreground"
-                        data-testid={`${key}-scope`}
-                      >
-                        仅含 {list.historical.before} 起签约，不含{" "}
-                        {list.historical.count} 条历史
-                      </p>
-                    )}
-                    {list.pending && (
-                      <p
-                        className="mt-0.5 text-xs text-muted-foreground"
-                        data-testid={`${key}-scope`}
-                      >
-                        材料核验通过；工作台共 {list.pending.count} 个
-                        {list.pending.label}
-                      </p>
-                    )}
+                    <p
+                      className="mt-0.5 text-xs text-muted-foreground"
+                      data-testid={`${key}-scope`}
+                    >
+                      {SCOPE[key]}
+                      {list.historical && list.historical.count > 0 && (
+                        <>
+                          ；仅含 {list.historical.before} 起签约，不含{" "}
+                          {list.historical.count} 条历史
+                        </>
+                      )}
+                      {list.pending && (
+                        <>
+                          ；退税工作台本月共 {list.pending.count} 个
+                          {list.pending.label}，其余多为发票待复核或缺失，
+                          <Link
+                            href={meta.all}
+                            className="text-primary hover:underline"
+                          >
+                            去退税工作台
+                          </Link>
+                        </>
+                      )}
+                    </p>
                   </div>
                   <Badge variant={list.count > 0 ? "default" : "outline"}>
                     {list.count}
@@ -172,7 +206,12 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                             </span>
                           )}
                           <span className="min-w-0 truncate text-muted-foreground">
-                            {item.party ?? ""}
+                            {item.party ??
+                              (key === "refundable"
+                                ? ""
+                                : SUPPLIER_LISTS.includes(key)
+                                  ? "未登记供应商"
+                                  : "未登记客户")}
                           </span>
                           {item.amount !== null && (
                             <span className="shrink-0 tabular-nums">
