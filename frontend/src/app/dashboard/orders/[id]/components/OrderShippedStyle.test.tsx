@@ -76,11 +76,11 @@ describe("已发运订单的历史装箱告警配色", () => {
 
   it("货柜页签：已发运的利用率不显示绿色，未发运达标仍为绿色", () => {
     const shipped = renderContainer("SHIPPED");
-    expect(shipped.container.innerHTML).not.toContain("text-emerald-700");
+    expect(shipped.container.innerHTML).not.toContain("text-status-green");
     shipped.unmount();
     const packing = renderContainer("PACKING");
     expect(
-      packing.container.querySelector("span.text-emerald-700"),
+      packing.container.querySelector("span.text-status-green"),
     ).not.toBeNull();
   });
 });

@@ -143,50 +143,46 @@ function StatusPill({ status }: { status: PurchaseStatus }) {
     [PurchaseStatus.DRAFT]: {
       label: "草稿",
       icon: <Circle className="h-3 w-3 fill-current" />,
-      className:
-        "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800",
+      className: "bg-status-gray-soft text-status-gray border-status-gray/30",
     },
     [PurchaseStatus.SIGNED]: {
       label: PURCHASE_STATUS_LABELS.SIGNED,
       icon: <CheckCircle2 className="h-3 w-3" />,
       className:
-        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+        "bg-status-green-soft text-status-green border-status-green/30",
     },
     [PurchaseStatus.PRODUCING]: {
       label: "生产中",
       icon: <Loader2 className="h-3 w-3 animate-spin" />,
-      className:
-        "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+      className: "bg-status-blue-soft text-status-blue border-status-blue/30",
     },
     [PurchaseStatus.READY]: {
       label: "生产完成",
       icon: <PackageCheck className="h-3 w-3" />,
-      className:
-        "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950 dark:text-cyan-400 dark:border-cyan-800",
+      className: "bg-status-blue-soft text-status-blue border-status-blue/30",
     },
     [PurchaseStatus.SHIPPED]: {
       label: "已发货",
       icon: <Truck className="h-3 w-3" />,
       className:
-        "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800",
+        "bg-status-amber-soft text-status-amber border-status-amber/30",
     },
     [PurchaseStatus.RECEIVED]: {
       label: "已收货",
       icon: <PackageCheck className="h-3 w-3" />,
       className:
-        "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950 dark:text-violet-400 dark:border-violet-800",
+        "bg-status-green-soft text-status-green border-status-green/30",
     },
     [PurchaseStatus.COMPLETED]: {
       label: "已完成",
       icon: <CheckCircle2 className="h-3 w-3" />,
       className:
-        "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800",
+        "bg-status-green-soft text-status-green border-status-green/30",
     },
     [PurchaseStatus.CANCELLED]: {
       label: "已取消",
       icon: <X className="h-3 w-3" />,
-      className:
-        "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800",
+      className: "bg-status-red-soft text-status-red border-status-red/30",
     },
   };
 
@@ -240,7 +236,7 @@ function PurchaseTimelineStep({
           isCurrent
             ? "border-primary bg-primary text-primary-foreground"
             : isCompleted
-              ? "border-emerald-500 bg-emerald-50 text-emerald-600 dark:bg-emerald-950"
+              ? "border-status-green bg-status-green-soft text-status-green"
               : "border-border bg-muted text-muted-foreground",
         )}
       >
@@ -267,7 +263,7 @@ function PurchaseTimelineStep({
           aria-hidden="true"
           className={cn(
             "absolute left-[calc(50%+1rem)] top-4 h-[2px] w-[calc(100%-2rem)]",
-            index < currentIndex ? "bg-emerald-500" : "bg-border",
+            index < currentIndex ? "bg-status-green" : "bg-border",
           )}
         />
       ) : null}
@@ -293,7 +289,7 @@ function ContractTimeline({
     <div className="rounded-xl border border-border/40 bg-card p-5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
       <h3 className="mb-4 text-sm font-medium">合同进度</h3>
       {isCancelled ? (
-        <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-400">
+        <div className="flex items-center gap-2 rounded-lg bg-status-red-soft p-3 text-sm text-status-red">
           <X className="h-4 w-4" />
           该合同已取消
         </div>
@@ -855,8 +851,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
           <CardContent className="pt-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Receipt className="h-4 w-4 text-emerald-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-green-soft">
+                <Receipt className="h-4 w-4 text-status-green" />
               </div>
               <div className="flex-1">
                 <div className="text-xl font-bold tabular-nums">
@@ -873,8 +869,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
           <CardContent className="pt-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
-                <DollarSign className="h-4 w-4 text-amber-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-amber-soft">
+                <DollarSign className="h-4 w-4 text-status-amber" />
               </div>
               <div>
                 {payable ? (
@@ -901,8 +897,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <Card className="overflow-hidden rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
           <CardContent className="pt-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10">
-                <Building2 className="h-4 w-4 text-sky-600" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-blue-soft">
+                <Building2 className="h-4 w-4 text-status-blue" />
               </div>
               <div className="min-w-0">
                 <div
@@ -921,7 +917,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       {amountSummary.issues.length > 0 && (
         <div
           role="alert"
-          className="rounded-lg border border-amber-300/70 bg-amber-50/70 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+          className="rounded-lg border border-status-amber/30 bg-status-amber-soft p-3 text-sm text-status-amber"
         >
           <div className="flex items-start gap-2">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1268,7 +1264,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                     >
                       不含税合计
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm tabular-nums text-emerald-600">
+                    <TableCell className="text-right font-mono text-sm tabular-nums text-status-green">
                       ¥{amountSummary.netAmount.toLocaleString()}
                     </TableCell>
                   </TableRow>
@@ -1290,7 +1286,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                     >
                       含税合计
                     </TableCell>
-                    <TableCell className="text-right font-mono text-base font-bold tabular-nums text-emerald-600">
+                    <TableCell className="text-right font-mono text-base font-bold tabular-nums text-status-green">
                       ¥{amountSummary.lineGrossAmount.toLocaleString()}
                     </TableCell>
                   </TableRow>
