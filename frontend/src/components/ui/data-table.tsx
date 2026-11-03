@@ -67,7 +67,8 @@ export interface DataTableFilterChip {
 export interface DataTablePagination {
   page: number;
   pageSize: number;
-  total: number;
+  /** 总数未知（接口没给或加载失败）时传 null/undefined：不显示「共 N 条」，也不显示 0。 */
+  total?: number | null;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 }
@@ -169,9 +170,15 @@ export function DataTable<T>({
     selection.onChange(next);
   };
 
-  const totalPages = pagination
-    ? Math.max(1, Math.ceil(pagination.total / pagination.pageSize))
-    : 1;
+  const totalKnown =
+    pagination !== undefined && Number.isFinite(pagination.total);
+  const totalPages =
+    pagination && totalKnown
+      ? Math.max(
+          1,
+          Math.ceil((pagination.total as number) / pagination.pageSize),
+        )
+      : 1;
   const headClass = "sticky top-0 z-10 bg-card";
 
   return (
@@ -406,8 +413,12 @@ export function DataTable<T>({
       {pagination && !loading && !hasError ? (
         <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <span>
-            共 {pagination.total} 条
-            {totalPages > 1 ? `，第 ${pagination.page}/${totalPages} 页` : ""}
+            {totalKnown
+              ? `共 ${pagination.total} 条`
+              : `第 ${pagination.page} 页`}
+            {totalKnown && totalPages > 1
+              ? `，第 ${pagination.page}/${totalPages} 页`
+              : ""}
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <PageSizeSelect
@@ -427,7 +438,11 @@ export function DataTable<T>({
               type="button"
               variant="outline"
               size="sm"
-              disabled={pagination.page >= totalPages}
+              disabled={
+                totalKnown
+                  ? pagination.page >= totalPages
+                  : data.length < pagination.pageSize
+              }
               onClick={() => pagination.onPageChange(pagination.page + 1)}
             >
               下一页

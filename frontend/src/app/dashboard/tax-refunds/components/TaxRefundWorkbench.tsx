@@ -7,6 +7,7 @@
 "use client";
 
 import { LoadingValue } from "@/components/ui/loading-value";
+import { orMissing } from "@/lib/missing-value";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import {
   useCallback,
@@ -269,31 +270,41 @@ export function TaxRefundWorkbench() {
             <div className="rounded-lg border bg-background p-3">
               <p className="text-xs text-muted-foreground">待处理出口</p>
               <p className="mt-1 text-2xl font-semibold">
-                {summary?.contracts ?? "-"}
+                <LoadingValue loading={loading} className="h-7 w-10">
+                  {orMissing(summary?.contracts)}
+                </LoadingValue>
               </p>
             </div>
             <div className="rounded-lg border bg-background p-3">
               <p className="text-xs text-muted-foreground">材料核验通过</p>
               <p className="mt-1 text-2xl font-semibold text-status-green">
-                {summary?.materialReadyCount ?? "-"}
+                <LoadingValue loading={loading} className="h-7 w-10">
+                  {orMissing(summary?.materialReadyCount)}
+                </LoadingValue>
               </p>
             </div>
             <div className="rounded-lg border bg-background p-3">
               <p className="text-xs text-muted-foreground">待复核合同</p>
               <p className="mt-1 text-2xl font-semibold text-status-amber">
-                {summary?.needsReview ?? "-"}
+                <LoadingValue loading={loading} className="h-7 w-10">
+                  {orMissing(summary?.needsReview)}
+                </LoadingValue>
               </p>
             </div>
             <div className="rounded-lg border bg-background p-3">
               <p className="text-xs text-muted-foreground">缺失发票</p>
               <p className="mt-1 text-2xl font-semibold text-status-red">
-                {summary?.missingInvoices ?? "-"}
+                <LoadingValue loading={loading} className="h-7 w-10">
+                  {orMissing(summary?.missingInvoices)}
+                </LoadingValue>
               </p>
             </div>
             <div className="rounded-lg border bg-background p-3">
               <p className="text-xs text-muted-foreground">已确认出货</p>
               <p className="mt-1 text-2xl font-semibold">
-                {summary?.confirmedCount ?? "-"}
+                <LoadingValue loading={loading} className="h-7 w-10">
+                  {orMissing(summary?.confirmedCount)}
+                </LoadingValue>
               </p>
             </div>
           </div>
@@ -374,7 +385,10 @@ export function TaxRefundWorkbench() {
       )}
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         <span>
-          共 <LoadingValue loading={loading}>{data?.total ?? 0}</LoadingValue>{" "}
+          共{" "}
+          <LoadingValue loading={loading}>
+            {orMissing(data?.total)}
+          </LoadingValue>{" "}
           条，第 {page} 页
         </span>
         <PageSizeSelect

@@ -241,6 +241,67 @@ describe("DataTable", () => {
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
+  it("总数未知（null/undefined）时不显示「共 N 条」，只显示页码，下一页按本页是否满页决定", () => {
+    for (const total of [null, undefined]) {
+      const { unmount } = render(
+        <DataTable
+          columns={columns}
+          data={rows}
+          rowKey={(r) => r.id}
+          pagination={{
+            page: 2,
+            pageSize: 3,
+            total,
+            onPageChange: vi.fn(),
+            onPageSizeChange: vi.fn(),
+          }}
+        />,
+      );
+      expect(screen.queryByText(/共/)).toBeNull();
+      expect(screen.queryByText(/0 条/)).toBeNull();
+      expect(screen.getByText("第 2 页")).toBeInTheDocument();
+      // 本页满页（3/3），总数未知：仍允许翻下一页
+      expect(screen.getByRole("button", { name: "下一页" })).toBeEnabled();
+      unmount();
+    }
+  });
+
+  it("总数未知且本页不满时，下一页禁用", () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={rows.slice(0, 2)}
+        rowKey={(r) => r.id}
+        pagination={{
+          page: 1,
+          pageSize: 3,
+          total: null,
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "下一页" })).toBeDisabled();
+  });
+
+  it("总数为真实的 0 时照常显示「共 0 条」", () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={[]}
+        rowKey={(r) => r.id}
+        pagination={{
+          page: 1,
+          pageSize: 20,
+          total: 0,
+          onPageChange: vi.fn(),
+          onPageSizeChange: vi.fn(),
+        }}
+      />,
+    );
+    expect(screen.getByText("共 0 条")).toBeInTheDocument();
+  });
+
   describe("renderCard (narrow screens, review R1-5)", () => {
     // jsdom applies no CSS, so assert the layout classes: only the table may be desktop-only.
     const desktopOnly = (el: HTMLElement) =>
