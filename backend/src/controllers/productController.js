@@ -10,7 +10,19 @@ const prisma = require('../utils/prisma');
 const { listLowStockAlerts } = require('../services/inventoryAlertService');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
+const { INVENTORY_STATUS } = require('../config/constants');
 const { normalizePagination, parsePositiveInt } = require('../utils/pagination');
+
+// 可用库存 = 已入库(INBOUND)数量合计，与低库存预警(inventoryAlertService)同一口径；无库存记录按 0。
+const loadAvailableStock = async (productIds) => {
+  if (productIds.length === 0) return new Map();
+  const rows = await prisma.inventory.groupBy({
+    by: ['productId'],
+    where: { productId: { in: productIds }, status: INVENTORY_STATUS.INBOUND },
+    _sum: { quantity: true },
+  });
+  return new Map(rows.map(row => [row.productId, row._sum.quantity ?? 0]));
+};
 
 // 请求体字段只接受标量，数组/对象不得进入 Prisma data（CodeQL type-confusion）。
 const bodyText = (value, label) => {
@@ -147,7 +159,11 @@ const list = async (req, res, next) => {
       prisma.product.count({ where }),
     ]);
     
-    const items = lowStock ? products.map(product => ({ ...product, availableStock: alertByProduct.get(product.id)?.currentStock ?? 0 })) : products;
+    const stock = await loadAvailableStock(products.map(product => product.id));
+    const items = products.map(product => ({
+      ...product,
+      availableStock: lowStock ? (alertByProduct.get(product.id)?.currentStock ?? 0) : (stock.get(product.id) ?? 0),
+    }));
     paginated(res, items, total, page, pageSize);
   } catch (error) {
     next(error);
@@ -173,7 +189,8 @@ const getById = async (req, res, next) => {
       throw createError('商品不存在', 404);
     }
     
-    success(res, product);
+    const stock = await loadAvailableStock([product.id]);
+    success(res, { ...product, availableStock: stock.get(product.id) ?? 0 });
   } catch (error) {
     next(error);
   }

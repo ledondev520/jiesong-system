@@ -1,6 +1,6 @@
 /**
  * Input: 商品服务API、URL初始关键词/低库存/资料不全参数、独立商品编辑/保存会话
- * Output: 商品管理页面，失败保留草稿、旧保存不干扰新会话或当前筛选
+ * Output: 商品管理页面，失败保留草稿、旧保存不干扰新会话或当前筛选；卡片不含删除（删除在详情页危险区），显示可用库存，未维护的重量/体积显示「未维护」
  * Pos: 资料模块页面；库存已拆到 /dashboard/inventory
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -27,7 +27,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Search, Package, X } from "lucide-react";
+import { Plus, Pencil, Search, Package, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { formatMeasure } from "./measure";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ProductDialog } from "./components/ProductDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -35,16 +37,6 @@ import { MobileListCard } from "@/components/mobile";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { toast } from "sonner";
 import { runAwait } from "@/lib/run-await";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 
 /**
@@ -107,9 +99,6 @@ function ProductsPageContent() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [keyword, setKeyword] = useState(initialKeyword);
   const debouncedKeyword = useDebouncedValue(keyword, 350);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
@@ -221,49 +210,6 @@ function ProductsPageContent() {
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) dialogSession.current += 1;
     setIsDialogOpen(nextOpen);
-  };
-
-  /**
-   * 职责：打开删除确认弹窗并记录当前待删除商品。
-   * 思路：先缓存目标商品，再打开受控弹窗供用户确认。
-   * @param product 待删除的商品记录
-   */
-  const openDeleteDialog = (product: Product) => {
-    // 0. 初始化待删除上下文
-    setProductToDelete(product);
-    setDeleteDialogOpen(true);
-  };
-
-  /**
-   * 职责：执行商品删除并同步本地列表状态。
-   * 思路：
-   * 1. 校验待删除商品是否存在；
-   * 2. 调用删除接口并在成功后更新本地列表；
-   * 3. 收口弹窗与加载态。
-   * @returns Promise<void>
-   */
-  const handleDeleteProduct = async (): Promise<void> => {
-    if (!productToDelete) {
-      return;
-    }
-
-    setDeleting(true);
-    try {
-      await productService.delete(productToDelete.id);
-      setProducts((prevProducts) =>
-        prevProducts.filter((product) => product.id !== productToDelete.id),
-      );
-      toast.success("商品已删除");
-      if (products.length === 1 && currentPage > 1)
-        setCurrentPage((page) => page - 1);
-      else void loadProducts();
-      setDeleteDialogOpen(false);
-      setProductToDelete(null);
-    } catch {
-      toast.error("删除失败");
-    } finally {
-      setDeleting(false);
-    }
   };
 
   const handleSubmit = async (data: Record<string, unknown>) => {
@@ -406,20 +352,23 @@ function ProductsPageContent() {
             <MobileListCard
               key={product.id}
               title={product.customsName}
+              badge={
+                product.isActive === false ? (
+                  <Badge variant="secondary">已停用</Badge>
+                ) : undefined
+              }
               subtitle={
                 [product.specification, product.unit]
                   .filter(Boolean)
                   .join(" · ") || "-"
               }
               fields={[
-                ...(lowStock
-                  ? [
-                      {
-                        label: "可用库存 / 阈值",
-                        value: `${product.availableStock ?? 0} / ${product.lowStockThreshold ?? 0}`,
-                      },
-                    ]
-                  : []),
+                {
+                  label: lowStock ? "可用库存 / 阈值" : "可用库存",
+                  value: lowStock
+                    ? `${product.availableStock ?? 0} / ${product.lowStockThreshold ?? 0}`
+                    : String(product.availableStock ?? 0),
+                },
                 ...(incomplete
                   ? [
                       {
@@ -431,19 +380,15 @@ function ProductsPageContent() {
                 { label: "包装规格", value: product.packingSpec || "-" },
                 {
                   label: "毛重",
-                  value:
-                    product.grossWeight != null
-                      ? `${product.grossWeight} kg`
-                      : "-",
+                  value: formatMeasure(product.grossWeight, "kg"),
                 },
                 {
                   label: "净重",
-                  value:
-                    product.netWeight != null ? `${product.netWeight} kg` : "-",
+                  value: formatMeasure(product.netWeight, "kg"),
                 },
                 {
                   label: "体积",
-                  value: product.volume != null ? `${product.volume} CBM` : "-",
+                  value: formatMeasure(product.volume, "CBM"),
                 },
               ]}
               action={
@@ -466,16 +411,6 @@ function ProductsPageContent() {
                       onClick={() => handleEdit(product)}
                     >
                       <Pencil className="mr-1 h-4 w-4" /> 编辑
-                    </Button>
-                  </BusinessWrite>
-                  <BusinessWrite>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-10 rounded-xl px-3"
-                      onClick={() => openDeleteDialog(product)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </BusinessWrite>
                 </div>
@@ -538,9 +473,16 @@ function ProductsPageContent() {
                           {product.specification || "—"}
                         </p>
                       </div>
-                      <Badge variant="outline" className="shrink-0 text-[11px]">
-                        {product.unit || "件"}
-                      </Badge>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {product.isActive === false && (
+                          <Badge variant="secondary" className="text-[11px]">
+                            已停用
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-[11px]">
+                          {product.unit || "件"}
+                        </Badge>
+                      </div>
                     </div>
 
                     {incomplete && (
@@ -548,12 +490,17 @@ function ProductsPageContent() {
                         缺少：{missingFields(product).join("、") || "-"}
                       </p>
                     )}
-                    {lowStock && (
-                      <p className="text-sm text-destructive">
-                        可用库存 {product.availableStock ?? 0} / 阈值{" "}
-                        {product.lowStockThreshold ?? 0}
-                      </p>
-                    )}
+                    <p
+                      className={cn(
+                        "text-sm",
+                        lowStock ? "text-destructive" : "text-muted-foreground",
+                      )}
+                    >
+                      可用库存 {product.availableStock ?? 0}
+                      {lowStock && (
+                        <> / 阈值 {product.lowStockThreshold ?? 0}</>
+                      )}
+                    </p>
                     {/* 规格信息 */}
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div className="rounded-lg bg-muted/40 p-2">
@@ -561,7 +508,7 @@ function ProductsPageContent() {
                           毛重
                         </p>
                         <p className="text-sm font-bold tabular-nums">
-                          {product.grossWeight || 0}kg
+                          {formatMeasure(product.grossWeight, "kg")}
                         </p>
                       </div>
                       <div className="rounded-lg bg-muted/40 p-2">
@@ -569,7 +516,7 @@ function ProductsPageContent() {
                           净重
                         </p>
                         <p className="text-sm font-bold tabular-nums">
-                          {product.netWeight || 0}kg
+                          {formatMeasure(product.netWeight, "kg")}
                         </p>
                       </div>
                       <div className="rounded-lg bg-muted/40 p-2">
@@ -577,7 +524,7 @@ function ProductsPageContent() {
                           体积
                         </p>
                         <p className="text-sm font-bold tabular-nums">
-                          {product.volume || 0}CBM
+                          {formatMeasure(product.volume, "CBM")}
                         </p>
                       </div>
                     </div>
@@ -624,19 +571,6 @@ function ProductsPageContent() {
                           }}
                         >
                           <Pencil className="mr-1 h-3 w-3" /> 编辑
-                        </Button>
-                      </BusinessWrite>
-                      <BusinessWrite>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 flex-1 rounded-lg text-xs text-destructive hover:bg-destructive/10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDeleteDialog(product);
-                          }}
-                        >
-                          <Trash2 className="mr-1 h-3 w-3" /> 删除
                         </Button>
                       </BusinessWrite>
                     </div>
@@ -687,35 +621,6 @@ function ProductsPageContent() {
         product={editingProduct}
         onSubmit={handleSubmit}
       />
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除商品 <strong>{productToDelete?.customsName}</strong>{" "}
-              吗？
-              <br />
-              此操作无法撤销。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={deleting}
-              onClick={() => setProductToDelete(null)}
-            >
-              取消
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteProduct}
-              disabled={deleting}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {deleting ? "删除中..." : "确认删除"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
