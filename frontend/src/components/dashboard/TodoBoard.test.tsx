@@ -167,7 +167,12 @@ describe("TodoBoard credibility (B49)", () => {
 
   it("falls back to a labelled placeholder for a missing party", () => {
     render(<TodoBoard todos={board} />);
-    expect(screen.getAllByText("未登记客户").length).toBeGreaterThan(0);
     expect(screen.getByText("未登记供应商")).toBeInTheDocument();
+  });
+
+  it("does not call a party unregistered when the backend never sends one", () => {
+    render(<TodoBoard todos={board} />);
+    // toShip 与 overdueReceivables 后端恒为 party=null
+    expect(screen.queryByText("未登记客户")).toBeNull();
   });
 });

@@ -69,12 +69,14 @@ const LIST_META: Record<
   refundable: { all: "/dashboard/tax-refunds", currency: "CNY" },
 };
 
-/** 对方名称为空时的占位：采购类卡片是供应商，其余是客户。 */
-const SUPPLIER_LISTS: TodoKey[] = [
-  "paymentsDue",
-  "receiptsToInspect",
-  "missingInvoice",
-];
+/** 对方名称为空时的占位；只列后端确实会返回对方名称的卡片（其余卡片后端恒为 null，不能说成「未登记」）。 */
+const PARTY_FALLBACK: Partial<Record<TodoKey, string>> = {
+  quotesToSend: "未登记客户",
+  quotesAwaitingCustomer: "未登记客户",
+  paymentsDue: "未登记供应商",
+  receiptsToInspect: "未登记供应商",
+  missingInvoice: "未登记供应商",
+};
 
 const KEYS = Object.keys(LIST_META) as TodoKey[];
 
@@ -166,7 +168,7 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                       {list.pending && (
                         <>
                           ；退税工作台本月共 {list.pending.count} 个
-                          {list.pending.label}，其余多为发票待复核或缺失，
+                          {list.pending.label}，其余需在退税工作台补齐材料，
                           <Link
                             href={meta.all}
                             className="text-primary hover:underline"
@@ -206,12 +208,7 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                             </span>
                           )}
                           <span className="min-w-0 truncate text-muted-foreground">
-                            {item.party ??
-                              (key === "refundable"
-                                ? ""
-                                : SUPPLIER_LISTS.includes(key)
-                                  ? "未登记供应商"
-                                  : "未登记客户")}
+                            {item.party ?? PARTY_FALLBACK[key] ?? ""}
                           </span>
                           {item.amount !== null && (
                             <span className="shrink-0 tabular-nums">
