@@ -53,7 +53,7 @@ const buildShipmentPreparation = ({ salesContract, purchases = [], declaration =
   }
   for (const result of invoiceVerification.results) {
     if (invoiceAllocations[result.invoiceNo]?.verified) {
-      result.issues = result.issues.filter(issue => issue !== '价税合计与源表采购金额不一致');
+      result.issues = result.issues.filter(issue => issue !== '价税合计与采购台账采购金额不一致');
       result.checks.total = true;
     }
     const actual = invoiceRecords.find(x => x.invNo === result.invoiceNo);

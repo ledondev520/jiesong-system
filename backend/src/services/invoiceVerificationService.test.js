@@ -91,11 +91,29 @@ test('相同发票同时来自数据库和导出文件时合并来源而不误�
   assert.deepEqual(result.results[0].lookupSources, ['database', 'invoice_file']);
 });
 
-test('未命中发票时仍保留源表厂家缺失问题，便于补证据', () => {
+test('未命中发票时仍保留台账厂家缺失问题，便于补证据', () => {
   const result = verifyShipmentInvoices({
     shipmentRows: [{ ...shipment, expectedSeller: null }],
     invoiceRecords: [],
   });
   assert.equal(result.results[0].status, 'MISSING');
-  assert.match(result.results[0].issues.join('；'), /源表缺少厂家/);
+  assert.match(result.results[0].issues.join('；'), /采购台账缺少厂家/);
+});
+
+test('用户可见的核验问题不出现内部词「源表」，改用采购台账表述 (B46)', () => {
+  const bare = { ...shipment, invoiceNo: '', expectedSeller: null, expectedTotal: null };
+  const mismatch = {
+    ...shipment,
+    expectedSeller: '另一家供应商',
+    itemName: '完全不同的品名',
+    expectedTotal: 500,
+  };
+  const issues = [
+    ...verifyShipmentInvoices({ shipmentRows: [bare], invoiceRecords: [] }).results,
+    ...verifyShipmentInvoices({ shipmentRows: [mismatch], invoiceRecords: [invoice] }).results,
+  ].flatMap((result) => result.issues);
+  assert.ok(issues.length >= 5, issues.join('；'));
+  assert.equal(issues.filter((issue) => issue.includes('源表')).length, 0);
+  assert.ok(issues.some((issue) => issue.includes('采购台账缺少发票号码')));
+  assert.ok(issues.some((issue) => issue.includes('价税合计与采购台账采购金额不一致')));
 });

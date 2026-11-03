@@ -20,10 +20,10 @@ const STEPS: ReadonlyArray<{ title: string; line: string; icon: LucideIcon }> =
     { title: "报价", line: "向客户发出报价", icon: FileText },
     { title: "出口订单", line: "确认订单与条款", icon: ClipboardList },
     { title: "采购", line: "按订单生成采购单", icon: ShoppingCart },
-    { title: "收货入库", line: "分批到货与验货", icon: PackageCheck },
+    { title: "库存", line: "分批到货与验货", icon: PackageCheck },
     { title: "装柜发运", line: "装箱、装柜与发运", icon: Container },
-    { title: "单证报关", line: "出货单证与报关", icon: FileStack },
-    { title: "发票与财务", line: "进项发票与收付款", icon: Receipt },
+    { title: "报关单", line: "出货单证与报关", icon: FileStack },
+    { title: "财务", line: "进项发票与收付款", icon: Receipt },
     { title: "出口退税", line: "按申报月份整理资料", icon: BadgePercent },
   ];
 

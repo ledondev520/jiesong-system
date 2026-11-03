@@ -5,7 +5,13 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CustomsDeclarationListPageContent } from "./CustomsDeclarationListPageContent";
 
@@ -131,6 +137,36 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
       expect(returnTo).not.toContain("returnTo=");
     },
   );
+
+  it("单号末尾的 -DRAFT 不作为单号显示，状态仍以状态徽章为准 (B46)", async () => {
+    window.history.replaceState({}, "", "/dashboard/customs");
+    mocks.params = new URLSearchParams(window.location.search);
+    mocks.getAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "d1",
+            declarationNo: "CUS-AUTO-20261101-EXP1-DRAFT",
+            status: "DECLARED",
+            totalAmount: 0,
+            currency: "USD",
+          },
+        ],
+        pagination: { total: 1 },
+      },
+    });
+    render(<CustomsDeclarationListPageContent />);
+    const row = await screen.findByTestId(
+      "declaration-row-CUS-AUTO-20261101-EXP1-DRAFT",
+    );
+    expect(row).toHaveTextContent("CUS-AUTO-20261101-EXP1");
+    expect(row).not.toHaveTextContent(/DRAFT/i);
+    expect(within(row).getByText("已申报")).toBeInTheDocument();
+    expect(within(row).queryByText("草稿")).not.toBeInTheDocument();
+    expect(
+      within(row).getByTitle("CUS-AUTO-20261101-EXP1-DRAFT"),
+    ).toBeInTheDocument();
+  });
 
   it("可翻到第2页，搜索后回到第1页，不漏掉20条以后的报关单", async () => {
     mocks.getAll.mockImplementation(async ({ page }) => ({

@@ -26,7 +26,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { Dispatch, SetStateAction } from "react";
 import type { UseTableSortResult } from "@/lib/hooks/useTableSort";
-import { formatPercent, isExpiredHsCode } from "../hs-code-helpers";
+import {
+  formatPercent,
+  isExpiredHsCode,
+  parseDeclarationElements,
+} from "../hs-code-helpers";
 
 export function HsCodeResultsCard({
   results,
@@ -230,10 +234,12 @@ export function HsCodeResultsCard({
                               variant="outline"
                               className="text-xs truncate max-w-[140px] block"
                             >
-                              {record.declarationElements.slice(0, 20)}
-                              {record.declarationElements.length > 20
-                                ? "…"
-                                : ""}
+                              {
+                                parseDeclarationElements(
+                                  record.declarationElements,
+                                ).length
+                              }{" "}
+                              项要素
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground text-xs">
