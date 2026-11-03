@@ -54,6 +54,10 @@ vi.mock("./components/FinanceOverviewCharts", () => ({
   ),
 }));
 
+vi.mock("./components/MonthlyStatementsTrend", () => ({
+  default: () => <div data-testid="monthly-statements-trend-stub" />,
+}));
+
 describe("FinancePage 交互逻辑", () => {
   beforeEach(() => {
     clearAllCache();
@@ -108,6 +112,42 @@ describe("FinancePage 交互逻辑", () => {
     expect(pageSource).toMatch(
       /import\(["']\.\/components\/FinanceOverviewCharts["']\)/,
     );
+  });
+
+  it("概览页同时渲染月度财务报表趋势，且图表库只经延迟加载的内部 Module 引入 (B41)", async () => {
+    mockGetStats.mockResolvedValue({
+      payable: { total: 1200, paid: 400, unpaid: 800 },
+      receivable: { total: 3200, received: 1000, unreceived: 2200 },
+    });
+    render(<FinancePage />);
+    expect(
+      await screen.findByTestId("monthly-statements-trend-stub"),
+    ).toBeInTheDocument();
+    const pageSource = readFileSync(
+      "src/app/dashboard/finance/page.tsx",
+      "utf8",
+    );
+    expect(pageSource).toMatch(
+      /import\(["']\.\/components\/MonthlyStatementsTrend["']\)/,
+    );
+  });
+
+  it("金额统一两位小数：整数/一位小数的金额也补齐到 .00/.30 (B41)", async () => {
+    mockGetStats.mockResolvedValue({
+      payable: { total: 306482.3, paid: 1000, unpaid: 305482.3 },
+      receivable: {
+        total: 2161308.3,
+        received: 780309.38,
+        unreceived: 1380998.92,
+      },
+    });
+    render(<FinancePage />);
+    expect((await screen.findAllByText(/306,482\.30/)).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText(/2,161,308\.30/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/1,000\.00/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/306,482\.3(?!\d)/)).toBeNull();
   });
 
   it("加载完成后展示统计信息", async () => {

@@ -8,6 +8,7 @@
 
 "use client";
 
+import { formatAmount } from "@/lib/format";
 import {
   lazy,
   Suspense,
@@ -63,6 +64,10 @@ import {
 
 const FinanceOverviewCharts = lazy(
   () => import("./components/FinanceOverviewCharts"),
+);
+
+const MonthlyStatementsTrend = lazy(
+  () => import("./components/MonthlyStatementsTrend"),
 );
 
 const financeChartsFallback = (
@@ -420,8 +425,8 @@ export default function FinancePage() {
                 className={`h-2 ${payableUrgent ? "[&>div]:bg-destructive" : "[&>div]:bg-status-green"}`}
               />
               <p className="text-xs text-muted-foreground mt-1.5">
-                已付 ¥{(stats?.payable.paid ?? 0).toLocaleString()} / 总额 ¥
-                {(stats?.payable.total ?? 0).toLocaleString()}
+                已付 ¥{formatAmount(stats?.payable.paid ?? 0)} / 总额 ¥
+                {formatAmount(stats?.payable.total ?? 0)}
               </p>
             </CardContent>
           </Card>
@@ -453,8 +458,8 @@ export default function FinancePage() {
                 className={`h-2 ${receivableUrgent ? "[&>div]:bg-status-amber" : "[&>div]:bg-status-green"}`}
               />
               <p className="text-xs text-muted-foreground mt-1.5">
-                已收 USD {(stats?.receivable.received ?? 0).toLocaleString()} /
-                总额 USD {(stats?.receivable.total ?? 0).toLocaleString()}
+                已收 USD {formatAmount(stats?.receivable.received ?? 0)} / 总额
+                USD {formatAmount(stats?.receivable.total ?? 0)}
               </p>
             </CardContent>
           </Card>
@@ -465,15 +470,15 @@ export default function FinancePage() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4">
         <KpiCard
           label="应付账款总额"
-          value={`¥${(stats?.payable.total ?? 0).toLocaleString()}`}
-          subLabel={`已付 ¥${(stats?.payable.paid ?? 0).toLocaleString()}`}
+          value={`¥${formatAmount(stats?.payable.total ?? 0)}`}
+          subLabel={`已付 ¥${formatAmount(stats?.payable.paid ?? 0)}`}
           trend={payableTrendDir}
           trendValue={payableTrend}
           icon={<ArrowUpRight className="h-4 w-4" />}
         />
         <KpiCard
           label="待付账款"
-          value={`¥${(stats?.payable.unpaid ?? 0).toLocaleString()}`}
+          value={`¥${formatAmount(stats?.payable.unpaid ?? 0)}`}
           subLabel={
             payableUrgent ? "超过总额50%，建议优先处理" : "尚未支付给供应商"
           }
@@ -484,15 +489,15 @@ export default function FinancePage() {
         />
         <KpiCard
           label="应收账款总额"
-          value={`USD ${(stats?.receivable.total ?? 0).toLocaleString()}`}
-          subLabel={`已收 USD ${(stats?.receivable.received ?? 0).toLocaleString()}`}
+          value={`USD ${formatAmount(stats?.receivable.total ?? 0)}`}
+          subLabel={`已收 USD ${formatAmount(stats?.receivable.received ?? 0)}`}
           trend={receivableTrendDir}
           trendValue={receivableTrend}
           icon={<ArrowDownLeft className="h-4 w-4" />}
         />
         <KpiCard
           label="待收账款"
-          value={`USD ${(stats?.receivable.unreceived ?? 0).toLocaleString()}`}
+          value={`USD ${formatAmount(stats?.receivable.unreceived ?? 0)}`}
           subLabel={
             receivableUrgent
               ? "当前客户剩余欠款偏高，建议优先跟进"
@@ -513,6 +518,10 @@ export default function FinancePage() {
           effectiveRate={exchangeRate?.effectiveRate ?? null}
           onTrendDaysChange={setTrendDays}
         />
+      </Suspense>
+
+      <Suspense fallback={financeChartsFallback}>
+        <MonthlyStatementsTrend />
       </Suspense>
 
       {/* 银行流水 & 发票台账摘要 */}
@@ -673,7 +682,7 @@ export default function FinancePage() {
                     </Badge>
                   </div>
                   <span className="tabular-nums text-status-red font-medium">
-                    USD {item.unreceived.toLocaleString()}
+                    USD {formatAmount(item.unreceived)}
                   </span>
                 </div>
               ))}

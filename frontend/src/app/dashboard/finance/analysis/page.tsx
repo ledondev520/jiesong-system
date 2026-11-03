@@ -8,6 +8,7 @@
 
 "use client";
 
+import { formatAmount } from "@/lib/format";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { DateStringPicker } from "@/components/ui/date-picker";
@@ -674,7 +675,7 @@ function BusinessReportsContent() {
                   <Tooltip
                     content={
                       <ChartTooltip
-                        valueFormatter={(v) => `¥${Number(v).toLocaleString()}`}
+                        valueFormatter={(v) => `¥${formatAmount(v)}`}
                       />
                     }
                   />
