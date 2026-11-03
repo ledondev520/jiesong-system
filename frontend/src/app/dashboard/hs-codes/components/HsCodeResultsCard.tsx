@@ -187,7 +187,7 @@ export function HsCodeResultsCard({
                         className={cn(
                           "cursor-pointer hover:bg-muted/50",
                           isExpiredHsCode(record) &&
-                            "bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40",
+                            "bg-status-red-soft hover:bg-status-red-soft/70",
                         )}
                         onClick={() => setSelectedRecord(record)}
                       >
