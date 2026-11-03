@@ -72,7 +72,7 @@ it("KPI 显示负数发票张数，使有效+已红冲+负数=总数", async () 
   render(<InvoicesPage />);
   expect(await screen.findByTestId("negative-count")).toHaveTextContent("81");
   expect(
-    screen.getByText(/有效 200 \+ 已红冲 19 \+ 负数 = 共 300/),
+    screen.getByText(/有效 200 \+ 已红冲 19 \+ 负数及其他 = 共 300/),
   ).toBeInTheDocument();
 });
 it("每页条数可选 20/50/100，切换后回到第一页并按新条数请求；销方筛选与流水链接是两个独立控件", async () => {

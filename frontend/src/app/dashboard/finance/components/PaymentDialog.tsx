@@ -186,7 +186,7 @@ export function PaymentDialog({
               </p>
               <p className="text-muted-foreground">
                 保存后立即计入{type === PaymentType.PAYABLE ? "应付" : "应收"}
-                合计和对账数据。
+                合计。对账页按银行流水与发票计算，不受本次登记影响。
               </p>
             </div>
             <DialogFooter>

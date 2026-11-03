@@ -265,13 +265,13 @@ export default function InvoicesPage() {
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
-                <p className="text-xs text-muted-foreground mb-1">负数发票</p>
+                <p className="text-xs text-muted-foreground mb-1">负数及其他</p>
                 <p className="text-lg font-bold" data-testid="negative-count">
                   {negativeInvoiceCount(stats).toLocaleString()}
                 </p>
                 <p className="text-[10px] text-muted-foreground">
                   有效 {stats.validCount.toLocaleString()} + 已红冲{" "}
-                  {stats.reversedCount.toLocaleString()} + 负数 = 共{" "}
+                  {stats.reversedCount.toLocaleString()} + 负数及其他 = 共{" "}
                   {stats.totalCount.toLocaleString()}
                 </p>
               </CardContent>

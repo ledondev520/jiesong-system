@@ -175,3 +175,15 @@ it("标题「对账中心」在筛选栏之前；自动匹配先确认范围，�
   fireEvent.click(await screen.findByRole("button", { name: "开始自动匹配" }));
   await waitFor(() => expect(autoMatch).toHaveBeenCalledTimes(1));
 });
+it("搜索中确认自动匹配：范围说明不受搜索限制，且不声称汇总会变化", async () => {
+  render(<ReconciliationPage />);
+  fireEvent.change(
+    await screen.findByPlaceholderText("搜索未匹配对手方、发票号或摘要"),
+    { target: { value: "synthetic" } },
+  );
+  fireEvent.click(screen.getByRole("button", { name: /自动匹配/ }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toHaveTextContent("不受当前搜索限制");
+  expect(dialog).not.toHaveTextContent("41 条");
+  expect(dialog).toHaveTextContent("供应商汇总按名称计算，不受影响");
+});

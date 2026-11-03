@@ -478,8 +478,9 @@ export default function ReconciliationPage() {
             <span>
               匹配率偏低：付款对方共 {matchRate(s).total} 家，仅{" "}
               {matchRate(s).matched} 家已匹配到发票（
-              {Math.round(matchRate(s).rate * 100)}%，低于 50%）。另有未匹配流水{" "}
-              {bankTotal} 条、未匹配发票 {invoiceTotal} 张待核对。
+              {Math.round(matchRate(s).rate * 100)}%，低于
+              50%）。另有无票付款对方 {s.unmatchedPaymentCount}{" "}
+              家、无流水发票销方 {s.unmatchedInvoiceCount} 家待核对。
             </span>
           </div>
         )}
@@ -828,11 +829,13 @@ export default function ReconciliationPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-1">
                 <p>
-                  范围：全部未匹配的银行流水 {bankTotal} 条、发票 {invoiceTotal}{" "}
-                  张。
+                  范围：
+                  {search
+                    ? "全部未匹配的银行流水和发票（不受当前搜索限制）。"
+                    : `全部未匹配的银行流水 ${bankTotal} 条、发票 ${invoiceTotal} 张。`}
                 </p>
                 <p>
-                  命中规则的流水和发票会自动关联到合同，匹配结果写入对账数据，汇总数字随之变化；未命中的保留在未匹配列表。
+                  命中规则的流水和发票会关联到合同并移出未匹配列表；供应商汇总按名称计算，不受影响。未命中的保留在未匹配列表。
                 </p>
               </div>
             </AlertDialogDescription>
