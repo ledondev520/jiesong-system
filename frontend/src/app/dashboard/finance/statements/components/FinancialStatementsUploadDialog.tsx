@@ -281,7 +281,7 @@ export function FinancialStatementsUploadDialog({
               {preview.summary.accountingEquationDifference === 0 &&
                 preview.summary.trialBalanceChecks?.periodDifference === 0 &&
                 preview.summary.trialBalanceChecks?.endingDifference === 0 && (
-                  <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400">
+                  <div className="flex items-center gap-2 text-xs text-status-green">
                     <CheckCircle2 className="h-4 w-4" />
                     资产负债表与科目余额表借贷平衡校验通过
                   </div>
@@ -298,7 +298,7 @@ export function FinancialStatementsUploadDialog({
               {preview.warnings.map((message) => (
                 <div
                   key={message}
-                  className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                  className="flex items-start gap-2 rounded-md border border-status-amber/40 bg-status-amber-soft px-3 py-2 text-sm text-status-amber"
                 >
                   <SemanticBadge tone="warning" className="mt-0.5 shrink-0">
                     复核

@@ -799,7 +799,7 @@ export default function UsersPage() {
                             "expiring" && (
                             <Badge
                               variant="outline"
-                              className="border-amber-400 text-amber-700 text-[10px]"
+                              className="border-status-amber/40 text-status-amber text-[10px]"
                             >
                               即将过期
                             </Badge>

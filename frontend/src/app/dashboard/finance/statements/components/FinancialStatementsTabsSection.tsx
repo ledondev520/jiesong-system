@@ -56,19 +56,24 @@ import { fmtAmount, profitColor } from "./financialStatementsFormatting";
 import { buildExpenseShare } from "./expenseShare";
 
 const COLORS = {
-  revenue: "#10b981",
-  cost: "#f59e0b",
-  admin: "#8b5cf6",
-  financial: "#06b6d4",
-  selling: "#3b82f6",
-  netProfit: "#22c55e",
-  assets: "#3b82f6",
-  liabilities: "#ef4444",
-  equity: "#10b981",
-  cash: "#f59e0b",
+  revenue: "var(--status-green)",
+  cost: "var(--status-amber)",
+  admin: "var(--chart-5)",
+  financial: "var(--chart-2)",
+  selling: "var(--status-blue)",
+  netProfit: "var(--status-green)",
+  assets: "var(--status-blue)",
+  liabilities: "var(--status-red)",
+  equity: "var(--status-green)",
+  cash: "var(--status-amber)",
 };
 
-const PIE_COLORS = ["#f59e0b", "#8b5cf6", "#06b6d4", "#3b82f6"];
+const PIE_COLORS = [
+  "var(--status-amber)",
+  "var(--chart-5)",
+  "var(--chart-2)",
+  "var(--status-blue)",
+];
 const PIE_COLOR_BY_NAME: Record<string, string> = {
   营业成本: PIE_COLORS[0],
   管理费用: PIE_COLORS[1],
@@ -951,11 +956,11 @@ export function FinancialStatementsTabsSection({
                           <td className="py-1.5 text-right tabular-nums">
                             ¥{m.revenue.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right tabular-nums text-red-600">
+                          <td className="py-1.5 text-right tabular-nums text-status-red">
                             ¥{m.cost.toLocaleString()}
                           </td>
                           <td
-                            className={`py-1.5 text-right tabular-nums font-semibold ${m.profit >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                            className={`py-1.5 text-right tabular-nums font-semibold ${m.profit >= 0 ? "text-status-green" : "text-status-red"}`}
                           >
                             ¥{m.profit.toLocaleString()}
                           </td>
@@ -966,14 +971,14 @@ export function FinancialStatementsTabsSection({
                             {m.status === "profit" ? (
                               <Badge
                                 variant="outline"
-                                className="text-emerald-600 border-emerald-200 text-[10px]"
+                                className="text-status-green border-status-green/40 text-[10px]"
                               >
                                 盈利
                               </Badge>
                             ) : (
                               <Badge
                                 variant="outline"
-                                className="text-red-600 border-red-200 text-[10px]"
+                                className="text-status-red border-status-red/40 text-[10px]"
                               >
                                 亏损
                               </Badge>
@@ -1338,11 +1343,11 @@ export function FinancialStatementsTabsSection({
                       />
                       <ReferenceLine
                         y={0.7}
-                        stroke="#ef4444"
+                        stroke="var(--status-red)"
                         strokeDasharray="4 4"
                         label={{
                           value: "70%警戒线",
-                          fill: "#ef4444",
+                          fill: "var(--status-red)",
                           fontSize: 11,
                         }}
                       />
@@ -1547,7 +1552,7 @@ export function FinancialStatementsTabsSection({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <AlertTriangle className="h-5 w-5 text-status-amber" />
               历史预警记录
             </CardTitle>
             <CardDescription>
@@ -1562,13 +1567,13 @@ export function FinancialStatementsTabsSection({
                   className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${
                     alert.level === "danger"
                       ? "border-destructive/20 bg-destructive/5"
-                      : "border-amber-200/50 bg-amber-50/50 dark:border-amber-800/30 dark:bg-amber-950/20"
+                      : "border-status-amber/50 bg-status-amber-soft/50"
                   }`}
                 >
                   {alert.level === "danger" ? (
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                   ) : (
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-amber" />
                   )}
                   <div className="min-w-0">
                     <p className="font-medium">{alert.message}</p>

@@ -263,7 +263,7 @@ export default function BankFlowPage() {
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
                 <p className="text-xs text-muted-foreground mb-1">总收入</p>
-                <p className="text-lg font-bold text-emerald-600">
+                <p className="text-lg font-bold text-status-green">
                   {fmt(stats.totalIn)}
                 </p>
               </CardContent>
@@ -271,7 +271,7 @@ export default function BankFlowPage() {
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
                 <p className="text-xs text-muted-foreground mb-1">总支出</p>
-                <p className="text-lg font-bold text-red-600">
+                <p className="text-lg font-bold text-status-red">
                   {fmt(stats.totalOut)}
                 </p>
               </CardContent>
@@ -280,7 +280,7 @@ export default function BankFlowPage() {
               <CardContent className="pt-4 pb-3 px-4">
                 <p className="text-xs text-muted-foreground mb-1">净现金流</p>
                 <p
-                  className={`text-lg font-bold ${stats.netFlow >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                  className={`text-lg font-bold ${stats.netFlow >= 0 ? "text-status-green" : "text-status-red"}`}
                 >
                   {fmt(stats.netFlow)}
                 </p>
@@ -526,21 +526,21 @@ export default function BankFlowPage() {
                         {item.direction === "IN" ? (
                           <Badge
                             variant="outline"
-                            className="text-emerald-600 border-emerald-200 text-[10px]"
+                            className="text-status-green border-status-green/40 text-[10px]"
                           >
                             <ArrowDownLeft className="h-3 w-3 mr-0.5" />收
                           </Badge>
                         ) : (
                           <Badge
                             variant="outline"
-                            className="text-red-600 border-red-200 text-[10px]"
+                            className="text-status-red border-status-red/40 text-[10px]"
                           >
                             <ArrowUpRight className="h-3 w-3 mr-0.5" />付
                           </Badge>
                         )}
                       </TableCell>
                       <TableCell
-                        className={`text-right tabular-nums font-medium ${item.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}
+                        className={`text-right tabular-nums font-medium ${item.direction === "IN" ? "text-status-green" : "text-status-red"}`}
                       >
                         {item.currency} {item.direction === "IN" ? "+" : "-"}
                         {fmt(Math.abs(item.amount))}
@@ -589,7 +589,7 @@ export default function BankFlowPage() {
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
               <span className="text-muted-foreground">本页合计</span>
-              <span className="font-semibold text-emerald-600">
+              <span className="font-semibold text-status-green">
                 收 {currency}{" "}
                 {fmt(
                   filteredByAmount
@@ -597,7 +597,7 @@ export default function BankFlowPage() {
                     .reduce((s, i) => s + Math.abs(i.amount), 0),
                 )}
               </span>
-              <span className="font-semibold text-red-600">
+              <span className="font-semibold text-status-red">
                 付 {currency}{" "}
                 {fmt(
                   filteredByAmount

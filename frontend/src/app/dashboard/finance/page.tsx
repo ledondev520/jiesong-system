@@ -398,7 +398,7 @@ export default function FinancePage() {
             className={
               payableUrgent
                 ? "border-destructive/40 bg-destructive/5"
-                : "border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/10"
+                : "border-status-green/30 bg-status-green-soft/30"
             }
           >
             <CardContent className="pt-4 pb-4">
@@ -409,7 +409,7 @@ export default function FinancePage() {
                 {payableUrgent ? (
                   <AlertTriangle className="h-4 w-4 text-destructive" />
                 ) : (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <CheckCircle2 className="h-4 w-4 text-status-green" />
                 )}
               </div>
               <p className="text-2xl font-bold tabular-nums mb-2">
@@ -417,7 +417,7 @@ export default function FinancePage() {
               </p>
               <Progress
                 value={payableRate}
-                className={`h-2 ${payableUrgent ? "[&>div]:bg-destructive" : "[&>div]:bg-emerald-600"}`}
+                className={`h-2 ${payableUrgent ? "[&>div]:bg-destructive" : "[&>div]:bg-status-green"}`}
               />
               <p className="text-xs text-muted-foreground mt-1.5">
                 已付 ¥{(stats?.payable.paid ?? 0).toLocaleString()} / 总额 ¥
@@ -430,8 +430,8 @@ export default function FinancePage() {
           <Card
             className={
               receivableUrgent
-                ? "border-amber-500/40 bg-amber-50/30 dark:bg-amber-950/10"
-                : "border-emerald-500/30 bg-emerald-50/30 dark:bg-emerald-950/10"
+                ? "border-status-amber/40 bg-status-amber-soft/30"
+                : "border-status-green/30 bg-status-green-soft/30"
             }
           >
             <CardContent className="pt-4 pb-4">
@@ -440,9 +440,9 @@ export default function FinancePage() {
                   应收账款完成率
                 </p>
                 {receivableUrgent ? (
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertTriangle className="h-4 w-4 text-status-amber" />
                 ) : (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <CheckCircle2 className="h-4 w-4 text-status-green" />
                 )}
               </div>
               <p className="text-2xl font-bold tabular-nums mb-2">
@@ -450,7 +450,7 @@ export default function FinancePage() {
               </p>
               <Progress
                 value={receivableRate}
-                className={`h-2 ${receivableUrgent ? "[&>div]:bg-amber-500" : "[&>div]:bg-emerald-600"}`}
+                className={`h-2 ${receivableUrgent ? "[&>div]:bg-status-amber" : "[&>div]:bg-status-green"}`}
               />
               <p className="text-xs text-muted-foreground mt-1.5">
                 已收 USD {(stats?.receivable.received ?? 0).toLocaleString()} /
@@ -501,7 +501,7 @@ export default function FinancePage() {
           trend="neutral"
           trendValue={receivableUrgent ? "需跟进" : "正常"}
           icon={<DollarSign className="h-4 w-4" />}
-          valueClassName={receivableUrgent ? "text-amber-600" : undefined}
+          valueClassName={receivableUrgent ? "text-status-amber" : undefined}
         />
       </div>
 
@@ -536,7 +536,7 @@ export default function FinancePage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-xs text-muted-foreground">总收入</p>
-                      <p className="text-base font-bold text-emerald-600 tabular-nums">
+                      <p className="text-base font-bold text-status-green tabular-nums">
                         ¥
                         {bankStats.totalIn.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
@@ -546,7 +546,7 @@ export default function FinancePage() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">总支出</p>
-                      <p className="text-base font-bold text-red-600 tabular-nums">
+                      <p className="text-base font-bold text-status-red tabular-nums">
                         ¥
                         {bankStats.totalOut.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
@@ -557,7 +557,7 @@ export default function FinancePage() {
                     <div>
                       <p className="text-xs text-muted-foreground">净现金流</p>
                       <p
-                        className={`text-base font-bold tabular-nums ${bankStats.netFlow >= 0 ? "text-emerald-600" : "text-red-600"}`}
+                        className={`text-base font-bold tabular-nums ${bankStats.netFlow >= 0 ? "text-status-green" : "text-status-red"}`}
                       >
                         ¥
                         {bankStats.netFlow.toLocaleString(undefined, {
@@ -642,11 +642,11 @@ export default function FinancePage() {
 
       {/* 应收逾期预警 */}
       {overdueList.length > 0 && (
-        <Card className="border-red-500/40 bg-red-50/20 dark:bg-red-950/10">
+        <Card className="border-status-red/40 bg-status-red-soft/20">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              <CardTitle className="text-sm font-medium text-red-800 dark:text-red-400">
+              <AlertTriangle className="h-5 w-5 text-status-red" />
+              <CardTitle className="text-sm font-medium text-status-red">
                 应收逾期预警 · {overdueList.length} 单待催收
               </CardTitle>
             </div>
@@ -659,7 +659,7 @@ export default function FinancePage() {
               {overdueList.slice(0, 5).map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between rounded-md border border-red-200/50 bg-background px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-md border border-status-red/50 bg-background px-3 py-2 text-sm"
                 >
                   <div className="flex items-center gap-3">
                     <span className="font-mono font-medium">
@@ -667,12 +667,12 @@ export default function FinancePage() {
                     </span>
                     <Badge
                       variant="outline"
-                      className="text-xs border-red-500/50 text-red-700 dark:text-red-400"
+                      className="text-xs border-status-red/50 text-status-red"
                     >
                       逾期 {item.overdueDays} 天
                     </Badge>
                   </div>
-                  <span className="tabular-nums text-red-700 dark:text-red-400 font-medium">
+                  <span className="tabular-nums text-status-red font-medium">
                     USD {item.unreceived.toLocaleString()}
                   </span>
                 </div>

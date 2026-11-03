@@ -75,27 +75,27 @@ const stageMeta: Record<
 > = {
   PREPARATION: {
     label: "准备材料",
-    className: "border-slate-200 bg-slate-50 text-slate-700",
+    className: "border-status-gray/40 bg-status-gray-soft text-status-gray",
   },
   VERIFICATION: {
     label: "待确认资料",
-    className: "border-blue-200 bg-blue-50 text-blue-700",
+    className: "border-status-blue/40 bg-status-blue-soft text-status-blue",
   },
   DRAFT: {
     label: "资料已确认",
-    className: "border-amber-200 bg-amber-50 text-amber-700",
+    className: "border-status-amber/40 bg-status-amber-soft text-status-amber",
   },
   READY_TO_EXPORT: {
     label: "可生成明细",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    className: "border-status-green/40 bg-status-green-soft text-status-green",
   },
   SUBMITTED: {
     label: "已提交跟进",
-    className: "border-violet-200 bg-violet-50 text-violet-700",
+    className: "border-status-blue/40 bg-status-blue-soft text-status-blue",
   },
   REFUNDED: {
     label: "已退税",
-    className: "border-green-200 bg-green-50 text-green-700",
+    className: "border-status-green/40 bg-status-green-soft text-status-green",
   },
 };
 
@@ -274,19 +274,19 @@ export function TaxRefundWorkbench() {
             </div>
             <div className="rounded-lg border bg-background p-3">
               <p className="text-xs text-muted-foreground">材料核验通过</p>
-              <p className="mt-1 text-2xl font-semibold text-emerald-700">
+              <p className="mt-1 text-2xl font-semibold text-status-green">
                 {summary?.materialReadyCount ?? "-"}
               </p>
             </div>
             <div className="rounded-lg border bg-background p-3">
               <p className="text-xs text-muted-foreground">待复核合同</p>
-              <p className="mt-1 text-2xl font-semibold text-amber-700">
+              <p className="mt-1 text-2xl font-semibold text-status-amber">
                 {summary?.needsReview ?? "-"}
               </p>
             </div>
             <div className="rounded-lg border bg-background p-3">
               <p className="text-xs text-muted-foreground">缺失发票</p>
-              <p className="mt-1 text-2xl font-semibold text-red-700">
+              <p className="mt-1 text-2xl font-semibold text-status-red">
                 {summary?.missingInvoices ?? "-"}
               </p>
             </div>
@@ -601,20 +601,20 @@ export function TaxRefundWorkbench() {
                             </p>
                           </>
                         ) : (
-                          <span className="text-red-600">未关联</span>
+                          <span className="text-status-red">未关联</span>
                         )}
                       </TableCell>
                       <TableCell className="text-xs">
                         <p>
-                          <span className="text-emerald-700">
+                          <span className="text-status-green">
                             通过 {item.invoiceSummary.pass}
                           </span>{" "}
                           ·{" "}
-                          <span className="text-amber-700">
+                          <span className="text-status-amber">
                             复核 {item.invoiceSummary.review}
                           </span>{" "}
                           ·{" "}
-                          <span className="text-red-700">
+                          <span className="text-status-red">
                             缺失 {item.invoiceSummary.missing}
                           </span>
                         </p>
@@ -635,7 +635,7 @@ export function TaxRefundWorkbench() {
                             className="space-y-2 text-xs"
                           />
                         ) : (
-                          <span className="text-emerald-700">
+                          <span className="text-status-green">
                             <CheckCircle2 className="mr-1 inline h-3 w-3" />
                             内部校验通过
                           </span>
@@ -687,7 +687,7 @@ export function TaxRefundWorkbench() {
         </CardContent>
       </Card>
 
-      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+      <div className="flex items-start gap-2 rounded-lg border border-status-amber/40 bg-status-amber-soft p-3 text-xs text-status-amber">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         本页生成内部出货和月度准备清单。税局用途确认、正式申报及受理结果另行跟进。
       </div>

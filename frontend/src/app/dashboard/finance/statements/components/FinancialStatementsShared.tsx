@@ -35,16 +35,16 @@ export type StatementsIncomeStatement = NonNullable<
 >;
 
 export const CHART_COLORS = {
-  revenue: "#3b82f6",
-  cost: "#f59e0b",
-  admin: "#8b5cf6",
-  financial: "#06b6d4",
-  selling: "#10b981",
-  netProfit: "#22c55e",
-  assets: "#3b82f6",
-  liabilities: "#ef4444",
-  equity: "#10b981",
-  cash: "#f59e0b",
+  revenue: "var(--status-blue)",
+  cost: "var(--status-amber)",
+  admin: "var(--chart-5)",
+  financial: "var(--chart-2)",
+  selling: "var(--status-green)",
+  netProfit: "var(--status-green)",
+  assets: "var(--status-blue)",
+  liabilities: "var(--status-red)",
+  equity: "var(--status-green)",
+  cash: "var(--status-amber)",
 } as const;
 
 export function fmtAmount(val: number | null | undefined): string {
@@ -65,9 +65,7 @@ export function fmtPercent(val: number | null | undefined): string {
 
 export function profitColor(val: number | null | undefined): string {
   if (val === null || val === undefined) return "text-muted-foreground";
-  return val >= 0
-    ? "text-emerald-600 dark:text-emerald-400"
-    : "text-destructive";
+  return val >= 0 ? "text-status-green" : "text-destructive";
 }
 
 export function KpiCard({
@@ -109,7 +107,7 @@ export function KpiCard({
         {subValue && (
           <div className="mt-1 flex items-center gap-1">
             {trend === "up" && (
-              <TrendingUp className="h-3 w-3 text-emerald-500" />
+              <TrendingUp className="h-3 w-3 text-status-green" />
             )}
             {trend === "down" && (
               <TrendingDown className="h-3 w-3 text-destructive" />
@@ -122,10 +120,8 @@ export function KpiCard({
             <span
               className={cn(
                 "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
-                isUp &&
-                  "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400",
-                isDown &&
-                  "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400",
+                isUp && "bg-status-green-soft text-status-green",
+                isDown && "bg-status-red-soft text-status-red",
                 !isUp && !isDown && "bg-muted text-muted-foreground",
               )}
             >
@@ -153,7 +149,7 @@ export function AlertItem({ alert }: { alert: FinancialAlert }) {
         {isError ? (
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
         ) : (
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-amber" />
         )}
         <div className="min-w-0 flex-1">
           <AlertTitle className="text-sm font-semibold">
@@ -227,12 +223,10 @@ export function FinancialHealthAlert({
   periodLabel?: string | null;
 }) {
   return (
-    <Alert className="border-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-950/20">
-      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-      <AlertTitle className="text-emerald-700 dark:text-emerald-400">
-        财务状况良好
-      </AlertTitle>
-      <AlertDescription className="text-xs text-emerald-600/80 dark:text-emerald-500/80">
+    <Alert className="border-status-green/50 bg-status-green-soft/50">
+      <CheckCircle2 className="h-4 w-4 text-status-green" />
+      <AlertTitle className="text-status-green">财务状况良好</AlertTitle>
+      <AlertDescription className="text-xs text-status-green/80">
         {periodLabel} 各项财务指标均在安全范围内
       </AlertDescription>
     </Alert>

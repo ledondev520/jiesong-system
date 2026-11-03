@@ -73,9 +73,9 @@ const formatPercent = (value: number | null) =>
   value === null ? "待核验" : `${(value * 100).toFixed(1)}%`;
 
 const REPORT_COLORS = {
-  sales: "#10b981",
-  purchases: "#ef4444",
-  profit: "#3b82f6",
+  sales: "var(--status-green)",
+  purchases: "var(--status-red)",
+  profit: "var(--status-blue)",
 };
 
 type ReportPeriod = { startDate?: string; endDate?: string };
@@ -392,7 +392,7 @@ function BusinessReportsContent() {
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 商品毛利（CNY）
               </CardTitle>
-              <span className="rounded-xl bg-emerald-500/8 p-2 text-emerald-600 ring-1 ring-emerald-500/12 transition-all duration-200 group-hover:bg-emerald-500/12">
+              <span className="rounded-xl bg-status-green/8 p-2 text-status-green ring-1 ring-status-green/12 transition-all duration-200 group-hover:bg-status-green/12">
                 <TrendingUp className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -447,7 +447,7 @@ function BusinessReportsContent() {
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 应收总额
               </CardTitle>
-              <span className="rounded-xl bg-blue-500/8 p-2 text-blue-600 ring-1 ring-blue-500/12 transition-all duration-200 group-hover:bg-blue-500/12">
+              <span className="rounded-xl bg-status-blue/8 p-2 text-status-blue ring-1 ring-status-blue/12 transition-all duration-200 group-hover:bg-status-blue/12">
                 <ArrowUpRight className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -469,7 +469,7 @@ function BusinessReportsContent() {
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 应付总额
               </CardTitle>
-              <span className="rounded-xl bg-amber-500/8 p-2 text-amber-600 ring-1 ring-amber-500/12 transition-all duration-200 group-hover:bg-amber-500/12">
+              <span className="rounded-xl bg-status-amber/8 p-2 text-status-amber ring-1 ring-status-amber/12 transition-all duration-200 group-hover:bg-status-amber/12">
                 <ArrowDownLeft className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -563,7 +563,7 @@ function BusinessReportsContent() {
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 低库存预警
               </CardTitle>
-              <span className="rounded-xl bg-amber-500/8 p-2 text-amber-600 ring-1 ring-amber-500/12 transition-all duration-200 group-hover:bg-amber-500/12">
+              <span className="rounded-xl bg-status-amber/8 p-2 text-status-amber ring-1 ring-status-amber/12 transition-all duration-200 group-hover:bg-status-amber/12">
                 <AlertTriangle className="h-4 w-4" />
               </span>
             </CardHeader>
@@ -585,7 +585,7 @@ function BusinessReportsContent() {
               <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
                 在途货柜
               </CardTitle>
-              <span className="rounded-xl bg-blue-500/8 p-2 text-blue-600 ring-1 ring-blue-500/12 transition-all duration-200 group-hover:bg-blue-500/12">
+              <span className="rounded-xl bg-status-blue/8 p-2 text-status-blue ring-1 ring-status-blue/12 transition-all duration-200 group-hover:bg-status-blue/12">
                 <Ship className="h-4 w-4" />
               </span>
             </CardHeader>

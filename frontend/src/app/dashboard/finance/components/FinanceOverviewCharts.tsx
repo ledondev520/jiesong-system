@@ -37,9 +37,9 @@ import type {
 } from "@/lib/finance-currency";
 
 const FINANCE_COLORS = {
-  income: "#10b981",
-  expense: "#ef4444",
-  profit: "#3b82f6",
+  income: "var(--status-green)",
+  expense: "var(--status-red)",
+  profit: "var(--status-blue)",
 };
 
 interface FinanceOverviewChartsProps {

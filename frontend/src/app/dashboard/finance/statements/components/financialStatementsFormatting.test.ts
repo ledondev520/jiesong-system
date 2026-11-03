@@ -46,7 +46,7 @@ describe("fmtPercent", () => {
 
 describe("profitColor", () => {
   it("应该返回盈利颜色", () => {
-    expect(profitColor(100)).toContain("emerald");
+    expect(profitColor(100)).toContain("status-green");
   });
 
   it("应该返回亏损颜色", () => {

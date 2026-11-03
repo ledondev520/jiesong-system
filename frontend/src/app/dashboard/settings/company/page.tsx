@@ -150,7 +150,7 @@ export default function CompanySettingsPage() {
       {legacyFilled.length > 0 ? (
         <p
           role="status"
-          className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+          className="rounded-md border border-status-amber/40 bg-status-amber-soft p-3 text-sm text-status-amber"
         >
           部分内容来自旧的「我方开票抬头信息」，已带入下方表单；点击「保存」后写入公司信息，之后旧文本不再使用。
         </p>

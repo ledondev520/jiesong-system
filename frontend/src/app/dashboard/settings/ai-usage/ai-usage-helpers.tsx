@@ -466,7 +466,7 @@ export const buildGovernanceSummary = ({
       preset: "pending" as const,
       Icon: Clock3,
       className:
-        "border-amber-500/40 bg-amber-50/70 text-amber-950 [&>svg]:text-amber-600 dark:bg-amber-950/20 dark:text-amber-100",
+        "border-status-amber/40 bg-status-amber-soft/70 text-status-amber [&>svg]:text-status-amber",
       agingBadges: [
         agedPendingSessionCount > 0
           ? {
@@ -489,7 +489,7 @@ export const buildGovernanceSummary = ({
     preset: "all" as const,
     Icon: CheckCircle2,
     className:
-      "border-emerald-500/40 bg-emerald-50/70 text-emerald-950 [&>svg]:text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-100",
+      "border-status-green/40 bg-status-green-soft/70 text-status-green [&>svg]:text-status-green",
     agingBadges: [],
   };
 };
