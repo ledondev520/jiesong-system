@@ -182,7 +182,9 @@ export function TaxRefundListPageContent() {
 
   // 报关单列表只在 URL 带 view=customs 时回写筛选，所以按角色选出默认页签后把它显式写进地址。
   useEffect(() => {
-    if (!requestedView && role) replaceBrowserQuery({ view: defaultView });
+    // 读实时地址：客户端导航时 Next 在 insertion effect 里才更新 URL，渲染期快照可能还是旧地址（没有 view）。
+    if (role && !new URLSearchParams(window.location.search).get("view"))
+      replaceBrowserQuery({ view: defaultView });
   }, [requestedView, role, defaultView]);
 
   const sort = useTableSort<TaxRefund, string>(
