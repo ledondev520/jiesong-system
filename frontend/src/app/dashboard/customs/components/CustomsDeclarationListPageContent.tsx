@@ -1,6 +1,6 @@
 /**
  * Input: 报关单服务、共享列表URL状态、router
- * Output: 报关单列表页（筛选与历史同步，详情携带安全的当前列表返回上下文）
+ * Output: 报关单列表页（嵌入时只渲染工具栏；状态 chips、KpiStat、草稿单标注；筛选与历史同步，详情携带安全的当前列表返回上下文）
  * Pos: 报关单管理主列表页
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -30,7 +30,10 @@ import { runAwait } from "@/lib/run-await";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiStat } from "@/components/ui/kpi-stat";
+import { StageChips } from "@/components/ui/stage-chips";
 import {
   Table,
   TableBody,
@@ -39,24 +42,28 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { MobileListCard } from "@/components/mobile";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Search, Plus, FileText } from "lucide-react";
 import { toast } from "sonner";
-import {
-  CustomsDeclarationStatusBadge,
-  customsDeclarationStatusOptions,
-} from "./CustomsDeclarationStatusBadge";
+import { cn } from "@/lib/utils";
+import { CustomsDeclarationStatusBadge } from "./CustomsDeclarationStatusBadge";
 
 import { resolveCustomsReturnTo } from "./customs-return-context";
 import { splitDraftSuffix } from "./declarationNo";
+
+// 报关单只会写入这四个状态（CustomsDeclarationForm），后端按精确值过滤；其余枚举值没有写入路径，不单列 chip。
+const statusChips = [
+  { key: "ALL", label: "全部" },
+  { key: "DRAFT", label: "草稿" },
+  { key: "DECLARED", label: "已申报" },
+  { key: "RELEASED", label: "已放行" },
+  { key: "VOID", label: "已作废" },
+];
+
+const isDraftDeclaration = (declaration: CustomsDeclaration) =>
+  declaration.status === "DRAFT" ||
+  splitDraftSuffix(declaration.declarationNo).isDraft;
 
 const formatAmount = (amount: number, currency: string) =>
   `${currency} ${amount.toLocaleString()}`;
@@ -207,114 +214,94 @@ export function CustomsDeclarationListPageContent({
     }
   };
 
+  const actions = (
+    <>
+      <div className="relative w-full sm:w-64">
+        <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={keyword}
+          onChange={(event) => {
+            const nextKeyword = event.target.value;
+            setListState({ keyword: nextKeyword });
+          }}
+          placeholder="搜索报关单号或报关行..."
+          className="h-11 rounded-xl border-border/70 bg-background/70 pl-10"
+        />
+      </div>
+
+      {(keyword || status !== "ALL") && (
+        <Button
+          variant="ghost"
+          className="h-11 rounded-xl"
+          onClick={() => {
+            setListState({ keyword: "", status: "ALL" });
+          }}
+          data-testid="reset-filters"
+        >
+          重置
+        </Button>
+      )}
+
+      <BusinessWrite>
+        <Button
+          variant="outline"
+          className="h-11 rounded-xl"
+          onClick={handleGenerateDrafts}
+          disabled={generatingDrafts}
+        >
+          自动生成草稿
+        </Button>
+      </BusinessWrite>
+
+      <BusinessWrite>
+        <Button
+          className="h-11 rounded-xl"
+          onClick={() => router.push("/dashboard/customs/new")}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          新建报关单
+        </Button>
+      </BusinessWrite>
+    </>
+  );
+
   return (
     <div className="space-y-6 pb-10">
-      <PageHeader
-        title="报关单管理"
-        description="跟踪出口报关草稿、申报进度、查验与放行状态。"
-        actions={
-          <>
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={keyword}
-                onChange={(event) => {
-                  const nextKeyword = event.target.value;
-                  setListState({ keyword: nextKeyword });
-                }}
-                placeholder="搜索报关单号或报关行..."
-                className="h-11 rounded-xl border-border/70 bg-background/70 pl-10"
-              />
-            </div>
+      {embedded ? (
+        // 嵌在「单证与退税」页签里：页面标题由外层承担，这里只渲染工具栏。
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+      ) : (
+        <PageHeader
+          title="报关单管理"
+          description="跟踪出口报关草稿、申报进度、查验与放行状态。"
+          actions={actions}
+        />
+      )}
 
-            <Select
-              value={status}
-              onValueChange={(value) => {
-                setListState({ status: value });
-              }}
-            >
-              <SelectTrigger className="h-11 w-40 rounded-xl">
-                <SelectValue placeholder="全部状态" />
-              </SelectTrigger>
-              <SelectContent>
-                {customsDeclarationStatusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {(keyword || status !== "ALL") && (
-              <Button
-                variant="ghost"
-                className="h-11 rounded-xl"
-                onClick={() => {
-                  setListState({ keyword: "", status: "ALL" });
-                }}
-                data-testid="reset-filters"
-              >
-                重置
-              </Button>
-            )}
-
-            <BusinessWrite>
-              <Button
-                variant="outline"
-                className="h-11 rounded-xl"
-                onClick={handleGenerateDrafts}
-                disabled={generatingDrafts}
-              >
-                自动生成草稿
-              </Button>
-            </BusinessWrite>
-
-            <BusinessWrite>
-              <Button
-                className="h-11 rounded-xl"
-                onClick={() => router.push("/dashboard/customs/new")}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                新建报关单
-              </Button>
-            </BusinessWrite>
-          </>
-        }
+      <StageChips
+        ariaLabel="报关单状态"
+        stages={statusChips}
+        value={status}
+        showCount={false}
+        onChange={(key) => setListState({ status: key })}
       />
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="surface-panel">
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">
-              本页单量
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold">
-            {declarations.length}
-          </CardContent>
-        </Card>
-
-        <Card className="surface-panel">
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">
-              草稿 / 待完善
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold">
-            {draftCount}
-          </CardContent>
-        </Card>
-
-        <Card className="surface-panel">
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">
-              本页货值
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-3xl font-semibold">
-            USD {totalAmount.toLocaleString()}
-          </CardContent>
-        </Card>
+        <KpiStat
+          label="本页单量"
+          loading={loading}
+          value={String(declarations.length)}
+        />
+        <KpiStat
+          label="本页草稿 / 待完善"
+          loading={loading}
+          value={String(draftCount)}
+        />
+        <KpiStat
+          label="本页货值"
+          loading={loading}
+          value={`USD ${totalAmount.toLocaleString()}`}
+        />
       </div>
 
       <div className="space-y-3 md:hidden">
@@ -443,7 +430,10 @@ export function CustomsDeclarationListPageContent({
                 sort.sortedData.map((declaration) => (
                   <TableRow
                     key={declaration.id}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className={cn(
+                      "cursor-pointer hover:bg-muted/50",
+                      isDraftDeclaration(declaration) && "bg-muted/30",
+                    )}
                     onClick={() => openDetail(declaration.id)}
                     data-testid={`declaration-row-${declaration.declarationNo}`}
                   >
@@ -452,6 +442,14 @@ export function CustomsDeclarationListPageContent({
                       title={declaration.declarationNo}
                     >
                       {splitDraftSuffix(declaration.declarationNo).displayNo}
+                      {isDraftDeclaration(declaration) && (
+                        <Badge
+                          variant="outline"
+                          className="ml-2 border-dashed font-normal text-muted-foreground"
+                        >
+                          草稿 · 非正式单
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>{declaration.customsBroker || "-"}</TableCell>
                     <TableCell>{declaration.currency}</TableCell>

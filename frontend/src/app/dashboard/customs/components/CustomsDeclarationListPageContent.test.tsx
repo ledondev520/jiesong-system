@@ -214,7 +214,7 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     const user = userEvent.setup();
     render(<CustomsDeclarationListPageContent embedded />);
     await waitFor(() => expect(mocks.getAll).toHaveBeenCalled());
-    await user.click(screen.getAllByRole("combobox")[1]);
+    await user.click(screen.getAllByRole("combobox")[0]);
     await user.click(screen.getByRole("option", { name: "每页 50 条" }));
     await waitFor(() =>
       expect(mocks.getAll).toHaveBeenLastCalledWith(
@@ -271,6 +271,85 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     });
     expect(mocks.router.replace).not.toHaveBeenCalled();
     expect(input).toHaveValue("");
+  });
+
+  it("嵌入时只渲染工具栏：没有自己的页面标题；独立使用仍有标题", async () => {
+    const { unmount } = render(<CustomsDeclarationListPageContent embedded />);
+    await waitFor(() => expect(mocks.getAll).toHaveBeenCalled());
+    expect(screen.queryByRole("heading", { name: "报关单管理" })).toBeNull();
+    expect(
+      screen.getByPlaceholderText("搜索报关单号或报关行..."),
+    ).toBeInTheDocument();
+    unmount();
+    render(<CustomsDeclarationListPageContent />);
+    expect(
+      await screen.findByRole("heading", { name: "报关单管理" }),
+    ).toBeInTheDocument();
+  });
+
+  it("状态 chips 按状态重新请求，当前状态 aria-pressed", async () => {
+    const user = userEvent.setup();
+    render(<CustomsDeclarationListPageContent embedded />);
+    await waitFor(() => expect(mocks.getAll).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "全部" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    // 已申报 = 库里实际写入的 DECLARED（表单只写 DRAFT/DECLARED/RELEASED/VOID）
+    await user.click(screen.getByRole("button", { name: "已申报" }));
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: "DECLARED" }),
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "已作废" }));
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: "VOID" }),
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "已放行" }));
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: "RELEASED" }),
+      ),
+    );
+    expect(screen.getByRole("button", { name: "已放行" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("草稿报关单与正式单在单号列就能区分，KPI 加载中不显示 0", async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.getAll.mockReturnValue(new Promise((r) => (resolve = r)));
+    render(<CustomsDeclarationListPageContent embedded />);
+    expect(screen.queryByText("USD 0")).toBeNull();
+    resolve({
+      data: {
+        items: [
+          {
+            id: "d",
+            declarationNo: "CD-1-DRAFT",
+            status: "DRAFT",
+            currency: "USD",
+            totalAmount: 10,
+          },
+          {
+            id: "f",
+            declarationNo: "CD-2",
+            status: "RELEASED",
+            currency: "USD",
+            totalAmount: 20,
+          },
+        ],
+        pagination: { total: 2 },
+      },
+    });
+    const draftRow = await screen.findByTestId("declaration-row-CD-1-DRAFT");
+    expect(within(draftRow).getByText("草稿 · 非正式单")).toBeInTheDocument();
+    const formalRow = screen.getByTestId("declaration-row-CD-2");
+    expect(within(formalRow).queryByText("草稿 · 非正式单")).toBeNull();
   });
 });
 

@@ -21,6 +21,8 @@ interface StageChipsProps {
   value: string;
   onChange: (key: string) => void;
   loading?: boolean;
+  /** 后端没有各阶段计数时传 false，不显示「—」占位。 */
+  showCount?: boolean;
   ariaLabel?: string;
   className?: string;
 }
@@ -30,6 +32,7 @@ export function StageChips({
   value,
   onChange,
   loading = false,
+  showCount = true,
   ariaLabel = "阶段筛选",
   className,
 }: StageChipsProps) {
@@ -55,9 +58,13 @@ export function StageChips({
             )}
           >
             {stage.label}
-            <span className="tabular-nums">
-              {loading || isMissing(stage.count) ? MISSING_VALUE : stage.count}
-            </span>
+            {showCount && (
+              <span className="tabular-nums">
+                {loading || isMissing(stage.count)
+                  ? MISSING_VALUE
+                  : stage.count}
+              </span>
+            )}
           </button>
         );
       })}

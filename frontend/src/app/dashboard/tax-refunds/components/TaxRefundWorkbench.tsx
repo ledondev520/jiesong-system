@@ -1,6 +1,6 @@
 /**
  * Input: 出口退税工作台 Interface、进项发票导入与退税草稿/申报明细操作
- * Output: 手机卡片与桌面表格展示准备清单、发票核验、申报明细工作台
+ * Output: KpiStat 汇总（含预计可退税额）、阶段/阻塞原因 chips、历史待办标注与开关、草稿报关单展示；手机卡片与桌面表格展示准备清单、发票核验、申报明细工作台
  * Pos: 出口退税页面主操作面；税局登录、勾选和提交仍由用户在官方系统完成
  */
 
@@ -25,7 +25,6 @@ import {
   FileCheck2,
   FileSearch,
   Loader2,
-  ReceiptText,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -33,21 +32,11 @@ import { runAwait } from "@/lib/run-await";
 import { MobileListCard } from "@/components/mobile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { KpiStat } from "@/components/ui/kpi-stat";
+import { StageChips } from "@/components/ui/stage-chips";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -68,7 +57,13 @@ import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
 import { InvoiceVerificationDialog } from "./InvoiceVerificationDialog";
-import { BlockerGroups } from "@/components/tax-refund/BlockerGroups";
+import {
+  BlockerChips,
+  blockerReasons,
+} from "@/components/tax-refund/BlockerChips";
+import { CustomsDeclarationStatusBadge } from "@/app/dashboard/customs/components/CustomsDeclarationStatusBadge";
+import { splitDraftSuffix } from "@/app/dashboard/customs/components/declarationNo";
+import type { CustomsDeclarationStatus } from "@/types";
 
 const stageMeta: Record<
   Exclude<TaxRefundWorkbenchStage, "ALL">,
@@ -100,15 +95,61 @@ const stageMeta: Record<
   },
 };
 
-const stageOptions: Array<{ value: TaxRefundWorkbenchStage; label: string }> = [
-  { value: "ALL", label: "全部阶段" },
-  { value: "PREPARATION", label: "准备材料" },
-  { value: "VERIFICATION", label: "待确认资料" },
-  { value: "DRAFT", label: "资料已确认" },
-  { value: "READY_TO_EXPORT", label: "可生成明细" },
-  { value: "SUBMITTED", label: "已提交跟进" },
-  { value: "REFUNDED", label: "已退税" },
+// 按申报月份加载时后端只会产出这三个阶段（taxRefundWorkbenchService），其余阶段在此视图里永远为空，不列 chip。
+const stageOptions: Array<{ key: TaxRefundWorkbenchStage; label: string }> = [
+  { key: "ALL", label: "全部阶段" },
+  { key: "PREPARATION", label: "准备材料" },
+  { key: "VERIFICATION", label: "待确认资料" },
+  { key: "DRAFT", label: "资料已确认" },
 ];
+
+const ALL_REASONS = "ALL";
+const count = (value: number | undefined) =>
+  value === undefined ? undefined : String(value);
+
+// 后端 listShipmentPreparations 只返回「月份 < 申报月份」的出货：申报月份 M 的本期 = M-1 月出货，更早的是历史待办。
+// 月份与后端 monthOf 同取 Asia/Shanghai。
+function monthOf(value?: string | null) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" })
+        .format(date)
+        .slice(0, 7)
+    : null;
+}
+
+function previousMonth(filingMonth: string) {
+  const [year, month] = filingMonth.split("-").map(Number);
+  return month === 1
+    ? `${year - 1}-12`
+    : `${year}-${String(month - 1).padStart(2, "0")}`;
+}
+
+function isHistorical(item: TaxRefundWorkbenchItem, filingMonth: string) {
+  const month = monthOf(item.declaration?.exportDate || item.shippedAt);
+  return !month || month < previousMonth(filingMonth);
+}
+
+function DeclarationCell({
+  declaration,
+}: {
+  declaration: NonNullable<TaxRefundWorkbenchItem["declaration"]>;
+}) {
+  const { displayNo, isDraft } = splitDraftSuffix(declaration.declarationNo);
+  return (
+    <>
+      <p className="font-mono" title={declaration.declarationNo}>
+        {displayNo}
+      </p>
+      <div className="mt-0.5 flex items-center gap-1">
+        <CustomsDeclarationStatusBadge
+          status={declaration.status as CustomsDeclarationStatus}
+        />
+        {isDraft && <span className="text-muted-foreground">非正式单</span>}
+      </div>
+    </>
+  );
+}
 
 export function TaxRefundWorkbench() {
   const router = useRouter();
@@ -126,6 +167,16 @@ export function TaxRefundWorkbench() {
   const [pageSize, setPageSize] = useState(20);
   const [loadError, setLoadError] = useState(false);
   const [stage, setStage] = useState<TaxRefundWorkbenchStage>("ALL");
+  // 以下两个只过滤已加载的这一页（后端没有按月份范围/原因筛选的参数），合计与分页仍是服务端口径。
+  const [includeHistory, setIncludeHistory] = useState(true);
+  const [reason, setReason] = useState(ALL_REASONS);
+  // 原因筛选只作用于当前页，翻页、改条数或换月份/阶段/关键词时回到「全部原因」，避免新一页被旧原因筛成空。
+  const [prevPageKey, setPrevPageKey] = useState("");
+  const pageKey = `${page}|${pageSize}|${filingMonth}|${stage}|${keyword}`;
+  if (pageKey !== prevPageKey) {
+    setPrevPageKey(pageKey);
+    setReason(ALL_REASONS);
+  }
   const [exporting, setExporting] = useState(false);
   const [invoiceImportOpen, setInvoiceImportOpen] = useState(false);
   const [selected, setSelected] = useState<TaxRefundWorkbenchItem | null>(null);
@@ -212,159 +263,186 @@ export function TaxRefundWorkbench() {
   };
 
   const summary = loadError ? undefined : data?.summary;
+  const loaded = data?.items ?? [];
+  const historyCount = filingMonth
+    ? loaded.filter((item) => isHistorical(item, filingMonth)).length
+    : 0;
+  const monthItems = includeHistory
+    ? loaded
+    : loaded.filter((item) => !isHistorical(item, filingMonth));
+  const reasonCounts = new Map<string, number>();
+  for (const item of monthItems) {
+    for (const label of blockerReasons(item.issues)) {
+      reasonCounts.set(label, (reasonCounts.get(label) ?? 0) + 1);
+    }
+  }
+  const rows =
+    reason === ALL_REASONS
+      ? monthItems
+      : monthItems.filter((item) =>
+          blockerReasons(item.issues).includes(reason),
+        );
+  const reasonChips = [
+    { key: ALL_REASONS, label: "全部原因", count: monthItems.length },
+    ...[...reasonCounts].map(([label, count]) => ({
+      key: label,
+      label,
+      count,
+    })),
+  ];
   return (
     <div className="space-y-5">
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">
-        <CardHeader className="gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="flex items-center gap-2 font-semibold tracking-tight">
-              <ReceiptText className="h-5 w-5 text-primary" />
-              出口退税工作台
-            </h2>
-            <CardDescription className="mt-2 max-w-3xl">
-              出货后自动归集三单、报关单和进项发票；处理差异后一次确认生成清单。按申报月份汇总历史待办与本期出货。
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <BusinessWrite>
-              <Button
-                variant="outline"
-                onClick={() => setInvoiceImportOpen(true)}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                导入进项发票
-              </Button>
-            </BusinessWrite>
-            <BusinessWrite>
-              <Button
-                disabled={exporting || !filingMonth || loadError || !canExport}
-                title={canExport ? undefined : "由财务或管理员导出票面核验清单"}
-                onClick={async () => {
-                  setExporting(true);
-                  try {
-                    await taxRefundService.exportMonthlyPreparations(
-                      filingMonth,
-                    );
-                    toast.success("月度准备清单已导出");
-                  } catch (error: unknown) {
-                    toast.error(
-                      error instanceof Error ? error.message : "月度导出失败",
-                    );
-                  } finally {
-                    setExporting(false);
-                  }
-                }}
-              >
-                {exporting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                导出月度准备清单
-              </Button>
-            </BusinessWrite>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-lg border bg-background p-3">
-              <p className="text-xs text-muted-foreground">待处理出口</p>
-              <p className="mt-1 text-2xl font-semibold">
-                <LoadingValue loading={loading} className="h-7 w-10">
-                  {orMissing(summary?.contracts)}
-                </LoadingValue>
-              </p>
-            </div>
-            <div className="rounded-lg border bg-background p-3">
-              <p className="text-xs text-muted-foreground">材料核验通过</p>
-              <p className="mt-1 text-2xl font-semibold text-status-green">
-                <LoadingValue loading={loading} className="h-7 w-10">
-                  {orMissing(summary?.materialReadyCount)}
-                </LoadingValue>
-              </p>
-            </div>
-            <div className="rounded-lg border bg-background p-3">
-              <p className="text-xs text-muted-foreground">待复核合同</p>
-              <p className="mt-1 text-2xl font-semibold text-status-amber">
-                <LoadingValue loading={loading} className="h-7 w-10">
-                  {orMissing(summary?.needsReview)}
-                </LoadingValue>
-              </p>
-            </div>
-            <div className="rounded-lg border bg-background p-3">
-              <p className="text-xs text-muted-foreground">缺失发票</p>
-              <p className="mt-1 text-2xl font-semibold text-status-red">
-                <LoadingValue loading={loading} className="h-7 w-10">
-                  {orMissing(summary?.missingInvoices)}
-                </LoadingValue>
-              </p>
-            </div>
-            <div className="rounded-lg border bg-background p-3">
-              <p className="text-xs text-muted-foreground">已确认出货</p>
-              <p className="mt-1 text-2xl font-semibold">
-                <LoadingValue loading={loading} className="h-7 w-10">
-                  {orMissing(summary?.confirmedCount)}
-                </LoadingValue>
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{data?.disclaimer}</span>
-            <span>资料变化后会重新核验，原归档保留</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-3xl text-sm text-muted-foreground">
+          出货后自动归集三单、报关单和进项发票；处理差异后一次确认生成清单。
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <BusinessWrite>
+            <Button
+              variant="outline"
+              onClick={() => setInvoiceImportOpen(true)}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              导入进项发票
+            </Button>
+          </BusinessWrite>
+          <BusinessWrite>
+            <Button
+              disabled={exporting || !filingMonth || loadError || !canExport}
+              title={canExport ? undefined : "由财务或管理员导出票面核验清单"}
+              onClick={async () => {
+                setExporting(true);
+                try {
+                  await taxRefundService.exportMonthlyPreparations(filingMonth);
+                  toast.success("月度准备清单已导出");
+                } catch (error: unknown) {
+                  toast.error(
+                    error instanceof Error ? error.message : "月度导出失败",
+                  );
+                } finally {
+                  setExporting(false);
+                }
+              }}
+            >
+              {exporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              导出月度准备清单
+            </Button>
+          </BusinessWrite>
+        </div>
+      </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Input
-          type="month"
-          aria-label="申报月份"
-          className="w-44"
-          value={filingMonth}
-          onChange={(event) => {
-            setFilingMonth(event.target.value);
-            setPage(1);
-          }}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <KpiStat
+          label="待处理出口"
+          loading={loading}
+          value={count(summary?.contracts)}
         />
-        <Input
-          className="max-w-sm"
-          value={keyword}
-          onChange={(event) => {
-            setKeyword(event.target.value);
-            setPage(1);
-          }}
-          placeholder="搜索 EXP、报关单号、退税单号或问题"
+        <KpiStat
+          label="材料核验通过"
+          loading={loading}
+          value={count(summary?.materialReadyCount)}
+          valueClassName="text-status-green"
         />
-        <Select
-          value={stage}
-          onValueChange={(value) => {
-            setStage(value as TaxRefundWorkbenchStage);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {stageOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {(keyword || stage !== "ALL") && (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setKeyword("");
-              setStage("ALL");
+        <KpiStat
+          label="待复核合同"
+          loading={loading}
+          value={count(summary?.needsReview)}
+          valueClassName="text-status-amber"
+        />
+        <KpiStat
+          label="缺失发票"
+          loading={loading}
+          value={count(summary?.missingInvoices)}
+          valueClassName="text-status-red"
+        />
+        <KpiStat
+          label="已确认出货"
+          loading={loading}
+          value={count(summary?.confirmedCount)}
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>{data?.disclaimer}</span>
+        <span>资料变化后会重新核验，原归档保留</span>
+      </div>
+      <p className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
+        阶段与退税记录状态对照：「已提交跟进」= 记录状态「已申报 /
+        已批准」；「已退税」=
+        记录状态「已退税」（两处含义相同）；其余阶段尚在准备，记录为「草稿」或还没有记录。
+      </p>
+
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            type="month"
+            aria-label="申报月份"
+            className="w-44"
+            value={filingMonth}
+            onChange={(event) => {
+              setFilingMonth(event.target.value);
               setPage(1);
             }}
-          >
-            重置
-          </Button>
-        )}
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <Switch
+              checked={includeHistory}
+              onCheckedChange={setIncludeHistory}
+              aria-label="包含历史待办"
+            />
+            含历史待办
+          </label>
+          <Input
+            className="max-w-sm"
+            value={keyword}
+            onChange={(event) => {
+              setKeyword(event.target.value);
+              setPage(1);
+            }}
+            placeholder="搜索 EXP、报关单号、退税单号或问题"
+          />
+          {keyword && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setKeyword("");
+                setPage(1);
+              }}
+            >
+              重置
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {filingMonth
+            ? `申报月份 ${filingMonth}：列表含 ${previousMonth(filingMonth)} 出货（本期应申报），以及更早尚未处理的历史待办（${loading ? "—" : historyCount} 条在本页）。`
+            : "请选择申报月份。"}
+          {!includeHistory &&
+            ` 已隐藏本页 ${historyCount} 条历史待办；合计与分页仍含历史。`}
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <StageChips
+          ariaLabel="退税阶段"
+          stages={stageOptions}
+          value={stage}
+          showCount={false}
+          onChange={(key) => {
+            setStage(key as TaxRefundWorkbenchStage);
+            setPage(1);
+          }}
+        />
+        <StageChips
+          ariaLabel="阻塞原因（仅本页）"
+          stages={reasonChips}
+          value={reason}
+          loading={loading}
+          onChange={setReason}
+        />
       </div>
 
       {loadError && (
@@ -424,16 +502,27 @@ export function TaxRefundWorkbench() {
           <p className="py-8 text-center text-destructive">
             读取失败，请使用上方重试
           </p>
-        ) : !data?.items.length ? (
+        ) : !rows.length ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
             当前没有符合条件的待退税出口
           </p>
         ) : (
-          data.items.map((item) => (
+          rows.map((item) => (
             <MobileListCard
               key={item.shipmentKey || item.salesContractId}
               title={item.contractNo}
-              subtitle={item.declaration?.declarationNo || "未关联报关单"}
+              subtitle={
+                item.declaration
+                  ? (() => {
+                      const { displayNo, isDraft } = splitDraftSuffix(
+                        item.declaration.declarationNo,
+                      );
+                      return isDraft
+                        ? `${displayNo}（草稿 · 非正式单）`
+                        : displayNo;
+                    })()
+                  : "未关联报关单"
+              }
               badge={
                 <Badge
                   variant="outline"
@@ -474,10 +563,7 @@ export function TaxRefundWorkbench() {
               action={
                 <div className="space-y-3">
                   {item.issues.length ? (
-                    <BlockerGroups
-                      blockers={item.issues}
-                      className="space-y-2 text-xs text-muted-foreground"
-                    />
+                    <BlockerChips blockers={item.issues} />
                   ) : (
                     <p className="text-xs text-muted-foreground">
                       内部校验通过
@@ -563,7 +649,7 @@ export function TaxRefundWorkbench() {
                       读取失败，请重试
                     </TableCell>
                   </TableRow>
-                ) : !data?.items.length ? (
+                ) : !rows.length ? (
                   <TableRow>
                     <TableCell
                       colSpan={7}
@@ -573,7 +659,7 @@ export function TaxRefundWorkbench() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  data.items.map((item) => (
+                  rows.map((item) => (
                     <TableRow key={item.shipmentKey || item.salesContractId}>
                       <TableCell>
                         <button
@@ -592,6 +678,11 @@ export function TaxRefundWorkbench() {
                                 "zh-CN",
                               )
                             : "未登记出货日期"}
+                          {isHistorical(item, filingMonth) && (
+                            <Badge variant="outline" className="ml-1.5">
+                              历史
+                            </Badge>
+                          )}
                         </p>
                       </TableCell>
                       <TableCell>
@@ -606,14 +697,7 @@ export function TaxRefundWorkbench() {
                       </TableCell>
                       <TableCell className="text-xs">
                         {item.declaration ? (
-                          <>
-                            <p className="font-mono">
-                              {item.declaration.declarationNo}
-                            </p>
-                            <p className="text-muted-foreground">
-                              {item.declaration.status}
-                            </p>
-                          </>
+                          <DeclarationCell declaration={item.declaration} />
                         ) : (
                           <span className="text-status-red">未关联</span>
                         )}
@@ -644,10 +728,7 @@ export function TaxRefundWorkbench() {
                       </TableCell>
                       <TableCell className="max-w-sm whitespace-normal break-words text-xs text-muted-foreground">
                         {item.issues.length ? (
-                          <BlockerGroups
-                            blockers={item.issues}
-                            className="space-y-2 text-xs"
-                          />
+                          <BlockerChips blockers={item.issues} />
                         ) : (
                           <span className="text-status-green">
                             <CheckCircle2 className="mr-1 inline h-3 w-3" />

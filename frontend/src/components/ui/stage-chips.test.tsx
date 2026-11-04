@@ -34,4 +34,17 @@ describe("StageChips", () => {
     fireEvent.click(screen.getByRole("button", { name: "待验货0" }));
     expect(onChange).toHaveBeenCalledWith("pending");
   });
+
+  it("showCount=false 不显示计数也不显示「—」", () => {
+    render(
+      <StageChips
+        stages={stages}
+        value="all"
+        onChange={() => {}}
+        showCount={false}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "全部" })).toBeInTheDocument();
+    expect(screen.queryByText("—")).toBeNull();
+  });
 });

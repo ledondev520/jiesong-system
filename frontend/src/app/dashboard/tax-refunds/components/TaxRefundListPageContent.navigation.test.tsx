@@ -94,6 +94,11 @@ vi.mock("@/lib/api-cache", () => ({
 vi.mock("sonner", () => ({
   toast: { error: mocks.toastError, success: vi.fn() },
 }));
+// 默认页签按角色：财务进工作台，保持下面各用例原有的起点。
+vi.mock("@/store/auth.store", () => ({
+  useAuthStore: (selector: (state: { user: { role: string } }) => unknown) =>
+    selector({ user: { role: "FINANCE" } }),
+}));
 vi.mock("./TaxRefundWorkbench", () => ({
   TaxRefundWorkbench: () => <h2>合成工作台</h2>,
 }));
@@ -195,7 +200,7 @@ describe("退税页签实际组件的路由流转", () => {
     });
     expect(window.location.pathname).toBe("/dashboard/customs/qa-customs");
     await user.click(await screen.findByRole("button", { name: "返回" }));
-    await screen.findByRole("heading", { name: "报关单管理" });
+    await screen.findByRole("group", { name: "报关单状态" });
     await user.click(screen.getByRole("tab", { name: "退税记录" }));
     expect(window.location.search).toBe("?view=refunds");
     expect(screen.getByRole("tab", { name: "退税记录" })).toHaveAttribute(
@@ -203,16 +208,16 @@ describe("退税页签实际组件的路由流转", () => {
       "true",
     );
     await waitFor(() => expect(mocks.refundsGetAll).toHaveBeenCalled());
-    expect(screen.queryByRole("heading", { name: "报关单管理" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "报关单状态" })).toBeNull();
     await user.click(screen.getByRole("tab", { name: "退税记录" }));
     expect(window.location.search).toBe("?view=refunds");
     await user.click(screen.getByRole("tab", { name: "退税工作台" }));
-    expect(window.location.search).toBe("");
+    expect(window.location.search).toBe("?view=workbench");
     expect(screen.getByRole("heading", { name: "合成工作台" })).toBeVisible();
     await user.keyboard("{ArrowRight}");
-    await waitFor(() => expect(window.location.search).toBe("?view=customs"));
-    await user.keyboard("{ArrowRight}");
     await waitFor(() => expect(window.location.search).toBe("?view=refunds"));
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(window.location.search).toBe("?view=customs"));
   });
 
   it("Next 缓存误用旧 canonical 筛选时，明确返回走新文档恢复已验证的最新地址", async () => {
@@ -242,7 +247,10 @@ describe("退税页签实际组件的路由流转", () => {
       expect(mocks.documentNavigate).toHaveBeenCalledExactlyOnceWith(returnTo);
       expect(mocks.router.push).not.toHaveBeenCalled();
       await screen.findByDisplayValue("QA-CUSTOMS");
-      expect(screen.getAllByRole("combobox")[0]).toHaveTextContent("草稿");
+      expect(screen.getByRole("button", { name: "草稿" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
     } finally {
       mocks.router.push.mockImplementation(originalPush!);
     }
@@ -281,7 +289,10 @@ describe("退税页签实际组件的路由流转", () => {
           window.location.search +
           window.location.hash,
       ).toBe(expectedReturn);
-      expect(screen.getAllByRole("combobox")[0]).toHaveTextContent("已放行");
+      expect(screen.getByRole("button", { name: "已放行" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
       expect(screen.getByRole("tab", { name: "报关单" })).toHaveAttribute(
         "aria-selected",
         "true",
@@ -311,7 +322,10 @@ describe("退税页签实际组件的路由流转", () => {
     await user.click(await screen.findByRole("button", { name: "返回" }));
     await screen.findByDisplayValue("QA-CUSTOMS");
     expect(window.location.pathname + window.location.search).toBe(returnTo);
-    expect(screen.getAllByRole("combobox")[0]).toHaveTextContent("草稿");
+    expect(screen.getByRole("button", { name: "草稿" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it.each([
@@ -335,7 +349,7 @@ describe("退税页签实际组件的路由流转", () => {
     expect(mocks.documentNavigate).toHaveBeenLastCalledWith(
       "/dashboard/customs?view=customs",
     );
-    await screen.findByRole("heading", { name: "报关单管理" });
+    await screen.findByRole("group", { name: "报关单状态" });
     expect(screen.getByPlaceholderText("搜索报关单号或报关行...")).toHaveValue(
       "",
     );
@@ -433,7 +447,7 @@ describe("退税页签实际组件的路由流转", () => {
         "aria-selected",
         "true",
       );
-      expect(screen.queryByRole("heading", { name: "报关单管理" })).toBeNull();
+      expect(screen.queryByRole("group", { name: "报关单状态" })).toBeNull();
       await act(async () => mocks.notify());
       expect(window.location.search).toBe("?view=refunds");
       expect(mocks.router.replace).not.toHaveBeenCalled();
@@ -571,7 +585,7 @@ describe("退税页签实际组件的路由流转", () => {
       fireEvent.change(input, { target: { value: "TEST" } });
       mocks.router.replace("/dashboard/customs?view=refunds");
     });
-    expect(screen.getByRole("heading", { name: "报关单管理" })).toBeVisible();
+    expect(screen.getByRole("group", { name: "报关单状态" })).toBeVisible();
     expect(window.location.search).toBe("?view=refunds");
     expect(mocks.router.replace).toHaveBeenLastCalledWith(
       "/dashboard/customs?view=refunds",
@@ -585,7 +599,7 @@ describe("退税页签实际组件的路由流转", () => {
       "aria-selected",
       "true",
     );
-    expect(screen.queryByRole("heading", { name: "报关单管理" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "报关单状态" })).toBeNull();
   });
 
   it("浏览器 Back/Forward 恢复报关筛选并保留父页签及其他参数", async () => {
@@ -666,8 +680,7 @@ describe("退税页签实际组件的路由流转", () => {
       );
       expect(screen.getByDisplayValue("TEST")).toBeVisible();
     });
-    await user.click(screen.getAllByRole("combobox")[0]);
-    await user.click(screen.getByRole("option", { name: "草稿" }));
+    await user.click(screen.getByRole("button", { name: "草稿" }));
     await waitFor(() =>
       expect(new URLSearchParams(window.location.search).get("status")).toBe(
         "DRAFT",
