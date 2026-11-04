@@ -3,7 +3,7 @@
  * Output: 阻塞原因 chips 与按原因筛选、历史待办标注与开关、草稿报关单展示、预计可退税额 KPI
  * Pos: TaxRefundWorkbench 单证与退税页（B54）回归
  */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TaxRefundWorkbench } from "./TaxRefundWorkbench";
