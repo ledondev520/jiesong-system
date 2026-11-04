@@ -84,6 +84,36 @@ describe("经营报表范围与追溯", () => {
       "/dashboard/sales?shipped=true&shippedFrom=2026-09-01&shippedTo=2026-09-30",
     );
   });
+  it("全部应收都超过 30 天未收时出现琥珀色提示，部分逾期时不出现", async () => {
+    const { unmount } = render(<BusinessReportsPage />);
+    await screen.findByText("¥200.00");
+    expect(
+      screen.queryByTestId("all-receivables-overdue"),
+    ).not.toBeInTheDocument();
+    unmount();
+    overview.mockResolvedValue({
+      data: { ...data, funds: { ...data.funds, overdueReceivable: 100 } },
+    });
+    render(<BusinessReportsPage />);
+    const alert = await screen.findByTestId("all-receivables-overdue");
+    expect(alert).toHaveTextContent("全部应收都已发运超过 30 天未收");
+    expect(alert).toHaveTextContent("没有一笔应收在 30 天内");
+  });
+  it("在途货柜说明口径，不与工作台待办数混读；没有应收时不报全部逾期", async () => {
+    overview.mockResolvedValue({
+      data: {
+        ...data,
+        funds: { ...data.funds, totalReceivable: 0, overdueReceivable: 0 },
+      },
+    });
+    render(<BusinessReportsPage />);
+    expect(
+      await screen.findByText(/与工作台待办数不是同一口径/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("all-receivables-overdue"),
+    ).not.toBeInTheDocument();
+  });
   it("未知利润显示待核验、每笔缺哪项输入、按原因笔数和已核实汇总，不显示零", async () => {
     overview.mockResolvedValue({
       data: {

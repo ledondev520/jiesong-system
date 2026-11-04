@@ -7,7 +7,7 @@
 | 名字 | 地位 | 功能 |
 | --- | --- | --- |
 | FinancialStatementsPageContent.tsx | 页面组合 | 账期读取、导入弹窗和各分析分区 |
-| FinancialStatementsOverview.tsx | 报表概览 | 账期、指标、异常及导入入口 |
+| FinancialStatementsOverview.tsx | 报表概览 | 账期、指标、异常及导入入口；KPI 组统一万元；环比用 `comparePeriods`；账期滞后 2 个月及以上不宣布「财务状况良好」 |
 | FinancialStatementsTabsSection.tsx | 账期下钻 | 资产负债、利润、现金流和账簿页签 |
 | FinancialStatementsShared.tsx | 共享界面 | 财务加载、指标及表格基础组件 |
 | FinancialStatementsUploadDialog.tsx | 月度导入 | 原有三文件预览和明确确认 |

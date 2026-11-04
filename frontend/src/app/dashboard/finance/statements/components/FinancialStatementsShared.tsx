@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { KpiStat } from "@/components/ui/kpi-stat";
 import { Separator } from "@/components/ui/separator";
-import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import type {
   FinancialAlert,
   FinancialPeriod,
@@ -169,11 +169,33 @@ export const ChartTooltipContent = ({
   );
 };
 
+/**
+ * 「财务状况良好」只对新近账期成立。账期滞后 2 个月及以上时，不下结论，
+ * 只说明该账期内没有触发预警，以及它不代表当前状况。
+ */
 export function FinancialHealthAlert({
   periodLabel,
+  staleness,
 }: {
   periodLabel?: string | null;
+  staleness?: {
+    latestLabel: string;
+    monthsBehind: number;
+    stale: boolean;
+  } | null;
 }) {
+  if (staleness?.stale) {
+    return (
+      <Alert data-testid="stale-health-note">
+        <Info className="h-4 w-4" />
+        <AlertTitle>{staleness.latestLabel} 账期内未触发预警</AlertTitle>
+        <AlertDescription className="text-xs">
+          最新账期已滞后 {staleness.monthsBehind}{" "}
+          个月，这只代表当时的数据，不代表当前财务状况；导入最新账期后再判断。
+        </AlertDescription>
+      </Alert>
+    );
+  }
   return (
     <Alert className="border-status-green/50 bg-status-green-soft/50">
       <CheckCircle2 className="h-4 w-4 text-status-green" />

@@ -180,7 +180,7 @@ it("confirmStep: shows scope and reconciliation effect first; nothing is saved u
   const confirm = await screen.findByTestId("payment-confirm");
   expect(confirm).toHaveTextContent("合同 测试");
   expect(confirm).toHaveTextContent("22.6");
-  expect(confirm).toHaveTextContent("登记后该合同待结 CNY ¥77.4");
+  expect(confirm).toHaveTextContent("登记后该合同待结 CNY ¥77.40");
   expect(confirm).toHaveTextContent(
     "计入应付合计。对账页按银行流水与发票计算，不受本次登记影响",
   );

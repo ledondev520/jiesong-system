@@ -54,6 +54,7 @@ import {
 import api, { clearApiGetCache } from "@/lib/axios";
 import { type ApiResponse } from "@/types";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
+import { comparePeriods, NO_PRIOR_PERIOD } from "@/lib/period-comparison";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { KpiCard } from "@/components/finance/KpiCard";
@@ -104,24 +105,6 @@ interface ExchangeRate {
   rate: number;
   buffer: number;
   effectiveRate: number;
-}
-
-function calcTrendDirection(
-  current: number,
-  previous: number,
-): "up" | "down" | "neutral" {
-  if (!previous || previous === 0) return "neutral";
-  const diff = ((current - previous) / previous) * 100;
-  if (diff > 0.1) return "up";
-  if (diff < -0.1) return "down";
-  return "neutral";
-}
-
-function calcTrendValue(current: number, previous: number): string {
-  if (!previous || previous === 0) return "环比持平";
-  const diff = ((current - previous) / previous) * 100;
-  const sign = diff > 0 ? "+" : "";
-  return `环比 ${sign}${diff.toFixed(1)}%`;
 }
 
 /**
@@ -215,22 +198,21 @@ export default function FinancePage() {
         !trends[trends.length - 2]
       ) {
         return {
-          payableTrend: "环比持平",
-          receivableTrend: "环比持平",
+          payableTrend: NO_PRIOR_PERIOD,
+          receivableTrend: NO_PRIOR_PERIOD,
           payableTrendDir: "neutral" as const,
           receivableTrendDir: "neutral" as const,
         };
       }
       const last = trends[trends.length - 1];
       const prev = trends[trends.length - 2];
+      const payable = comparePeriods(last.payables, prev.payables);
+      const receivable = comparePeriods(last.receivables, prev.receivables);
       return {
-        payableTrend: calcTrendValue(last.payables, prev.payables),
-        receivableTrend: calcTrendValue(last.receivables, prev.receivables),
-        payableTrendDir: calcTrendDirection(last.payables, prev.payables),
-        receivableTrendDir: calcTrendDirection(
-          last.receivables,
-          prev.receivables,
-        ),
+        payableTrend: payable.text,
+        receivableTrend: receivable.text,
+        payableTrendDir: payable.dir,
+        receivableTrendDir: receivable.dir,
       };
     }, [trends]);
 
@@ -390,6 +372,11 @@ export default function FinancePage() {
                     <p className="text-xs text-muted-foreground mt-0.5">
                       市场汇率 {exchangeRate.rate?.toFixed(2) ?? "—"} · 风险缓冲{" "}
                       {exchangeRate.buffer?.toFixed(2) ?? "—"}
+                    </p>
+                  )}
+                  {exchangeRate && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      结算汇率 = 市场汇率 − 风险缓冲，用于美元应收折算人民币
                     </p>
                   )}
                 </div>

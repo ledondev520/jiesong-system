@@ -44,7 +44,6 @@ import type {
 import {
   AlertItem,
   FinancialHealthAlert,
-  fmtAmount,
   fmtPercent,
   fmtWan,
   KpiCard,
@@ -52,6 +51,8 @@ import {
   type StatementsBalanceSheet,
   type StatementsIncomeStatement,
 } from "./FinancialStatementsShared";
+import { getStatementsStaleness } from "./financialStatementsFormatting";
+import { comparePeriods } from "@/lib/period-comparison";
 
 interface FinancialStatementsLoadingStateProps {
   count?: number;
@@ -103,21 +104,6 @@ interface FinancialStatementsOverviewProps {
   selectedPeriod: string;
   showHeader?: boolean;
   warningAlerts: FinancialAlert[];
-}
-
-function calcTrend(
-  current: number | null | undefined,
-  previous: number | null | undefined,
-): { dir: "up" | "down" | "neutral"; text: string } {
-  if (current == null || previous == null || previous === 0)
-    return { dir: "neutral", text: "无可比上期数据" };
-  const diff = ((current - previous) / Math.abs(previous)) * 100;
-  const sign = diff > 0 ? "+" : "";
-  if (Math.abs(diff) < 0.1) return { dir: "neutral", text: "环比持平" };
-  return {
-    dir: diff > 0 ? "up" : "down",
-    text: `环比 ${sign}${diff.toFixed(1)}%`,
-  };
 }
 
 export function FinancialStatementsOverview({
@@ -217,10 +203,14 @@ export function FinancialStatementsOverview({
           {dangerAlerts.length === 0 && warningAlerts.length === 0 && (
             <FinancialHealthAlert
               periodLabel={analytics?.latestPeriod?.periodLabel}
+              staleness={getStatementsStaleness(periods)}
             />
           )}
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <p className="col-span-full text-xs text-muted-foreground">
+              下列金额统一以「万元」为单位，比率为百分比。
+            </p>
             {detailLoading && (
               <div className="col-span-full flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -240,11 +230,11 @@ export function FinancialStatementsOverview({
                       point.month === previousDate.getMonth() + 1,
                   )
                 : null;
-              const revenueTrend = calcTrend(
+              const revenueTrend = comparePeriods(
                 latestIncomeStatement?.revenueMonth,
                 prev?.revenue,
               );
-              const profitTrend = calcTrend(
+              const profitTrend = comparePeriods(
                 latestIncomeStatement?.netProfitMonth,
                 prev?.netProfit,
               );
@@ -252,8 +242,8 @@ export function FinancialStatementsOverview({
                 prev && prev.totalAssets
                   ? prev.totalLiabilities / prev.totalAssets
                   : null;
-              const debtTrend = calcTrend(debtRatioVal, prevDebtRatio);
-              const equityTrend = calcTrend(
+              const debtTrend = comparePeriods(debtRatioVal, prevDebtRatio);
+              const equityTrend = comparePeriods(
                 latestBalanceSheet?.totalEquity,
                 prev?.totalEquity,
               );
@@ -295,7 +285,7 @@ export function FinancialStatementsOverview({
                   <KpiCard
                     title="所有者权益"
                     value={fmtWan(latestBalanceSheet?.totalEquity)}
-                    subValue={`货币资金：${fmtAmount(latestBalanceSheet?.cashAndEquivalents)}`}
+                    subValue={`货币资金：${fmtWan(latestBalanceSheet?.cashAndEquivalents)}`}
                     icon={Wallet}
                     valueClass={profitColor(latestBalanceSheet?.totalEquity)}
                     trend={equityTrend.dir}
@@ -318,7 +308,7 @@ export function FinancialStatementsOverview({
                 )}
               </CardTitle>
               <CardDescription>
-                应收账款、存货、应付账款等流动性关键项
+                应收账款、存货、应付账款等流动性关键项（单位：万元）
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -377,9 +367,7 @@ export function FinancialStatementsOverview({
                       <p
                         className={`text-sm font-semibold tabular-nums ${item.value != null ? item.color : "text-muted-foreground"}`}
                       >
-                        {item.value != null
-                          ? `¥${(item.value / 10000).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}万`
-                          : "—"}
+                        {fmtWan(item.value)}
                       </p>
                     </div>
                   ))}

@@ -71,7 +71,7 @@ describe("UnallocatedReceiptsPanel", () => {
   it("shows each pending receipt with its customer and remaining amount", async () => {
     render(<UnallocatedReceiptsPanel onChanged={vi.fn()} />);
     expect(await screen.findByText("合成客户")).toBeInTheDocument();
-    expect(screen.getByText(/剩余待分配 USD 3,000/)).toBeInTheDocument();
+    expect(screen.getByText(/剩余待分配 USD 3,000\.00/)).toBeInTheDocument();
     expect(screen.getByText(/待分配款项（1 笔）/)).toBeInTheDocument();
   });
 
@@ -132,7 +132,7 @@ describe("UnallocatedReceiptsPanel", () => {
       await screen.findByText(/范围：当前待分配的全部 1 笔/),
     ).toBeVisible();
     const dialog = screen.getByRole("alertdialog");
-    expect(dialog).toHaveTextContent("USD 3,000");
+    expect(dialog).toHaveTextContent("USD 3,000.00");
     expect(dialog).toHaveTextContent("未收余额随之减少");
     await userEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(mocks.autoMatchUnallocatedPayments).not.toHaveBeenCalled();

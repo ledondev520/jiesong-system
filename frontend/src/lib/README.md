@@ -13,3 +13,5 @@
 `format.ts` 只负责金额/单价/统计值的显示（`formatMoney` 固定两位小数并带 ¥/$，`formatUnitPrice` 整数不带小数，`formatStat` 在加载/出错时返回「—」而不是 0）；不做任何取整，取整口径由定价配置决定。`error-reason.ts` 从被 reject 的响应体或 Error 取出服务端原因，供 `ErrorState` 显示「<失败的事>：<原因>」。日期仍用 `date-format.ts`。
 
 `redirect-query.ts` 的 `withQuery(target, searchParams)` 供旧路由兼容 stub 重定向时原样保留查询参数。`ai-message-text.ts` 的 `stripPageContext` 去掉用户消息开头的「【当前页面：…】」行（AI 面板恢复历史与会话记录页共用）。
+
+`period-comparison.ts` 是环比的唯一算法（`comparePeriods`）：上期缺失写「无上期数据」，上期为 0 不计算，只有变化小于 0.1% 才写「环比持平」；财务概览与财务报表共用，不要在页面里再写一份。

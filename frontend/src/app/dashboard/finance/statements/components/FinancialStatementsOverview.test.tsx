@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { FinancialStatementsOverview } from "./FinancialStatementsOverview";
 
 type Props = Parameters<typeof FinancialStatementsOverview>[0];
@@ -60,5 +60,51 @@ it("缺失紧前月份时不能用其他历史期冒充环比", () => {
       ])}
     />,
   );
-  expect(screen.getAllByText("无可比上期数据")).toHaveLength(4);
+  expect(screen.getAllByText("无上期数据")).toHaveLength(4);
+});
+
+afterEach(() => vi.useRealTimers());
+
+it("最新账期滞后超过 1 个月时不宣布「财务状况良好」，并说明滞后", () => {
+  vi.useFakeTimers({ now: new Date("2026-11-04T00:00:00Z"), toFake: ["Date"] });
+  render(
+    <FinancialStatementsOverview
+      {...props([])}
+      periods={[{ year: 2026, month: 7 }] as never}
+    />,
+  );
+  expect(screen.queryByText("财务状况良好")).not.toBeInTheDocument();
+  const note = screen.getByTestId("stale-health-note");
+  expect(note).toHaveTextContent("2026年7月 账期内未触发预警");
+  expect(note).toHaveTextContent("已滞后 4 个月");
+});
+
+it("账期只滞后 1 个月属正常，仍显示「财务状况良好」", () => {
+  vi.useFakeTimers({ now: new Date("2026-11-04T00:00:00Z"), toFake: ["Date"] });
+  render(
+    <FinancialStatementsOverview
+      {...props([])}
+      periods={[{ year: 2026, month: 10 }] as never}
+    />,
+  );
+  expect(screen.getByText("财务状况良好")).toBeInTheDocument();
+  expect(screen.queryByTestId("stale-health-note")).not.toBeInTheDocument();
+});
+
+it("KPI 组统一用万元：货币资金不再用元，避免与资产合计差 100 倍的错觉", () => {
+  const balance = {
+    totalEquity: 2000000,
+    totalAssets: 2100000,
+    totalLiabilities: 100000,
+    cashAndEquivalents: 123456.78,
+  };
+  render(
+    <FinancialStatementsOverview
+      {...props([])}
+      latestBalanceSheet={balance as never}
+    />,
+  );
+  expect(screen.getByText("货币资金：¥12.35万")).toBeInTheDocument();
+  expect(screen.getByText(/下列金额统一以「万元」为单位/)).toBeInTheDocument();
+  expect(screen.queryByText(/123,456\.78/)).not.toBeInTheDocument();
 });

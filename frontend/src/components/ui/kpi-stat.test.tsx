@@ -45,4 +45,20 @@ describe("KpiStat", () => {
     rerender(<KpiStat label="收入" value="1" trend="up" trendValue="+5%" />);
     expect(screen.getByText("+5%")).toBeInTheDocument();
   });
+
+  it("footer 在数值下方显示，加载时不显示", () => {
+    const { rerender } = render(
+      <KpiStat label="应收" value="1" footer={<a href="/x">查看明细</a>} />,
+    );
+    expect(screen.getByRole("link", { name: "查看明细" })).toBeInTheDocument();
+    rerender(
+      <KpiStat
+        label="应收"
+        value="1"
+        loading
+        footer={<a href="/x">查看明细</a>}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: "查看明细" })).toBeNull();
+  });
 });
