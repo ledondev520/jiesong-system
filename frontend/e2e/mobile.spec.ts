@@ -209,7 +209,10 @@ test.describe("手机查阅与异常恢复", () => {
   });
   test("设置子菜单完整可达并自动收起", async ({ page }) => {
     await signInAsAdmin(page, "/dashboard/settings");
-    const menu = page.locator("details");
+    // 设置页还有「高级」折叠区的 details；收起时菜单里的链接不在可访问树里，所以按 summary 文案取设置导航菜单
+    const menu = page
+      .locator("details")
+      .filter({ has: page.locator("summary", { hasText: "设置菜单" }) });
     for (const [label, path] of [
       ["港口", "ports"],
       ["商品分类", "categories"],
