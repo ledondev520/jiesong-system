@@ -1,6 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+
+const toastError = vi.hoisted(() => vi.fn());
+vi.mock("sonner", () => ({ toast: { error: toastError } }));
 import { RecordHeader } from "./RecordHeader";
 
 vi.mock("next/navigation", () => ({
@@ -55,7 +58,9 @@ describe("RecordHeader", () => {
         blocker={{ reason: "有 2 批货未验货", actionLabel: "去处理", onAction }}
       />,
     );
-    const alert = screen.getByRole("alert");
+    // 阻塞提示是持续状态，不是事件：role=status，不能是 alert
+    expect(screen.queryByRole("alert")).toBeNull();
+    const alert = screen.getByRole("status");
     expect(alert).toHaveTextContent("有 2 批货未验货");
     await user.click(within(alert).getByRole("button", { name: "去处理" }));
     expect(onAction).toHaveBeenCalledTimes(1);
@@ -116,5 +121,47 @@ describe("RecordHeader", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: "单证" })).toBeNull();
+  });
+
+  it("菜单项 onSelect 被拒绝时弹出错误，不静默吞掉", async () => {
+    toastError.mockClear();
+    const user = userEvent.setup();
+    render(
+      <RecordHeader
+        number="N1"
+        documentsMenu={[
+          {
+            key: "pdf",
+            label: "导出 PDF",
+            onSelect: () => Promise.reject(new Error("导出失败：服务不可用")),
+          },
+        ]}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "单证" }));
+    await user.click(await screen.findByRole("menuitem", { name: "导出 PDF" }));
+    expect(toastError).toHaveBeenCalledWith("导出失败：服务不可用");
+  });
+
+  it("菜单项同步抛错同样提示，无错误信息时用兜底文案", async () => {
+    toastError.mockClear();
+    const user = userEvent.setup();
+    render(
+      <RecordHeader
+        number="N1"
+        documentsMenu={[
+          {
+            key: "x",
+            label: "查看",
+            onSelect: () => {
+              throw "boom";
+            },
+          },
+        ]}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "单证" }));
+    await user.click(await screen.findByRole("menuitem", { name: "查看" }));
+    expect(toastError).toHaveBeenCalledWith("操作失败，请重试");
   });
 });
