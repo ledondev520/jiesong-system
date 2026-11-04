@@ -52,15 +52,13 @@ import { CustomsDeclarationStatusBadge } from "./CustomsDeclarationStatusBadge";
 import { resolveCustomsReturnTo } from "./customs-return-context";
 import { splitDraftSuffix } from "./declarationNo";
 
-// 只列各状态里互不重复的一档（库里还有历史别名 DECLARED/VOID，沿用 URL 仍有效，只是不单列 chip）。
+// 报关单只会写入这四个状态（CustomsDeclarationForm），后端按精确值过滤；其余枚举值没有写入路径，不单列 chip。
 const statusChips = [
   { key: "ALL", label: "全部" },
   { key: "DRAFT", label: "草稿" },
-  { key: "SUBMITTED", label: "已申报" },
-  { key: "INSPECTING", label: "查验中" },
+  { key: "DECLARED", label: "已申报" },
   { key: "RELEASED", label: "已放行" },
-  { key: "COMPLETED", label: "已归档" },
-  { key: "CANCELLED", label: "已作废" },
+  { key: "VOID", label: "已作废" },
 ];
 
 const isDraftDeclaration = (declaration: CustomsDeclaration) =>

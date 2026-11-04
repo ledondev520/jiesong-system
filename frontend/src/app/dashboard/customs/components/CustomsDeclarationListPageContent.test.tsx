@@ -295,6 +295,19 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
       "aria-pressed",
       "true",
     );
+    // 已申报 = 库里实际写入的 DECLARED（表单只写 DRAFT/DECLARED/RELEASED/VOID）
+    await user.click(screen.getByRole("button", { name: "已申报" }));
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: "DECLARED" }),
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "已作废" }));
+    await waitFor(() =>
+      expect(mocks.getAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: "VOID" }),
+      ),
+    );
     await user.click(screen.getByRole("button", { name: "已放行" }));
     await waitFor(() =>
       expect(mocks.getAll).toHaveBeenLastCalledWith(

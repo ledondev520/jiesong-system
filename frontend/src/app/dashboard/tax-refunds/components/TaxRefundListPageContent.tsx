@@ -26,6 +26,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  replaceBrowserQuery,
   replaceBrowserUrl,
   useBrowserQuery,
 } from "@/lib/hooks/useBrowserQuery";
@@ -86,7 +87,7 @@ export function TaxRefundListPageContent() {
     useBrowserQuery(searchParams.toString()),
   );
   const role = useAuthStore((state) => state.user?.role);
-  // 默认页签按角色：财务/管理员做退税，其余角色（销售、单证）要的是报关单。
+  // 默认页签按角色：仅财务进退税工作台；管理员和其余角色（销售、单证）进报关单。
   const defaultView = role === "FINANCE" ? "workbench" : "customs";
   const requestedView = browserQuery.get("view");
   const activeView =
@@ -181,7 +182,7 @@ export function TaxRefundListPageContent() {
 
   // 报关单列表只在 URL 带 view=customs 时回写筛选，所以按角色选出默认页签后把它显式写进地址。
   useEffect(() => {
-    if (!requestedView && role) replaceBrowserUrl(viewHref(defaultView));
+    if (!requestedView && role) replaceBrowserQuery({ view: defaultView });
   }, [requestedView, role, defaultView]);
 
   const sort = useTableSort<TaxRefund, string>(

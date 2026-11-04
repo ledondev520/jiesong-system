@@ -61,7 +61,7 @@ const response = {
         ...base,
         salesContractId: "a",
         contractNo: "EXP-CURRENT",
-        shippedAt: "2026-11-05T00:00:00.000Z",
+        shippedAt: "2026-10-15T00:00:00.000Z",
         declaration: {
           id: "d1",
           declarationNo: "CD-0001-DRAFT",
@@ -124,7 +124,7 @@ describe("TaxRefundWorkbench 单证与退税（B54）", () => {
     await renderLoaded();
     expect(
       screen.getByText(
-        /列表含该月出货，以及更早尚未处理的历史待办（1 条在本页）/,
+        /列表含 2026-10 出货（本期应申报），以及更早尚未处理的历史待办（1 条在本页）/,
       ),
     ).toBeInTheDocument();
     expect(screen.getAllByText("历史")).toHaveLength(1);
@@ -136,7 +136,7 @@ describe("TaxRefundWorkbench 单证与退税（B54）", () => {
     ).toBeInTheDocument();
   });
 
-  it("草稿报关单显示去掉 DRAFT 后缀的单号 + 草稿徽章 + 非正式单", async () => {
+  it("桌面表格：草稿报关单显示去掉 DRAFT 后缀的单号 + 草稿徽章 + 非正式单", async () => {
     await renderLoaded();
     expect(screen.getAllByText("CD-0001").length).toBeGreaterThan(0);
     expect(screen.queryByText("CD-0001-DRAFT")).toBeNull();
@@ -144,10 +144,39 @@ describe("TaxRefundWorkbench 单证与退税（B54）", () => {
     expect(screen.getAllByText("草稿").length).toBeGreaterThan(0);
   });
 
-  it("预计可退税额 KPI 带说明；阻塞原文仍可展开到达", async () => {
+  it("不显示预计可退税额（按月准备清单不计算退税额）；阻塞原文仍可展开到达", async () => {
     await renderLoaded();
-    await waitFor(() => expect(screen.getByText("¥1,234")).toBeInTheDocument());
-    expect(screen.getByText("按当前资料估算，非申报金额")).toBeInTheDocument();
+    expect(screen.queryByText("预计可退税额")).toBeNull();
     expect(screen.getAllByText("报关单未放行").length).toBeGreaterThan(0);
+  });
+
+  it("本期 = 申报月份前一月（含跨年），按上海时区取月", async () => {
+    mocks.getWorkbench.mockResolvedValue({
+      data: {
+        ...response.data,
+        items: [
+          {
+            ...response.data.items[0],
+            contractNo: "EXP-DEC",
+            // 上海时区已是 12-01 的出货不能被 UTC 切成 11 月
+            shippedAt: "2025-11-30T20:00:00.000Z",
+          },
+        ],
+      },
+    });
+    render(<TaxRefundWorkbench />);
+    fireEvent.change(screen.getByLabelText("申报月份"), {
+      target: { value: "2026-01" },
+    });
+    await screen.findAllByText("EXP-DEC");
+    expect(
+      screen.getByText(/列表含 2025-12 出货（本期应申报）/),
+    ).toBeInTheDocument();
+    expect(screen.queryAllByText("历史")).toHaveLength(0);
+  });
+
+  it("手机卡片上的草稿报关单也标注非正式单", async () => {
+    await renderLoaded();
+    expect(screen.getAllByText("CD-0001（草稿 · 非正式单）").length).toBe(1);
   });
 });

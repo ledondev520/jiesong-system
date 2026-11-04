@@ -95,27 +95,39 @@ const stageMeta: Record<
   },
 };
 
+// 按申报月份加载时后端只会产出这三个阶段（taxRefundWorkbenchService），其余阶段在此视图里永远为空，不列 chip。
 const stageOptions: Array<{ key: TaxRefundWorkbenchStage; label: string }> = [
   { key: "ALL", label: "全部阶段" },
   { key: "PREPARATION", label: "准备材料" },
   { key: "VERIFICATION", label: "待确认资料" },
   { key: "DRAFT", label: "资料已确认" },
-  { key: "READY_TO_EXPORT", label: "可生成明细" },
-  { key: "SUBMITTED", label: "已提交跟进" },
-  { key: "REFUNDED", label: "已退税" },
 ];
 
 const ALL_REASONS = "ALL";
 const count = (value: number | undefined) =>
   value === undefined ? undefined : String(value);
 
-// 与后端 listShipmentPreparations 同口径：出货/报关月份早于申报月份、或没有月份，都算历史待办。
+// 后端 listShipmentPreparations 只返回「月份 < 申报月份」的出货：申报月份 M 的本期 = M-1 月出货，更早的是历史待办。
+// 月份与后端 monthOf 同取 Asia/Shanghai。
+function monthOf(value?: string | null) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" })
+        .format(date)
+        .slice(0, 7)
+    : null;
+}
+
+function previousMonth(filingMonth: string) {
+  const [year, month] = filingMonth.split("-").map(Number);
+  return month === 1
+    ? `${year - 1}-12`
+    : `${year}-${String(month - 1).padStart(2, "0")}`;
+}
+
 function isHistorical(item: TaxRefundWorkbenchItem, filingMonth: string) {
-  const month = (item.declaration?.exportDate || item.shippedAt || "").slice(
-    0,
-    7,
-  );
-  return !month || month < filingMonth;
+  const month = monthOf(item.declaration?.exportDate || item.shippedAt);
+  return !month || month < previousMonth(filingMonth);
 }
 
 function DeclarationCell({
@@ -158,6 +170,13 @@ export function TaxRefundWorkbench() {
   // 以下两个只过滤已加载的这一页（后端没有按月份范围/原因筛选的参数），合计与分页仍是服务端口径。
   const [includeHistory, setIncludeHistory] = useState(true);
   const [reason, setReason] = useState(ALL_REASONS);
+  // 原因筛选只作用于当前页，翻页、改条数或换月份/阶段/关键词时回到「全部原因」，避免新一页被旧原因筛成空。
+  const [prevPageKey, setPrevPageKey] = useState("");
+  const pageKey = `${page}|${pageSize}|${filingMonth}|${stage}|${keyword}`;
+  if (pageKey !== prevPageKey) {
+    setPrevPageKey(pageKey);
+    setReason(ALL_REASONS);
+  }
   const [exporting, setExporting] = useState(false);
   const [invoiceImportOpen, setInvoiceImportOpen] = useState(false);
   const [selected, setSelected] = useState<TaxRefundWorkbenchItem | null>(null);
@@ -316,7 +335,7 @@ export function TaxRefundWorkbench() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <KpiStat
           label="待处理出口"
           loading={loading}
@@ -344,16 +363,6 @@ export function TaxRefundWorkbench() {
           label="已确认出货"
           loading={loading}
           value={count(summary?.confirmedCount)}
-        />
-        <KpiStat
-          label="预计可退税额"
-          loading={loading}
-          value={
-            summary?.estimatedRefundableAmount === undefined
-              ? undefined
-              : `¥${summary.estimatedRefundableAmount.toLocaleString()}`
-          }
-          subLabel="按当前资料估算，非申报金额"
         />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -409,7 +418,7 @@ export function TaxRefundWorkbench() {
         </div>
         <p className="text-xs text-muted-foreground">
           {filingMonth
-            ? `申报月份 ${filingMonth}：列表含该月出货，以及更早尚未处理的历史待办（${loading ? "—" : historyCount} 条在本页）。`
+            ? `申报月份 ${filingMonth}：列表含 ${previousMonth(filingMonth)} 出货（本期应申报），以及更早尚未处理的历史待办（${loading ? "—" : historyCount} 条在本页）。`
             : "请选择申报月份。"}
           {!includeHistory &&
             ` 已隐藏本页 ${historyCount} 条历史待办；合计与分页仍含历史。`}
@@ -504,7 +513,14 @@ export function TaxRefundWorkbench() {
               title={item.contractNo}
               subtitle={
                 item.declaration
-                  ? splitDraftSuffix(item.declaration.declarationNo).displayNo
+                  ? (() => {
+                      const { displayNo, isDraft } = splitDraftSuffix(
+                        item.declaration.declarationNo,
+                      );
+                      return isDraft
+                        ? `${displayNo}（草稿 · 非正式单）`
+                        : displayNo;
+                    })()
                   : "未关联报关单"
               }
               badge={
