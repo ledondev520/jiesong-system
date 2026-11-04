@@ -8,7 +8,7 @@ describe("中文业务面包屑", () => {
     ["/dashboard/reports", "经营分析"],
     ["/dashboard/finance/analysis", "经营分析"],
     ["/dashboard/notifications", "通知中心"],
-    ["/dashboard/settings/logs", "操作日志"],
+    ["/dashboard/settings/logs", "系统日志"],
     ["/dashboard/settings/ai-usage", "AI 用量"],
     ["/dashboard/settings/ai-access", "AI 接入"],
     ["/dashboard/settings/customs-brokers", "报关行"],

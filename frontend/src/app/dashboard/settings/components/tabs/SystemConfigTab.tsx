@@ -32,7 +32,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Cpu, X, Save, Loader2, Key, ExternalLink, Globe } from "lucide-react";
+import {
+  ChevronRight,
+  Cpu,
+  X,
+  Save,
+  Loader2,
+  Key,
+  ExternalLink,
+  Globe,
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { UNITS as INITIAL_UNITS } from "@/lib/constants";
 import { configService } from "@/services/config.service";
@@ -708,8 +717,16 @@ export function SystemConfigTab({
                   OpenAI 模式下不修改这两项。
                 </p>
               ) : (
-                <div className="border-t pt-4 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                // 高级：默认收起；原生 details 保持控件始终在 DOM 中，保存逻辑不变
+                <details className="group border-t pt-4">
+                  <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                    <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+                    高级：采样参数
+                    <span className="text-xs font-normal text-muted-foreground">
+                      一般无需修改
+                    </span>
+                  </summary>
+                  <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
                     {!isDeepSeek && (
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -763,7 +780,7 @@ export function SystemConfigTab({
                       </p>
                     </div>
                   </div>
-                </div>
+                </details>
               )}
 
               {(effectiveChatModel || effectiveHsCodeModel) && (

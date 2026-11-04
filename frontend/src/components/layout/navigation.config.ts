@@ -7,7 +7,6 @@ import {
   FileText,
   Home,
   Landmark,
-  History,
   PackageOpen,
   Package,
   ShoppingCart,
@@ -21,14 +20,6 @@ import { Role } from "@/types";
 export interface TabConfig {
   href: string;
   label: string;
-}
-
-export interface SystemCenterLink {
-  href: string;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-  desc: string;
-  detail: string;
 }
 
 export type NavGroup = "main" | "business" | "data" | "system";
@@ -57,29 +48,6 @@ export interface ModuleNavItem {
   visibleRoles?: Role[];
   mobilePrimary?: boolean;
 }
-
-export const ADMIN_TABS: TabConfig[] = [
-  { href: "/dashboard/settings", label: "系统配置" },
-  { href: "/dashboard/settings/users", label: "账号管理" },
-  { href: "/dashboard/settings/logs", label: "系统日志" },
-];
-
-export const SYSTEM_CENTER_LINKS: SystemCenterLink[] = [
-  {
-    href: "/dashboard/notifications",
-    label: "通知中心",
-    icon: Bell,
-    desc: "查看系统通知和未读提醒",
-    detail: "管理所有系统消息、操作提醒与告警通知，支持批量已读。",
-  },
-  {
-    href: "/dashboard/settings/logs",
-    label: "系统日志",
-    icon: History,
-    desc: "审计关键操作日志与变更记录",
-    detail: "追踪合同创建/修改/删除、数据导入等关键操作，支持 CSV 导出。",
-  },
-];
 
 // 菜单指向现有 URL（URL 迁移见后续 IA 卡片）。
 export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
@@ -256,7 +224,8 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       "/dashboard/settings/customs-brokers",
       "/dashboard/import",
     ],
-    children: ADMIN_TABS,
+    // 设置内部导航由 SettingsNav 提供；侧栏不再重复列出子页面（B56）
+    children: [],
     group: "system",
     visibleRoles: [Role.ADMIN],
   },

@@ -136,7 +136,8 @@ describe("navigation.config helpers", () => {
       "经营分析",
     ]);
     expect(labels("documents")).toEqual([]);
-    expect(labels("admin")).toEqual(["系统配置", "账号管理", "系统日志"]);
+    // 设置内部导航由 SettingsNav 提供，侧栏不重复列出（B56）
+    expect(labels("admin")).toEqual([]);
   });
 
   it("移动端底栏：首页·订单·采购·库存，其余进入更多（隐藏项不出现；报价进入更多）", () => {

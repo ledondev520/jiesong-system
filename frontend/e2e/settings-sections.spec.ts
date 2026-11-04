@@ -18,7 +18,7 @@ test.describe("settings sections", () => {
     const nav = page.locator("aside");
     for (const [name, href] of [
       ["报价规则", "/dashboard/settings"],
-      ["用户", "/dashboard/settings/users"],
+      ["账号管理", "/dashboard/settings/users"],
       ["公司信息", "/dashboard/settings/company"],
       ["AI 接入", "/dashboard/settings/ai-access"],
       ["AI 用量", "/dashboard/settings/ai-usage"],

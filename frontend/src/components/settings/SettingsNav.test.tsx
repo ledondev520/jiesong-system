@@ -23,4 +23,14 @@ describe("SettingsNav", () => {
     fireEvent.click(exportLink);
     expect(menu.open).toBe(false);
   });
+
+  it("账号入口统一叫「账号管理」，系统日志只出现一次（B56）", () => {
+    render(<SettingsNav />);
+    expect(screen.getByRole("link", { name: "账号管理" })).toHaveAttribute(
+      "href",
+      "/dashboard/settings/users",
+    );
+    expect(screen.queryByRole("link", { name: "用户" })).toBeNull();
+    expect(screen.getAllByRole("link", { name: "系统日志" })).toHaveLength(1);
+  });
 });

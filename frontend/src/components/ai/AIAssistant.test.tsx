@@ -15,6 +15,8 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useAuthStore } from "@/store/auth.store";
+import { Role, type User } from "@/types";
 import {
   AIAssistant,
   stripPageContext,
@@ -566,5 +568,56 @@ describe("AIAssistant", () => {
 
     expect(trigger.style.left).not.toBe("");
     expect(trigger.style.top).not.toBe("");
+  });
+});
+
+describe("AIAssistant 来源说明与操作记录入口（B56）", () => {
+  const sendQuestion = async () => {
+    const reader = createMockSseReader([
+      'data: {"type":"chunk","content":"本月应收 ¥1,000"}\n\n',
+      'data: {"type":"done","model":"kimi","pendingActions":[]}\n\n',
+    ]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+    } as unknown as Response);
+    const user = userEvent.setup();
+    render(<AIAssistant />);
+    await user.click(screen.getByRole("button", { name: "AI 助手" }));
+    return user;
+  };
+  const asRole = (role: Role | null) =>
+    useAuthStore.setState({ user: role ? ({ role } as User) : null });
+
+  it("管理员在面板底部看到指向「设置 > AI 用量」的操作记录入口", async () => {
+    asRole(Role.ADMIN);
+    await sendQuestion();
+    expect(
+      screen.getByRole("link", { name: "查看助手操作记录" }),
+    ).toHaveAttribute("href", "/dashboard/settings/ai-usage");
+    asRole(null);
+  });
+
+  it("非管理员不显示操作记录入口（该页只有管理员能进）", async () => {
+    asRole(Role.SALES);
+    await sendQuestion();
+    expect(screen.queryByRole("link", { name: "查看助手操作记录" })).toBeNull();
+    asRole(null);
+  });
+
+  it("回答完成后标注生成时间与核对口径；开场白不加", async () => {
+    asRole(null);
+    const user = await sendQuestion();
+    expect(screen.queryByText(/AI 回答 · /)).toBeNull();
+    await user.type(
+      screen.getByPlaceholderText("输入问题或粘贴图片..."),
+      "应收",
+    );
+    await user.keyboard("{Enter}");
+    expect(
+      await screen.findByText(
+        /AI 回答 · \d{2}:\d{2} 生成 · 金额与状态请以对应页面为准/,
+      ),
+    ).toBeInTheDocument();
   });
 });
