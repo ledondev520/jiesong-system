@@ -1,6 +1,6 @@
 /**
  * Input: 出口订单详情、出柜判定结果
- * Output: 概览页签：金额汇总、装柜摘要、物流时间线、「按门店」履约表（下单 / 已采购 / 已入库 / 已装箱）
+ * Output: 概览页签：金额汇总、装柜摘要、「发运信息」卡（订单号/柜号/目的港/日期/报关行/提单号未记录/打印）、物流时间线、「按门店」履约表（下单 / 已采购 / 已入库 / 已装箱）
  * Pos: /dashboard/orders/[id] 概览（UX 规范 §4.2）
  */
 "use client";
@@ -13,11 +13,13 @@ import {
   CheckCircle2,
   CircleDashed,
   CircleDot,
+  Printer,
   Store as StoreIcon,
   Truck,
 } from "lucide-react";
 import { SalesStatus, type SalesContract } from "@/types";
 import { formatDate } from "@/lib/date-format";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -52,6 +54,13 @@ const STATUS_ORDER: Record<SalesStatus, number> = {
   [SalesStatus.COMPLETED]: 5,
   [SalesStatus.CANCELLED]: -1,
 };
+
+// 只打印 #order-shipping-print-root（发运信息卡）；其余页面内容在打印时隐藏，做法与装柜面板一致。
+const PRINT_CSS = `@media print {
+  body * { visibility: hidden !important; }
+  #order-shipping-print-root, #order-shipping-print-root * { visibility: visible !important; }
+  #order-shipping-print-root { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
+}`;
 
 const usd = (value: number) => `$${(value || 0).toLocaleString()}`;
 
@@ -120,6 +129,79 @@ const buildTimeline = (contract: SalesContract, readiness: OrderReadiness) => {
   return timeline;
 };
 
+/**
+ * 职责：发运信息集中展示（订单号、柜号、发运/到港日期、目的港、报关行、提单号）。
+ * 柜号 = SalesContract.containerLabel（物理货柜编号，发运导入填写）；没有填写则「未记录」，不用订单号冒充。
+ * 提单号系统暂无字段，如实标「未记录」而不是留空。
+ */
+function ShippingInfoCard({
+  contract,
+  readiness,
+}: {
+  contract: SalesContract;
+  readiness: OrderReadiness;
+}) {
+  const shipped = hasOrderShipped(contract.status);
+  const facts: Array<{ label: string; value: string; hint?: string }> = [
+    { label: "订单号", value: contract.contractNo },
+    { label: "柜号", value: contract.containerLabel?.trim() || "未记录" },
+    { label: "柜型", value: readiness.plan?.containerType ?? "—" },
+    { label: "目的港", value: contract.port?.name || "—" },
+    { label: "发运日期", value: formatDate(contract.shippedAt, "—") },
+    { label: "预计到港", value: formatDate(contract.estimatedArrival, "—") },
+    { label: "报关行", value: contract.customsBroker || "—" },
+    {
+      label: "提单号",
+      value: "未记录",
+      hint: "系统暂无提单号字段，提单原件请在「单证」页签的源文件附件中归档",
+    },
+  ];
+  return (
+    <Card className="min-w-0">
+      <style>{PRINT_CSS}</style>
+      <CardHeader className="flex-row items-center justify-between gap-2 space-y-0 pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+          <Truck className="h-4 w-4 text-primary" />
+          发运信息
+        </CardTitle>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => window.print()}
+        >
+          <Printer className="mr-1 h-4 w-4" />
+          打印
+        </Button>
+      </CardHeader>
+      <CardContent className="pt-0" id="order-shipping-print-root">
+        <p className="mb-3 hidden text-sm font-medium print:block">
+          {contract.contractNo} 发运信息
+        </p>
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+          {facts.map((fact) => (
+            <div key={fact.label} className="min-w-0">
+              <dt className="text-xs text-muted-foreground">{fact.label}</dt>
+              <dd className="break-words text-sm font-medium tabular-nums">
+                {fact.value}
+              </dd>
+              {fact.hint && (
+                <p className="text-xs text-muted-foreground">{fact.hint}</p>
+              )}
+            </div>
+          ))}
+        </dl>
+        {shipped && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            订单状态与外销合同文件相互独立：发运不要求先生成合同，已发运订单也可以在页头「单证
+            ▾」→「生成出口单证」补生成外销合同（需订单资料完整），所以已发运订单可能暂无合同文件。
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function Metric({
   label,
   value,
@@ -181,6 +263,8 @@ export function OrderOverviewTab({
           </p>
         </Metric>
       </div>
+
+      <ShippingInfoCard contract={contract} readiness={readiness} />
 
       <Card className="min-w-0">
         <CardHeader className="pb-3">
