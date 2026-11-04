@@ -44,7 +44,7 @@ function unallocatedTotals(payments: Payment[]): string {
     );
   }
   return [...byCurrency]
-    .map(([currency, sum]) => `${currency} ${sum.toLocaleString()}`)
+    .map(([currency, sum]) => `${currency} ${formatAmount(sum)}`)
     .join("、");
 }
 

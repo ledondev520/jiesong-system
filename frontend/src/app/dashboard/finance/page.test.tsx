@@ -132,6 +132,32 @@ describe("FinancePage 交互逻辑", () => {
     );
   });
 
+  it("只有一个月数据时写「无上期数据」而不是「环比持平」，并解释结算汇率 (B44)", async () => {
+    mockGetStats.mockResolvedValue({
+      payable: { total: 400, paid: 0, unpaid: 400 },
+      receivable: { total: 1000, received: 0, unreceived: 1000 },
+    });
+    mockApiGet.mockImplementation((url: string) => {
+      if (url.includes("/system/exchange-rate"))
+        return Promise.resolve({
+          data: { rate: 6.8, buffer: 0.2, effectiveRate: 6.6 },
+        });
+      if (url.includes("/finance/payment-trends"))
+        return Promise.resolve({
+          data: [{ label: "本期", receivables: 1000, payables: 400 }],
+        });
+      return Promise.resolve({ data: url.includes("overdue") ? [] : null });
+    });
+    render(<FinancePage />);
+    expect((await screen.findAllByText("无上期数据")).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText("环比持平")).toBeNull();
+    expect(
+      screen.getByText(/结算汇率 = 市场汇率 − 风险缓冲/),
+    ).toBeInTheDocument();
+  });
+
   it("金额统一两位小数：整数/一位小数的金额也补齐到 .00/.30 (B41)", async () => {
     mockGetStats.mockResolvedValue({
       payable: { total: 306482.3, paid: 1000, unpaid: 305482.3 },

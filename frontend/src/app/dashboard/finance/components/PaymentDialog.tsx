@@ -176,14 +176,14 @@ export function PaymentDialog({
               <p>
                 本次登记 <strong>1 笔</strong>：合同 {contractNo}，{label}{" "}
                 {resolvedCurrency} {currencySymbol}
-                {pending.amount.toLocaleString()}
+                {formatAmount(pending.amount)}
               </p>
               <p className="text-muted-foreground">
                 {afterOpen < -0.005
-                  ? `超出待结金额 ${resolvedCurrency} ${currencySymbol}${Math.abs(afterOpen).toLocaleString()}，该合同将多${type === PaymentType.PAYABLE ? "付" : "收"}。`
+                  ? `超出待结金额 ${resolvedCurrency} ${currencySymbol}${formatAmount(Math.abs(afterOpen))}，该合同将多${type === PaymentType.PAYABLE ? "付" : "收"}。`
                   : afterOpen <= 0.005
                     ? "登记后该合同待结金额为 0，将视为结清。"
-                    : `登记后该合同待结 ${resolvedCurrency} ${currencySymbol}${afterOpen.toLocaleString()}${isResidual(afterOpen) ? "（尾差，不会自动核销）" : ""}。`}
+                    : `登记后该合同待结 ${resolvedCurrency} ${currencySymbol}${formatAmount(afterOpen)}${isResidual(afterOpen) ? "（尾差，不会自动核销）" : ""}。`}
               </p>
               <p className="text-muted-foreground">
                 保存后立即计入{type === PaymentType.PAYABLE ? "应付" : "应收"}

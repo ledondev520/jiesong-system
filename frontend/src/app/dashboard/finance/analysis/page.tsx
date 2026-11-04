@@ -1,6 +1,6 @@
 /**
  * Input: reportsService.getBusinessOverview API 与 URL 已应用发运期间
- * Output: 保留历史期间、区分日期草稿并隔离晚到请求的经营数据报表页面（老板视角）
+ * Output: 保留历史期间、区分日期草稿并隔离晚到请求的经营数据报表页面（老板视角）；指标卡统一用 KpiStat，全部应收逾期时给出琥珀色提示
  * Pos: Dashboard > 经营执行，提供公司整体经营状况、资金风险、库存健康度与趋势
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -26,6 +26,8 @@ import {
   useBrowserQuery,
 } from "@/lib/hooks/useBrowserQuery";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { KpiStat } from "@/components/ui/kpi-stat";
 import {
   DollarSign,
   ShoppingCart,
@@ -271,6 +273,11 @@ function BusinessReportsContent() {
   }
 
   const { overview, funds, inventory, trends } = data;
+  // Equality only: the two totals are defined differently on the server (owned goods
+  // vs. header amount), so overdue > total proves nothing about "all overdue".
+  const allReceivablesOverdue =
+    funds.totalReceivable > 0 &&
+    Math.abs(funds.overdueReceivable - funds.totalReceivable) < 0.005;
   const salesParams = new URLSearchParams({ shipped: "true" });
   if (data.period.startDate)
     salesParams.set("shippedFrom", data.period.startDate);
@@ -342,93 +349,61 @@ function BusinessReportsContent() {
       <section aria-label="经营概览" className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">经营概览</h2>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                发运销售额（CNY）
-              </CardTitle>
-              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12">
-                <DollarSign className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none">
-                {formatCurrency(overview.totalSales, "CNY")}
-              </div>
+          <KpiStat
+            label="发运销售额（CNY）"
+            value={formatCurrency(overview.totalSales, "CNY")}
+            icon={<DollarSign className="h-4 w-4" />}
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href={salesHref}
               >
                 查看发运销售明细
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                匹配已售采购成本（CNY）
-              </CardTitle>
-              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12">
-                <ShoppingCart className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none">
-                {formatCurrency(overview.totalPurchases, "CNY")}
-              </div>
+          <KpiStat
+            label="匹配已售采购成本（CNY）"
+            value={formatCurrency(overview.totalPurchases, "CNY")}
+            icon={<ShoppingCart className="h-4 w-4" />}
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href={salesHref}
               >
                 查看已售成本与单柜财务
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                商品毛利（CNY）
-              </CardTitle>
-              <span className="rounded-xl bg-status-green/8 p-2 text-status-green ring-1 ring-status-green/12">
-                <TrendingUp className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none">
-                {formatCurrency(overview.grossProfit, "CNY")}
-              </div>
+          <KpiStat
+            label="商品毛利（CNY）"
+            value={formatCurrency(overview.grossProfit, "CNY")}
+            icon={<TrendingUp className="h-4 w-4" />}
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href={salesHref}
               >
                 查看单柜毛利明细
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                利润率
-              </CardTitle>
-              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12">
-                <Percent className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none">
-                {formatPercent(overview.profitMargin)}
-              </div>
+          <KpiStat
+            label="利润率"
+            value={formatPercent(overview.profitMargin)}
+            icon={<Percent className="h-4 w-4" />}
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href={salesHref}
               >
                 查看单柜利润率
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
         </div>
       </section>
 
@@ -440,94 +415,82 @@ function BusinessReportsContent() {
         <p className="text-xs text-muted-foreground">
           {funds.overdueRule}。超过交期待付按采购交期判断，不代表付款到期。
         </p>
+        {allReceivablesOverdue && (
+          <Alert
+            data-testid="all-receivables-overdue"
+            className="border-status-amber/50 bg-status-amber-soft/50"
+          >
+            <AlertTriangle className="h-4 w-4 text-status-amber" />
+            <AlertTitle className="text-status-amber">
+              全部应收都已发运超过 30 天未收
+            </AlertTitle>
+            <AlertDescription className="text-xs">
+              应收总额与「发运超过30天未收」相同（
+              {formatCurrency(funds.totalReceivable, "USD")}
+              ），没有一笔应收在 30 天内。请先核对收款是否已登记，再跟进催收。
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                应收总额
-              </CardTitle>
-              <span className="rounded-xl bg-status-blue/8 p-2 text-status-blue ring-1 ring-status-blue/12">
-                <ArrowUpRight className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none">
-                {formatCurrency(funds.totalReceivable, "USD")}
-              </div>
+          <KpiStat
+            label="应收总额"
+            value={formatCurrency(funds.totalReceivable, "USD")}
+            icon={<ArrowUpRight className="h-4 w-4" />}
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href="/dashboard/finance/receivable"
               >
                 查看应收明细
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                应付总额
-              </CardTitle>
-              <span className="rounded-xl bg-status-amber/8 p-2 text-status-amber ring-1 ring-status-amber/12">
-                <ArrowDownLeft className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none">
-                {formatCurrency(funds.totalPayable, "CNY")}
-              </div>
+          <KpiStat
+            label="应付总额"
+            value={formatCurrency(funds.totalPayable, "CNY")}
+            icon={<ArrowDownLeft className="h-4 w-4" />}
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href="/dashboard/finance/payable"
               >
                 查看应付明细
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          <Card className="border-destructive/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-destructive/80">
-                发运超过30天未收
-              </CardTitle>
-              <span className="rounded-xl bg-destructive/8 p-2 text-destructive ring-1 ring-destructive/12">
-                <AlertTriangle className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none text-destructive">
-                {formatCurrency(funds.overdueReceivable, "USD")}
-              </div>
+          <KpiStat
+            label="发运超过30天未收"
+            value={formatCurrency(funds.overdueReceivable, "USD")}
+            icon={<AlertTriangle className="h-4 w-4" />}
+            valueClassName="text-destructive"
+            className="border-destructive/20"
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href="/dashboard/finance/receivable?overdue=true"
               >
                 查看发运超过30天未收明细
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          <Card className="border-destructive/20">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-destructive/80">
-                超过交期待付
-              </CardTitle>
-              <span className="rounded-xl bg-destructive/8 p-2 text-destructive ring-1 ring-destructive/12">
-                <AlertTriangle className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none text-destructive">
-                {formatCurrency(funds.overduePayable, "CNY")}
-              </div>
+          <KpiStat
+            label="超过交期待付"
+            value={formatCurrency(funds.overduePayable, "CNY")}
+            icon={<AlertTriangle className="h-4 w-4" />}
+            valueClassName="text-destructive"
+            className="border-destructive/20"
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href="/dashboard/finance/payable?pastDelivery=true"
               >
                 查看超过交期待付明细
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
         </div>
       </section>
 
@@ -535,71 +498,48 @@ function BusinessReportsContent() {
       <section aria-label="库存与物流" className="space-y-3">
         <h2 className="text-sm font-semibold text-foreground">库存与物流</h2>
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                活跃商品总数
-              </CardTitle>
-              <span className="rounded-xl bg-primary/8 p-2 text-primary ring-1 ring-primary/12">
-                <Package className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none">
-                {inventory.totalItems}
-              </div>
+          <KpiStat
+            label="活跃商品总数"
+            value={String(inventory.totalItems)}
+            icon={<Package className="h-4 w-4" />}
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href="/dashboard/products"
               >
                 查看活跃商品
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                低库存预警
-              </CardTitle>
-              <span className="rounded-xl bg-status-amber/8 p-2 text-status-amber ring-1 ring-status-amber/12">
-                <AlertTriangle className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none">
-                {inventory.lowStockItems}
-              </div>
+          <KpiStat
+            label="低库存预警"
+            value={String(inventory.lowStockItems)}
+            icon={<AlertTriangle className="h-4 w-4" />}
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href="/dashboard/products?lowStock=true"
               >
                 查看低库存商品
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground/70">
-                在途货柜
-              </CardTitle>
-              <span className="rounded-xl bg-status-blue/8 p-2 text-status-blue ring-1 ring-status-blue/12">
-                <Ship className="h-4 w-4" />
-              </span>
-            </CardHeader>
-            <CardContent>
-              <div className="text-[1.75rem] font-bold tabular-nums tracking-tight leading-none">
-                {inventory.inTransitContainers}
-              </div>
+          <KpiStat
+            label="在途货柜"
+            value={String(inventory.inTransitContainers)}
+            subLabel="状态为「已发运」的销售合同数，与工作台待办数不是同一口径"
+            icon={<Ship className="h-4 w-4" />}
+            footer={
               <Link
                 className="mt-3 inline-block text-xs text-primary underline"
                 href="/dashboard/sales?status=SHIPPED"
               >
                 查看已发运未到港货柜
               </Link>
-            </CardContent>
-          </Card>
+            }
+          />
         </div>
       </section>
 
