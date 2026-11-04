@@ -205,3 +205,65 @@ it("「详情」打开只读库存详情，不触发任何状态变更 (B17)", a
   expect(dialog).toHaveTextContent("手工流转");
   expect(batchUpdateStatus).not.toHaveBeenCalled();
 });
+
+const stockRow = (id: string, over: Record<string, unknown> = {}) => ({
+  id,
+  productId: `p-${id}`,
+  product: { customsName: `商品${id}`, unit: "件" },
+  quantity: 5,
+  status: InventoryStatus.INBOUND,
+  createdAt: "2026-10-01",
+  updatedAt: "2026-10-01",
+  ...over,
+});
+
+it("显示入库日期；没有入库时间的行显示「—」，并解释可用库存口径与系统不记录仓库/批次", async () => {
+  getAll.mockResolvedValueOnce({
+    data: {
+      items: [
+        stockRow("a", { inboundAt: "2026-10-05T03:00:00.000Z" }),
+        stockRow("b"),
+      ] as unknown as Inventory[],
+      pagination: { total: 2, totalPages: 1 },
+    },
+  });
+  render(<InventoryTab />);
+  expect(
+    await screen.findByRole("columnheader", { name: "入库日期" }),
+  ).toBeInTheDocument();
+  expect(screen.getAllByText("2026-10-05").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  expect(screen.getByText(/只统计状态为「已入库」的数量/)).toBeInTheDocument();
+  expect(
+    screen.getByText(/系统目前不记录仓库\/库位和批次号/),
+  ).toBeInTheDocument();
+});
+
+it("当前页没有任何采购合同来源时隐藏整列「采购合同」；有来源时显示", async () => {
+  getAll.mockResolvedValueOnce({
+    data: {
+      items: [stockRow("a")] as unknown as Inventory[],
+      pagination: { total: 1, totalPages: 1 },
+    },
+  });
+  const { unmount } = render(<InventoryTab />);
+  await screen.findByRole("columnheader", { name: "入库日期" });
+  expect(screen.queryByRole("columnheader", { name: /采购合同/ })).toBeNull();
+  unmount();
+
+  getAll.mockResolvedValueOnce({
+    data: {
+      items: [
+        stockRow("a", {
+          purchaseItem: { purchaseContract: { contractNo: "PC-9" } },
+        }),
+      ] as unknown as Inventory[],
+      pagination: { total: 1, totalPages: 1 },
+    },
+  });
+  render(<InventoryTab />);
+  expect(
+    await screen.findByRole("columnheader", { name: /采购合同/ }),
+  ).toBeInTheDocument();
+  expect(screen.getAllByText("PC-9").length).toBeGreaterThan(0);
+});
