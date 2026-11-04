@@ -1,22 +1,13 @@
 /**
  * Input: PurchaseStatus、PurchaseContract 类型
- * Output: 采购列表共用的状态 pill、状态色条、金额与分页页码辅助
+ * Output: 采购列表共用的状态徽章（StatusBadge 映射）、状态色条、金额与分页页码辅助
  * Pos: 采购列表页（ContractsPageContent）拆出的纯展示辅助；草稿/已取消状态明确标注不计应付（应付口径白名单见 isPayable）
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { PurchaseContract, PurchaseItem, PurchaseStatus } from "@/types";
-import {
-  Circle,
-  CheckCircle2,
-  Loader2,
-  PackageCheck,
-  Truck,
-  X,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { PURCHASE_STATUS_LABELS } from "@/components/ui/status-badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 // 扩展类型
 export interface PurchaseContractDetail extends PurchaseContract {
@@ -51,61 +42,10 @@ export function getPageNumbers(
 }
 
 /**
- * 职责：状态 pill 组件（带图标）
+ * 职责：列表/弹窗里的合同状态；颜色与文案统一来自 StatusBadge 的 purchaseContract 映射，
+ * 这里只补草稿「不计应付」的悬停说明
  */
 export function StatusPill({ status }: { status: PurchaseStatus }) {
-  const config: Record<
-    PurchaseStatus,
-    { label: string; icon: React.ReactNode; className: string }
-  > = {
-    [PurchaseStatus.DRAFT]: {
-      label: "草稿",
-      icon: <Circle className="h-3 w-3 fill-current" />,
-      className: "bg-status-gray-soft text-status-gray border-status-gray/30",
-    },
-    [PurchaseStatus.SIGNED]: {
-      label: PURCHASE_STATUS_LABELS.SIGNED,
-      icon: <CheckCircle2 className="h-3 w-3" />,
-      className:
-        "bg-status-green-soft text-status-green border-status-green/30",
-    },
-    [PurchaseStatus.PRODUCING]: {
-      label: "生产中",
-      icon: <Loader2 className="h-3 w-3 animate-spin" />,
-      className: "bg-status-blue-soft text-status-blue border-status-blue/30",
-    },
-    [PurchaseStatus.READY]: {
-      label: "生产完成",
-      icon: <PackageCheck className="h-3 w-3" />,
-      className: "bg-status-blue-soft text-status-blue border-status-blue/30",
-    },
-    [PurchaseStatus.SHIPPED]: {
-      label: "已发货",
-      icon: <Truck className="h-3 w-3" />,
-      className:
-        "bg-status-amber-soft text-status-amber border-status-amber/30",
-    },
-    [PurchaseStatus.RECEIVED]: {
-      label: "已收货",
-      icon: <PackageCheck className="h-3 w-3" />,
-      className:
-        "bg-status-green-soft text-status-green border-status-green/30",
-    },
-    [PurchaseStatus.COMPLETED]: {
-      label: "已完成",
-      icon: <CheckCircle2 className="h-3 w-3" />,
-      className:
-        "bg-status-green-soft text-status-green border-status-green/30",
-    },
-    [PurchaseStatus.CANCELLED]: {
-      label: "已取消",
-      icon: <X className="h-3 w-3" />,
-      className: "bg-status-red-soft text-status-red border-status-red/30",
-    },
-  };
-
-  const c = config[status] || config[PurchaseStatus.DRAFT];
-
   return (
     <span
       title={
@@ -113,13 +53,8 @@ export function StatusPill({ status }: { status: PurchaseStatus }) {
           ? "草稿合同尚未生效，不计入应付"
           : undefined
       }
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
-        c.className,
-      )}
     >
-      {c.icon}
-      {c.label}
+      <StatusBadge domain="purchaseContract" status={status} />
     </span>
   );
 }
