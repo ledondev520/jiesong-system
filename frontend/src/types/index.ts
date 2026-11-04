@@ -358,6 +358,7 @@ export interface PurchaseContract {
   invoiceNo?: string;
   storeName?: string; // 发货店铺名称
   note?: string;
+  salesContractId?: string; // 生成该采购单的出口订单（接口原本就返回，详情页「关联订单」用）
   createdAt: string;
   updatedAt: string;
   supplier?: Supplier;

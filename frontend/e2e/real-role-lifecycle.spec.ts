@@ -131,7 +131,8 @@ test("PURCHASE arrival survives reload and stays pending until inspection", asyn
   fixture = await startRoleFixture("purchase");
   await forwardRealApi(page, fixture);
   await loginAs(page, fixture, "PURCHASE");
-  await page.goto(`/dashboard/purchases/${fixture.purchaseId}`);
+  // 分批到货与验货面板在「收货验货」页签（B52），非激活页签不渲染
+  await page.goto(`/dashboard/purchases/${fixture.purchaseId}?tab=receiving`);
   await expect(page.getByText("分批到货与验货", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "登记分批到货" }).click();
   const dialog = page.getByRole("dialog", { name: "登记本批到货" });
@@ -179,7 +180,8 @@ test("WAREHOUSE inspection persists its actor and only accepted stock reaches in
   fixture = await startRoleFixture("warehouse");
   await forwardRealApi(page, fixture);
   await loginAs(page, fixture, "WAREHOUSE");
-  await page.goto(`/dashboard/purchases/${fixture.purchaseId}`);
+  // 分批到货与验货面板在「收货验货」页签（B52），非激活页签不渲染
+  await page.goto(`/dashboard/purchases/${fixture.purchaseId}?tab=receiving`);
   await page.getByRole("button", { name: "登记验货", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "登记本批验货" });
   await dialog.getByLabel(`${productName} 累计合格量`).fill("30");
@@ -239,7 +241,8 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   fixture = await startRoleFixture("sales");
   await forwardRealApi(page, fixture);
   const salesToken = await loginAs(page, fixture, "SALES");
-  await page.goto(`/dashboard/purchases/${fixture.purchaseId}`);
+  // 分批到货与验货面板在「收货验货」页签（B52），非激活页签不渲染
+  await page.goto(`/dashboard/purchases/${fixture.purchaseId}?tab=receiving`);
   await expect(page.getByText("分批到货与验货", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "登记分批到货" })).toHaveCount(
     0,
@@ -356,13 +359,20 @@ test("BOSS reads purchase and sales UI, hides write controls and cannot mutate r
   await expect(
     page.getByRole("link", { name: "AI 助手", exact: true }),
   ).toHaveCount(0);
-  await page.goto(`/dashboard/purchases/${fixture.purchaseId}`);
+  // 分批到货与验货面板在「收货验货」页签（B52），非激活页签不渲染
+  await page.goto(`/dashboard/purchases/${fixture.purchaseId}?tab=receiving`);
   await expect(
     page.getByText("本批到货 100 · 合格 30 · 待验 0 · 待复验 70"),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "登记分批到货" })).toHaveCount(
     0,
   );
+  // 头部：老板只读，主操作和「单证」「更多」菜单都不出现
+  for (const name of ["单证", "更多", "登记完工资料", "确认供应商已发货"]) {
+    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
+      0,
+    );
+  }
   await expect(
     page.getByRole("button", { name: "登记验货", exact: true }),
   ).toHaveCount(0);

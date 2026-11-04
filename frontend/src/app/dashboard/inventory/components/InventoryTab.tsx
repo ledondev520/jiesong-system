@@ -1,6 +1,6 @@
 /**
  * Input: 实时库存服务、采购合同店铺汇总、共享列表URL状态、SortableTableHead、useTableSort
- * Output: 支持当前筛选刷新、窄屏操作与长名称显示的库存状态管理 Tab 组件（店铺筛选、单条/批量状态流转（需确认）、桌面表列排序；采购/验货来源库存自动流转）
+ * Output: 支持当前筛选刷新、窄屏操作与长名称显示的库存状态管理 Tab 组件（店铺筛选、单条/批量状态流转（需确认）、桌面表列排序；入库日期列、无合同来源时隐藏采购合同列、可用库存口径说明；采购/验货来源库存自动流转）
  * Pos: 库存页（/dashboard/inventory）主体
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -76,6 +76,8 @@ import {
 } from "@/components/ui/sheet";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
+import { formatDate } from "@/lib/date-format";
+import { MISSING_VALUE } from "@/lib/missing-value";
 
 /** 单位字段可能是脏数据（如 "41.0"）；纯数字不当作单位展示，避免出现两个无标签数字。 */
 const formatQuantity = (quantity: number, unit?: string | null) =>
@@ -432,6 +434,12 @@ export function InventoryTab() {
   const totalPages = Math.ceil(total / pageSize);
   const pagedInventory = inventorySort.sortedData;
 
+  // 采购合同只在「采购明细」来源的行上有值；当前页没有任何一行有值时整列不显示，避免一整列「—」。
+  const showContractColumn = pagedInventory.some(
+    (item) => item.purchaseItem?.purchaseContract?.contractNo,
+  );
+  const columnCount = showContractColumn ? 7 : 6;
+
   const hasManualInventory = inventory.some(
     (item) => !item.purchaseItemId && !item.receiptInspectionId,
   );
@@ -462,6 +470,9 @@ export function InventoryTab() {
 
   return (
     <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        「可用库存」（商品页、低库存预警）只统计状态为「已入库」的数量，其他状态不计入。系统目前不记录仓库/库位和批次号，「入库日期」是该条库存转为已入库的日期。
+      </p>
       <div className="hidden flex-wrap items-center gap-2 md:flex">
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -671,11 +682,13 @@ export function InventoryTab() {
                         <p className="text-base font-semibold tracking-tight">
                           {item.product?.customsName}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          合同号：
-                          {item.purchaseItem?.purchaseContract?.contractNo ||
-                            "-"}
-                        </p>
+                        {showContractColumn ? (
+                          <p className="text-sm text-muted-foreground">
+                            合同号：
+                            {item.purchaseItem?.purchaseContract?.contractNo ||
+                              "-"}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     {getStatusBadge(item.status)}
@@ -688,6 +701,14 @@ export function InventoryTab() {
                       </p>
                       <p className="text-sm font-medium">
                         {formatQuantity(item.quantity, item.product?.unit)}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                        入库日期
+                      </p>
+                      <p className="text-sm font-medium">
+                        {formatDate(item.inboundAt, MISSING_VALUE)}
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -766,14 +787,16 @@ export function InventoryTab() {
               >
                 商品名称
               </SortableTableHead>
-              <SortableTableHead
-                sortKey="contractNo"
-                currentSortKey={inventorySort.sortKey}
-                currentSortDir={inventorySort.sortDir}
-                onSort={inventorySort.onSort}
-              >
-                采购合同
-              </SortableTableHead>
+              {showContractColumn ? (
+                <SortableTableHead
+                  sortKey="contractNo"
+                  currentSortKey={inventorySort.sortKey}
+                  currentSortDir={inventorySort.sortDir}
+                  onSort={inventorySort.onSort}
+                >
+                  采购合同
+                </SortableTableHead>
+              ) : null}
               <SortableTableHead
                 sortKey="quantity"
                 currentSortKey={inventorySort.sortKey}
@@ -782,16 +805,21 @@ export function InventoryTab() {
               >
                 数量
               </SortableTableHead>
+              <TableHead>入库日期</TableHead>
               <TableHead>当前状态</TableHead>
               <TableHead className="w-[100px]">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableStateRow colSpan={6} variant="loading" title="加载中..." />
+              <TableStateRow
+                colSpan={columnCount}
+                variant="loading"
+                title="加载中..."
+              />
             ) : loadError ? (
               <TableStateRow
-                colSpan={6}
+                colSpan={columnCount}
                 variant="error"
                 title="数据加载失败"
                 description="库存列表暂时不可用，请稍后重试。"
@@ -808,7 +836,7 @@ export function InventoryTab() {
               />
             ) : inventory.length === 0 ? (
               <TableStateRow
-                colSpan={6}
+                colSpan={columnCount}
                 variant="empty"
                 icon={Search}
                 title="暂无库存记录"
@@ -830,11 +858,16 @@ export function InventoryTab() {
                   <TableCell className="font-medium">
                     {item.product?.customsName}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.purchaseItem?.purchaseContract?.contractNo || "-"}
-                  </TableCell>
+                  {showContractColumn ? (
+                    <TableCell className="text-muted-foreground">
+                      {item.purchaseItem?.purchaseContract?.contractNo || "-"}
+                    </TableCell>
+                  ) : null}
                   <TableCell>
                     {formatQuantity(item.quantity, item.product?.unit)}
+                  </TableCell>
+                  <TableCell>
+                    {formatDate(item.inboundAt, MISSING_VALUE)}
                   </TableCell>
                   <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell>

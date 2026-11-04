@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "页面不存在" };
 export default function NotFoundPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
-      <div className="flex w-full max-w-xl flex-col items-center rounded-lg border border-border/70 bg-card/95 py-16 text-center shadow-lg">
+      <div className="flex w-full max-w-xl flex-col items-center rounded-lg border border-border/70 bg-card/95 py-16 text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
           <Compass className="h-8 w-8" />
         </div>

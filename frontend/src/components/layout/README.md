@@ -11,7 +11,7 @@
 | HeaderUserMenu.tsx / HeaderProfileDialog.tsx | 用户设置组件 | 打开既有个人设置草稿，保存本地资料/偏好并显示同步写入失败 |
 | HeaderUserMenu.lifecycle.test.tsx | 菜单生命周期回归 | jsdom 覆盖取消、最新保存值重开、偏好或回调失败重试 |
 | HeaderUserMenu.auth-profile.test.tsx | 真实本地资料持久化回归 | 使用实际 Zustand updateProfile 验证部分写入、草稿保留、恢复已有用户值与明确重试 |
-| RecordHeader.tsx | 记录页头部（B51） | 基于 PageHeader：单号（等宽）、状态、关键事实 chips、唯一主操作、「单证」「更多」菜单（破坏性项只在「更多」且先确认）、主操作被阻塞时的提示条；`RecordHeader.test.tsx` 覆盖 |
+| RecordHeader.tsx | 记录页头部（B51） | 基于 PageHeader：单号（等宽）、状态、关键事实 chips、唯一主操作、「单证」「更多」菜单（破坏性项只在「更多」且先确认）、主操作被阻塞时的提示条（`role=status`，持续状态而非事件）；菜单项 `onSelect` 返回的 Promise 被拒绝时弹出错误提示，不静默吞掉；`RecordHeader.test.tsx` 覆盖；首个业务页用户：采购合同详情（B52） |
 
 Header/MobileTabBar退出登录先等待服务端撤销当前浏览器会话，失败保留状态并提示重试。重复退出共用请求，晚到响应不得清理较新的登录。HeaderUserMenu保持可访问的“用户菜单”入口。
 
