@@ -38,6 +38,7 @@ vi.mock("@/lib/hooks/useMobile", () => ({ useMobile: () => false }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
   usePathname: () => "/dashboard/purchases/A",
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },

@@ -8,8 +8,9 @@
 
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { ChevronDown, TriangleAlert } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
@@ -31,6 +32,7 @@ export interface RecordFact {
 export interface RecordMenuItem {
   key: string;
   label: string;
+  /** 返回的 Promise 被拒绝时，菜单会弹出错误提示，不会静默吞掉；调用方仍可自行处理更具体的错误 */
   onSelect: () => void | Promise<void>;
   /** 破坏性操作：只允许放进「更多」，选中后先弹确认，确认才执行 */
   destructive?: boolean;
@@ -61,6 +63,22 @@ interface RecordHeaderProps {
   onBack?: () => void;
 }
 
+function reportFailure(error: unknown) {
+  toast.error(
+    error instanceof Error && error.message
+      ? error.message
+      : "操作失败，请重试",
+  );
+}
+
+function runItem(item: RecordMenuItem) {
+  try {
+    void Promise.resolve(item.onSelect()).catch(reportFailure);
+  } catch (error) {
+    reportFailure(error);
+  }
+}
+
 function ActionMenu({
   label,
   items,
@@ -83,18 +101,18 @@ function ActionMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {items.map((item, index) => (
-            <div key={item.key}>
+            <Fragment key={item.key}>
               {item.destructive && index > 0 && <DropdownMenuSeparator />}
               <DropdownMenuItem
                 disabled={item.disabled}
                 variant={item.destructive ? "destructive" : "default"}
                 onSelect={() =>
-                  item.destructive ? setPending(item) : void item.onSelect()
+                  item.destructive ? setPending(item) : runItem(item)
                 }
               >
                 {item.label}
               </DropdownMenuItem>
-            </div>
+            </Fragment>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -107,7 +125,7 @@ function ActionMenu({
         onConfirm={() => {
           const item = pending;
           setPending(null);
-          if (item) void item.onSelect();
+          if (item) runItem(item);
         }}
       />
     </>
@@ -161,7 +179,7 @@ export function RecordHeader({
       )}
       {blocker && (
         <div
-          role="alert"
+          role="status"
           className="flex flex-wrap items-center gap-2 rounded-lg border border-status-amber/30 bg-status-amber-soft px-3 py-2 text-sm text-status-amber"
         >
           <TriangleAlert className="h-4 w-4 shrink-0" />

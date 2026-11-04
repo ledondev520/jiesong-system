@@ -77,10 +77,7 @@ export function EmptyState({
       )}
       {action &&
         (isActionObject(action) ? (
-          <Button
-            className="mt-5 rounded-lg shadow-sm"
-            onClick={action.onClick}
-          >
+          <Button className="mt-5 rounded-lg" onClick={action.onClick}>
             {action.label}
           </Button>
         ) : (
