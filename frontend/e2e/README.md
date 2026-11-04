@@ -67,7 +67,7 @@
 
 - `helpers.ts` 为 `/api/v1/system/pricing-config` 提供专用 GET/PUT 夹具，复用共用 pricing JSON/schema，返回完整 config/revision/schema；PUT 校验版本并仅修改每项测试内存，重载可读回，不写仓库配置或业务数据库。`pricing-settings.spec.ts` 持续检查未捕获页面异常，异常响应不得移除系统配置标题和主导航，不得伪报成功或丢弃草稿。浏览器无法启动时，定义检查和组件回归通过不代表 E2E 执行通过。
 
-settings-sections.spec.ts：设置分区链接与旧地址（用户、系统日志、通知、关于、AI 会话）重定向，只读。
+settings-sections.spec.ts：设置分区链接与旧地址（账号管理、系统日志、通知、关于、AI 会话）重定向，只读。
 home-todos.spec.ts：首页待办卡片（合成只读 API，390/1440px），无写入请求。
 
 - E2E-PREP 对齐（无浏览器执行，仅静态核对）：`helpers.ts` 合成路由补 `GET /sales/:id/loading-plan`（订单详情的货柜页签与发运门槛 fail-closed，缺它会显示「装柜计划加载失败」）；`real-export-3d.spec.ts` 在 <768px 断言 2D 装柜图（无 canvas）、1440px 回到 520px 高的 3D 画布，页签返回用「明细」；`quote-to-order`/`order-editor` 的落点是 `/dashboard/orders/:id`，订单合计按整美元向上取整为 $20,000.00；`dashboard-return-context` 的经营分析地址是 `/dashboard/finance/analysis`，发运销售明细经 `/dashboard/sales` 重定向落在 `/dashboard/orders`。浏览器结果仍以 hosted CI 为准。

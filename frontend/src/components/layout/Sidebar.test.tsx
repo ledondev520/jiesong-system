@@ -155,17 +155,15 @@ describe("Sidebar", () => {
     expect(mockLogout).not.toHaveBeenCalled();
   });
 
-  it("设置路由下设置菜单激活并展开子页面", () => {
+  it("设置路由下设置菜单激活，子页面只在设置内导航出现，不在侧栏重复", () => {
     mockPathname = "/dashboard/settings/users";
-    const { getByText } = render(<Sidebar />);
+    const { getByText, queryByText } = render(<Sidebar />);
 
     expect(
       getByText("设置").closest("a")?.className.includes("bg-sidebar-accent"),
     ).toBe(true);
-    expect(getByText("账号管理").closest("a")).toHaveAttribute(
-      "href",
-      "/dashboard/settings/users",
-    );
+    expect(queryByText("账号管理")).not.toBeInTheDocument();
+    expect(queryByText("系统日志")).not.toBeInTheDocument();
   });
 
   it("单证与退税是单一菜单项，报关单子页面时保持激活", () => {

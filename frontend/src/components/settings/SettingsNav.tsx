@@ -47,7 +47,7 @@ const navGroups: NavGroup[] = [
         label: "报价规则",
         icon: SlidersHorizontal,
       },
-      { href: "/dashboard/settings/users", label: "用户", icon: Users },
+      { href: "/dashboard/settings/users", label: "账号管理", icon: Users },
       {
         href: "/dashboard/settings/company",
         label: "公司信息",

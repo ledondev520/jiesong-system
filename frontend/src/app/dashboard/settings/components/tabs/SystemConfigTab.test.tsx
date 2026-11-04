@@ -46,6 +46,12 @@ describe("SystemConfigTab", () => {
     mockUpdateSystemConfig.mockResolvedValue({});
   });
 
+  it("采样参数在「高级」里，默认收起（B56）", async () => {
+    render(<SystemConfigTab />);
+    const summary = await screen.findByText("高级：采样参数");
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+  });
+
   it("加载后展示 AI 模型优先级与温度、Max tokens", async () => {
     render(<SystemConfigTab />);
 

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import NextImage from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bot,
@@ -42,6 +43,8 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
+import { Role } from "@/types";
 import { errorLogger } from "@/lib/error-logger";
 import {
   aiService,
@@ -144,6 +147,8 @@ export function AIAssistant({
   pageContext,
 }: AIAssistantProps) {
   const router = useRouter();
+  // 助手操作记录在「设置 > AI 用量」，仅管理员可进入
+  const isAdmin = useAuthStore((state) => state.user?.role === Role.ADMIN);
   const isWorkspace = presentation === "workspace";
   const isDocked = presentation === "docked";
   // 只有 floating 形态带可拖动的悬浮入口
@@ -1069,6 +1074,15 @@ export function AIAssistant({
                           ))}
                         </div>
                       )}
+                      {/* 来源说明：开场白与流式未完成的回复不加 */}
+                      {msg.role === "assistant" &&
+                        msg.id !== INITIAL_MESSAGE.id &&
+                        msg.content &&
+                        !isStreamingThis && (
+                          <p className="mt-1.5 text-[10px] text-muted-foreground">
+                            {`AI 回答 · ${msg.createdAt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })} 生成 · 金额与状态请以对应页面为准`}
+                          </p>
+                        )}
                       {/* 显示模型标签 */}
                       {msg.role === "assistant" && msg.model && (
                         <div className="mt-1.5 flex items-center gap-1">
@@ -1151,6 +1165,17 @@ export function AIAssistant({
             </form>
             <p className="text-[10px] text-muted-foreground text-center">
               内部草稿按请求直接生成；付款、实物状态和异常操作需一次确认
+              {isAdmin && (
+                <>
+                  {" · "}
+                  <Link
+                    href="/dashboard/settings/ai-usage"
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    查看助手操作记录
+                  </Link>
+                </>
+              )}
             </p>
           </CardFooter>
         </Card>
