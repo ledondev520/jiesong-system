@@ -1,7 +1,7 @@
 /**
  * Input: 退税服务、URL 查询参数、router
- * Output: 浏览器权威页签、同步中断筛选导航、窄屏汇总与退税记录列表
- * Pos: 退税管理主列表页
+ * Output: 「单证与退税」唯一页面标题；页签 报关单 · 退税工作台 · 退税记录（默认页签按角色，view 显式写入 URL）；退税记录 KPI（可退/已退/进度，本页口径）与列表
+ * Pos: 单证与退税主页面（/dashboard/customs）
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -42,6 +42,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { KpiStat } from "@/components/ui/kpi-stat";
+import { useAuthStore } from "@/store/auth.store";
 import {
   Table,
   TableBody,
@@ -67,6 +69,8 @@ import { TaxRefundWorkbench } from "./TaxRefundWorkbench";
 
 const DEFAULT_PAGE_SIZE = 20;
 
+const viewHref = (view: string) => `/dashboard/customs?view=${view}`;
+
 const CustomsDeclarationListPageContent = lazy(() =>
   import("@/app/dashboard/customs/components/CustomsDeclarationListPageContent").then(
     (module) => ({
@@ -81,11 +85,16 @@ export function TaxRefundListPageContent() {
   const browserQuery = new URLSearchParams(
     useBrowserQuery(searchParams.toString()),
   );
+  const role = useAuthStore((state) => state.user?.role);
+  // 默认页签按角色：财务/管理员做退税，其余角色（销售、单证）要的是报关单。
+  const defaultView = role === "FINANCE" ? "workbench" : "customs";
   const requestedView = browserQuery.get("view");
   const activeView =
-    requestedView === "customs" || requestedView === "refunds"
+    requestedView === "workbench" ||
+    requestedView === "customs" ||
+    requestedView === "refunds"
       ? requestedView
-      : "workbench";
+      : defaultView;
   const initialKeyword = browserQuery.get("keyword") || "";
   const initialStatus = browserQuery.get("status") || "ALL";
 
@@ -170,6 +179,11 @@ export function TaxRefundListPageContent() {
     void requestTaxRefunds();
   }, [activeView, requestTaxRefunds]);
 
+  // 报关单列表只在 URL 带 view=customs 时回写筛选，所以按角色选出默认页签后把它显式写进地址。
+  useEffect(() => {
+    if (!requestedView && role) replaceBrowserUrl(viewHref(defaultView));
+  }, [requestedView, role, defaultView]);
+
   const sort = useTableSort<TaxRefund, string>(
     taxRefunds,
     useCallback((item, key) => {
@@ -224,23 +238,17 @@ export function TaxRefundListPageContent() {
   };
 
   const handleViewChange = (view: string) => {
-    const href =
-      view === "customs"
-        ? "/dashboard/customs?view=customs"
-        : view === "refunds"
-          ? "/dashboard/customs?view=refunds"
-          : "/dashboard/customs";
     setKeyword("");
     setStatus("ALL");
     setPage(1);
-    replaceBrowserUrl(href);
+    replaceBrowserUrl(viewHref(view));
   };
 
   return (
     <div className="space-y-6 pb-10">
       <PageHeader
-        title="出口退税"
-        description="从待申报清单、进项发票核验到申报明细生成，在一个工作台完成税局操作前准备。"
+        title="单证与退税"
+        description="报关单跟踪，以及从待申报清单、进项发票核验到申报明细生成的税局操作前准备。"
         actions={
           activeView === "refunds" ? (
             <>
@@ -310,8 +318,8 @@ export function TaxRefundListPageContent() {
         className="space-y-6"
       >
         <TabsList className="grid w-full max-w-xl grid-cols-3 border bg-background">
-          <TabsTrigger value="workbench">退税工作台</TabsTrigger>
           <TabsTrigger value="customs">报关单</TabsTrigger>
+          <TabsTrigger value="workbench">退税工作台</TabsTrigger>
           <TabsTrigger value="refunds">退税记录</TabsTrigger>
         </TabsList>
 
@@ -343,37 +351,38 @@ export function TaxRefundListPageContent() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 md:gap-4">
-            <Card className="surface-panel">
-              <CardHeader>
-                <CardTitle className="text-sm text-muted-foreground">
-                  当前记录数
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-3xl font-semibold">
-                {taxRefunds.length}
-              </CardContent>
-            </Card>
-            <Card className="surface-panel">
-              <CardHeader>
-                <CardTitle className="text-sm text-muted-foreground">
-                  可退金额合计
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-3xl font-semibold">
-                {totalRefundable.toLocaleString()}
-              </CardContent>
-            </Card>
-            <Card className="surface-panel">
-              <CardHeader>
-                <CardTitle className="text-sm text-muted-foreground">
-                  待跟进批次
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="text-3xl font-semibold">
-                {pendingCount}
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 md:gap-4">
+            <KpiStat
+              label="退税记录总数"
+              loading={loading}
+              value={loadError ? undefined : String(total)}
+              subLabel={`本页待跟进 ${pendingCount} 批`}
+            />
+            <KpiStat
+              label="可退金额（本页）"
+              loading={loading}
+              value={
+                loadError ? undefined : `¥${totalRefundable.toLocaleString()}`
+              }
+            />
+            <KpiStat
+              label="已退金额（本页）"
+              loading={loading}
+              value={
+                loadError ? undefined : `¥${totalRefunded.toLocaleString()}`
+              }
+              valueClassName="text-status-green"
+            />
+            <KpiStat
+              label="退税进度（本页）"
+              loading={loading}
+              value={
+                loadError || totalRefundable <= 0
+                  ? undefined
+                  : `${Math.round((totalRefunded / totalRefundable) * 100)}%`
+              }
+              subLabel="已退 ÷ 可退"
+            />
           </div>
 
           {/* 移动端卡片列表 */}

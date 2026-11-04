@@ -17,6 +17,8 @@ const mockGetWorkbench = vi.fn();
 const mockSearchParamGet = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
+const mockCustomsGetAll = vi.fn();
+let mockRole = "FINANCE";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -38,6 +40,18 @@ vi.mock("@/services/taxRefund.service", () => ({
     exportDeclarationCsv: vi.fn(),
     exportMonthlyPreparations: vi.fn(),
     getInvoiceVerification: vi.fn(),
+  },
+}));
+
+vi.mock("@/store/auth.store", () => ({
+  useAuthStore: (selector: (state: { user: { role: string } }) => unknown) =>
+    selector({ user: { role: mockRole } }),
+}));
+
+vi.mock("@/services/customsDeclaration.service", () => ({
+  customsDeclarationService: {
+    getAll: (...args: unknown[]) => mockCustomsGetAll(...args),
+    generateDrafts: vi.fn(),
   },
 }));
 
@@ -72,6 +86,11 @@ describe("TaxRefundsDashboardPage 交互逻辑", () => {
   beforeEach(() => {
     mockPush.mockReset();
     mockReplace.mockReset();
+    mockRole = "FINANCE";
+    mockCustomsGetAll.mockReset();
+    mockCustomsGetAll.mockResolvedValue({
+      data: { items: [], pagination: { total: 0 } },
+    });
     mockGetAll.mockReset();
     mockGenerateDrafts.mockReset();
     mockGetWorkbench.mockReset();
@@ -242,18 +261,23 @@ describe("TaxRefundsDashboardPage 交互逻辑", () => {
     });
   });
 
-  it("默认进入退税工作台并展示三段式操作入口", async () => {
+  it("财务默认进入退税工作台：单一页面标题，操作入口齐全，URL 写入 view", async () => {
     renderTaxRefundsPage();
     expect(
-      await screen.findByRole("heading", { name: "出口退税工作台" }),
+      await screen.findByRole("button", { name: "导入进项发票" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "导入进项发票" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "单证与退税" })).toBeVisible();
+    // 嵌入的列表和工作台不再自带第二个页面标题
+    expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    expect(screen.getByRole("tab", { name: "退税工作台" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(
       screen.getByRole("button", { name: "导出月度准备清单" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("申报月份")).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).toBe("?view=workbench"));
     await waitFor(() =>
       expect(mockGetWorkbench).toHaveBeenCalledWith({
         page: 1,
@@ -263,5 +287,63 @@ describe("TaxRefundsDashboardPage 交互逻辑", () => {
         filingMonth: expect.stringMatching(/^\d{4}-\d{2}$/),
       }),
     );
+  });
+
+  it("非财务角色默认进入报关单，页签顺序为 报关单 · 退税工作台 · 退税记录", async () => {
+    mockRole = "SALES";
+    renderTaxRefundsPage();
+    expect(
+      await screen.findByRole("group", { name: "报关单状态" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "报关单",
+      "退税工作台",
+      "退税记录",
+    ]);
+    expect(screen.getByRole("tab", { name: "报关单" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    expect(mockGetWorkbench).not.toHaveBeenCalled();
+    await waitFor(() => expect(window.location.search).toBe("?view=customs"));
+  });
+
+  it("退税记录页签显示可退/已退金额与进度 KPI（本页口径）", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "view" ? "refunds" : key === "status" ? "ALL" : "",
+    );
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "a",
+            refundNo: "TR-A",
+            status: "APPLIED",
+            declaredAmount: 100,
+            refundableAmount: 200,
+            refundedAmount: 50,
+            appliedAt: "2026-01-01",
+            note: "",
+          },
+          {
+            id: "b",
+            refundNo: "TR-B",
+            status: "REFUNDED",
+            declaredAmount: 100,
+            refundableAmount: 200,
+            refundedAmount: 150,
+            appliedAt: "2026-01-02",
+            note: "",
+          },
+        ],
+        pagination: { total: 2 },
+      },
+    });
+    renderTaxRefundsPage();
+    expect(await screen.findByText("¥400")).toBeInTheDocument();
+    expect(screen.getAllByText("¥200").length).toBeGreaterThan(0);
+    expect(screen.getByText("50%")).toBeInTheDocument();
+    expect(screen.getByText("可退金额（本页）")).toBeInTheDocument();
   });
 });

@@ -492,7 +492,7 @@ for (const kind of ["customs", "refunds"] as const) {
   const listURL =
     kind === "customs"
       ? /\/dashboard\/customs\?view=customs$/
-      : /\/dashboard\/customs$/;
+      : /\/dashboard\/customs(\?view=workbench)?$/;
 
   test(`FINANCE ${kind} unsaved create return cancels with zero record or audit writes`, async ({
     page,

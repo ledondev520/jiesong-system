@@ -100,13 +100,17 @@ for (const width of [390, 1440]) {
     );
     await expect(search).toHaveValue("OLD");
     // 30 秒应用缓存可命中历史查询；验收页面恢复，不强制重复发送 API 请求。
-    await expect(page.getByRole("combobox").first()).toHaveText("已放行");
+    await expect(
+      page.getByRole("button", { name: "已放行", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await expect(
       page.getByText("共 37 条，第 1 页；本页已放行 0 条", { exact: true }),
     ).toBeVisible();
     await page.goForward();
     await expect(search).toHaveValue("NEW");
-    await expect(page.getByRole("combobox").first()).toHaveText("草稿");
+    await expect(
+      page.getByRole("button", { name: "草稿", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     // 历史前进恢复 URL 中的原页码（page=2），不再强制回到第一页。
     await expect(
       page.getByText("共 37 条，第 2 页；本页已放行 0 条", { exact: true }),
@@ -119,8 +123,7 @@ for (const width of [390, 1440]) {
     await expect
       .poll(() => new URL(page.url()).searchParams.get("keyword"))
       .toBe("TEST");
-    await page.getByRole("combobox").first().click();
-    await page.getByRole("option", { name: "已放行", exact: true }).click();
+    await page.getByRole("button", { name: "已放行", exact: true }).click();
     await expect
       .poll(() => new URL(page.url()).searchParams.get("status"))
       .toBe("RELEASED");
@@ -131,12 +134,13 @@ for (const width of [390, 1440]) {
       /\/dashboard\/customs\?view=customs&source=qa$/,
     );
     await expect(search).toHaveValue("");
-    await expect(page.getByRole("combobox").first()).toHaveText("全部状态");
+    await expect(
+      page.getByRole("button", { name: "全部", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
 
     // 明确返回必须恢复已筛选的来源地址，不能只回到空白报关页签。
     await search.fill(declaration.declarationNo);
-    await page.getByRole("combobox").first().click();
-    await page.getByRole("option", { name: "草稿", exact: true }).click();
+    await page.getByRole("button", { name: "草稿", exact: true }).click();
     await expect(search).toHaveValue(declaration.declarationNo);
     const filteredReturn =
       "/dashboard/customs?view=customs&source=qa&keyword=" +
@@ -155,16 +159,20 @@ for (const width of [390, 1440]) {
     await page.goBack();
     await expect(page).toHaveURL(new URL(filteredReturn, page.url()).href);
     await expect(search).toHaveValue(declaration.declarationNo);
-    await expect(page.getByRole("combobox").first()).toHaveText("草稿");
+    await expect(
+      page.getByRole("button", { name: "草稿", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await page.goForward();
     await expect(page).toHaveURL(expectedDetail);
     await page.getByRole("button", { name: "返回", exact: true }).click();
     await expect(page).toHaveURL(new URL(filteredReturn, page.url()).href);
     await expect(search).toHaveValue(declaration.declarationNo);
-    await expect(page.getByRole("combobox").first()).toHaveText("草稿");
+    await expect(
+      page.getByRole("button", { name: "草稿", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await expect(customsTab).toHaveAttribute("aria-selected", "true");
     await expect(
-      page.getByRole("heading", { name: "报关单管理", exact: true }),
+      page.getByRole("group", { name: "报关单状态", exact: true }),
     ).toBeVisible();
     // 不等待最后一次搜索 URL 提交，紧接着切换页签以覆盖中断中的筛选工作。
     await search.fill("LATE");
@@ -172,17 +180,18 @@ for (const width of [390, 1440]) {
     await expect(page).toHaveURL(/\/dashboard\/customs\?view=refunds$/);
     await expect(refundsTab).toHaveAttribute("aria-selected", "true");
     await expect(
-      page.getByRole("heading", { name: "报关单管理", exact: true }),
+      page.getByRole("group", { name: "报关单状态", exact: true }),
     ).not.toBeVisible();
     await refundsTab.click();
     await expect(page).toHaveURL(/\/dashboard\/customs\?view=refunds$/);
     await page.getByRole("tab", { name: "退税工作台", exact: true }).click();
-    await expect(page).toHaveURL(/\/dashboard\/customs$/);
-    await page.keyboard.press("ArrowRight");
-    await expect(customsTab).toHaveAttribute("aria-selected", "true");
+    await expect(page).toHaveURL(/\/dashboard\/customs\?view=workbench$/);
+    // 页签顺序：报关单 · 退税工作台 · 退税记录（循环）
     await page.keyboard.press("ArrowRight");
     await expect(refundsTab).toHaveAttribute("aria-selected", "true");
     await expect(page).toHaveURL(/\/dashboard\/customs\?view=refunds$/);
+    await page.keyboard.press("ArrowRight");
+    await expect(customsTab).toHaveAttribute("aria-selected", "true");
     expect(businessWrites).toEqual([]);
   });
 }
