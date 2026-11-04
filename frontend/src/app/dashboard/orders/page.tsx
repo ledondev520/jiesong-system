@@ -1,6 +1,6 @@
 /**
  * Input: 出口订单服务、列表 URL 状态（q/status/shipped/shippedFrom/shippedTo/storeId/page/pageSize，沿用旧 /sales 参数名）
- * Output: 出口订单表格（服务端分页、发运阶段 chips 待装柜/已装柜/已发运/已到港带计数、发运日期与预计到港列、关键词、发运前利用率徽章），行点击进入订单详情
+ * Output: 出口订单表格（服务端分页、发运阶段 chips 待装柜/装柜中/已发运/已到港带计数、发运日期与预计到港列、关键词、发运前利用率徽章），行点击进入订单详情
  * Pos: 业务 > 出口订单；旧 /dashboard/sales 列表重定向到这里。详情在 /dashboard/orders/[id]，新建在 /dashboard/orders/new
  */
 "use client";
@@ -24,7 +24,7 @@ import { useLatestRequest } from "@/lib/hooks/useLatestRequest";
 import { salesService } from "@/services/sales.service";
 import { SalesStatus, type SalesContract } from "@/types";
 
-// 发运阶段是状态预设，不是新页面（E1）；口径与工作台待办一致：CONFIRMED=待装柜，PACKING=已装柜待发运
+// 发运阶段是状态预设，不是新页面（E1）；口径与工作台待办一致：CONFIRMED=待装柜，PACKING=装柜中（待发运），与订单状态徽章「装柜中」同名
 const SHIPPING_STAGES: {
   status: SalesStatus | "";
   key: string;
@@ -36,7 +36,7 @@ const SHIPPING_STAGES: {
     key: SalesStatus.CONFIRMED,
     label: "待装柜",
   },
-  { status: SalesStatus.PACKING, key: SalesStatus.PACKING, label: "已装柜" },
+  { status: SalesStatus.PACKING, key: SalesStatus.PACKING, label: "装柜中" },
   { status: SalesStatus.SHIPPED, key: SalesStatus.SHIPPED, label: "已发运" },
   { status: SalesStatus.ARRIVED, key: SalesStatus.ARRIVED, label: "已到港" },
 ];

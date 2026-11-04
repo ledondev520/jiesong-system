@@ -174,7 +174,7 @@ it("B55: 发运阶段 chips 带真实计数，点击切换 status 预设；列�
   const group = await screen.findByRole("group", { name: "发运阶段" });
   await screen.findAllByText("EXP-S");
   expect(screen.getByRole("button", { name: "待装柜3" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "已装柜2" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "装柜中2" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "已发运4" })).toBeInTheDocument();
   // 0 是真实计数，不是缺失
   expect(screen.getByRole("button", { name: "已到港0" })).toBeInTheDocument();

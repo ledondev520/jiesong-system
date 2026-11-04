@@ -41,8 +41,9 @@ describe("OrderOverviewTab 发运信息", () => {
       />,
     );
     const info = document.getElementById("order-shipping-print-root")!;
-    expect(info).toHaveTextContent("柜号 / 订单号");
-    expect(info).toHaveTextContent("EXP-B55");
+    expect(info).toHaveTextContent("订单号EXP-B55");
+    // 没有物理货柜编号：如实写「未记录」，不用订单号冒充
+    expect(info).toHaveTextContent("柜号未记录");
     expect(info).toHaveTextContent("40HQ");
     expect(info).toHaveTextContent("洛杉矶");
     expect(info).toHaveTextContent("2026-11-15");
@@ -52,6 +53,19 @@ describe("OrderOverviewTab 发运信息", () => {
     expect(info).toHaveTextContent("发运日期—");
     expect(info).toHaveTextContent("报关行—");
     expect(screen.queryByText(/订单状态与外销合同文件相互独立/)).toBeNull();
+  });
+
+  it("柜号取物理货柜编号 containerLabel，订单号单独显示", () => {
+    render(
+      <OrderOverviewTab
+        contract={contract({ containerLabel: "02-振宗" })}
+        readiness={readiness}
+      />,
+    );
+    const info = document.getElementById("order-shipping-print-root")!;
+    expect(info).toHaveTextContent("柜号02-振宗");
+    expect(info).toHaveTextContent("订单号EXP-B55");
+    expect(info).not.toHaveTextContent("系统以订单号标识货柜");
   });
 
   it("已发运订单解释为什么可以先发运后补合同，并可打印", async () => {

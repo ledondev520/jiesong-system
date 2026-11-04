@@ -1,6 +1,6 @@
 /**
  * Input: 出口订单详情、出柜判定结果
- * Output: 概览页签：金额汇总、装柜摘要、「发运信息」卡（柜号/目的港/日期/报关行/提单号未记录/打印）、物流时间线、「按门店」履约表（下单 / 已采购 / 已入库 / 已装箱）
+ * Output: 概览页签：金额汇总、装柜摘要、「发运信息」卡（订单号/柜号/目的港/日期/报关行/提单号未记录/打印）、物流时间线、「按门店」履约表（下单 / 已采购 / 已入库 / 已装箱）
  * Pos: /dashboard/orders/[id] 概览（UX 规范 §4.2）
  */
 "use client";
@@ -130,8 +130,9 @@ const buildTimeline = (contract: SalesContract, readiness: OrderReadiness) => {
 };
 
 /**
- * 职责：发运信息集中展示（装柜/发运日期、目的港、柜号、报关行、提单号）。
- * 柜号 = EXP 订单号（系统以出口合同承载货柜，没有单独的柜号字段）；提单号系统暂无字段，如实标「未记录」而不是留空。
+ * 职责：发运信息集中展示（订单号、柜号、发运/到港日期、目的港、报关行、提单号）。
+ * 柜号 = SalesContract.containerLabel（物理货柜编号，发运导入填写）；没有填写则「未记录」，不用订单号冒充。
+ * 提单号系统暂无字段，如实标「未记录」而不是留空。
  */
 function ShippingInfoCard({
   contract,
@@ -142,11 +143,8 @@ function ShippingInfoCard({
 }) {
   const shipped = hasOrderShipped(contract.status);
   const facts: Array<{ label: string; value: string; hint?: string }> = [
-    {
-      label: "柜号 / 订单号",
-      value: contract.contractNo,
-      hint: "系统以订单号标识货柜",
-    },
+    { label: "订单号", value: contract.contractNo },
+    { label: "柜号", value: contract.containerLabel?.trim() || "未记录" },
     { label: "柜型", value: readiness.plan?.containerType ?? "—" },
     { label: "目的港", value: contract.port?.name || "—" },
     { label: "发运日期", value: formatDate(contract.shippedAt, "—") },
@@ -195,8 +193,8 @@ function ShippingInfoCard({
         </dl>
         {shipped && (
           <p className="mt-3 text-xs text-muted-foreground">
-            订单状态与外销合同文件相互独立：发运不要求先生成合同，已发运订单也可以随时在页头「单证
-            ▾」→「生成出口单证」补生成外销合同，所以已发运订单可能暂无合同文件。
+            订单状态与外销合同文件相互独立：发运不要求先生成合同，已发运订单也可以在页头「单证
+            ▾」→「生成出口单证」补生成外销合同（需订单资料完整），所以已发运订单可能暂无合同文件。
           </p>
         )}
       </CardContent>
