@@ -99,6 +99,19 @@ describe("经营报表范围与追溯", () => {
     expect(alert).toHaveTextContent("全部应收都已发运超过 30 天未收");
     expect(alert).toHaveTextContent("没有一笔应收在 30 天内");
   });
+  it("逾期合计大于应收合计（两者口径不同）时不报全部逾期", async () => {
+    overview.mockResolvedValue({
+      data: {
+        ...data,
+        funds: { ...data.funds, totalReceivable: 70, overdueReceivable: 100 },
+      },
+    });
+    render(<BusinessReportsPage />);
+    await screen.findByText(/与工作台待办数不是同一口径/);
+    expect(
+      screen.queryByTestId("all-receivables-overdue"),
+    ).not.toBeInTheDocument();
+  });
   it("在途货柜说明口径，不与工作台待办数混读；没有应收时不报全部逾期", async () => {
     overview.mockResolvedValue({
       data: {

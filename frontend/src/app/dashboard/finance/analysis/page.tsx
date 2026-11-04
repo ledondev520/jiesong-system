@@ -273,9 +273,11 @@ function BusinessReportsContent() {
   }
 
   const { overview, funds, inventory, trends } = data;
+  // Equality only: the two totals are defined differently on the server (owned goods
+  // vs. header amount), so overdue > total proves nothing about "all overdue".
   const allReceivablesOverdue =
     funds.totalReceivable > 0 &&
-    funds.overdueReceivable >= funds.totalReceivable;
+    Math.abs(funds.overdueReceivable - funds.totalReceivable) < 0.005;
   const salesParams = new URLSearchParams({ shipped: "true" });
   if (data.period.startDate)
     salesParams.set("shippedFrom", data.period.startDate);
