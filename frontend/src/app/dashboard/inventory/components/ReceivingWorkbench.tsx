@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { MobileListCard } from "@/components/mobile";
 import { useBusinessReadOnly } from "@/lib/hooks/useBusinessReadOnly";
+import { useAuthStore } from "@/store/auth.store";
 import { formatDate } from "@/lib/date-format";
 import { MISSING_VALUE } from "@/lib/missing-value";
 import { PurchaseReceiptPanel } from "@/app/dashboard/purchases/[id]/components/PurchaseReceiptPanel";
@@ -70,6 +71,10 @@ const progress = (contract: PurchaseContract) => {
 
 export function ReceivingWorkbench() {
   const readOnly = useBusinessReadOnly();
+  const role = useAuthStore((state) => state.user?.role);
+  // 与 PurchaseReceiptPanel 的写入角色一致；其他角色只能查看，按钮不许诺能登记。
+  const canRegister =
+    !readOnly && ["ADMIN", "PURCHASE", "WAREHOUSE"].includes(role || "");
   const [contracts, setContracts] = useState<PurchaseContract[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -121,7 +126,7 @@ export function ReceivingWorkbench() {
   );
   const visible = contracts.filter((contract) => stageOf(contract) === stage);
 
-  const actionLabel = readOnly ? "查看到货" : "登记到货 / 验货";
+  const actionLabel = canRegister ? "登记到货 / 验货" : "查看到货";
   const open = (contract: PurchaseContract) => setOpened(contract);
 
   return (
@@ -226,8 +231,8 @@ export function ReceivingWorkbench() {
       )}
       {!loading && !error && total > contracts.length ? (
         <p className="text-xs text-muted-foreground">
-          只显示最早的 {contracts.length} 条（共 {total}{" "}
-          条已发货合同）；其余请到采购合同页按状态筛选。
+          只显示合同号最新的 {contracts.length} 条（共 {total}{" "}
+          条已发货合同），上方阶段计数只统计这些；其余请到采购合同页按状态筛选。
         </p>
       ) : null}
 

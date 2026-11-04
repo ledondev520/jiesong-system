@@ -9,6 +9,11 @@ vi.mock("@/services/purchase.service", () => ({
   purchaseService: { getAll: (...args: unknown[]) => getAll(...args) },
 }));
 let readOnly = false;
+let role = "WAREHOUSE";
+vi.mock("@/store/auth.store", () => ({
+  useAuthStore: (select: (state: { user: { role: string } }) => unknown) =>
+    select({ user: { role } }),
+}));
 vi.mock("@/lib/hooks/useBusinessReadOnly", () => ({
   useBusinessReadOnly: () => readOnly,
 }));
@@ -62,6 +67,7 @@ beforeEach(() => {
   getAll.mockReset();
   panel.mockReset();
   readOnly = false;
+  role = "WAREHOUSE";
 });
 
 describe("stageOf", () => {
@@ -175,7 +181,22 @@ describe("ReceivingWorkbench", () => {
     getAll.mockResolvedValue(reply([contract("1", "NONE")], 250));
     render(<ReceivingWorkbench />);
     expect(
-      await screen.findByText(/只显示最早的 1 条（共 250 条已发货合同）/),
+      await screen.findByText(
+        /只显示合同号最新的 1 条（共 250 条已发货合同），上方阶段计数只统计这些/,
+      ),
     ).toBeInTheDocument();
+  });
+
+  it("没有写入权限的角色（如 SALES）按钮是「查看到货」，不许诺能登记", async () => {
+    role = "SALES";
+    getAll.mockResolvedValue(reply([contract("1", "NONE")]));
+    render(<ReceivingWorkbench />);
+    await screen.findAllByText("PC-1");
+    expect(
+      screen.queryByRole("button", { name: "登记到货 / 验货" }),
+    ).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: "查看到货" }).length,
+    ).toBeGreaterThan(0);
   });
 });
