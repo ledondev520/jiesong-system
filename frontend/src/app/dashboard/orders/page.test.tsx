@@ -132,3 +132,83 @@ it("发运前订单显示利用率徽章：达标「利用率达标」、未达�
     screen.getAllByText("未达80%").length,
   );
 });
+
+it("B55: 发运阶段 chips 带真实计数，点击切换 status 预设；列表有发运日期与预计到港列", async () => {
+  const totals: Record<string, number> = {
+    "": 9,
+    CONFIRMED: 3,
+    PACKING: 2,
+    SHIPPED: 4,
+    ARRIVED: 0,
+  };
+  mocks.getAll.mockImplementation(
+    (params: { pageSize: number; status?: string }) =>
+      Promise.resolve({
+        data: {
+          items:
+            params.pageSize === 1
+              ? []
+              : [
+                  {
+                    id: "EXP-S",
+                    contractNo: "EXP-S",
+                    status: "SHIPPED",
+                    totalAmount: 1,
+                    receivedAmount: 0,
+                    createdAt: "2026-10-01T00:00:00.000Z",
+                    shippedAt: "2026-10-20T04:00:00.000Z",
+                    estimatedArrival: "2026-11-15T04:00:00.000Z",
+                    port: { id: "p", name: "洛杉矶" },
+                  },
+                ],
+          pagination: {
+            total: totals[params.status ?? ""],
+            page: 1,
+            pageSize: params.pageSize,
+            totalPages: 1,
+          },
+        },
+      }),
+  );
+  render(<OrdersPage />);
+  const group = await screen.findByRole("group", { name: "发运阶段" });
+  await screen.findAllByText("EXP-S");
+  expect(screen.getByRole("button", { name: "待装柜3" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "已装柜2" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "已发运4" })).toBeInTheDocument();
+  // 0 是真实计数，不是缺失
+  expect(screen.getByRole("button", { name: "已到港0" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "全部9" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(group).toBeInTheDocument();
+  expect(screen.getAllByText("2026-10-20").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("2026-11-15").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("洛杉矶").length).toBeGreaterThan(0);
+
+  fireEvent.click(screen.getByRole("button", { name: "已发运4" }));
+  await act(async () => {});
+  expect(window.location.search).toContain("status=SHIPPED");
+  expect(screen.getByRole("button", { name: "已发运4" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(mocks.getAll).toHaveBeenCalledWith(
+    expect.objectContaining({ status: "SHIPPED", pageSize: 20 }),
+  );
+});
+
+it("B55: 计数请求失败时 chip 显示「—」而不是 0，列表仍可用", async () => {
+  mocks.getAll.mockImplementation((params: { pageSize: number }) =>
+    params.pageSize === 1
+      ? Promise.reject(new Error("count failed"))
+      : Promise.resolve(reply("EXP-OK")),
+  );
+  render(<OrdersPage />);
+  expect((await screen.findAllByText("EXP-OK")).length).toBeGreaterThan(0);
+  expect(
+    await screen.findByRole("button", { name: "待装柜—" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "待装柜0" })).toBeNull();
+});

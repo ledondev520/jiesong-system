@@ -1,6 +1,6 @@
 /**
  * Input: 出口订单服务、列表 URL 状态（q/status/shipped/shippedFrom/shippedTo/storeId/page/pageSize，沿用旧 /sales 参数名）
- * Output: 出口订单表格（服务端分页、状态 chip、关键词、发运前利用率徽章），行点击进入订单详情
+ * Output: 出口订单表格（服务端分页、发运阶段 chips 待装柜/已装柜/已发运/已到港带计数、发运日期与预计到港列、关键词、发运前利用率徽章），行点击进入订单详情
  * Pos: 业务 > 出口订单；旧 /dashboard/sales 列表重定向到这里。详情在 /dashboard/orders/[id]，新建在 /dashboard/orders/new
  */
 "use client";
@@ -14,20 +14,36 @@ import { AmountText } from "@/components/ui/amount-text";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { StageChips } from "@/components/ui/stage-chips";
 import { SemanticBadge, StatusBadge } from "@/components/ui/status-badge";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
+import { formatDate } from "@/lib/date-format";
 import { formatMoney } from "@/lib/format";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { useLatestRequest } from "@/lib/hooks/useLatestRequest";
 import { salesService } from "@/services/sales.service";
 import { SalesStatus, type SalesContract } from "@/types";
 
-const STATUS_FILTERS: { status: SalesStatus; label: string }[] = [
+// 发运阶段是状态预设，不是新页面（E1）；口径与工作台待办一致：CONFIRMED=待装柜，PACKING=已装柜待发运
+const SHIPPING_STAGES: {
+  status: SalesStatus | "";
+  key: string;
+  label: string;
+}[] = [
+  { status: "", key: "all", label: "全部" },
+  {
+    status: SalesStatus.CONFIRMED,
+    key: SalesStatus.CONFIRMED,
+    label: "待装柜",
+  },
+  { status: SalesStatus.PACKING, key: SalesStatus.PACKING, label: "已装柜" },
+  { status: SalesStatus.SHIPPED, key: SalesStatus.SHIPPED, label: "已发运" },
+  { status: SalesStatus.ARRIVED, key: SalesStatus.ARRIVED, label: "已到港" },
+];
+
+// 阶段 chip 已覆盖的状态不再重复出现在表格筛选里
+const OTHER_STATUS_FILTERS: { status: SalesStatus; label: string }[] = [
   { status: SalesStatus.DRAFT, label: "草稿" },
-  { status: SalesStatus.CONFIRMED, label: "已确认" },
-  { status: SalesStatus.PACKING, label: "装箱中" },
-  { status: SalesStatus.SHIPPED, label: "已发运" },
-  { status: SalesStatus.ARRIVED, label: "已到达" },
   { status: SalesStatus.COMPLETED, label: "已完成" },
 ];
 
@@ -87,6 +103,36 @@ function OrdersList() {
   const [loadError, setLoadError] = useState<unknown>(null);
 
   const startRequest = useLatestRequest();
+  // 阶段计数：每个阶段一次 pageSize=1 的只读列表请求取 pagination.total；失败显示「—」而不是 0
+  const [stageCounts, setStageCounts] = useState<Record<string, number | null>>(
+    {},
+  );
+  const [stageCountsLoading, setStageCountsLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all(
+      SHIPPING_STAGES.map(async (stage) => {
+        try {
+          const response = await salesService.getAll?.({
+            page: 1,
+            pageSize: 1,
+            status: stage.status || undefined,
+            lite: true,
+          });
+          return [stage.key, response?.data.pagination.total ?? null] as const;
+        } catch {
+          return [stage.key, null] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      setStageCounts(Object.fromEntries(entries));
+      setStageCountsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     const isCurrent = startRequest();
@@ -150,6 +196,18 @@ function OrdersList() {
     },
     { key: "port", header: "目的港", cell: (order) => order.port?.name ?? "—" },
     {
+      key: "shippedAt",
+      header: "发运日期",
+      cell: (order) => formatDate(order.shippedAt, "—"),
+      sortValue: (order) => order.shippedAt ?? "",
+    },
+    {
+      key: "estimatedArrival",
+      header: "预计到港",
+      cell: (order) => formatDate(order.estimatedArrival, "—"),
+      sortValue: (order) => order.estimatedArrival ?? "",
+    },
+    {
       key: "status",
       header: "状态",
       cell: (order) => <StatusBadge status={order.status} />,
@@ -204,6 +262,27 @@ function OrdersList() {
         }
       />
 
+      <StageChips
+        ariaLabel="发运阶段"
+        stages={SHIPPING_STAGES.map((stage) => ({
+          key: stage.key,
+          label: stage.label,
+          count: stageCounts[stage.key],
+        }))}
+        // 草稿/已完成等不在阶段里的筛选：不高亮任何阶段，也不冒充「全部」
+        value={
+          SHIPPING_STAGES.find((stage) => stage.status === filters.status)
+            ?.key ?? "other"
+        }
+        loading={stageCountsLoading}
+        onChange={(key) =>
+          setFilters({
+            status:
+              SHIPPING_STAGES.find((stage) => stage.key === key)?.status ?? "",
+          })
+        }
+      />
+
       <DataTable
         renderCard={(order) => (
           <Link href={`/dashboard/orders/${order.id}`}>
@@ -216,6 +295,10 @@ function OrdersList() {
                 <p className="text-sm text-muted-foreground">
                   {order.stores?.length ? order.stores.join("、") : "—"} ·{" "}
                   {order.port?.name ?? "—"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  发运 {formatDate(order.shippedAt, "—")} · 预计到港{" "}
+                  {formatDate(order.estimatedArrival, "—")}
                 </p>
                 <div className="flex items-center justify-between gap-2">
                   <AmountText>
@@ -248,7 +331,7 @@ function OrdersList() {
           onChange: (keyword) => setFilters({ keyword }),
           placeholder: "搜索订单号、港口或门店...",
         }}
-        filters={STATUS_FILTERS.map(({ status, label }) => ({
+        filters={OTHER_STATUS_FILTERS.map(({ status, label }) => ({
           key: status,
           label,
           active: filters.status === status,
