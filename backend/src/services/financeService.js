@@ -1,7 +1,7 @@
 /**
  * Input: 财务请求参数
  * Output: 付款记录与应收应付统计
- * Pos: 财务业务服务层，负责幂等写入、收款分配事务守恒与聚合计算
+ * Pos: 财务业务服务层，负责幂等写入、收款分配事务守恒与聚合计算（收款池自动匹配：同合同号多笔到账不互相覆盖，余额相等的多笔交人工，本批累计不超收）
  */
 
 const prisma = require('../utils/prisma');
@@ -343,7 +343,9 @@ const findAutoMatchCandidatesBatch = async (payments) => {
   payments.forEach((payment) => {
     const refs = extractSalesContractRefs(payment.note);
     if (refs.length === 1) {
-      refMap.set(refs[0], payment);
+      // 同一合同号可被多笔到账引用，不能互相覆盖
+      if (!refMap.has(refs[0])) refMap.set(refs[0], []);
+      refMap.get(refs[0]).push(payment);
     }
   });
 
@@ -369,9 +371,16 @@ const findAutoMatchCandidatesBatch = async (payments) => {
 
   // 3. 内存中完成匹配评估
   const results = new Map();
-  for (const [contractNo, payment] of refMap) {
+  for (const [contractNo, refPayments] of refMap) {
     const contract = contractByNo.get(contractNo);
-    results.set(payment.id, evaluateMatch(payment, contract));
+    const evaluated = refPayments.map((payment) => [payment, evaluateMatch(payment, contract)]);
+    // 多笔到账各自都等于合同待收余额时无法判断是哪一笔，全部交人工，不猜
+    const ambiguous = evaluated.filter(([, result]) => result.matched).length > 1;
+    for (const [payment, result] of evaluated) {
+      results.set(payment.id, ambiguous && result.matched
+        ? { matched: false, reason: 'ambiguous_multiple_receipts_for_contract' }
+        : result);
+    }
   }
 
   return results;
@@ -451,6 +460,8 @@ const autoMatchUnallocatedPayments = async () => {
 
   const matched = [];
   const skipped = [];
+  // 本批已分配到各合同的金额：不依赖逐笔事务前的快照，保证同批不超收
+  const allocatedPerContract = new Map();
 
   // 批量匹配（消除 N+1：一次查询替代多次 findUnique）
   const candidates = await findAutoMatchCandidatesBatch(
@@ -466,12 +477,19 @@ const autoMatchUnallocatedPayments = async () => {
     }
 
     const amount = Number(attachReceiptBalance(payment, allocationTotals).remainingAmount);
+    const allocatedSoFar = allocatedPerContract.get(candidate.contract.id) || 0;
+    const open = getEffectiveSalesContractTotal(candidate.contract) - Number(candidate.contract.receivedAmount || 0);
+    if (allocatedSoFar + amount > open + AUTO_MATCH_AMOUNT_TOLERANCE) {
+      skipped.push({ paymentId: payment.id, reason: 'contract_balance_exhausted' });
+      continue;
+    }
     await allocatePaymentToContracts(payment.id, [{
       salesContractId: candidate.contract.id,
       amount,
       note: `自动匹配 ${candidate.contract.contractNo} [${candidate.rule}]`,
     }]);
 
+    allocatedPerContract.set(candidate.contract.id, allocatedSoFar + amount);
     matched.push({
       paymentId: payment.id,
       salesContractId: candidate.contract.id,

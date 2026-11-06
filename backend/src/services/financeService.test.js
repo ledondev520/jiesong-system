@@ -952,3 +952,79 @@ test('allocatePaymentToContracts: 拒绝已取消合同和超出未收余额的�
     );
   }
 });
+
+// B68 (P1-2): 同一合同号被多笔未分配到账引用
+const withAutoMatchFixture = async (t, { receipts, contract }) => {
+  const saved = {
+    groupBy: prisma.payment.groupBy,
+    paymentFindMany: prisma.payment.findMany,
+    paymentFindUnique: prisma.payment.findUnique,
+    contractFindMany: prisma.salesContract.findMany,
+    transaction: prisma.$transaction,
+  };
+  t.after(() => {
+    prisma.payment.groupBy = saved.groupBy;
+    prisma.payment.findMany = saved.paymentFindMany;
+    prisma.payment.findUnique = saved.paymentFindUnique;
+    prisma.salesContract.findMany = saved.contractFindMany;
+    prisma.$transaction = saved.transaction;
+  });
+  const created = [];
+  prisma.payment.groupBy = async () => [];
+  prisma.payment.findMany = async () => receipts;
+  prisma.salesContract.findMany = async () => [contract];
+  prisma.payment.findUnique = async ({ where }) => receipts.find((r) => r.id === where.id) || null;
+  prisma.$transaction = async (callback) => callback({
+    $executeRaw: async () => 1,
+    payment: {
+      findUnique: prisma.payment.findUnique,
+      create: async (args) => { created.push(args.data); return { id: `alloc-${created.length}`, ...args.data }; },
+      aggregate: async () => ({ _sum: { amount: 0 } }),
+      update: async (args) => ({ id: args.where.id }),
+    },
+    salesContract: {
+      findMany: async () => [contract],
+      update: async (args) => ({ id: args.where.id }),
+    },
+  });
+  return created;
+};
+
+const syntheticReceipt = (id, amount) => ({
+  id, type: 'INCOME', amount, currency: 'USD', note: 'EXP250024 回款', paymentDate: new Date('2026-03-10T00:00:00.000Z'), customerName: 'Synthetic Buyer',
+});
+const syntheticContract = { id: 'sc-24', contractNo: 'EXP250024', totalAmount: 500, receivedAmount: 0, status: 'SHIPPED' };
+
+test('autoMatchUnallocatedPayments: 两笔到账引用同一合同号，不再互相覆盖（旧代码把第一笔误报为 no_contract_reference）', async (t) => {
+  const created = await withAutoMatchFixture(t, {
+    receipts: [syntheticReceipt('r-full', 500), syntheticReceipt('r-part', 300)],
+    contract: syntheticContract,
+  });
+  const result = await financeService.autoMatchUnallocatedPayments();
+  assert.equal(result.matchedCount, 1);
+  assert.equal(result.matched[0].paymentId, 'r-full');
+  assert.deepEqual(result.skipped, [{ paymentId: 'r-part', reason: 'amount_mismatch' }]);
+  assert.equal(created.length, 1);
+});
+
+test('autoMatchUnallocatedPayments: 两笔到账各自都等于合同待收余额时全部交人工，不猜', async (t) => {
+  const created = await withAutoMatchFixture(t, {
+    receipts: [syntheticReceipt('r-a', 500), syntheticReceipt('r-b', 500)],
+    contract: syntheticContract,
+  });
+  const result = await financeService.autoMatchUnallocatedPayments();
+  assert.equal(result.matchedCount, 0);
+  assert.deepEqual(result.skipped.map((s) => s.reason), ['ambiguous_multiple_receipts_for_contract', 'ambiguous_multiple_receipts_for_contract']);
+  assert.equal(created.length, 0, '不得向同一合同分配 2x 余额');
+});
+
+test('autoMatchUnallocatedPayments: 三笔到账引用同一合同，累计分配不超过待收余额且部分款不被吞掉', async (t) => {
+  const created = await withAutoMatchFixture(t, {
+    receipts: [syntheticReceipt('r-c', 200), syntheticReceipt('r-a', 500), syntheticReceipt('r-b', 500)],
+    contract: syntheticContract,
+  });
+  const result = await financeService.autoMatchUnallocatedPayments();
+  assert.equal(result.matchedCount, 0);
+  assert.equal(result.skipped.find((s) => s.paymentId === 'r-c').reason, 'amount_mismatch');
+  assert.ok(created.reduce((sum, row) => sum + row.amount, 0) <= 500 + 0.01);
+});
