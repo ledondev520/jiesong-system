@@ -1,6 +1,8 @@
 /**
  * Input: Prisma client、BankTransaction / InvoiceRecord / PurchaseContract / SalesContract 模型
  * Output: 智能关联引擎；发票自动写入重验待匹配状态，仅有效发票（正常且正数）可被自动关联、红冲/负数留待人工，人工关联验证有效购销目标；
+ *         发票只自动关联采购合同（购方须为本公司；人民币进项发票不与美元出口合同按数值比对，销项自动关联已移除）；
+ *         银行流水自动关联在批内递减合同余额，不会把多笔流水挂满同一合同；人工银行关联校验合同未取消、方向与币种（OUT→采购/CNY，IN→销售/USD）；
  *         发票→采购合同另有硬护栏（累计额≤合同额×1.01、税号冲突排除、早于签约30天以上排除）与仅动自动关联的重配 rematchAutoInvoiceLinks
  * Pos: 财务模块-智能关联业务逻辑层
  *
@@ -11,6 +13,7 @@ const prisma = require('../utils/prisma');
 const { isInEffect, payableWhere, outstandingOf } = require('./payablesService');
 const { createError } = require('../middleware/errorHandler');
 const { VALID_INVOICE_WHERE } = require('./invoiceRecordService');
+const { getEffectiveSalesContractTotal } = require('./salesContractAmount');
 
 // ==================== 常量配置 ====================
 
@@ -36,6 +39,7 @@ const INVOICE_EARLY_DAYS = 30; // 发票早于签约超过 30 天不关联，与
 const INVOICE_CAP_TOLERANCE = AMOUNT_LOOSE_TOLERANCE; // 关联发票累计额（含本张）上限 = 合同额 × (1+1%) + 0.01，容忍税差/凑整
 // 发票关联来源（InvoiceRecord.matchSource）：批量重配只动 AUTO；MANUAL 与 null（迁移前遗留）一律锁定不动。
 const MATCH_SOURCE = { AUTO: 'AUTO', MANUAL: 'MANUAL' };
+const COMPANY = '上海捷淞国际物流有限公司'; // 进项发票购方，同 financeImportService / bankFlowService
 const PURCHASE_KEYWORDS = ['货款', '采购', '购货', '材料款', '设备款', '商品款'];
 
 // ==================== 字符串工具 ====================
@@ -238,7 +242,7 @@ async function loadSalesContracts() {
     return {
       ...c,
       nameCandidates: storeNames.length > 0 ? storeNames : [c.port?.name].filter(Boolean),
-      unpaidAmount: Math.max(c.totalAmount - c.receivedAmount, 0),
+      unpaidAmount: Math.max(getEffectiveSalesContractTotal(c) - c.receivedAmount, 0),
     };
   });
 }
@@ -314,7 +318,7 @@ function matchBankToSales(txn, contracts) {
 
     const nameScore = Math.round((nameSim / 100) * 40);
     const amountScore = txn.direction === 'IN'
-      ? scoreAmount(txn.amount, contract.totalAmount, contract.receivedAmount)
+      ? scoreAmount(txn.amount, getEffectiveSalesContractTotal(contract), contract.receivedAmount)
       : 0;
     const dateScore = scoreDate(txn.txnDate, contract.signedAt);
 
@@ -337,6 +341,9 @@ function matchBankToSales(txn, contracts) {
 // linkedTotals：合同ID→已关联有效发票累计额；传 null 只排名、不做累计额上限（见 planInvoiceLinks）。
 function matchInvoiceToPurchase(inv, contracts, linkedTotals = null) {
   const best = { score: 0, contract: null, details: null };
+
+  // 购方必须是本公司：他人名下的进项发票不能挂到我方采购合同（缺购方同样不关联）。
+  if (!normalizeName(inv.buyer).includes(normalizeName(COMPANY))) return best;
 
   for (const contract of contracts) {
     if (taxIdConflict(inv.sellerTaxId, contract.supplier?.taxId)) continue;
@@ -362,61 +369,25 @@ function matchInvoiceToPurchase(inv, contracts, linkedTotals = null) {
 }
 
 /**
- * 职责：发票→销售合同匹配（销项）
- */
-function matchInvoiceToSales(inv, contracts) {
-  const best = { score: 0, contract: null, details: null };
-
-  for (const contract of contracts) {
-    const nameSim = maxStringSimilarity(inv.buyer, contract.nameCandidates);
-    if (nameSim < 50) continue;
-
-    const nameScore = Math.round((nameSim / 100) * 40);
-    const amountScore = scoreAmount(inv.total, contract.totalAmount, contract.receivedAmount);
-    const dateScore = scoreDate(inv.invDate, contract.signedAt);
-
-    const totalScore = nameScore + amountScore + dateScore;
-
-    if (totalScore > best.score) {
-      best.score = totalScore;
-      best.contract = contract;
-      best.details = { nameScore, amountScore, dateScore };
-    }
-  }
-
-  return best;
-}
-
-/**
  * 职责：为一批发票规划关联（纯函数，不写库）
  * 思路：先按「无累计额上限」的最优分降序（同分按开票日、id）排队，让最贴合的发票先占合同额度；
  *       再逐张按累计额上限匹配，超额的合同被跳过并回落到次优候选。fixedTotals 为不参与重配的已关联发票累计额。
- *       同分先比发票金额与合同额的接近程度（更贴合者先占额度），再比开票日、id。销售分更高而保持原采购关联的发票，仍占原采购合同的额度。
+ *       同分先比发票金额与合同额的接近程度（更贴合者先占额度），再比开票日、id。发票不再自动关联销售合同（币种不同，见头注释）。
  */
-function planInvoiceLinks(invoices, purchaseContracts, salesContracts, fixedTotals = new Map()) {
+function planInvoiceLinks(invoices, purchaseContracts, fixedTotals = new Map()) {
   const totals = new Map(fixedTotals);
   const queue = invoices
     .map((inv) => {
-      const p = matchInvoiceToPurchase(inv, purchaseContracts);
-      const s = matchInvoiceToSales(inv, salesContracts);
-      const best = p.score >= s.score ? p : s;
+      const best = matchInvoiceToPurchase(inv, purchaseContracts);
       return { inv, rank: best.score, gap: best.contract ? Math.abs(inv.total - best.contract.totalAmount) : Infinity };
     })
     .sort((a, b) => b.rank - a.rank || a.gap - b.gap || String(a.inv.invDate).localeCompare(String(b.inv.invDate)) || String(a.inv.id).localeCompare(String(b.inv.id)));
 
   return queue.map(({ inv }) => {
-    const pBest = matchInvoiceToPurchase(inv, purchaseContracts, totals);
-    const sBest = matchInvoiceToSales(inv, salesContracts);
-    const usePurchase = pBest.score >= sBest.score;
-    const best = usePurchase ? pBest : sBest;
-    const contractType = usePurchase ? CONTRACT_TYPE.PURCHASE : CONTRACT_TYPE.SALES;
+    const best = matchInvoiceToPurchase(inv, purchaseContracts, totals);
     const linked = best.score >= SCORE_THRESHOLD;
-    if (linked && usePurchase) totals.set(best.contract.id, (totals.get(best.contract.id) || 0) + inv.total);
-    // 销售分更高时重配保持原采购关联不动，其金额仍占原合同额度（待匹配发票无原关联，不受影响）。
-    else if (linked && inv.matchedContractType === CONTRACT_TYPE.PURCHASE && inv.matchedContractId) {
-      totals.set(inv.matchedContractId, (totals.get(inv.matchedContractId) || 0) + inv.total);
-    }
-    return { inv, best, contractType, linked };
+    if (linked) totals.set(best.contract.id, (totals.get(best.contract.id) || 0) + inv.total);
+    return { inv, best, contractType: CONTRACT_TYPE.PURCHASE, linked };
   });
 }
 
@@ -493,6 +464,12 @@ async function runAutoMatchOnce() {
         continue;
       }
 
+      // 批内递减余额：同一合同不会被多笔流水重复吃满（合同对象是本次加载的副本）。
+      const amount = Math.abs(Number(txn.amount) || 0);
+      best.contract.unpaidAmount = Math.max(best.contract.unpaidAmount - amount, 0);
+      if (contractType === CONTRACT_TYPE.PURCHASE) best.contract.paidAmount = Number(best.contract.paidAmount || 0) + amount;
+      else best.contract.receivedAmount = Number(best.contract.receivedAmount || 0) + amount;
+
       bankResults.push({
         id: txn.id,
         matched: true,
@@ -510,7 +487,7 @@ async function runAutoMatchOnce() {
   }
 
   // 2. 匹配发票（累计额上限以库里已关联的有效发票为基线，人工关联的也计入）
-  const plans = planInvoiceLinks(invoices, invoicePurchaseContracts, salesContracts, await loadLinkedPurchaseTotals());
+  const plans = planInvoiceLinks(invoices, invoicePurchaseContracts, await loadLinkedPurchaseTotals());
   for (const { inv, best, contractType, linked } of plans) {
     if (linked) {
       // A user may confirm/ignore this invoice after the candidate read. Keep the
@@ -569,13 +546,12 @@ async function runAutoMatchOnce() {
 async function rematchAutoInvoiceLinks({ apply = false } = {}) {
   similarityCache = new Map();
   try {
-    const [rows, purchaseContracts, salesContracts] = await Promise.all([
+    const [rows, purchaseContracts] = await Promise.all([
       prisma.invoiceRecord.findMany({
         where: { matchStatus: MATCH_STATUS.MATCHED, matchedContractType: CONTRACT_TYPE.PURCHASE, ...VALID_INVOICE_WHERE },
         orderBy: { invDate: 'asc' },
       }),
       loadPurchaseContracts(MATCH_PURPOSE.INVOICE),
-      loadSalesContracts(),
     ]);
     const isAuto = (r) => r.matchSource === MATCH_SOURCE.AUTO;
     const auto = rows.filter(isAuto);
@@ -587,10 +563,9 @@ async function rematchAutoInvoiceLinks({ apply = false } = {}) {
     const contractNo = new Map(purchaseContracts.map((c) => [c.id, c.contractNo]));
     const changes = [];
     let kept = 0;
-    for (const { inv, best, contractType, linked } of planInvoiceLinks(auto, purchaseContracts, salesContracts, lockedTotals)) {
+    for (const { inv, best, contractType, linked } of planInvoiceLinks(auto, purchaseContracts, lockedTotals)) {
       const toId = linked ? best.contract.id : null;
-      if (linked && contractType === CONTRACT_TYPE.PURCHASE && toId === inv.matchedContractId) { kept += 1; continue; } // 同合同：分数漂移不算变更
-      if (linked && contractType !== CONTRACT_TYPE.PURCHASE) { kept += 1; continue; } // 销售最优分更高：不跨类型改写，保持原状
+      if (linked && toId === inv.matchedContractId) { kept += 1; continue; } // 同合同：分数漂移不算变更
       changes.push({
         id: inv.id,
         invNo: inv.invNo,
@@ -703,20 +678,28 @@ async function manualMatch(entityType, entityId, contractId, contractType) {
     });
   }
 
-  const model = entityType === 'BANK' ? prisma.bankTransaction : prisma.invoiceRecord;
-
-  const updated = await model.update({
-    where: { id: entityId },
-    data: {
-      matchedContractId: contractId,
-      matchedContractType: contractType,
-      matchScore: 100,
-      matchStatus: MATCH_STATUS.MATCHED,
-      matchedAt: new Date(),
-    },
+  // 银行流水：合同须存在且未取消，方向/币种与合同类型一致（OUT→采购/CNY，IN→销售/USD）。
+  return prisma.$transaction(async tx => {
+    const txn = await tx.bankTransaction.findUnique({ where: { id: entityId }, select: { direction: true, currency: true } });
+    if (!txn) throw createError('银行流水不存在', 404);
+    const contractModel = contractType === CONTRACT_TYPE.PURCHASE ? tx.purchaseContract : tx.salesContract;
+    const contract = await contractModel.findUnique({ where: { id: contractId }, select: { status: true } });
+    if (!contract || contract.status === 'CANCELLED') throw createError('关联合同不存在或已取消', 400);
+    const expected = contractType === CONTRACT_TYPE.PURCHASE ? { direction: 'OUT', currency: 'CNY' } : { direction: 'IN', currency: 'USD' };
+    if (txn.direction !== expected.direction || String(txn.currency || 'CNY').toUpperCase() !== expected.currency) {
+      throw createError(`${contractType === CONTRACT_TYPE.PURCHASE ? '采购' : '销售'}合同只能关联${expected.currency}${expected.direction === 'OUT' ? '付款' : '收款'}流水`, 400);
+    }
+    return tx.bankTransaction.update({
+      where: { id: entityId },
+      data: {
+        matchedContractId: contractId,
+        matchedContractType: contractType,
+        matchScore: 100,
+        matchStatus: MATCH_STATUS.MATCHED,
+        matchedAt: new Date(),
+      },
+    });
   });
-
-  return updated;
 }
 
 /**

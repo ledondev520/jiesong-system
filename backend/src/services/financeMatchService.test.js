@@ -144,7 +144,7 @@ function invoiceFixture(t,{contracts,invoices}){
  return{rows,writes};
 }
 const contract=(over={})=>({id:'c1',contractNo:'CG-SYN-1',status:'DRAFT',totalAmount:38000,paidAmount:0,signedAt:new Date('2024-05-21'),supplier:{name:'合成供应商甲',taxId:'91SYNTHETIC00000001'},...over});
-const invoice=(id,over={})=>({id,invNo:id,seller:'合成供应商甲',sellerTaxId:'91SYNTHETIC00000001',invDate:'2024-06-01',total:38000,...over});
+const invoice=(id,over={})=>({id,invNo:id,seller:'合成供应商甲',buyer:'上海捷淞国际物流有限公司',sellerTaxId:'91SYNTHETIC00000001',invDate:'2024-06-01',total:38000,...over});
 
 test('同一合同多张同额发票：累计额上限只放行一张（CG2400009 型），最先开具者占额度',async(t)=>{
  const{writes}=invoiceFixture(t,{contracts:[contract()],invoices:[invoice('a',{invDate:'2025-02-24'}),invoice('b',{invDate:'2025-07-08'}),invoice('c',{invDate:'2025-07-08'}),invoice('d',{invDate:'2026-05-18'})]});
@@ -256,14 +256,56 @@ test('重配 MOVE：最优合同已被人工发票占满时，自动关联移到
  assert.deepEqual((await service.rematchAutoInvoiceLinks({apply:true})).changes,[]);
 });
 
-test('重配 P3-1：销售分更高而保持原采购关联的发票，仍占原采购合同的累计额度',async(t)=>{
- const link=(id,over={})=>invoice(id,{matchStatus:'MATCHED',matchedContractId:'c1',matchedContractType:'PURCHASE',matchScore:85,matchSource:'AUTO',...over});
- const fixture=invoiceFixture(t,{contracts:[contract({totalAmount:40000})],invoices:[link('salesy',{buyer:'合成买家'}),link('other')]});
+test('P0-7：发票不再自动关联销售合同（人民币进项/销项发票不与美元出口合同 1:1 比对）',async(t)=>{
+ const fixture=invoiceFixture(t,{contracts:[],invoices:[invoice('cny',{total:38000,buyer:'合成买家'})]});
  prisma.salesContract.findMany=async()=>[{id:'s1',contractNo:'XS-SYN-1',status:'SIGNED',totalAmount:38000,receivedAmount:0,signedAt:new Date('2024-05-21'),packingItems:[{store:{name:'合成买家'}}]}];
- const result=await service.rematchAutoInvoiceLinks({apply:true});
- assert.deepEqual(result.changes.map(c=>[c.id,c.action]),[['other','UNLINK']],'salesy 保持原样（算 kept），other 因合同额度被占而解除');
- assert.equal(fixture.rows.find(r=>r.id==='salesy').matchedContractId,'c1');
- assert.equal(fixture.rows.find(r=>r.id==='other').matchStatus,'PENDING');
+ const result=await service.runAutoMatch();
+ assert.equal(result.invoiceMatched,0);
+ assert.equal(fixture.rows[0].matchStatus,'PENDING');
+});
+
+test('P0-7：进项发票购方不是本公司（或缺购方）不关联采购合同',async(t)=>{
+ const fixture=invoiceFixture(t,{contracts:[contract({totalAmount:38000})],invoices:[invoice('other-buyer',{buyer:'合成别家公司'}),invoice('no-buyer',{buyer:null,invNo:'n2'}),invoice('ok',{invNo:'n3'})]});
+ await service.runAutoMatch();
+ const status=Object.fromEntries(fixture.rows.map(r=>[r.id,r.matchStatus]));
+ assert.deepEqual(status,{'other-buyer':'PENDING','no-buyer':'PENDING',ok:'MATCHED'});
+});
+
+test('P0-7：批内递减合同余额——3 笔同额流水只有 1 笔挂到仅剩一笔余额的合同',async(t)=>{
+ const saved={bf:prisma.bankTransaction.findMany,bu:prisma.bankTransaction.updateMany,i:prisma.invoiceRecord.findMany,p:prisma.purchaseContract.findMany,s:prisma.salesContract.findMany};
+ t.after(()=>{prisma.bankTransaction.findMany=saved.bf;prisma.bankTransaction.updateMany=saved.bu;prisma.invoiceRecord.findMany=saved.i;prisma.purchaseContract.findMany=saved.p;prisma.salesContract.findMany=saved.s;});
+ const txn=(id)=>({id,counterpart:'合成供应商甲',direction:'OUT',amount:20000,currency:'CNY',summary:'货款',txnDate:'2026-01-05'});
+ prisma.bankTransaction.findMany=async()=>[txn('t1'),txn('t2'),txn('t3')];
+ prisma.invoiceRecord.findMany=async()=>[];
+ prisma.salesContract.findMany=async()=>[];
+ prisma.purchaseContract.findMany=async()=>[{id:'c1',status:'SIGNED',totalAmount:20000,paidAmount:0,signedAt:new Date('2026-01-01'),supplier:{name:'合成供应商甲'}}];
+ prisma.bankTransaction.updateMany=async()=>({count:1});
+ const result=await service.runAutoMatch();
+ assert.equal(result.bankMatched,1);
+});
+
+test('P0-7：人工银行关联校验合同存在/未取消、方向与币种',async(t)=>{
+ const saved={bf:prisma.bankTransaction.findUnique,bu:prisma.bankTransaction.update,pc:prisma.purchaseContract.findUnique,sc:prisma.salesContract.findUnique,tx:prisma.$transaction};
+ t.after(()=>{prisma.bankTransaction.findUnique=saved.bf;prisma.bankTransaction.update=saved.bu;prisma.purchaseContract.findUnique=saved.pc;prisma.salesContract.findUnique=saved.sc;prisma.$transaction=saved.tx;});
+ let txn={direction:'OUT',currency:'CNY'};let status='SIGNED';let writes=0;
+ prisma.$transaction=async(fn)=>fn(prisma);
+ prisma.bankTransaction.findUnique=async()=>txn;
+ prisma.bankTransaction.update=async()=>{writes+=1;return{};};
+ prisma.purchaseContract.findUnique=async()=>status&&{status};
+ prisma.salesContract.findUnique=async()=>status&&{status};
+ await service.manualMatch('BANK','b1','c1','PURCHASE');
+ assert.equal(writes,1);
+ status='CANCELLED';
+ await assert.rejects(service.manualMatch('BANK','b1','c1','PURCHASE'),{statusCode:400});
+ status=null;
+ await assert.rejects(service.manualMatch('BANK','b1','c1','PURCHASE'),{statusCode:400});
+ status='SIGNED';
+ await assert.rejects(service.manualMatch('BANK','b1','c1','SALES'),{statusCode:400},'付款流水不能挂销售合同');
+ txn={direction:'IN',currency:'CNY'};
+ await assert.rejects(service.manualMatch('BANK','b1','c1','SALES'),{statusCode:400},'人民币收款不能挂美元销售合同');
+ txn={direction:'IN',currency:'USD'};
+ await service.manualMatch('BANK','b1','c1','SALES');
+ assert.equal(writes,2);
 });
 
 test('同分排队 P3-3：金额更贴近合同额者先占额度，而不是开票日更早者',async(t)=>{
