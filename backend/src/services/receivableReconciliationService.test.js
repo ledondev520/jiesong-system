@@ -39,3 +39,39 @@ test('buildReceivableReconciliation: 拆出重复EXP、漏记EXP和剩余折算�
   assert.equal(result.translatedOperatingReceivableCny, 1947822.32);
   assert.equal(result.residualCny, -17052.86);
 });
+
+const base = {
+  period: { year: 2026, month: 7, periodLabel: '2026年7账期', balanceSheet: { accountsReceivable: 0 } },
+  bankTransactions: [],
+};
+const contract = (contractNo, totalAmount) => ({
+  contractNo, totalAmount, signedAt: new Date('2026-07-01'), shippedAt: new Date('2026-07-02'),
+});
+
+test('buildReceivableReconciliation: 红字冲销行抵减该合同已确认借方', () => {
+  const result = buildReceivableReconciliation({
+    ...base,
+    contracts: [contract('EXP260001', 1000)],
+    ledgerEntries: [
+      { voucherNumber: '记-1', summary: 'EXP260001 外销收入', debit: 7200, credit: 0 },
+      { voucherNumber: '记-2', summary: 'EXP260001 外销收入', debit: -7200, credit: 0 },
+      { voucherNumber: '记-3', summary: '更正 EXP260001 外销收入', debit: 7200, credit: 0 },
+    ],
+  });
+  assert.equal(result.effectiveExchangeRate, 7.2);
+});
+
+test('buildReceivableReconciliation: 改摘要重记的合同不拉偏其他合同的汇率', () => {
+  const result = buildReceivableReconciliation({
+    ...base,
+    contracts: [contract('EXP260001', 1000), contract('EXP260002', 1000), contract('EXP260003', 1000)],
+    ledgerEntries: [
+      { voucherNumber: '记-1', summary: 'EXP260001 外销收入', debit: 7200, credit: 0 },
+      { voucherNumber: '记-2', summary: 'EXP260002 外销收入', debit: 7200, credit: 0 },
+      { voucherNumber: '记-3', summary: 'EXP260003 外销收入', debit: 7200, credit: 0 },
+      { voucherNumber: '记-4', summary: '更正 EXP260003 外销收入', debit: 7200, credit: 0 },
+    ],
+  });
+  assert.equal(result.effectiveExchangeRate, 7.2);
+  assert.deepEqual(result.anomalies.rateOutlierContracts, ['EXP260003']);
+});
