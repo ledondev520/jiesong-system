@@ -112,10 +112,11 @@ test('batchImportPurchaseContracts: 编号、合同与明细使用同一事务�
   assert.equal(calls.numbers, 1);
   assert.equal(calls.contracts[0].contractNo, `${prefix}00013`);
   assert.equal(calls.contracts[0].status, 'DRAFT');
-  assert.equal(calls.contracts[0].totalAmount, 480);
+  assert.equal(calls.contracts[0].taxRate, 13);
+  assert.equal(calls.contracts[0].totalAmount, 542.4); // 6 × 80 × 1.13 含税
   assert.equal(calls.items[0].purchaseContractId, 'synthetic-purchase-1');
   assert.equal(calls.items[0].unitPrice, 80);
-  assert.equal(calls.items[0].totalPrice, 480);
+  assert.equal(calls.items[0].totalPrice, 542.4);
 });
 
 test('batchImportPurchaseContracts: 自动编号唯一竞争重新分配后只统计一次成功', async t => {
@@ -183,4 +184,31 @@ test('batchImportPurchaseContracts: 连续竞争最多五次，失败后继续�
   assert.equal(calls.transactions, 6);
   assert.equal(calls.numbers, 6);
   assert.equal(calls.items.length, 1);
+});
+
+test('batchImportPurchaseContracts: 显式税率 0 保持不含税金额', async t => {
+  const { calls } = mockPurchaseImport(t);
+  await batchImportService.batchImportPurchaseContracts([{ ...purchaseRow, taxRate: 0 }], 'synthetic-user');
+  assert.equal(calls.contracts[0].taxRate, 0);
+  assert.equal(calls.contracts[0].totalAmount, 480);
+});
+
+test('batchImportSalesContracts: 缺失或非法售价在写库前被行级拒绝，不写 NaN', async t => {
+  const mockMethod = (object, key, implementation) => {
+    const original = object[key];
+    object[key] = implementation;
+    t.after(() => { object[key] = original; });
+  };
+  let writes = 0;
+  mockMethod(prisma.product, 'findFirst', async () => ({ id: 'p' }));
+  mockMethod(prisma.store, 'findFirst', async () => ({ id: 's' }));
+  mockMethod(prisma.salesContract, 'create', async () => { writes++; return { id: 'c' }; });
+  const base = { productName: 'x', storeName: 'y', quantity: '2' };
+  const result = await batchImportService.batchImportSalesContracts([
+    { ...base, _rowNum: 2 },
+    { ...base, _rowNum: 3, sellingPrice: 'abc' },
+    { ...base, _rowNum: 4, sellingPrice: '5', quantity: '0' },
+  ], 'u');
+  assert.equal(result.failed, 3);
+  assert.equal(writes, 0);
 });

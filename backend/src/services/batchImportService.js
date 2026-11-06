@@ -6,6 +6,7 @@
 const prisma = require('../utils/prisma');
 const { defaultSpotRate } = require('./exportPricing');
 const { generateNextContractNo } = require('./shared/contractUtils');
+const { calculateNewLineTotal, normalizePurchaseTaxRate } = require('./purchaseAmountService');
 const { generateNextPurchaseContractNo, isPurchaseNumberConflict } = require('./purchaseContractNumberService');
 
 const getCurrentYear = () => new Date().getFullYear().toString().slice(-2);
@@ -24,6 +25,13 @@ async function batchImportSalesContracts(data, userId) {
     const rowNum = row._rowNum || i + 1;
 
     try {
+      const quantity = Number(row.quantity);
+      const sellingPrice = Number(row.sellingPrice);
+      if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('销售数量必须为大于 0 的有效数字');
+      if (row.sellingPrice === undefined || row.sellingPrice === null || row.sellingPrice === '' || !Number.isFinite(sellingPrice) || sellingPrice < 0) {
+        throw new Error('销售单价必须为大于等于 0 的有效数字');
+      }
+
       // 获取下一个合同号
       const contractNo = await generateNextContractNo({ prisma, year: getCurrentYear() });
 
@@ -51,7 +59,7 @@ async function batchImportSalesContracts(data, userId) {
           contractNo,
           status: 'DRAFT',
           exchangeRate: parseFloat(row.exchangeRate) || defaultSpotRate(),
-          totalAmount: parseFloat(row.quantity) * parseFloat(row.sellingPrice),
+          totalAmount: quantity * sellingPrice,
         },
       });
 
@@ -61,10 +69,10 @@ async function batchImportSalesContracts(data, userId) {
           salesContractId: contract.id,
           productId: product.id,
           storeId: store.id,
-          quantity: parseFloat(row.quantity),
+          quantity,
           unit: row.unit || '件',
           costPrice: parseFloat(row.costPrice),
-          sellingPrice: parseFloat(row.sellingPrice),
+          sellingPrice,
         },
       });
 
@@ -116,6 +124,10 @@ async function batchImportPurchaseContracts(data, userId) {
         throw new Error('采购单价必须为大于等于 0 的有效数字');
       }
 
+      // 金额与手工建单一致：明细、合同总额均为含税，默认 13%（schema 默认值）。
+      const taxRate = normalizePurchaseTaxRate(numericInput(row.taxRate) ? row.taxRate : 13);
+      const grossTotal = calculateNewLineTotal({ quantity, unitPrice }, taxRate);
+
       // 查找供应商
       const supplier = await prisma.supplier.findFirst({
         where: { name: row.supplierName },
@@ -143,7 +155,8 @@ async function batchImportPurchaseContracts(data, userId) {
                 contractNo: row.contractNo || await generateNextPurchaseContractNo(tx),
                 supplierId: supplier.id,
                 status: 'DRAFT',
-                totalAmount: quantity * unitPrice,
+                taxRate,
+                totalAmount: grossTotal,
                 expectedDate: row.deliveryDate ? new Date(row.deliveryDate) : null,
               },
             });
@@ -155,7 +168,7 @@ async function batchImportPurchaseContracts(data, userId) {
                 quantity,
                 unit: row.unit || '件',
                 unitPrice,
-                totalPrice: quantity * unitPrice,
+                totalPrice: grossTotal,
               },
             });
           });

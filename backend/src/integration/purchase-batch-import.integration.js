@@ -65,8 +65,8 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
     for (const contract of contracts) {
       assert.equal(contract.status, 'DRAFT');
       assert.equal(contract.items.length, 1);
-      assert.equal(contract.totalAmount, 480);
-      assert.equal(contract.items[0].totalPrice, 480);
+      assert.equal(contract.totalAmount, 542.4);
+      assert.equal(contract.items[0].totalPrice, 542.4);
     }
   });
 
@@ -205,7 +205,7 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
     assert.deepEqual(compatible, { success: 2, failed: 0, errors: [] });
     for (const [contractNo, quantity, unitPrice, totalPrice] of [
       ['SYNTHETIC-ZERO-PRICE', 6.5, 0, 0],
-      ['SYNTHETIC-DECIMAL-PRICE', 2.5, 1.2, 3],
+      ['SYNTHETIC-DECIMAL-PRICE', 2.5, 1.2, 3.39],
     ]) {
       const contract = await db.purchaseContract.findUnique({ where: { contractNo }, include: { items: true } });
       assert.equal(contract.totalAmount, totalPrice);

@@ -541,7 +541,7 @@ const updatePackingItem = async (id, itemId, data = {}) => prisma.$transaction(a
       volume: data.volume,
       unitPrice,
       totalPrice,
-      storeId: data.storeId || null,
+      storeId: data.storeId === undefined ? undefined : (data.storeId || null), // 局部更新不得清空门店
       specification: data.specification,
       supplement: data.supplement,
       hsCode: data.hsCode,

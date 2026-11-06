@@ -20,6 +20,28 @@ const HS_OVERRIDE_SOURCES = new Set([
   'ai_suggestion',
 ]);
 
+// 序号取已有编号最大后缀 + 1（删除过单据后 count + 1 会撞唯一键）；P2002 并发撞号时整笔事务重试。
+const nextDocumentNo = async (delegate, field, base) => {
+  const rows = await delegate.findMany({ where: { [field]: { startsWith: base } }, select: { [field]: true } });
+  let max = 0;
+  for (const row of rows) {
+    const value = row[field];
+    if (value === base) max = Math.max(max, 1);
+    else if (value.startsWith(`${base}-`) && /^\d+$/.test(value.slice(base.length + 1))) max = Math.max(max, Number(value.slice(base.length + 1)));
+  }
+  return max === 0 ? base : `${base}-${max + 1}`;
+};
+
+const retryOnNumberConflict = async (run) => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      if (error?.code !== 'P2002' || attempt >= 2) throw error;
+    }
+  }
+};
+
 const extractHsOverrides = (items = []) => (Array.isArray(items) ? items : [])
   .filter((item) => (
     item?.packingItemId
@@ -75,7 +97,7 @@ const generateCustomsDeclaration = async ({
     resolvedItems = buildPreparedItems(readiness);
   }
 
-  const tx = await prisma.$transaction(async (tx) => {
+  const tx = await retryOnNumberConflict(() => prisma.$transaction(async (tx) => {
     // 获取出口合同详情
     const contract = await tx.salesContract.findUnique({
       where: { id: salesContractId },
@@ -95,9 +117,7 @@ const generateCustomsDeclaration = async ({
 
     // 生成报关单号（追加序号避免重复）
     // 思路：查询同合同已有报关单数量，序号从 1 开始递增
-    const existingCount = await tx.customsDeclaration.count({ where: { salesContractId } });
-    const seq = existingCount > 0 ? `-${existingCount + 1}` : '';
-    const declarationNo = `BG${contract.contractNo.slice(2)}${seq}`;
+    const declarationNo = await nextDocumentNo(tx.customsDeclaration, 'declarationNo', `BG${contract.contractNo.slice(2)}`);
 
     // 计算总额
     const totalAmount = resolvedItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
@@ -139,7 +159,7 @@ const generateCustomsDeclaration = async ({
     }
 
     return customsDeclaration;
-  });
+  }));
 
   return tx;
 };
@@ -157,7 +177,7 @@ const generateForexVerification = async ({
   extraData = {},
   receivedAmount,
 }) => {
-  const tx = await prisma.$transaction(async (tx) => {
+  const tx = await retryOnNumberConflict(() => prisma.$transaction(async (tx) => {
     // 获取出口合同详情
     const contract = await tx.salesContract.findUnique({
       where: { id: salesContractId },
@@ -177,9 +197,7 @@ const generateForexVerification = async ({
     }
 
     // 生成核销单号（追加序号避免重复）
-    const existingForexCount = await tx.forexVerification.count({ where: { salesContractId } });
-    const forexSeq = existingForexCount > 0 ? `-${existingForexCount + 1}` : '';
-    const verificationNo = `WH${contract.contractNo.slice(2)}${forexSeq}`;
+    const verificationNo = await nextDocumentNo(tx.forexVerification, 'verificationNo', `WH${contract.contractNo.slice(2)}`);
 
     // 创建外汇核销单
     const forexVerification = await tx.forexVerification.create({
@@ -200,7 +218,7 @@ const generateForexVerification = async ({
     });
 
     return forexVerification;
-  });
+  }));
 
   return tx;
 };
@@ -227,7 +245,7 @@ const generateTaxRefund = async ({
     resolvedItems = buildPreparedItems(readiness);
   }
 
-  const tx = await prisma.$transaction(async (tx) => {
+  const tx = await retryOnNumberConflict(() => prisma.$transaction(async (tx) => {
     // 获取出口合同详情
     const contract = await tx.salesContract.findUnique({
       where: { id: salesContractId },
@@ -245,9 +263,7 @@ const generateTaxRefund = async ({
     }
 
     // 生成退税单号（追加序号避免重复）
-    const existingTaxCount = await tx.taxRefund.count({ where: { salesContractId } });
-    const taxSeq = existingTaxCount > 0 ? `-${existingTaxCount + 1}` : '';
-    const refundNo = `TX${contract.contractNo.slice(2)}${taxSeq}`;
+    const refundNo = await nextDocumentNo(tx.taxRefund, 'refundNo', `TX${contract.contractNo.slice(2)}`);
 
     // 外贸企业免退税：以采购专票注明金额为计税依据，预计应退税额 = 计税依据 × 当前退税率。
     const declaredAmount = resolvedItems.reduce((sum, item) => sum + (item.refundBaseCny || 0), 0);
@@ -276,7 +292,7 @@ const generateTaxRefund = async ({
     });
 
     return taxRefund;
-  });
+  }));
 
   return tx;
 };
@@ -380,10 +396,10 @@ const exportThreeFormsExcel = async (salesContractId, ids = {}) => {
   if (!contract) throw createError('合同不存在', 404);
 
   const cdWhere = ids.customsDeclarationId
-    ? { id: ids.customsDeclarationId }
+    ? { id: ids.customsDeclarationId, salesContractId }
     : { salesContractId, ...(buildWhere ? buildWhere({}) : {}) };
-  const fvWhere = ids.forexId ? { id: ids.forexId } : { salesContractId };
-  const trWhere = ids.taxRefundId ? { id: ids.taxRefundId } : { salesContractId };
+  const fvWhere = ids.forexId ? { id: ids.forexId, salesContractId } : { salesContractId };
+  const trWhere = ids.taxRefundId ? { id: ids.taxRefundId, salesContractId } : { salesContractId };
 
   const [customsDeclaration, forexVerification, taxRefund] = await Promise.all([
     prisma.customsDeclaration.findFirst({
