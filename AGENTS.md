@@ -127,6 +127,8 @@
 - AUDIT-JS-4 P3 follow-up: csvSafeText leaves phone-style `+86 138-0000` text (digits, spaces, `( )`, `-` only after a leading `+`) unprefixed; xlsx is pinned to the SheetJS CDN tarball (integrity in lockfiles, outside npm audit/Dependabot, bump manually); `deploy.sh` chmods the freshly migrated SQLite file to 0600.
 - Agent pending write actions live in SQLite (`agent_pending_actions`, `backend/src/services/agentPendingActionService.js`), not a per-process Map: a confirm is claimed with an atomic `UPDATE ... WHERE status='pending'` so a double or cross-worker confirm executes once; a failed execution stays `failed` (never auto-retried), expiry (30 min) is checked in the DB and purged lazily on the next create. Rows hold the proposed params (Confidential); audit stays in `operationLog`.
 
+- `POST /tax-refunds/auto-drafts` (`backend/src/routes/taxRefunds.js`) is ADMIN/FINANCE only. `taxRefundDraftService.js` never deletes: `replaceExisting` updates a DRAFT in place (id/refundNo kept) and rejects any APPLIED/APPROVED/REFUNDED/REJECTED row with 409 before writing; VOID declarations are excluded; refundableAmount = linked CNY tax-inclusive purchase cost ÷ (1+VAT) × `HsCode.refundRate` (no import-tariff fallback, no USD FOB; missing linkage gives 0 with an UNVERIFIED_PURCHASE_BASIS note); refundNo is the day's max sequence + 1 inside the transaction with P2002 retry.
+
 - 报关自动生成只允许原子替换 DRAFT，保留单据 ID 与编号；已放行等业务状态必须拒绝替换（`backend/src/services/customsDeclarationDraftService.js`）。出货按自有装箱行与采购来源扣减合格库存，重复保存相同业务资料不使退税确认失效。
 
 - Agent 普通与流式入口必须检查 SDK query 的终止结果（`backend/src/services/openAgentService.js`）；上游错误返回 503/SSE error，不写入成功回放，不自动重试。

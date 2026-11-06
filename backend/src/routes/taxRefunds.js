@@ -23,7 +23,7 @@ router.get('/workbench/:salesContractId/invoice-verification', taxRefundControll
 router.get('/', withPaginationValidation, taxRefundController.list);
 router.post(
   '/auto-drafts',
-  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  roleAuth('ADMIN', 'FINANCE'),
   taxRefundController.generateTaxRefundDrafts,
 );
 router.post(
