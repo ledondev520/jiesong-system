@@ -132,3 +132,20 @@ test('contractDocService: CONTRACT_DOC_TEMPLATE_PATH 控制模板读写位置', 
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('generatePurchaseContract: 高压缩比模板在 AdmZip 解压前被拒绝', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'contract-bomb-'));
+  const templatePath = path.join(dir, 'bomb.docx');
+  const zip = new AdmZip();
+  zip.addFile('word/document.xml', Buffer.alloc(8 * 1024 * 1024));
+  zip.writeZip(templatePath);
+  const previous = process.env.CONTRACT_DOC_TEMPLATE_PATH;
+  process.env.CONTRACT_DOC_TEMPLATE_PATH = templatePath;
+  try {
+    const { generatePurchaseContract } = require('./contractDocService');
+    await assert.rejects(() => generatePurchaseContract(contractFixture), (e) => /Office 文件/.test(e.message));
+  } finally {
+    if (previous === undefined) delete process.env.CONTRACT_DOC_TEMPLATE_PATH; else process.env.CONTRACT_DOC_TEMPLATE_PATH = previous;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -9,6 +9,7 @@
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const XLSX = require('xlsx');
+const { assertSafeOfficeArchive, assertSafeWorksheetRange } = require('../utils/tabularImport');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { roundMoney } = require('../utils/money');
@@ -283,6 +284,7 @@ const worksheetHeaderValues = (worksheet, rowLimit = 5, columnLimit = 10) => {
  */
 const parseStatementBundleBuffer = async (buffer) => {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw createError('会计报表文件为空', 400);
+  assertSafeOfficeArchive(buffer);
   const workbook = new ExcelJS.Workbook();
   try {
     await workbook.xlsx.load(buffer);
@@ -317,12 +319,15 @@ const parseSheetRows = (buffer, sheetName, label) => {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) throw createError(`${label}文件为空`, 400);
   let workbook;
   try {
+    assertSafeOfficeArchive(buffer);
     workbook = XLSX.read(buffer, { type: 'buffer', raw: true, cellDates: true });
-  } catch {
+  } catch (error) {
+    if (error.statusCode === 400 && /Office 文件/.test(error.message)) throw error;
     throw createError(`无法解析${label}文件`, 400);
   }
   const actualSheetName = workbook.SheetNames.find((name) => name.trim() === sheetName);
   if (!actualSheetName) throw createError(`${label}文件缺少「${sheetName}」Sheet`, 400);
+  assertSafeWorksheetRange(workbook.Sheets[actualSheetName]); // 只拒绝，不裁剪：保留物理行号
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[actualSheetName], {
     header: 1,
     defval: null,
@@ -434,6 +439,7 @@ const parseStatementBuffer = async (buffer) => {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw createError('会计报表文件为空', 400);
   }
+  assertSafeOfficeArchive(buffer);
   const workbook = new ExcelJS.Workbook();
   try {
     await workbook.xlsx.load(buffer);

@@ -408,3 +408,14 @@ test('getPeriodDetail: 只读经营视图在查询前排除账簿行及来源文
   await require('./financialStatementsService').getPeriodDetail(2026, 6, db, { includeEvidence: false });
   assert.deepEqual(query.include, { balanceSheet: true, incomeStatement: true, cashFlowStatement: true });
 });
+
+test('previewFromBuffer: 高压缩比 ZIP 在 ExcelJS 解压前被拒绝', async () => {
+  const AdmZip = require('adm-zip');
+  const zip = new AdmZip();
+  zip.addFile('xl/worksheets/sheet1.xml', Buffer.alloc(8 * 1024 * 1024));
+  const service = require('./financialStatementsService');
+  await assert.rejects(
+    () => service.previewFromBuffer(zip.toBuffer(), 2026, 7, '2026年7账期', { financialPeriod: { findUnique: async () => null } }),
+    (e) => e.statusCode === 400 && /Office 文件/.test(e.message),
+  );
+});
