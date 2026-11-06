@@ -24,7 +24,7 @@ const { buildLoadingPlanAsync, checkUtilisation, evaluateShipmentReadinessAsync 
 const { getContainerSpec } = require('./containerSpecs');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
 const { buildDerivedSalesAmountUpdate, getEffectiveSalesContractTotal } = require('./salesContractAmount');
-const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
+const { getSalesCargoState, assertSalesContractDeletable, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
 
 const READY_PURCHASE_STATUSES = Object.freeze([
   'READY',
@@ -270,6 +270,7 @@ const updateSalesContract = async (id, data = {}) => {
 
 const removeSalesContract = async (id) => prisma.$transaction(async (tx) => {
   assertSalesCargoMutable(await getSalesCargoState(tx, id));
+  await assertSalesContractDeletable(tx, id);
   await tx.salesContract.delete({ where: { id } });
 });
 

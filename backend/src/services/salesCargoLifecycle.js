@@ -32,6 +32,23 @@ const assertSalesCargoMutable = (contract) => {
   }
 };
 
+// 删除出口合同前：已有收款、报关、核销、退税、装箱单核对、附件或银行/发票关联的合同不可删（否则 Payment 被 SetNull 成孤儿、关联悬空）。
+const assertSalesContractDeletable = async (tx, id) => {
+  const [payments, customs, forex, refunds, checks, files, bank, invoices] = await Promise.all([
+    tx.payment.count({ where: { salesContractId: id } }),
+    tx.customsDeclaration.count({ where: { salesContractId: id } }),
+    tx.forexVerification.count({ where: { salesContractId: id } }),
+    tx.taxRefund.count({ where: { salesContractId: id } }),
+    tx.packingListCheck.count({ where: { salesContractId: id } }),
+    tx.salesContractFile.count({ where: { salesContractId: id } }),
+    tx.bankTransaction.count({ where: { matchedContractId: id, matchedContractType: 'SALES' } }),
+    tx.invoiceRecord.count({ where: { matchedContractId: id, matchedContractType: 'SALES' } }),
+  ]);
+  if (payments + customs + forex + refunds + checks + files + bank + invoices > 0) {
+    throw createError('已有收款、报关、核销、退税、装箱单核对、附件、银行流水或发票关联的合同不可删除，请改为取消', 409);
+  }
+};
+
 const SOURCE_LOCKED_PACKING_FIELDS = Object.freeze([
   'quantity',
   'boxes',
@@ -87,4 +104,4 @@ const assertSalesCargoUpdate = (contract, item, data) => {
   }
 };
 
-module.exports = { isSalesCargoLocked, getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate };
+module.exports = { assertSalesContractDeletable, isSalesCargoLocked, getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate };
