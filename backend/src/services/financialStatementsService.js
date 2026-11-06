@@ -439,6 +439,7 @@ const parseStatementBuffer = async (buffer) => {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw createError('会计报表文件为空', 400);
   }
+  assertSafeOfficeArchive(buffer);
   const workbook = new ExcelJS.Workbook();
   try {
     await workbook.xlsx.load(buffer);
