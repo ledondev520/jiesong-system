@@ -42,7 +42,7 @@ const routeLabelMap: Record<string, string> = {
   sales: "出口订单",
   orders: "出口订单",
   quotes: "报价",
-  customers: "客户",
+  customers: "客户与门店",
   suppliers: "供应商",
   products: "商品",
   inventory: "库存",

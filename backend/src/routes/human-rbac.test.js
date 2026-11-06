@@ -25,7 +25,8 @@ test('finance: 写路由仅 ADMIN/FINANCE，付款登记按类型限角色，WAR
     assert.deepEqual(rolesOf(finance, m, p), ['ADMIN', 'FINANCE'], p);
   }
   assert.deepEqual(rolesOf(finance, 'post', '/payments'), ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE']);
-  for (const p of ['/payments', '/payables', '/receivables', '/stats', '/payment-trends', '/overdue-receivables', '/unallocated-payments', '/unmatched', '/contracts-for-match']) {
+  assert.deepEqual(rolesOf(finance, 'get', '/unmatched'), ['ADMIN', 'FINANCE', 'BOSS']); // 返回银行流水
+  for (const p of ['/payments', '/payables', '/receivables', '/stats', '/payment-trends', '/overdue-receivables', '/unallocated-payments', '/contracts-for-match']) {
     const roles = rolesOf(finance, 'get', p);
     assert.ok(roles && !roles.includes('WAREHOUSE'), p);
   }

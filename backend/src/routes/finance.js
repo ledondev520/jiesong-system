@@ -49,7 +49,7 @@ const bundleFields = [
 const router = Router();
 
 // 收款池分配/自动匹配保留 SALES（既有且有回归测试的业务流程）；PURCHASE/WAREHOUSE 移除
-// WAREHOUSE 无任何账务读权限；账期报表（含工资汇总）仅 ADMIN/FINANCE/BOSS
+// WAREHOUSE 无任何账务读权限；账期报表（含工资汇总）与 /unmatched（含银行流水）仅 ADMIN/FINANCE/BOSS
 const financeRead = roleAuth('ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE');
 const statementsRead = roleAuth('ADMIN', 'FINANCE', 'BOSS');
 // 付款登记：财务/管理员不限；采购只能登记应付付款，销售只能登记应收收款
@@ -176,7 +176,7 @@ router.post(
 );
 
 // GET /api/v1/finance/unmatched - 获取未匹配项列表
-router.get('/unmatched', financeRead, withPaginationValidation, financeMatchController.getUnmatched);
+router.get('/unmatched', statementsRead, withPaginationValidation, financeMatchController.getUnmatched);
 
 // GET /api/v1/finance/contracts-for-match - 获取可用于匹配的合同列表
 router.get('/contracts-for-match', financeRead, financeMatchController.listContracts);
