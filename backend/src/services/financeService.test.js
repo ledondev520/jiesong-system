@@ -14,11 +14,11 @@ test('收付款记录自动结清已收货/已到港合同，金额差异重新�
     ['purchase', 'RECEIVED', 100, 'COMPLETED'], ['purchase', 'RECEIVED', 50, 'RECEIVED'],
     ['purchase', 'SIGNED', 100, 'SIGNED'], ['purchase', 'COMPLETED', 90, 'RECEIVED'],
     ['sales', 'ARRIVED', 100, 'COMPLETED'], ['sales', 'SHIPPED', 100, 'SHIPPED'],
-    ['sales', 'COMPLETED', 110, 'ARRIVED'], ['sales', 'ARRIVED', 0, 'ARRIVED'],
+    ['sales', 'COMPLETED', 110, 'ARRIVED'], 
   ];
   for (const [kind, initialStatus, amount, expected] of cases) {
     let status = initialStatus;
-    const model = { update: async ({ data }) => { status = data.status || status; return { status, totalAmount: 100, ...data }; } };
+    const model = { findUnique: async () => ({ status: 'SIGNED' }), update: async ({ data }) => { status = data.status || status; return { status, totalAmount: 100, ...data }; } };
     t.mock.method(prisma, '$transaction', async fn => fn({
       payment: { create: async ({ data }) => ({ id: 'test-payment', ...data }), aggregate: async () => ({ _sum: { amount } }) },
       purchaseContract: model, salesContract: model,
@@ -34,7 +34,7 @@ test('createPayment: 幂等键命中时直接返回历史记录', async () => {
   const originalTransaction = prisma.$transaction;
   let transactionCalled = false;
 
-  prisma.payment.findUnique = async () => ({ id: 'pay-1', amount: 100, idempotencyKey: 'idem-1' });
+  prisma.payment.findUnique = async () => ({ id: 'pay-1', type: 'PAYABLE', purchaseContractId: 'pc-1', amount: 100, currency: 'CNY', paymentDate: new Date('2026-03-05'), idempotencyKey: 'idem-1' });
   prisma.$transaction = async () => {
     transactionCalled = true;
     throw new Error('should not call transaction');
@@ -42,7 +42,7 @@ test('createPayment: 幂等键命中时直接返回历史记录', async () => {
 
   try {
     const result = await financeService.createPayment(
-      { type: 'PAYABLE', amount: 100, paymentDate: '2026-03-05' },
+      { type: 'PAYABLE', purchaseContractId: 'pc-1', amount: 100, paymentDate: '2026-03-05' },
       { idempotencyKey: ' idem-1 ' },
     );
 
@@ -75,6 +75,7 @@ test('createPayment: 新建付款并回写采购已付金额', async () => {
       },
     },
     purchaseContract: {
+      findUnique: async () => ({ status: 'SIGNED' }),
       update: async (args) => {
         purchaseUpdateArgs = args;
         return { id: args.where.id };
@@ -101,7 +102,7 @@ test('createPayment: 新建付款并回写采购已付金额', async () => {
 
     assert.equal(result.reused, false);
     assert.equal(createArgs.data.idempotencyKey, 'idem-2');
-    assert.deepEqual(aggregateArgs.where, { purchaseContractId: 'pc-1', currency: 'CNY' });
+    assert.deepEqual(aggregateArgs.where, { purchaseContractId: 'pc-1', currency: 'CNY', type: { in: ['PAYABLE', 'PAYABLE_PAYMENT', 'EXPENSE'] } });
     assert.deepEqual(purchaseUpdateArgs, {
       where: { id: 'pc-1' },
       data: { paidAmount: 888 },
@@ -133,6 +134,7 @@ test('createPayment: 销售合同已收金额只统计收入类 payment', async 
       },
     },
     salesContract: {
+      findUnique: async () => ({ status: 'SIGNED' }),
       update: async (args) => {
         salesUpdateArgs = args;
         return { id: args.where.id };
@@ -200,7 +202,7 @@ test('createPayment: 并发唯一键冲突时返回已创建记录', async () =>
     if (findUniqueCalls === 1) {
       return null;
     }
-    return { id: 'pay-3', amount: 200, idempotencyKey: 'idem-race' };
+    return { id: 'pay-3', type: 'PAYABLE', purchaseContractId: 'pc-1', amount: 200, currency: 'CNY', paymentDate: new Date('2026-03-05'), idempotencyKey: 'idem-race' };
   };
   prisma.$transaction = async () => {
     const error = new Error('unique constraint conflict');
@@ -210,7 +212,7 @@ test('createPayment: 并发唯一键冲突时返回已创建记录', async () =>
 
   try {
     const result = await financeService.createPayment(
-      { type: 'PAYABLE', amount: 200, paymentDate: '2026-03-05' },
+      { type: 'PAYABLE', purchaseContractId: 'pc-1', amount: 200, paymentDate: '2026-03-05' },
       { idempotencyKey: 'idem-race' },
     );
 
@@ -304,7 +306,7 @@ test('allocatePaymentToContracts: 兼容历史 INCOME 收款进行分配', async
       },
     },
     salesContract: {
-      findMany: async ({ where }) => where.id.in.map(id => ({ id })),
+      findMany: async ({ where }) => where.id.in.map(id => ({ id, contractNo: id, status: 'SHIPPED', totalAmount: 1e9, receivedAmount: 0 })),
       update: async (args) => ({ id: args.where.id }),
     },
   });
@@ -486,7 +488,7 @@ test('autoMatchUnallocatedPayments: 命中唯一合同号且金额一致时自�
       },
     },
     salesContract: {
-      findMany: async ({ where }) => where.id.in.map(id => ({ id })),
+      findMany: async ({ where }) => where.id.in.map(id => ({ id, contractNo: id, status: 'SHIPPED', totalAmount: 1e9, receivedAmount: 0 })),
       update: async (args) => ({ id: args.where.id }),
     },
   });
@@ -666,7 +668,7 @@ test('allocatePaymentToContracts: 部分分配后保留在收款池', async () =
       },
     },
     salesContract: {
-      findMany: async ({ where }) => where.id.in.map(id => ({ id })),
+      findMany: async ({ where }) => where.id.in.map(id => ({ id, contractNo: id, status: 'SHIPPED', totalAmount: 1e9, receivedAmount: 0 })),
       update: async (args) => ({ id: args.where.id }),
     },
   });
@@ -877,7 +879,7 @@ test('混装柜：收齐捷淞自有额即结清为 COMPLETED', async (t) => {
   let status = 'ARRIVED';
   t.mock.method(prisma, '$transaction', async fn => fn({
     payment: { create: async ({ data }) => ({ id: 'p', ...data }), aggregate: async () => ({ _sum: { amount: 600 } }) },
-    salesContract: { update: async ({ data }) => { if (data.status) status = data.status; return mixedCargo(); } },
+    salesContract: { findUnique: async () => ({ status: 'ARRIVED' }), update: async ({ data }) => { if (data.status) status = data.status; return mixedCargo(); } },
   }));
   await financeService.createPayment({ type: 'RECEIVABLE_COLLECTION', salesContractId: 'c', amount: 600, currency: 'USD', paymentDate: '2026-10-01' });
   assert.equal(status, 'COMPLETED');
@@ -893,4 +895,60 @@ test('getOverdueReceivables: 混装柜收齐自有额不逾期，未收齐按自
   ] };
   const rows = await financeService.getOverdueReceivables(30);
   assert.deepEqual(rows.map((r) => [r.id, r.totalAmount, r.unreceived]), [['open', 600, 500]]);
+});
+
+test('createPayment: 拒绝非正/非数字金额、无效日期、无效类型和错误合同关联', async () => {
+  const base = { type: 'PAYABLE', purchaseContractId: 'pc-1', amount: 100, paymentDate: '2026-03-05' };
+  const bad = [
+    { amount: -5000 }, { amount: 0 }, { amount: 'abc' }, { amount: NaN }, { amount: 10.123 },
+    { paymentDate: 'not-a-date' }, { type: 'RECEIVABLE_RECEIPT_ALLOCATED' }, { type: 'BOGUS' },
+    { salesContractId: 'sc-1' }, { purchaseContractId: undefined },
+    { type: 'RECEIVABLE', purchaseContractId: undefined }, { type: 'RECEIVABLE_RECEIPT', purchaseContractId: undefined, currency: 'CNY' },
+  ];
+  for (const override of bad) {
+    await assert.rejects(financeService.createPayment({ ...base, ...override }), (e) => e.statusCode === 400, JSON.stringify(override));
+  }
+});
+
+test('createPayment: 已取消或不存在的合同不能登记款项', async (t) => {
+  for (const found of [null, { status: 'CANCELLED' }]) {
+    t.mock.method(prisma, '$transaction', async (fn) => fn({ purchaseContract: { findUnique: async () => found } }));
+    await assert.rejects(
+      financeService.createPayment({ type: 'PAYABLE', purchaseContractId: 'pc-1', amount: 1, paymentDate: '2026-03-05' }),
+      (e) => e.statusCode === 400,
+    );
+  }
+});
+
+test('createPayment: 幂等键对应不同金额时 409，而不是静默返回他人记录', async (t) => {
+  const original = prisma.payment.findUnique;
+  t.after(() => { prisma.payment.findUnique = original; });
+  prisma.payment.findUnique = async () => ({
+    id: 'pay-1', type: 'PAYABLE', purchaseContractId: 'pc-1', amount: 100, currency: 'CNY', paymentDate: new Date('2026-03-05'),
+  });
+  await assert.rejects(
+    financeService.createPayment({ type: 'PAYABLE', purchaseContractId: 'pc-1', amount: 250, paymentDate: '2026-03-05' }, { idempotencyKey: 'k' }),
+    (e) => e.statusCode === 409,
+  );
+});
+
+test('allocatePaymentToContracts: 拒绝已取消合同和超出未收余额的分配', async (t) => {
+  for (const [target, message] of [
+    [{ status: 'CANCELLED', totalAmount: 1000, receivedAmount: 0 }, /已取消/],
+    [{ status: 'SHIPPED', totalAmount: 1000, receivedAmount: 900 }, /超出/],
+  ]) {
+    t.mock.method(prisma, '$transaction', async (fn) => fn({
+      $executeRaw: async () => 1,
+      payment: {
+        findUnique: async () => ({ id: 'r1', type: 'RECEIVABLE_RECEIPT', amount: 500, currency: 'USD' }),
+        aggregate: async () => ({ _sum: { amount: 0 } }),
+        create: async () => { throw new Error('must not create'); },
+      },
+      salesContract: { findMany: async () => [{ id: 'sc-1', contractNo: 'EXP1', ...target }] },
+    }));
+    await assert.rejects(
+      financeService.allocatePaymentToContracts('r1', [{ salesContractId: 'sc-1', amount: 500 }]),
+      (e) => e.statusCode === 400 && message.test(e.message),
+    );
+  }
 });

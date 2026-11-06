@@ -55,7 +55,8 @@ router.get('/payments', withPaginationValidation, financeController.listPayments
 // POST /api/v1/finance/payments - 创建付款记录
 router.post('/payments', [
   body('type').notEmpty().withMessage('付款类型不能为空'),
-  body('amount').notEmpty().withMessage('金额不能为空'),
+  body('amount').custom((v) => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(Number(v)) && Number(v) > 0)
+    .withMessage('金额必须是大于 0 的有效数字'),
   body('paymentDate').notEmpty().withMessage('付款日期不能为空'),
 ], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
   { entity: 'Payment', action: 'CREATE', model: 'payment' },
@@ -91,14 +92,14 @@ router.get('/unallocated-payments', financeController.listUnallocatedPayments);
 router.post(
   '/payments/auto-match',
   roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
-  financeController.autoMatchPayments
+  withAuditLog({ entity: 'Payment', action: 'AUTO_MATCH' }, financeController.autoMatchPayments)
 );
 
 // POST /api/v1/finance/payments/:id/allocate - 将收款分配到多张销售合同
 router.post(
   '/payments/:id/allocate',
   roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
-  financeController.allocatePayment
+  withAuditLog({ entity: 'Payment', action: 'ALLOCATE' }, financeController.allocatePayment)
 );
 
 // ==================== 财务报表路由 ====================
