@@ -44,6 +44,8 @@ const normalizeCategory = (value) => (
 
 // 已确认清单含财务核验行；所有附件入口复用现有 ADMIN/FINANCE 边界。
 const assertFileAccess = (file, user) => {
+  // Agent callers have no req.user; attachments are human-only.
+  if (!user?.role) throw createError('无权访问附件', 403);
   if (String(file?.description || '').startsWith('退税出货清单确认:')
     && !['ADMIN', 'FINANCE'].includes(user?.role)) {
     throw createError('仅管理员或财务可访问已确认退税清单', 403);

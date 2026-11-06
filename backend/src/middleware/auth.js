@@ -102,6 +102,26 @@ const authenticateAgent = async (req, rawToken) => {
   };
 };
 
+// Agent (jsa_) tokens are deny-by-default: only routes listed here may be reached, and each
+// still enforces its own accessAuth/capabilityAuth grant. Add a route here only together
+// with an explicit capability check on it. Human JWT/session auth is unaffected.
+const AGENT_ROUTES = [
+  ['GET', /^\/api\/v1\/search$/],
+  ['POST', /^\/api\/v1\/purchases$/],
+  ['PUT', /^\/api\/v1\/purchases\/[^/]+(\/production-details|\/invoice-numbers)?$/],
+  ['POST', /^\/api\/v1\/suppliers$/],
+  ['PUT', /^\/api\/v1\/suppliers\/[^/]+$/],
+  ['GET', /^\/mcp$/],
+  ['POST', /^\/mcp$/], // tools/call checks per-tool capabilities in routes/mcp.js
+];
+
+const assertAgentRouteAllowed = (req) => {
+  const path = `${req.baseUrl || ''}${req.path || ''}`.replace(/\/+$/, '') || '/';
+  if (!AGENT_ROUTES.some(([method, re]) => method === req.method && re.test(path))) {
+    throw createError('Agent 无权限执行此操作', 403);
+  }
+};
+
 /**
  * 职责：验证JWT Token，将用户信息附加到请求对象
  * 思路：
@@ -129,6 +149,7 @@ const authenticate = async (req, res, next) => {
 
     if (token.startsWith('jsa_')) {
       await authenticateAgent(req, token);
+      assertAgentRouteAllowed(req);
       return next();
     }
     

@@ -215,6 +215,7 @@ test('assertFileAccess: 财务确认附件权限共享，普通附件不增加�
   }
   for (const role of ['ADMIN', 'FINANCE']) assert.doesNotThrow(() => fileService.assertFileAccess(protectedFile, { role }));
   assert.doesNotThrow(() => fileService.assertFileAccess({ description: '普通合成附件' }, { role: 'SALES' }));
+  assert.throws(() => fileService.assertFileAccess({ description: '普通合成附件' }, undefined), error => error.statusCode === 403);
 });
 
 test('createFile: 清理失败不覆盖原始错误或泄露文件路径', async t => {
