@@ -4,6 +4,9 @@
  * Pos: 财务数据导入服务，处理银行对账单和发票清单解析（含标题行、币种账号和发票多明细聚合）
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * 导入在单个事务内去重并写入（失败整体回滚）；去重按文件日期范围/发票号分块查询，无 50000 行截断；
+ * 回显给浏览器的错误行必须经 maskRowForError（账号 Restricted）。
+ * shortcut: 去重仍是应用层（无 fingerprint 唯一索引、无迁移），并发导入靠 SQLite 事务串行化；要硬保证时再加唯一列迁移。
  */
 
 const xlsx = require('xlsx');
@@ -219,6 +222,16 @@ function normalizeMaskedAccount(value) {
   return suffix ? `****${suffix}` : null;
 }
 
+// Restricted: 导入错误回显给浏览器，整行里的账号只留末4位（字符串≥8位数字、或≥12位整数）
+function maskRowForError(row) {
+  const mask = (text) => text.replace(/\d(?=(?:\D*\d){4})/g, '*');
+  return (Array.isArray(row) ? row : []).map((cell) => {
+    if (typeof cell === 'string' && (cell.match(/\d/g) || []).length >= 8) return mask(cell);
+    if (typeof cell === 'number' && Number.isInteger(cell) && String(Math.abs(cell)).length >= 12) return mask(String(cell));
+    return cell;
+  });
+}
+
 function buildBankLegacyKey(record) {
   return [
     normalizeBankCurrency(record.currency),
@@ -319,7 +332,7 @@ function parseBankStatement(buffer, bankType) {
     const dateVal = colMap.date !== -1 ? row[colMap.date] : null;
     const txnDate = parseDateCell(dateVal);
     if (!txnDate) {
-      errors.push({ row: headerRowIndex + i + 2, reason: '无法识别的交易日期', data: row });
+      errors.push({ row: headerRowIndex + i + 2, reason: '无法识别的交易日期', data: maskRowForError(row) });
       continue;
     }
 
@@ -353,7 +366,7 @@ function parseBankStatement(buffer, bankType) {
     }
 
     if (amount === 0) {
-      errors.push({ row: headerRowIndex + i + 2, reason: '金额为0或无法解析', data: row });
+      errors.push({ row: headerRowIndex + i + 2, reason: '金额为0或无法解析', data: maskRowForError(row) });
       continue;
     }
 
@@ -578,105 +591,119 @@ function parseInvoices(buffer, invoiceType) {
 
 // ==================== 去重与导入 ====================
 
+const SQLITE_IN_CHUNK = 900; // SQLITE_MAX_VARIABLE_NUMBER 保守值
+const IMPORT_TX_OPTIONS = { timeout: 60000, maxWait: 10000 };
+
 async function importBankTransactions(records, fileName, importedBy) {
   if (!records || records.length === 0) {
     return { success: 0, failed: 0, skipped: 0, batchId: null, errors: [] };
   }
 
-  const existingTxns = await prisma.bankTransaction.findMany({
-    select: {
-      txnId: true,
-      txnDate: true,
-      amount: true,
-      counterpart: true,
-      balance: true,
-      summary: true,
-      currency: true,
-      accountNoMasked: true,
-    },
-    take: 50000,
-  });
-  const existingPreciseKeys = new Set();
-  const existingBalanceCounterpartKeys = new Set();
-  const legacyKeysWithoutAccount = new Set();
-  for (const t of existingTxns) {
-    existingPreciseKeys.add(buildBankPreciseKey(t));
-    const balanceCounterpartKey = buildBankBalanceCounterpartKey(t);
-    if (balanceCounterpartKey) existingBalanceCounterpartKeys.add(balanceCounterpartKey);
-    if (!normalizeMaskedAccount(t.accountNoMasked)) {
-      legacyKeysWithoutAccount.add(buildBankLegacyKey(t));
-    }
-  }
+  const normalizedRecords = records.map((r) => ({
+    ...r,
+    bankName: String(r.bankName || '').trim() || null,
+    accountNoMasked: normalizeMaskedAccount(r.accountNoMasked),
+    currency: normalizeBankCurrency(r.currency),
+  }));
+  const fileDates = normalizedRecords.map((r) => r.txnDate).filter(Boolean).sort();
 
-  const deduped = [];
-  const dupeErrors = [];
-  const seenPreciseKeys = new Set();
-  const seenBalanceCounterpartKeys = new Set();
-  const seenLegacyKeysWithoutAccount = new Set();
-  for (const r of records) {
-    const normalized = {
-      ...r,
-      bankName: String(r.bankName || '').trim() || null,
-      accountNoMasked: normalizeMaskedAccount(r.accountNoMasked),
-      currency: normalizeBankCurrency(r.currency),
+  // 去重、批次头与明细在同一事务内：失败整体回滚，不留孤儿批次或半个对账单
+  return prisma.$transaction(async (tx) => {
+    // 所有键都含 txnDate，只需读取本文件日期范围内的既有行（不再 take:50000 截断）
+    const existingTxns = fileDates.length === 0 ? [] : await tx.bankTransaction.findMany({
+      where: { txnDate: { gte: fileDates[0], lte: fileDates[fileDates.length - 1] } },
+      select: {
+        txnId: true, txnDate: true, amount: true, counterpart: true,
+        balance: true, summary: true, currency: true, accountNoMasked: true,
+      },
+    });
+    const existingPreciseCounts = new Map();
+    const existingBalanceCounterpartKeys = new Set();
+    const legacyWithoutAccount = new Map();
+    for (const t of existingTxns) {
+      const preciseKey = buildBankPreciseKey(t);
+      existingPreciseCounts.set(preciseKey, (existingPreciseCounts.get(preciseKey) || 0) + 1);
+      const balanceCounterpartKey = buildBankBalanceCounterpartKey(t);
+      if (balanceCounterpartKey) existingBalanceCounterpartKeys.add(balanceCounterpartKey);
+      if (!normalizeMaskedAccount(t.accountNoMasked)) {
+        const legacyKey = buildBankLegacyKey(t);
+        if (!legacyWithoutAccount.has(legacyKey)) legacyWithoutAccount.set(legacyKey, []);
+        legacyWithoutAccount.get(legacyKey).push({ txnId: String(t.txnId || '').trim(), balance: t.balance, used: false });
+      }
+    }
+
+    const deduped = [];
+    const dupeErrors = [];
+    const seenPreciseCounts = new Map();
+    const seenBalanceCounterpartKeys = new Set();
+    for (const normalized of normalizedRecords) {
+      const preciseKey = buildBankPreciseKey(normalized);
+      const balanceCounterpartKey = buildBankBalanceCounterpartKey(normalized);
+      const hasTxnId = Boolean(String(normalized.txnId || '').trim());
+      // 有流水号：同键即同一笔。无流水号：按出现序号比较，同日同额的两笔真实转账不会被合并，重导同一文件则全部跳过
+      const ordinal = seenPreciseCounts.get(preciseKey) || 0;
+      seenPreciseCounts.set(preciseKey, ordinal + 1);
+      const duplicateByPrecise = hasTxnId
+        ? (existingPreciseCounts.has(preciseKey) || ordinal > 0)
+        : ordinal < (existingPreciseCounts.get(preciseKey) || 0);
+      const duplicateByBalanceCounterpart = balanceCounterpartKey
+        && (existingBalanceCounterpartKeys.has(balanceCounterpartKey)
+          || seenBalanceCounterpartKeys.has(balanceCounterpartKey));
+      // 历史无账号行：仅在流水号/余额不矛盾时才视为同一笔，且每条历史行最多抵消一条新行
+      let duplicateByLegacy = false;
+      if (!duplicateByPrecise && !duplicateByBalanceCounterpart) {
+        const txnId = String(normalized.txnId || '').trim();
+        // 余额都有时以余额为准（跨来源流水号不同但余额轨迹一致仍是同一笔）；否则流水号不矛盾才算同一笔
+        const candidate = (legacyWithoutAccount.get(buildBankLegacyKey(normalized)) || []).find((e) => !e.used
+          && (e.balance != null && normalized.balance != null
+            ? Number(e.balance).toFixed(2) === Number(normalized.balance).toFixed(2)
+            : (!e.txnId || !txnId || e.txnId === txnId)));
+        if (candidate) { candidate.used = true; duplicateByLegacy = true; }
+      }
+
+      if (duplicateByPrecise || duplicateByBalanceCounterpart || duplicateByLegacy) {
+        dupeErrors.push({
+          reason: '重复银行流水',
+          data: { txnDate: normalized.txnDate, currency: normalized.currency, accountNoMasked: normalized.accountNoMasked },
+        });
+        continue;
+      }
+
+      deduped.push(normalized);
+      if (balanceCounterpartKey) seenBalanceCounterpartKeys.add(balanceCounterpartKey);
+    }
+
+    if (deduped.length === 0) {
+      return { success: 0, failed: 0, skipped: records.length, batchId: null, errors: dupeErrors };
+    }
+
+    const dates = deduped.map((r) => r.txnDate).filter(Boolean).sort();
+    const batch = await tx.financeDataBatch.create({
+      data: {
+        type: 'BANK_FLOW',
+        fileName: fileName || 'bank_import.xlsx',
+        recordCount: deduped.length,
+        dataStartDate: dates[0] || null,
+        dataEndDate: dates[dates.length - 1] || null,
+      },
+    });
+
+    const BATCH_SIZE = 50;
+    let createdCount = 0;
+    for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
+      const chunk = deduped.slice(i, i + BATCH_SIZE).map((r) => ({ ...r, batchId: batch.id }));
+      const result = await tx.bankTransaction.createMany({ data: chunk });
+      createdCount += result.count;
+    }
+
+    return {
+      success: createdCount,
+      failed: 0,
+      skipped: records.length - deduped.length,
+      batchId: batch.id,
+      errors: dupeErrors,
     };
-    const preciseKey = buildBankPreciseKey(normalized);
-    const balanceCounterpartKey = buildBankBalanceCounterpartKey(normalized);
-    const legacyKey = buildBankLegacyKey(normalized);
-    const duplicateByPrecise = existingPreciseKeys.has(preciseKey) || seenPreciseKeys.has(preciseKey);
-    const duplicateByBalanceCounterpart = balanceCounterpartKey
-      && (existingBalanceCounterpartKeys.has(balanceCounterpartKey)
-        || seenBalanceCounterpartKeys.has(balanceCounterpartKey));
-    const duplicateByLegacy = legacyKeysWithoutAccount.has(legacyKey)
-      || seenLegacyKeysWithoutAccount.has(legacyKey);
-
-    if (duplicateByPrecise || duplicateByBalanceCounterpart || duplicateByLegacy) {
-      dupeErrors.push({
-        reason: '重复银行流水',
-        data: { txnDate: normalized.txnDate, currency: normalized.currency, accountNoMasked: normalized.accountNoMasked },
-      });
-      continue;
-    }
-
-    deduped.push(normalized);
-    seenPreciseKeys.add(preciseKey);
-    if (balanceCounterpartKey) seenBalanceCounterpartKeys.add(balanceCounterpartKey);
-    if (!normalized.accountNoMasked) seenLegacyKeysWithoutAccount.add(legacyKey);
-  }
-
-  if (deduped.length === 0) {
-    return { success: 0, failed: 0, skipped: records.length, batchId: null, errors: dupeErrors };
-  }
-
-  const dates = deduped.map((r) => r.txnDate).filter(Boolean).sort();
-  const dataStartDate = dates[0] || null;
-  const dataEndDate = dates[dates.length - 1] || null;
-
-  const batch = await prisma.financeDataBatch.create({
-    data: {
-      type: 'BANK_FLOW',
-      fileName: fileName || 'bank_import.xlsx',
-      recordCount: deduped.length,
-      dataStartDate,
-      dataEndDate,
-    },
-  });
-
-  const BATCH_SIZE = 50;
-  let createdCount = 0;
-  for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
-    const chunk = deduped.slice(i, i + BATCH_SIZE).map((r) => ({ ...r, batchId: batch.id }));
-    const result = await prisma.bankTransaction.createMany({ data: chunk });
-    createdCount += result.count;
-  }
-
-  return {
-    success: createdCount,
-    failed: 0,
-    skipped: records.length - deduped.length,
-    batchId: batch.id,
-    errors: dupeErrors,
-  };
+  }, IMPORT_TX_OPTIONS);
 }
 
 async function importInvoiceRecords(records, fileName, importedBy) {
@@ -684,60 +711,64 @@ async function importInvoiceRecords(records, fileName, importedBy) {
     return { success: 0, failed: 0, skipped: 0, batchId: null, errors: [] };
   }
 
-  const existingInvs = await prisma.invoiceRecord.findMany({
-    select: { invCode: true, invNo: true },
-    take: 50000,
-  });
-  const existingKeys = new Set();
-  for (const inv of existingInvs) {
-    const key = `${inv.invCode || ''}|${inv.invNo || ''}`;
-    if (key !== '|') existingKeys.add(key);
-  }
-
-  const deduped = [];
-  const dupeErrors = [];
-  for (const r of records) {
-    const key = `${r.invCode || ''}|${r.invNo || ''}`;
-    if (key !== '|' && existingKeys.has(key)) {
-      dupeErrors.push({ reason: `重复发票: ${r.invCode || ''} ${r.invNo || ''}`, data: r });
-      continue;
+  return prisma.$transaction(async (tx) => {
+    // 只查本文件出现的发票号（分块），不再 take:50000 截断
+    const invNos = [...new Set(records.map((r) => r.invNo).filter(Boolean))];
+    const existingKeys = new Set();
+    for (let i = 0; i < invNos.length; i += SQLITE_IN_CHUNK) {
+      const rows = await tx.invoiceRecord.findMany({
+        where: { invNo: { in: invNos.slice(i, i + SQLITE_IN_CHUNK) } },
+        select: { invCode: true, invNo: true },
+      });
+      for (const inv of rows) {
+        const key = `${inv.invCode || ''}|${inv.invNo || ''}`;
+        if (key !== '|') existingKeys.add(key);
+      }
     }
-    deduped.push(r);
-  }
 
-  if (deduped.length === 0) {
-    return { success: 0, failed: 0, skipped: records.length, batchId: null, errors: dupeErrors };
-  }
+    const deduped = [];
+    const dupeErrors = [];
+    for (const r of records) {
+      const key = `${r.invCode || ''}|${r.invNo || ''}`;
+      if (key !== '|' && existingKeys.has(key)) {
+        dupeErrors.push({ reason: `重复发票: ${r.invCode || ''} ${r.invNo || ''}`, data: r });
+        continue;
+      }
+      if (key !== '|') existingKeys.add(key); // 同一工作簿内的重复发票也只入一条
+      deduped.push(r);
+    }
 
-  const dates = deduped.map((r) => r.invDate).filter(Boolean).sort();
-  const dataStartDate = dates[0] || null;
-  const dataEndDate = dates[dates.length - 1] || null;
+    if (deduped.length === 0) {
+      return { success: 0, failed: 0, skipped: records.length, batchId: null, errors: dupeErrors };
+    }
 
-  const batch = await prisma.financeDataBatch.create({
-    data: {
-      type: 'INVOICE',
-      fileName: fileName || 'invoice_import.xlsx',
-      recordCount: deduped.length,
-      dataStartDate,
-      dataEndDate,
-    },
-  });
+    const dates = deduped.map((r) => r.invDate).filter(Boolean).sort();
+    const batch = await tx.financeDataBatch.create({
+      data: {
+        type: 'INVOICE',
+        fileName: fileName || 'invoice_import.xlsx',
+        recordCount: deduped.length,
+        dataStartDate: dates[0] || null,
+        dataEndDate: dates[dates.length - 1] || null,
+      },
+    });
 
-  const BATCH_SIZE = 30;
-  let createdCount = 0;
-  for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
-    const chunk = deduped.slice(i, i + BATCH_SIZE).map((r) => ({ ...r, batchId: batch.id }));
-    const result = await prisma.invoiceRecord.createMany({ data: chunk });
-    createdCount += result.count;
-  }
+    const BATCH_SIZE = 30;
+    let createdCount = 0;
+    for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
+      const chunk = deduped.slice(i, i + BATCH_SIZE).map((r) => ({ ...r, batchId: batch.id }));
+      const result = await tx.invoiceRecord.createMany({ data: chunk });
+      createdCount += result.count;
+    }
 
-  return {
-    success: createdCount,
-    failed: 0,
-    skipped: records.length - deduped.length,
-    batchId: batch.id,
-    errors: dupeErrors,
-  };
+    return {
+      success: createdCount,
+      failed: 0,
+      skipped: records.length - deduped.length,
+      batchId: batch.id,
+      errors: dupeErrors,
+    };
+  }, IMPORT_TX_OPTIONS);
 }
 
 module.exports = {
