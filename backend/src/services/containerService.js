@@ -3,7 +3,7 @@ const prisma = require('../utils/prisma');
 const { defaultSpotRate } = require('./exportPricing');
 const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
-const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
+const { getSalesCargoState, assertSalesContractDeletable, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
 const { SALES_STATUS, normalizeSalesStatus } = require('./salesStateMachine');
 const { getContainerSpec } = require('./containerSpecs');
 const {
@@ -358,6 +358,7 @@ const update = async (id, data = {}) => {
 
 const remove = async (id) => prisma.$transaction(async (tx) => {
   assertSalesCargoMutable(await getSalesCargoState(tx, id));
+  await assertSalesContractDeletable(tx, id);
   await tx.salesContract.delete({ where: { id } });
 });
 

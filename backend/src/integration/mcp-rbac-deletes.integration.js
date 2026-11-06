@@ -233,4 +233,27 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     assert.equal(customs.canDelete, false);
     assert.match(customs.blockers.join(), /报关/);
   });
+  await t.test('sales/container delete: 409 once payments or bank matches exist; clean draft still deletes', async () => {
+    const make = async () => db.salesContract.create({ data: { contractNo: `DG-${Math.random().toString(36).slice(2, 9)}`, exchangeRate: 7 } });
+    const paid = await make();
+    const pay = await db.payment.create({ data: { type: 'RECEIVABLE_COLLECTION', amount: 10, paymentDate: new Date(), salesContractId: paid.id } });
+    const matched = await make();
+    const batch = await db.financeDataBatch.create({ data: { type: 'BANK_FLOW', fileName: 'synthetic-dg.csv', recordCount: 1 } });
+    await db.bankTransaction.create({ data: { batchId: batch.id, txnTime: '2026-01-01 10:00:00', txnDate: '2026-01-01', amount: 1, direction: 'IN', matchedContractId: matched.id, matchedContractType: 'SALES' } });
+    for (const base of ['/sales', '/containers']) {
+      for (const c of [paid, matched]) assert.equal((await send('DELETE', `${base}/${c.id}`, 'ADMIN')).status, 409, `${base} ${c.id}`);
+    }
+    assert.equal((await db.payment.findUnique({ where: { id: pay.id } })).salesContractId, paid.id);
+    const clean = await make();
+    assert.equal((await send('DELETE', `/sales/${clean.id}`, 'ADMIN')).status, 200);
+    assert.equal(await db.salesContract.findUnique({ where: { id: clean.id } }), null);
+  });
+
+  await t.test('purchase delete: refused when inventory references an item', async () => {
+    const supplier = await db.supplier.create({ data: { name: '合成库存供应商' } });
+    const c = await db.purchaseContract.create({ data: { contractNo: `DG-INV-${Math.random().toString(36).slice(2, 9)}`, supplierId: supplier.id } });
+    const item = await db.purchaseItem.create({ data: { purchaseContractId: c.id, productId: product.id, quantity: 1, unitPrice: 1, totalPrice: 1 } });
+    await db.inventory.create({ data: { productId: product.id, quantity: 1, status: 'INBOUND', purchaseItemId: item.id } });
+    assert.equal((await send('DELETE', `/purchases/${c.id}`, 'ADMIN')).status, 409);
+  });
 });

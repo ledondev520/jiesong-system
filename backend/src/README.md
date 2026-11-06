@@ -84,7 +84,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | importService.js | 历史CSV按非唯一名称检查重名，按id更新；单行事务提交后才计成功并更新缓存，失败回滚且不吞数据库异常，既有合同沿用销售出库约束 |
 | financeImportService.js | 银行流水与发票清单解析、识别标题行后的招商银行中英文币种和脱敏账号、按银行/币种/账号及余额轨迹跨来源去重、税务全量导出的数电发票号码识别、同票多明细聚合及批次写入 |
 | bankFlowService.js | 银行流水按币种与脱敏账号查询（空币种沿用人民币默认值）、人民币发票对账和美元到账汇总 |
-| financeMatchService.js | 银行流水/发票与购销合同匹配；人民币只匹配采购、美元收入只匹配销售；发票自动写入重验 PENDING，仅有效发票自动关联（红冲/负数留待人工），银行流水同样只改 PENDING 行，人工目标沿用有效且未取消的购销合同规则 |
+| financeMatchService.js | 银行流水/发票与购销合同匹配；人民币只匹配采购、美元收入只匹配销售；发票自动写入重验 PENDING，仅有效发票自动关联（红冲/负数留待人工）且只关联购方为本公司的采购合同（不再自动关联销售合同，避免人民币发票与美元合同按数值比对）；银行流水同样只改 PENDING 行并在批内递减合同余额，人工银行关联校验合同未取消及方向/币种（OUT→采购/CNY，IN→销售/USD），人工发票目标沿用有效且未取消的购销合同规则 |
 | invoiceRecordService.js | 发票分页、筛选后有效/红冲分类统计、销方汇总及完整发票号码批量精确查询；`VALID_INVOICE_WHERE`（正常且正数）为自动关联与 `findInvoicedPurchaseContractIds`（已开票合同集合）共用的有效发票口径 |
 | invoiceVerificationService.js | 出口退税候选发票的销方、价税合计、品名、状态只读一致性核验 |
 | financialStatementsService.js | 会计报表数字公式缓存/既有空值兼容与明确错误指引、科目余额/明细账同账期校验，单事务写入与下钻查询 |
