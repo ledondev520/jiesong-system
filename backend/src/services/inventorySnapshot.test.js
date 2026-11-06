@@ -139,6 +139,7 @@ test('FIFO拆分和销售回滚保留验货来源及原入库时间', async () =
     inventory: {
       findMany: async ({ where }) => where.status === 'INBOUND' ? [stock] : [child],
       update: async ({ where, data }) => { Object.assign(where.id === stock.id ? stock : child, data); return {}; },
+      updateMany: async ({ where, data }) => { Object.assign(where.id === stock.id ? stock : child, data); return { count: 1 }; },
       create: async ({ data }) => { child = { id: 'child-1', ...data }; return child; },
     },
   };
@@ -181,4 +182,22 @@ test('非自有零值拼柜行不参与自有库存数量校验', async () => {
   };
   assert.deepEqual((await applySalesOutStock(tx, 'synthetic-sale')).results, []);
   assert.equal(inventoryRead, false);
+});
+
+test('P0-9: 库存行被并发出货先占用（CAS 命中 0 行）时整笔拒绝 409，不改库存', async () => {
+  const stock = { id: 'inv-1', productId: 'p1', purchaseItemId: 'pi-1', quantity: 10, status: 'INBOUND', purchaseItem: { unitPrice: 100 } };
+  let wrote = false;
+  const tx = {
+    salesContract: { findUnique: async () => ({ id: 'sc-2', items: [{ id: 'si-1', productId: 'p1', quantity: 4 }], packingItems: [] }) },
+    inventory: {
+      findMany: async () => [stock],
+      updateMany: async ({ where }) => {
+        assert.deepEqual(where, { id: 'inv-1', status: 'INBOUND', salesItemId: null, quantity: 10 });
+        return { count: 0 };
+      },
+      create: async () => { wrote = true; return {}; },
+    },
+  };
+  await assert.rejects(() => applySalesOutStock(tx, 'sc-2'), error => error.statusCode === 409);
+  assert.equal(wrote, false);
 });

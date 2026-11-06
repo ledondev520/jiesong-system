@@ -1,6 +1,6 @@
 /**
  * Input: PrismaClient、库存/采购/销售模型
- * Output: 库存快照与库存出入库服务能力；自有货物无效数量拒绝登记发运
+ * Output: 库存快照与库存出入库服务能力；自有货物无效数量拒绝登记发运；FIFO 占用用条件更新（CAS），被并发出货先占则 409 回滚
  * Pos: 统一处理库存快照、采购入库建档和销售出库扣减，确保财务金额对齐
  */
 
@@ -156,6 +156,15 @@ const applyPurchaseInStock = async (tx, purchaseContractId) => {
   return { created: 0, skipped: summary.items.length };
 };
 
+// 条件更新（CAS）：库存行仍是读到时的 INBOUND/未占用/同数量才改，否则说明被并发出货占用，整笔回滚。
+const claimLot = async (tx, lot, data) => {
+  const res = await getDefaultSnapshotInput(tx).inventory.updateMany({
+    where: { id: lot.id, status: INVENTORY_STATUS.INBOUND, salesItemId: null, quantity: lot.quantity },
+    data,
+  });
+  if (res.count !== 1) throw createError('库存已被其他出货单占用，请重试', 409);
+};
+
 const allocateInboundInventory = async ({
   tx,
   productId,
@@ -219,24 +228,16 @@ const allocateInboundInventory = async ({
     const outboundUnit = item.unit || normalizedUnit || null;
 
     if (outQty >= available - 1e-9) {
-      await getDefaultSnapshotInput(tx).inventory.update({
-        where: { id: item.id },
-        data: {
-          salesItemId,
-          salesContractId,
-          status: INVENTORY_STATUS.OUTBOUND,
-          outboundAt: at,
-          unit: outboundUnit || undefined,
-          note: '销售出库',
-        },
+      await claimLot(tx, item, {
+        salesItemId,
+        salesContractId,
+        status: INVENTORY_STATUS.OUTBOUND,
+        outboundAt: at,
+        unit: outboundUnit || undefined,
+        note: '销售出库',
       });
     } else {
-      await getDefaultSnapshotInput(tx).inventory.update({
-        where: { id: item.id },
-        data: {
-          quantity: available - outQty,
-        },
-      });
+      await claimLot(tx, item, { quantity: available - outQty });
 
       await getDefaultSnapshotInput(tx).inventory.create({
         data: {

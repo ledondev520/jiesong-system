@@ -1,4 +1,5 @@
-/** 出口合同与装箱服务；表头局部保存保留省略字段，历史发运重放不重复扣库，发运后货物与出库保持一致。 */
+/** 出口合同与装箱服务；表头局部保存保留省略字段，历史发运重放不重复扣库，发运后货物与出库保持一致；发运/装箱导入先取 SQLite 写锁，已取消出口合同的装箱不占采购箱数。 */
+const { Prisma } = require('@prisma/client');
 const prisma = require('../utils/prisma');
 const { assertStoresOwnedBy } = require('./shared/storeOwnership');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
@@ -319,6 +320,10 @@ const updateSalesStatus = async (id, status, context = {}) => {
   let applyResult = null;
 
   const contract = await prisma.$transaction(async (tx) => {
+    // SQLite: take the writer lock before reading status/inventory so two concurrent shipments
+    // (also across workers) serialize instead of both reading the same INBOUND lots.
+    const locked = await tx.$executeRaw`UPDATE sales_contracts SET id = id WHERE id = ${id}`;
+    if (locked !== 1) throw createError('出口合同不存在', 404);
     const existingContract = await tx.salesContract.findUnique({
       where: { id },
       select: {
@@ -608,6 +613,9 @@ const getAllocatedTotals = (packingItems = []) => packingItems.reduce((sum, item
   volume: sum.volume + (Number(item.volume) || 0),
 }), { boxes: 0, quantity: 0, grossWeight: 0, netWeight: 0, volume: 0 });
 
+// 已取消出口合同的装箱行只留作历史，不再占用采购箱数。
+const NOT_CANCELLED_PACKING = { salesContract: { status: { not: 'CANCELLED' } } };
+
 const buildAvailablePurchaseItem = (source) => {
   const allocated = getAllocatedTotals(source.packingItems);
   const remaining = {
@@ -677,6 +685,7 @@ const getAvailablePurchaseItems = async (salesContractId) => {
         },
       },
       packingItems: {
+        where: NOT_CANCELLED_PACKING,
         select: {
           salesContractId: true,
           boxes: true,
@@ -721,6 +730,9 @@ const importPurchasePackingItems = async (salesContractId, selections = []) => {
   }
 
   return prisma.$transaction(async (tx) => {
+    // SQLite: lock the selected purchase items before reading allocated boxes so concurrent imports
+    // from different containers cannot both pack the same remaining boxes.
+    await tx.$executeRaw(Prisma.sql`UPDATE purchase_items SET id = id WHERE id IN (${Prisma.join(normalized.map((selection) => selection.purchaseItemId))})`);
     assertSalesCargoMutable(await getSalesCargoState(tx, salesContractId));
 
     const sources = await tx.purchaseItem.findMany({
@@ -739,6 +751,7 @@ const importPurchasePackingItems = async (salesContractId, selections = []) => {
           },
         },
         packingItems: {
+          where: NOT_CANCELLED_PACKING,
           select: {
             boxes: true,
             quantity: true,
