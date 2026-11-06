@@ -87,4 +87,4 @@ const assertSalesCargoUpdate = (contract, item, data) => {
   }
 };
 
-module.exports = { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate };
+module.exports = { isSalesCargoLocked, getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate };

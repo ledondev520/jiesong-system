@@ -23,7 +23,7 @@ const { allocatedQuantity } = require('../utils/stockAllocation');
 const { buildLoadingPlanAsync, checkUtilisation, evaluateShipmentReadinessAsync } = require('./shipmentReadinessService');
 const { getContainerSpec } = require('./containerSpecs');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
-const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
+const { buildDerivedSalesAmountUpdate, getEffectiveSalesContractTotal } = require('./salesContractAmount');
 const { getSalesCargoState, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
 
 const READY_PURCHASE_STATUSES = Object.freeze([
@@ -328,9 +328,13 @@ const updateSalesStatus = async (id, status, context = {}) => {
         receivedAmount: true,
         grossWeight: true,
         volume: true,
+        amountSource: true,
         packingItems: {
           select: {
             id: true,
+            totalPrice: true,
+            isOwnedByJiesong: true,
+            note: true,
             boxes: true,
             quantity: true,
             grossWeight: true,
@@ -363,7 +367,7 @@ const updateSalesStatus = async (id, status, context = {}) => {
     }
 
     const isTransition = normalizeSalesStatus(existingContract.status) !== targetStatus;
-    const settledStatus = getSalesSettlementStatus(targetStatus, existingContract.totalAmount, existingContract.receivedAmount);
+    const settledStatus = getSalesSettlementStatus(targetStatus, getEffectiveSalesContractTotal(existingContract), existingContract.receivedAmount);
     if (targetStatus === SALES_STATUS.COMPLETED && settledStatus !== SALES_STATUS.COMPLETED) {
       throw createError('销售款项尚未结清或存在金额差异，请先处理收款记录', 400);
     }

@@ -157,7 +157,7 @@ test('createPayment: 销售合同已收金额只统计收入类 payment', async 
       type: { in: ['RECEIVABLE', 'RECEIVABLE_COLLECTION', 'INCOME'] },
       currency: 'USD',
     });
-    assert.deepEqual(salesUpdateArgs, {
+    assert.deepEqual({ where: salesUpdateArgs.where, data: salesUpdateArgs.data }, {
       where: { id: 'sc-9' },
       data: { receivedAmount: 1234 },
     });
@@ -864,4 +864,33 @@ test('getReceivables: 先过滤所有权及未收金额，再分页，total为�
   const searched=await financeService.getReceivables({page:1,pageSize:1,skip:0,search:'EXP-6',outstandingOnly:true});
   assert.equal(searched.total,1);assert.equal(searched.receivables[0].id,'second');
  } finally {prisma.salesContract.findMany=original;prisma.salesContract.count=originalCount;}
+});
+
+// 混装柜：totalAmount 是整柜货值，捷淞自有额 = 扣除第三方装箱后；结清与逾期都按自有额。
+const mixedCargo = (extra = {}) => ({
+  status: 'ARRIVED', totalAmount: 1000, amountSource: 'DERIVED', receivedAmount: 0,
+  packingItems: [{ totalPrice: 600, isOwnedByJiesong: true }, { totalPrice: 400, isOwnedByJiesong: false }],
+  ...extra,
+});
+
+test('混装柜：收齐捷淞自有额即结清为 COMPLETED', async (t) => {
+  let status = 'ARRIVED';
+  t.mock.method(prisma, '$transaction', async fn => fn({
+    payment: { create: async ({ data }) => ({ id: 'p', ...data }), aggregate: async () => ({ _sum: { amount: 600 } }) },
+    salesContract: { update: async ({ data }) => { if (data.status) status = data.status; return mixedCargo(); } },
+  }));
+  await financeService.createPayment({ type: 'RECEIVABLE_COLLECTION', salesContractId: 'c', amount: 600, currency: 'USD', paymentDate: '2026-10-01' });
+  assert.equal(status, 'COMPLETED');
+});
+
+test('getOverdueReceivables: 混装柜收齐自有额不逾期，未收齐按自有额计未收', async (t) => {
+  const shippedAt = new Date('2026-01-01');
+  const original = prisma.salesContract;
+  t.after(() => { prisma.salesContract = original; });
+  prisma.salesContract = { findMany: async () => [
+    { id: 'paid', contractNo: 'A', shippedAt, ...mixedCargo({ receivedAmount: 599.995 }) },
+    { id: 'open', contractNo: 'B', shippedAt, ...mixedCargo({ receivedAmount: 100 }) },
+  ] };
+  const rows = await financeService.getOverdueReceivables(30);
+  assert.deepEqual(rows.map((r) => [r.id, r.totalAmount, r.unreceived]), [['open', 600, 500]]);
 });

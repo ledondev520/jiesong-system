@@ -7,7 +7,8 @@
 const ExcelJS = require('exceljs');
 const crypto = require('node:crypto');
 const prisma = require('../utils/prisma');
-const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
+const { getSalesCargoState, isSalesCargoLocked } = require('./salesCargoLifecycle');
+const { buildDerivedSalesAmountUpdate, isJiesongOwnedPackingItem } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
 const fileService = require('./fileService');
@@ -112,7 +113,9 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     if (!evidence.hsEvidence) lineIssues.push(makeIssue('MISSING_CURRENT_HS_EVIDENCE', 'error', '缺少当前税则证据', item.id, productName));
     if (refundRate === null || refundRate === undefined) lineIssues.push(makeIssue('MISSING_REFUND_RATE', 'error', '缺少当期退税率', item.id, productName));
     if (!declaration) lineIssues.push(makeIssue('MISSING_DECLARATION', 'error', '缺少已确认申报要素', item.id, productName));
-    if (purchaseCostCny <= 0) lineIssues.push(makeIssue('MISSING_PURCHASE_COST', 'error', '缺少采购成本', item.id, productName));
+    // 第三方货值不是捷淞采购，不要求采购成本，也不按公式重定价。
+    const owned = isJiesongOwnedPackingItem(item);
+    if (owned && purchaseCostCny <= 0) lineIssues.push(makeIssue('MISSING_PURCHASE_COST', 'error', '缺少采购成本', item.id, productName));
 
     const categoryIds = item.product?.categoryIds || [];
     const targetMarkup = markupFor(categoryIds, config);
@@ -165,6 +168,16 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       pricingSource = 'order';
       pricingReference = '订单已确认单价';
       roundingMethod = 'order_confirmed';
+    }
+    if (!owned && toNumber(item.unitPrice) > 0) {
+      unitPriceUsd = toNumber(item.unitPrice);
+      totalUsd = round(unitPriceUsd * quantity, 4);
+      pricingSource = 'declared';
+      pricingReference = '第三方货物沿用原申报单价';
+      roundingMethod = 'declared_unit_price';
+    }
+    if (!owned && !(unitPriceUsd > 0) && !(manualUnitPrice > 0)) {
+      lineIssues.push(makeIssue('MISSING_THIRD_PARTY_PRICE', 'error', '第三方货物缺少申报单价，请填写订单单价或人工确认单价', item.id, productName));
     }
     if (manualUnitPrice > 0) {
       unitPriceUsd = manualUnitPrice;
@@ -446,33 +459,42 @@ const buildExportPacketWorkbook = async (packet) => {
   return Buffer.from(arrayBuffer);
 };
 
-const generateExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
-  const config = loadPricingConfig();
-  const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
-  const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
-  if (!packet.ready) {
-    const first = packet.issues.find((issue) => issue.severity === 'error');
-    throw createError(`出口三单资料未完整：${first?.productName ? `${first.productName}：` : ''}${first?.message || '请先完成预检'}`, 400);
+// 把冻结快照的价格/金额/汇率写回订单；货物已锁定时调用方不得调用。
+const writePacketAmounts = async (tx, salesContractId, contract, packet) => {
+  for (const line of packet.lines) {
+    await tx.packingItem.update({
+      where: { id: line.packingItemId },
+      data: { unitPrice: line.unitPriceUsd, totalPrice: line.totalUsd },
+    });
+  }
+  await tx.salesContract.update({
+    where: { id: salesContractId },
+    data: {
+      ...buildDerivedSalesAmountUpdate(contract, packet.summary.totalUsd),
+      // 写回保持订单口径：报价转换的订单仍存计价汇率，其余存现汇。
+      exchangeRate: contract.quoteId ? packet.pricingPolicy.effectiveRate : packet.pricingPolicy.spotRate,
+    },
+  });
+};
+
+// 生成并归档工作簿；locked 时不改写装箱价格/合同金额，单证价格取账上存值。
+const persistExportPacket = async (prismaClient, salesContractId, sources, packet, locked) => {
+  if (locked) {
+    // 已发运：单证必须与账上价格一致，不用当前配置重算。
+    const stored = new Map(sources.contract.packingItems.map((item) => [item.id, item]));
+    packet.lines.forEach((line) => {
+      const item = stored.get(line.packingItemId);
+      line.unitPriceUsd = toNumber(item?.unitPrice);
+      line.totalUsd = toNumber(item?.totalPrice);
+    });
+    packet.summary.totalUsd = round(packet.lines.reduce((sum, line) => sum + line.totalUsd, 0), 4);
   }
   const buffer = await buildExportPacketWorkbook(packet);
   const dateTag = packet.documentDate.replace(/-/g, '');
   const fileName = `${packet.contractNo}_出口合同_商业发票_装箱单_${dateTag}.xlsx`;
   let file;
   await prismaClient.$transaction(async (tx) => {
-    for (const line of packet.lines) {
-      await tx.packingItem.update({
-        where: { id: line.packingItemId },
-        data: { unitPrice: line.unitPriceUsd, totalPrice: line.totalUsd },
-      });
-    }
-    await tx.salesContract.update({
-      where: { id: salesContractId },
-      data: {
-        ...buildDerivedSalesAmountUpdate(sources.contract, packet.summary.totalUsd),
-        // 写回保持订单口径：报价转换的订单仍存计价汇率，其余存现汇。
-        exchangeRate: sources.contract.quoteId ? packet.pricingPolicy.effectiveRate : packet.pricingPolicy.spotRate,
-      },
-    });
+    if (!locked) await writePacketAmounts(tx, salesContractId, sources.contract, packet);
     file = await fileService.archiveGeneratedFile({
       contractId: salesContractId,
       contractType: fileService.CONTRACT_TYPE.SALES,
@@ -482,12 +504,25 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
       category: fileService.CONTRACT_FILE_CATEGORY.SYSTEM_GENERATED_XLSX,
       description: `${EXPORT_PACKET_DESCRIPTION}:${buildPackingSourceVersion(sources.contract.packingItems.map((item) => {
         const line = packet.lines.find((entry) => entry.packingItemId === item.id);
-        return line ? { ...item, unitPrice: line.unitPriceUsd, totalPrice: line.totalUsd } : item;
+        return line && !locked ? { ...item, unitPrice: line.unitPriceUsd, totalPrice: line.totalUsd } : item;
       }))}`,
       prismaClient: tx,
     });
   });
   return { packet, file };
+};
+
+const generateExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
+  const config = loadPricingConfig();
+  // 发运后/已有出库记录：仍可生成单证（退税资料流程需要），但不得改写装箱价格与合同金额。
+  const locked = isSalesCargoLocked(await getSalesCargoState(prismaClient, salesContractId));
+  const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
+  const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
+  if (!packet.ready) {
+    const first = packet.issues.find((issue) => issue.severity === 'error');
+    throw createError(`出口三单资料未完整：${first?.productName ? `${first.productName}：` : ''}${first?.message || '请先完成预检'}`, 400);
+  }
+  return persistExportPacket(prismaClient, salesContractId, sources, packet, locked);
 };
 
 module.exports = {
@@ -502,6 +537,8 @@ module.exports = {
   configureSheet,
   evaluateExportPacket,
   generateExportPacket,
+  writePacketAmounts,
+  persistExportPacket,
   historicalQuoteAllowed,
   previewExportPacket,
 };
