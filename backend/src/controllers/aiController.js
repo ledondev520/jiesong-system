@@ -415,7 +415,7 @@ const executeAgentAction = async (req, res, next) => {
     if (!actionId || typeof actionId !== 'string') {
       throw createError('actionId 不能为空', 400);
     }
-    const result = await openAgentService.executeAction(actionId, req.user.id);
+    const result = await openAgentService.executeAction(actionId, req.user.id, { userRole: req.user.role });
     success(res, result);
   } catch (error) {
     next(error);
