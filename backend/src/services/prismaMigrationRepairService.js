@@ -1,6 +1,6 @@
 /**
  * Input: prisma、migration 目录
- * Output: Prisma migration 状态修复计划与执行
+ * Output: Prisma migration 状态修复计划与执行；findStrayMigrationEntries 拒绝 migrations 下会被 Prisma 静默忽略的散落文件/空目录
  * Pos: 后端服务层
  */
 
@@ -63,6 +63,15 @@ const readRepositoryMigrations = (migrationsDir) => {
     })
     .filter(Boolean);
 };
+
+// Prisma only runs <dir>/migration.sql. Flat .sql files (or dirs without migration.sql) are silently ignored,
+// which once left a payments FK fix unapplied (P0-10); only migration_lock.toml may sit beside the folders.
+const findStrayMigrationEntries = (migrationsDir) => fs.readdirSync(migrationsDir, { withFileTypes: true })
+  .filter((entry) => (entry.isDirectory()
+    ? !fs.existsSync(path.join(migrationsDir, entry.name, 'migration.sql'))
+    : entry.name !== 'migration_lock.toml'))
+  .map((entry) => entry.name)
+  .sort();
 
 const buildSchemaSnapshot = async (prisma) => {
   const tableRows = await prisma.$queryRawUnsafe(`SELECT name FROM sqlite_master WHERE type='table'`);
@@ -178,6 +187,7 @@ const applyMigrationRepairPlan = async (prisma, plan = []) => {
 module.exports = {
   REPAIR_RULES,
   readRepositoryMigrations,
+  findStrayMigrationEntries,
   buildSchemaSnapshot,
   loadMigrationRows,
   collectMigrationRepairPlan,

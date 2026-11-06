@@ -83,3 +83,26 @@ test('collectMigrationRepairPlan: 仅对已确认 no-op 且 schema effect 存在
     checksum: 'current-checksum',
   }]);
 });
+
+test('findStrayMigrationEntries: 只放行 migration.sql 目录与 migration_lock.toml，散落 .sql/空目录被拒', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { findStrayMigrationEntries } = require('./prismaMigrationRepairService');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'synthetic-migrations-'));
+  try {
+    fs.mkdirSync(path.join(dir, '20260101000000_ok'));
+    fs.writeFileSync(path.join(dir, '20260101000000_ok', 'migration.sql'), '-- ok');
+    fs.writeFileSync(path.join(dir, 'migration_lock.toml'), 'provider = "sqlite"');
+    assert.deepEqual(findStrayMigrationEntries(dir), []);
+    fs.writeFileSync(path.join(dir, '20260402133700_flat.sql'), '-- never applied');
+    fs.mkdirSync(path.join(dir, '20260102000000_empty'));
+    assert.deepEqual(findStrayMigrationEntries(dir), ['20260102000000_empty', '20260402133700_flat.sql']);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('仓库 prisma/migrations 没有会被 Prisma 忽略的散落文件（P0-10 回归）', () => {
+  const path = require('node:path');
+  const { findStrayMigrationEntries } = require('./prismaMigrationRepairService');
+  assert.deepEqual(findStrayMigrationEntries(path.resolve(__dirname, '../../prisma/migrations')), []);
+});
