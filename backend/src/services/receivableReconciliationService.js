@@ -14,6 +14,13 @@ const normalizeText = (value) => String(value || '').trim().toUpperCase().replac
 const extractContractNo = (value) => normalizeText(value).match(/EXP\d+/)?.[0] || null;
 const recognitionDate = (contract) => contract.shippedAt || contract.signedAt || null;
 const toIsoDate = (date) => date.toISOString().slice(0, 10);
+// A booking above this multiple of the median per-contract rate is a re-booked/duplicate outlier.
+const MAX_RATE_MULTIPLE = 1.5;
+const median = (values) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
 
 const buildReceivableReconciliation = ({
   period,
@@ -39,9 +46,30 @@ const buildReceivableReconciliation = ({
 
   const uniqueLedgerLines = new Map();
   const duplicateGroups = new Map();
-  ledgerEntries.forEach((entry) => {
+  const reversalByContract = new Map();
+  // Pair each red-ink row with one same-contract, same-amount booking first, so a reversed
+  // booking cancels exactly once and a re-booking with the same summary is not collapsed into it.
+  const paired = new Set();
+  ledgerEntries.forEach((neg, ni) => {
+    const negNo = extractContractNo(neg.summary);
+    if (!negNo || Number(neg.debit || 0) >= 0) return;
+    const pi = ledgerEntries.findIndex((pos, i) => (
+      !paired.has(i) && Number(pos.debit || 0) > 0 && extractContractNo(pos.summary) === negNo
+      && roundMoney(pos.debit) === roundMoney(-neg.debit)
+    ));
+    if (pi >= 0) { paired.add(pi); paired.add(ni); }
+  });
+  ledgerEntries.forEach((entry, index) => {
     const contractNo = extractContractNo(entry.summary);
-    if (!contractNo || Number(entry.debit || 0) <= 0) return;
+    if (!contractNo || paired.has(index)) return;
+    // Red-ink (negative debit) rows reverse an earlier booking; they are netted below, not deduplicated.
+    if (Number(entry.debit || 0) < 0) {
+      reversalByContract.set(contractNo, roundMoney((reversalByContract.get(contractNo) || 0) + Number(entry.debit)));
+      return;
+    }
+    if (Number(entry.debit || 0) === 0) return;
+    // voucherNumber is deliberately not in the key: same amount+summary in different vouchers is the
+    // double-booking this report exists to flag (owner-verified 7月 EXP260008); split lots show as a visible anomaly.
     const key = [
       contractNo,
       normalizeText(entry.summary),
@@ -68,12 +96,29 @@ const buildReceivableReconciliation = ({
       roundMoney((recognizedDebitByContract.get(entry.contractNo) || 0) + Number(entry.debit || 0)),
     );
   });
+  reversalByContract.forEach((reversal, contractNo) => {
+    if (!recognizedDebitByContract.has(contractNo)) return;
+    const net = roundMoney(recognizedDebitByContract.get(contractNo) + reversal);
+    if (net > 0) recognizedDebitByContract.set(contractNo, net);
+    else recognizedDebitByContract.delete(contractNo); // fully reversed: unbooked, reported as missing
+  });
   const periodContractByNo = new Map(periodContracts.map((contract) => [normalizeText(contract.contractNo), contract]));
   const recognizedPeriodContracts = Array.from(periodContractByNo.values()).filter((contract) => (
     recognizedDebitByContract.has(normalizeText(contract.contractNo))
   ));
-  const recognizedPeriodUsd = recognizedPeriodContracts.reduce((sum, contract) => sum + Number(contract.totalAmount || 0), 0);
-  const recognizedPeriodCny = recognizedPeriodContracts.reduce((sum, contract) => (
+  const contractRate = (contract) => (
+    Number(recognizedDebitByContract.get(normalizeText(contract.contractNo)) || 0) / Number(contract.totalAmount || 0)
+  );
+  const rated = recognizedPeriodContracts.filter((contract) => Number(contract.totalAmount || 0) > 0);
+  // shortcut: a median needs >=3 contracts to mean anything; below that nothing is excluded.
+  const mid = rated.length >= 3 ? median(rated.map(contractRate)) : null;
+  const rateOutlierContracts = mid === null ? [] : rated.filter((contract) => (
+    contractRate(contract) > mid * MAX_RATE_MULTIPLE || contractRate(contract) < mid / MAX_RATE_MULTIPLE
+  ));
+  // Outliers stay out of the rate so one bad voucher cannot skew every other contract.
+  const rateContracts = recognizedPeriodContracts.filter((contract) => !rateOutlierContracts.includes(contract));
+  const recognizedPeriodUsd = rateContracts.reduce((sum, contract) => sum + Number(contract.totalAmount || 0), 0);
+  const recognizedPeriodCny = rateContracts.reduce((sum, contract) => (
     sum + Number(recognizedDebitByContract.get(normalizeText(contract.contractNo)) || 0)
   ), 0);
   const effectiveExchangeRate = recognizedPeriodUsd > 0
@@ -122,6 +167,7 @@ const buildReceivableReconciliation = ({
       duplicateContracts: Array.from(new Set(duplicateLines.map((entry) => entry.contractNo))),
       missingDebitCny,
       missingContracts,
+      rateOutlierContracts: rateOutlierContracts.map((contract) => contract.contractNo),
     },
     assumptions: [
       '美元来款按客户累计核销，不强行分配到具体合同',
