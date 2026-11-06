@@ -477,15 +477,17 @@ const writePacketAmounts = async (tx, salesContractId, contract, packet) => {
   });
 };
 
-const generateExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
-  const config = loadPricingConfig();
-  // 发运后/已有出库记录：仍可生成单证（退税资料流程需要），但不得改写装箱价格与合同金额。
-  const locked = isSalesCargoLocked(await getSalesCargoState(prismaClient, salesContractId));
-  const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
-  const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
-  if (!packet.ready) {
-    const first = packet.issues.find((issue) => issue.severity === 'error');
-    throw createError(`出口三单资料未完整：${first?.productName ? `${first.productName}：` : ''}${first?.message || '请先完成预检'}`, 400);
+// 生成并归档工作簿；locked 时不改写装箱价格/合同金额，单证价格取账上存值。
+const persistExportPacket = async (prismaClient, salesContractId, sources, packet, locked) => {
+  if (locked) {
+    // 已发运：单证必须与账上价格一致，不用当前配置重算。
+    const stored = new Map(sources.contract.packingItems.map((item) => [item.id, item]));
+    packet.lines.forEach((line) => {
+      const item = stored.get(line.packingItemId);
+      line.unitPriceUsd = toNumber(item?.unitPrice);
+      line.totalUsd = toNumber(item?.totalPrice);
+    });
+    packet.summary.totalUsd = round(packet.lines.reduce((sum, line) => sum + line.totalUsd, 0), 4);
   }
   const buffer = await buildExportPacketWorkbook(packet);
   const dateTag = packet.documentDate.replace(/-/g, '');
@@ -510,6 +512,19 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
   return { packet, file };
 };
 
+const generateExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
+  const config = loadPricingConfig();
+  // 发运后/已有出库记录：仍可生成单证（退税资料流程需要），但不得改写装箱价格与合同金额。
+  const locked = isSalesCargoLocked(await getSalesCargoState(prismaClient, salesContractId));
+  const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
+  const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
+  if (!packet.ready) {
+    const first = packet.issues.find((issue) => issue.severity === 'error');
+    throw createError(`出口三单资料未完整：${first?.productName ? `${first.productName}：` : ''}${first?.message || '请先完成预检'}`, 400);
+  }
+  return persistExportPacket(prismaClient, salesContractId, sources, packet, locked);
+};
+
 module.exports = {
   EXPORT_PACKET_DESCRIPTION,
   buildPackingSourceVersion,
@@ -523,6 +538,7 @@ module.exports = {
   evaluateExportPacket,
   generateExportPacket,
   writePacketAmounts,
+  persistExportPacket,
   historicalQuoteAllowed,
   previewExportPacket,
 };

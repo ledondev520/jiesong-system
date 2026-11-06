@@ -12,6 +12,7 @@ const {
   evaluateExportPacket,
   historicalQuoteAllowed,
   writePacketAmounts,
+  persistExportPacket,
 } = require('./exportPacketService');
 
 const contract = (overrides = {}) => ({
@@ -206,4 +207,24 @@ test('writePacketAmounts 写回装箱价格与合同金额；锁定时调用方�
   const packet = { lines: [{ packingItemId: 'p1', unitPriceUsd: 13, totalUsd: 130 }], summary: { totalUsd: 130 }, pricingPolicy: { spotRate: 6.8, effectiveRate: 6.6 } };
   await writePacketAmounts(tx, 's1', { amountSource: 'DERIVED' }, packet);
   assert.deepEqual(writes, [['item', 'p1', { unitPrice: 13, totalPrice: 130 }], ['contract', { totalAmount: 130, exchangeRate: 6.8 }]]);
+});
+
+test('persistExportPacket 已锁定：不写 packingItem/合同，工作簿总额等于账上存值', async (t) => {
+  const fileService = require('./fileService');
+  t.mock.method(fileService, 'archiveGeneratedFile', async (args) => ({ id: 'f1', args }));
+  const writes = [];
+  const tx = { packingItem: { update: async () => writes.push('item') }, salesContract: { update: async () => writes.push('contract') } };
+  const prismaClient = { $transaction: async (fn) => fn(tx) };
+  const base = contract().packingItems[0];
+  const stored = { ...base, unitPrice: 99, totalPrice: 990 };
+  const sources = { contract: contract({ packingItems: [stored] }), readiness: readiness(), historicalQuotes: [] };
+  const packet = evaluateExportPacket(sources.contract, sources.readiness, [], options());
+  assert.notEqual(packet.lines[0].totalUsd, 990); // 当前配置重算值，与账上不同
+  const result = await persistExportPacket(prismaClient, 'sales-1', sources, packet, true);
+  assert.deepEqual(writes, []);
+  assert.equal(result.packet.summary.totalUsd, 990);
+  assert.equal(result.packet.lines[0].unitPriceUsd, 99);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await buildExportPacketWorkbook(result.packet));
+  assert.equal(workbook.getWorksheet('商业发票').getCell(10 + 1, 8).value, 990);
 });
