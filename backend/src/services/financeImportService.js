@@ -10,6 +10,7 @@
  */
 
 const xlsx = require('xlsx');
+const { assertSafeOfficeArchive, assertSafeWorksheetRange } = require('../utils/tabularImport');
 const prisma = require('../utils/prisma');
 const { roundMoney } = require('../utils/money');
 
@@ -288,9 +289,11 @@ function mergeInvoiceRecord(target, incoming) {
 // ==================== 银行对账单解析 ====================
 
 function parseBankStatement(buffer, bankType) {
+  assertSafeOfficeArchive(buffer);
   const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
+  assertSafeWorksheetRange(sheet);
   const template = BANK_TEMPLATES[bankType] || BANK_TEMPLATES.GENERIC;
   const headerRowIndex = findBankHeaderRow(sheet, template);
   const headers = normalizeHeaders(sheet, headerRowIndex);
@@ -429,9 +432,11 @@ function parseBankStatement(buffer, bankType) {
 // ==================== 发票解析 ====================
 
 function parseInvoices(buffer, invoiceType) {
+  assertSafeOfficeArchive(buffer);
   const workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
+  assertSafeWorksheetRange(sheet);
   const headerRowIndex = findInvoiceHeaderRow(sheet);
   const headers = normalizeHeaders(sheet, headerRowIndex);
 

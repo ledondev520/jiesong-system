@@ -7,6 +7,7 @@
  */
 
 const xlsx = require('xlsx');
+const { assertSafeOfficeArchive, assertSafeWorksheetRange } = require('../utils/tabularImport');
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');
 const { generateNextPurchaseContractNo, isPurchaseNumberConflict } = require('./purchaseContractNumberService');
@@ -224,12 +225,14 @@ const importPurchasesExcel = async (source, userId, options = {}) => {
   // optional blank. Cached numeric/empty-string formulas keep their real type.
   let workbook;
   try {
+    assertSafeOfficeArchive(buffer);
     workbook = xlsx.read(buffer, { type: 'buffer', sheetStubs: true });
   } catch {
     throw createError('Excel 文件损坏或格式不正确', 400);
   }
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
+  assertSafeWorksheetRange(worksheet);
   const rawData = xlsx.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
   if (rawData.length < 2) {
