@@ -35,7 +35,7 @@ test('generateTaxRefund: 按采购专票估算基数和当前退税率落库，�
       findUnique: async () => ({ id: 'sales-1', contractNo: 'XS260001', totalAmount: 99999 }),
     },
     taxRefund: {
-      count: async () => 0,
+      findMany: async () => [],
       create: async ({ data }) => {
         createdData = data;
         return { id: 'refund-1', ...data };
@@ -90,5 +90,64 @@ test('exportThreeFormsExcel: 合同不存在时返回受控 404 且不查询旧 
     });
   } finally {
     prisma.salesContract = originalSalesContract;
+  }
+});
+
+test('单据编号取最大后缀 + 1：删除中间单据后不撞号，且不误计其他合同前缀', async () => {
+  const originalTransaction = prisma.$transaction;
+  let created = null;
+  const tx = {
+    salesContract: { findUnique: async () => ({ id: 's1', contractNo: 'XS260001' }) },
+    taxRefund: {
+      // 已删除 -2，仍剩 base 与 -3；XS2600011 属于另一合同，不得计入
+      findMany: async () => [{ refundNo: 'TX260001' }, { refundNo: 'TX260001-3' }, { refundNo: 'TX2600011-9' }],
+      create: async ({ data }) => { created = data; return { id: 'r1', ...data }; },
+    },
+  };
+  prisma.$transaction = async (cb) => cb(tx);
+  try {
+    await generateTaxRefund({ salesContractId: 's1', customsDeclarationId: 'c', forexVerificationId: 'f', itemsPrepared: true, items: [] });
+    assert.equal(created.refundNo, 'TX260001-4');
+  } finally {
+    prisma.$transaction = originalTransaction;
+  }
+});
+
+test('单据编号遇 P2002 并发撞号整笔重试', async () => {
+  const originalTransaction = prisma.$transaction;
+  let attempts = 0;
+  const tx = {
+    salesContract: { findUnique: async () => ({ id: 's1', contractNo: 'XS260001' }) },
+    taxRefund: {
+      findMany: async () => (attempts > 1 ? [{ refundNo: 'TX260001' }] : []),
+      create: async ({ data }) => {
+        if (attempts === 1) throw Object.assign(new Error('dup'), { code: 'P2002' });
+        return { id: 'r1', ...data };
+      },
+    },
+  };
+  prisma.$transaction = async (cb) => { attempts++; return cb(tx); };
+  try {
+    const r = await generateTaxRefund({ salesContractId: 's1', customsDeclarationId: 'c', forexVerificationId: 'f', itemsPrepared: true, items: [] });
+    assert.equal(attempts, 2);
+    assert.equal(r.refundNo, 'TX260001-2');
+  } finally {
+    prisma.$transaction = originalTransaction;
+  }
+});
+
+test('exportThreeFormsExcel: 指定的单据 ID 必须属于该合同', async () => {
+  const names = ['salesContract', 'customsDeclaration', 'forexVerification', 'taxRefund'];
+  const originals = Object.fromEntries(names.map((n) => [n, prisma[n]]));
+  const wheres = {};
+  prisma.salesContract = { findUnique: async () => ({ contractNo: 'XS260001', totalAmount: 1 }) };
+  for (const n of names.slice(1)) prisma[n] = { findFirst: async (a) => { wheres[n] = a.where; return null; } };
+  try {
+    await exportThreeFormsExcel('s1', { customsDeclarationId: 'cd', forexId: 'fv', taxRefundId: 'tr' });
+    assert.deepEqual(wheres.customsDeclaration, { id: 'cd', salesContractId: 's1' });
+    assert.deepEqual(wheres.forexVerification, { id: 'fv', salesContractId: 's1' });
+    assert.deepEqual(wheres.taxRefund, { id: 'tr', salesContractId: 's1' });
+  } finally {
+    for (const n of names) prisma[n] = originals[n];
   }
 });

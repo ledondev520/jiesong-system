@@ -928,3 +928,28 @@ test('P0-9: 不存在的合同在写锁处即 404（updateSalesStatus 先取 SQL
   prisma.$executeRaw = async () => 0;
   await assert.rejects(() => salesService.updateSalesStatus('nope', 'SHIPPED'), error => error.statusCode === 404);
 });
+
+test('updatePackingItem: 局部更新不带 storeId 时不清空门店，显式 null 才清空', async () => {
+  const originalTransaction = prisma.$transaction;
+  const updates = [];
+  const tx = {
+    packingItem: {
+      findFirst: async () => ({ id: 'pk-1', salesContractId: 'sc-1', purchaseItemId: null, quantity: 10, unitPrice: 5 }),
+      update: async (args) => { updates.push(args.data); return { id: 'pk-1' }; },
+      aggregate: async () => ({ _sum: {} }),
+    },
+    salesContract: {
+      findUnique: async () => ({ id: 'sc-1', status: 'DRAFT', inventories: [], customerId: null }),
+      update: async () => ({ id: 'sc-1' }),
+    },
+  };
+  prisma.$transaction = async (cb) => cb(tx);
+  try {
+    await salesService.updatePackingItem('sc-1', 'pk-1', { note: '改备注' });
+    assert.equal(updates[0].storeId, undefined);
+    await salesService.updatePackingItem('sc-1', 'pk-1', { storeId: null });
+    assert.equal(updates[1].storeId, null);
+  } finally {
+    prisma.$transaction = originalTransaction;
+  }
+});
