@@ -5,6 +5,7 @@
  */
 
 const test = require('node:test');
+const xlsx = require('xlsx');
 const assert = require('node:assert/strict');
 
 const financeImportService = require('./financeImportService');
@@ -198,7 +199,10 @@ test('importBankTransactions: 跨币种不误判重复、票据号复用不误�
   const originalFindMany = prisma.bankTransaction.findMany;
   const originalCreateMany = prisma.bankTransaction.createMany;
   const originalBatchCreate = prisma.financeDataBatch.create;
+  const originalTransaction = prisma.$transaction;
+  prisma.$transaction = async (fn) => fn(prisma);
   t.after(() => {
+    prisma.$transaction = originalTransaction;
     prisma.bankTransaction.findMany = originalFindMany;
     prisma.bankTransaction.createMany = originalCreateMany;
     prisma.financeDataBatch.create = originalBatchCreate;
@@ -258,7 +262,10 @@ test('importBankTransactions: PDF与Excel流水号摘要不同但余额轨迹一
   const prisma = require('../utils/prisma');
   const originalFindMany = prisma.bankTransaction.findMany;
   const originalBatchCreate = prisma.financeDataBatch.create;
+  const originalTransaction = prisma.$transaction;
+  prisma.$transaction = async (fn) => fn(prisma);
   t.after(() => {
+    prisma.$transaction = originalTransaction;
     prisma.bankTransaction.findMany = originalFindMany;
     prisma.financeDataBatch.create = originalBatchCreate;
   });
@@ -297,4 +304,82 @@ test('importBankTransactions: PDF与Excel流水号摘要不同但余额轨迹一
   assert.strictEqual(result.success, 0);
   assert.strictEqual(result.skipped, 1);
   assert.strictEqual(result.batchId, null);
+});
+
+test('importBankTransactions: 同日同额两笔无流水号转账都入库，重导同一文件全部跳过；历史无账号行每条只抵消一条', async (t) => {
+  const prisma = require('../utils/prisma');
+  const saved = [prisma.$transaction, prisma.bankTransaction.findMany, prisma.bankTransaction.createMany, prisma.financeDataBatch.create];
+  t.after(() => { [prisma.$transaction, prisma.bankTransaction.findMany, prisma.bankTransaction.createMany, prisma.financeDataBatch.create] = saved; });
+  prisma.$transaction = async (fn) => fn(prisma);
+  let store = [];
+  prisma.bankTransaction.findMany = async () => store.map((r) => ({ ...r }));
+  prisma.bankTransaction.createMany = async ({ data }) => { store = store.concat(data); return { count: data.length }; };
+  prisma.financeDataBatch.create = async () => ({ id: 'b' });
+  const row = { txnDate: '2026-05-01', txnTime: '2026-05-01', amount: -20000, counterpart: '示例供应商', direction: 'OUT', currency: 'CNY', accountNoMasked: '****1234', balance: null, txnId: null };
+  const first = await financeImportService.importBankTransactions([row, { ...row }], 'a.xlsx', 't');
+  assert.strictEqual(first.success, 2);
+  const again = await financeImportService.importBankTransactions([row, { ...row }], 'a.xlsx', 't');
+  assert.strictEqual(again.success, 0);
+  assert.strictEqual(again.skipped, 2);
+
+  // 历史一条无账号行只能抵消新文件里的一条，另一笔同日同额转账保留
+  store = [{ ...row, accountNoMasked: null }];
+  const legacy = await financeImportService.importBankTransactions([row, { ...row }], 'b.xlsx', 't');
+  assert.strictEqual(legacy.success, 1);
+  assert.strictEqual(legacy.skipped, 1);
+});
+
+test('importBankTransactions: 去重不受 50000 行截断，按文件日期范围查询', async (t) => {
+  const prisma = require('../utils/prisma');
+  const saved = [prisma.$transaction, prisma.bankTransaction.findMany];
+  t.after(() => { [prisma.$transaction, prisma.bankTransaction.findMany] = saved; });
+  prisma.$transaction = async (fn) => fn(prisma);
+  let args;
+  prisma.bankTransaction.findMany = async (a) => { args = a; return []; };
+  prisma.financeDataBatch.create = async () => ({ id: 'b' });
+  prisma.bankTransaction.createMany = async ({ data }) => ({ count: data.length });
+  await financeImportService.importBankTransactions([{ txnDate: '2026-05-02', amount: 1, counterpart: 'x', currency: 'CNY', txnId: 'T1' }], 'a.xlsx', 't');
+  assert.strictEqual(args.take, undefined);
+  assert.deepStrictEqual(args.where.txnDate, { gte: '2026-05-02', lte: '2026-05-02' });
+});
+
+test('importBankTransactions / importInvoiceRecords: 任一块写入失败整体回滚由事务承担（写入走 tx 客户端）', async (t) => {
+  const prisma = require('../utils/prisma');
+  const saved = prisma.$transaction;
+  t.after(() => { prisma.$transaction = saved; });
+  let used = 0;
+  prisma.$transaction = async (fn, opts) => { used += 1; assert.ok(opts.timeout >= 60000); return fn({
+    bankTransaction: { findMany: async () => [], createMany: async () => { throw new Error('boom'); } },
+    invoiceRecord: { findMany: async () => [], createMany: async () => { throw new Error('boom'); } },
+    financeDataBatch: { create: async () => ({ id: 'b' }) },
+  }); };
+  await assert.rejects(financeImportService.importBankTransactions([{ txnDate: '2026-05-02', amount: 1, counterpart: 'x', currency: 'CNY', txnId: 'T1' }], 'a', 't'), /boom/);
+  await assert.rejects(financeImportService.importInvoiceRecords([{ invCode: 'C', invNo: '1', invDate: '2026-05-02' }], 'a', 't'), /boom/);
+  assert.strictEqual(used, 2);
+});
+
+test('importInvoiceRecords: 同一工作簿内重复发票只入一条', async (t) => {
+  const prisma = require('../utils/prisma');
+  const saved = prisma.$transaction;
+  t.after(() => { prisma.$transaction = saved; });
+  let created = [];
+  prisma.$transaction = async (fn) => fn({
+    invoiceRecord: { findMany: async () => [], createMany: async ({ data }) => { created = created.concat(data); return { count: data.length }; } },
+    financeDataBatch: { create: async () => ({ id: 'b' }) },
+  });
+  const r = { invCode: 'C1', invNo: '001', invDate: '2026-05-02' };
+  const res = await financeImportService.importInvoiceRecords([r, { ...r }], 'a', 't');
+  assert.strictEqual(res.success, 1);
+  assert.strictEqual(res.skipped, 1);
+});
+
+test('parseBankStatement: 错误行回显只保留账号末4位', () => {
+  const wb = xlsx.utils.book_new();
+  const data = [['交易日期', '收入', '支出', '对方户名', '付款账号'], ['不是日期', 100, '', '示例公司', '6222020200112233445']];
+  xlsx.utils.book_append_sheet(wb, xlsx.utils.aoa_to_sheet(data), 'Sheet1');
+  const result = financeImportService.parseBankStatement(xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' }), 'GENERIC');
+  assert.strictEqual(result.errors.length, 1);
+  const text = JSON.stringify(result.errors);
+  assert.ok(!text.includes('6222020200112233445'));
+  assert.ok(text.includes('***************3445'));
 });
