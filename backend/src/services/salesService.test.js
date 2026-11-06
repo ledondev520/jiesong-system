@@ -23,12 +23,15 @@ const salesService = require('./salesService');
 // 单元测试只运行合成事务桩；真实事务/SQLite 的一致性由 sales-cargo-lifecycle.integration.js 验证。
 const baseTransaction = prisma.$transaction;
 const baseSalesFindUnique = prisma.salesContract.findUnique;
+const baseExecuteRaw = prisma.$executeRaw;
 test.beforeEach(() => {
   prisma.$transaction = async callback => callback(prisma);
+  prisma.$executeRaw = async () => 1;
   prisma.salesContract.findUnique = async () => ({ id: 'sc-1', status: 'DRAFT', inventories: [] });
 });
 test.afterEach(() => {
   prisma.$transaction = baseTransaction;
+  prisma.$executeRaw = baseExecuteRaw;
   prisma.salesContract.findUnique = baseSalesFindUnique;
 });
 const inventorySnapshot = require('./inventorySnapshot');
@@ -58,7 +61,7 @@ test('登记到港后保留出库，已收齐合同自动完成；未收齐不�
   let currentStatus = 'SHIPPED';
   let packingItems = [];
   let reverted = false;
-  prisma.$transaction = async fn => fn({ salesContract: {
+  prisma.$transaction = async fn => fn({ $executeRaw: async () => 1, salesContract: {
     findUnique: async () => ({ id: 'sc-1', status: currentStatus, totalAmount: 100, receivedAmount, packingItems }),
     update: async ({ data }) => ({ id: 'sc-1', ...data }),
   } });
@@ -394,7 +397,7 @@ test('updateSalesStatus: 历史 out_stock 会规范为 SHIPPED 并触发自动�
   let updatedData = null;
   let outStockCalled = false;
 
-  prisma.$transaction = async (fn) => fn({
+  prisma.$transaction = async (fn) => fn({ $executeRaw: async () => 1,
     salesContract: {
       findUnique: async () => ({
         id: 'sc-1',
@@ -441,7 +444,7 @@ test('updateSalesStatus: 有箱件无法放入时拒绝确认发运', async () =
   const originalApplySalesOutStock = inventorySnapshot.applySalesOutStock;
   let outStockCalled = false;
 
-  prisma.$transaction = async (fn) => fn({
+  prisma.$transaction = async (fn) => fn({ $executeRaw: async () => 1,
     salesContract: {
       findUnique: async () => ({
         id: 'sc-1',
@@ -486,7 +489,7 @@ test('updateSalesStatus: 交互事务超时放宽到 15 s（门禁排柜排队�
   let options;
   prisma.$transaction = async (fn, opts) => {
     options = opts;
-    return fn({ salesContract: { findUnique: async () => null } });
+    return fn({ $executeRaw: async () => 1, salesContract: { findUnique: async () => null } });
   };
   try {
     await assert.rejects(() => salesService.updateSalesStatus('sc-x', 'SHIPPED'), (error) => error.statusCode === 404);
@@ -506,7 +509,7 @@ test('updateSalesStatus: 排柜 worker 超时/崩溃（503）时拒绝确认发�
   const crashFile = path.join(dir, 'crash.js');
   fs.writeFileSync(crashFile, 'process.exit(1);');
   const writes = [];
-  prisma.$transaction = async (fn) => fn({
+  prisma.$transaction = async (fn) => fn({ $executeRaw: async () => 1,
     salesContract: {
       findUnique: async () => ({
         id: 'sc-1',
@@ -743,7 +746,7 @@ test('importPurchasePackingItems: 按选中箱数同比例带入数量、重量�
     },
     packingItems: [],
   };
-  prisma.$transaction = async (callback) => callback({
+  prisma.$transaction = async (callback) => callback({ $executeRaw: async () => 1,
     salesContract: {
       findUnique: async () => ({ id: 'sc-1', status: 'CONFIRMED' }),
       update: async (args) => {
@@ -908,4 +911,20 @@ test('经营钻取按上海发运日期过滤三种已发运状态，搜索港�
     await assert.rejects(salesService.getSalesContracts({ page: 1, pageSize: 20, shippedFrom: '2026-02-30' }), (error) => error.statusCode === 400);
     await assert.rejects(salesService.getSalesContracts({ page: 1, pageSize: 20, shippedFrom: '2026-10-01', shippedTo: '2026-09-30' }), /不能晚于/);
   } finally { prisma.salesContract.findMany = originalFindMany; prisma.salesContract.count = originalCount; }
+});
+
+test('P0-9: 出口合同装箱占用不含已取消合同（getAvailablePurchaseItems 过滤 packingItems）', async () => {
+  const original = prisma.purchaseItem.findMany;
+  let seen;
+  prisma.salesContract.findUnique = async () => ({ id: 'sc-1' });
+  prisma.purchaseItem.findMany = async args => { seen = args; return []; };
+  try {
+    await salesService.getAvailablePurchaseItems('sc-1');
+    assert.deepEqual(seen.select.packingItems.where, { salesContract: { status: { not: 'CANCELLED' } } });
+  } finally { prisma.purchaseItem.findMany = original; }
+});
+
+test('P0-9: 不存在的合同在写锁处即 404（updateSalesStatus 先取 SQLite 写锁）', async () => {
+  prisma.$executeRaw = async () => 0;
+  await assert.rejects(() => salesService.updateSalesStatus('nope', 'SHIPPED'), error => error.statusCode === 404);
 });
