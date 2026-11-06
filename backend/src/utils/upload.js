@@ -1,7 +1,7 @@
 /**
  * Input: multer库、配置
  * Output: 文件上传中间件；磁盘上传写流前校验并保护可信根下的日期目录，非法格式返回客户端错误
- * Pos: 文件上传工具，处理合同文件等上传
+ * Pos: 文件上传工具，处理合同文件等上传；附件下载/删除路径统一经 resolveContainedUploadPath 做 realpath 包含校验
  * 
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -137,14 +137,45 @@ const getFullPath = (relativePath) => {
 };
 
 /**
- * 职责：删除文件
+ * 职责：把库里存的附件路径解析为 UPLOAD_DIR 内的真实普通文件路径（下载/删除共用）
+ * 思路：拒绝 NUL 与根外/`..` 路径，对根和目标都取 realpath 后再做包含检查（根本身可为符号链接/相对路径），
+ *       目标必须是普通文件（lstat）。文件不存在抛 404，其余一律 400，调用方不得再自行拼路径。
+ * @param {string} storedPath - ContractFile.filePath（相对 UPLOAD_DIR 或历史绝对路径）
+ * @returns {{ path: string, realPath: string }} path 为根内的词法路径，realPath 为真实路径
+ */
+const resolveContainedUploadPath = (storedPath, uploadRoot = uploadDir) => {
+  const invalidPath = () => createError('附件存储路径无效', 400);
+  if (typeof storedPath !== 'string' || !storedPath || storedPath.includes('\0')) throw invalidPath();
+  const absoluteRoot = path.resolve(uploadRoot);
+  const target = path.resolve(absoluteRoot, storedPath);
+  if (!target.startsWith(`${absoluteRoot}${path.sep}`)) throw invalidPath();
+  let realRoot;
+  let realTarget;
+  try {
+    realRoot = fs.realpathSync(absoluteRoot);
+    realTarget = fs.realpathSync(target);
+  } catch (error) {
+    if (error?.code === 'ENOENT') throw createError('附件文件不存在', 404);
+    throw invalidPath();
+  }
+  if (!realTarget.startsWith(`${realRoot}${path.sep}`)) throw invalidPath();
+  if (!fs.lstatSync(realTarget).isFile()) throw invalidPath();
+  return { path: target, realPath: realTarget };
+};
+
+/**
+ * 职责：删除文件（路径必须通过 resolveContainedUploadPath；文件已不存在视为已删除）
  * @param {string} relativePath - 相对路径
  */
 const deleteFile = (relativePath) => {
-  const fullPath = getFullPath(relativePath);
-  if (fs.existsSync(fullPath)) {
-    fs.unlinkSync(fullPath);
+  let resolved;
+  try {
+    resolved = resolveContainedUploadPath(relativePath);
+  } catch (error) {
+    if (error?.statusCode === 404) return;
+    throw error;
   }
+  fs.unlinkSync(resolved.path);
 };
 
 module.exports = {
@@ -153,5 +184,6 @@ module.exports = {
   pdfCheckUpload,
   getRelativePath,
   getFullPath,
+  resolveContainedUploadPath,
   deleteFile,
 };

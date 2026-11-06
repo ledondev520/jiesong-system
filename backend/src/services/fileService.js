@@ -4,6 +4,7 @@
  * Pos: 文件管理领域服务，屏蔽采购/出口合同附件的底层表差异
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * 下载/删除前的库内路径统一经 resolveContainedUploadPath（realpath 包含 UPLOAD_DIR）。
  */
 
 const prisma = require('../utils/prisma');
@@ -12,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
-const { deleteFile: removeFile, getFullPath } = require('../utils/upload');
+const { deleteFile: removeFile, getFullPath, resolveContainedUploadPath } = require('../utils/upload');
 
 const CONTRACT_TYPE = {
   PURCHASE: 'PURCHASE',
@@ -293,6 +294,13 @@ const deleteFileRecord = async (fileId) => {
   const file = await findFileById(fileId);
   if (!file) return null;
 
+  // 先校验存储路径在 UPLOAD_DIR 内：库里被篡改/符号链接逃逸的路径拒绝删除，记录也不动
+  try {
+    resolveContainedUploadPath(file.filePath);
+  } catch (error) {
+    if (error?.statusCode !== 404) throw error;
+  }
+
   if (file.contractType === CONTRACT_TYPE.SALES) {
     const checkCount = await prisma.packingListCheck.count({
       where: { salesContractFileId: fileId },
@@ -312,6 +320,7 @@ const deleteFileRecord = async (fileId) => {
 };
 
 module.exports = {
+  resolveContainedUploadPath,
   CONTRACT_TYPE,
   CONTRACT_FILE_CATEGORY,
   assertFileAccess,

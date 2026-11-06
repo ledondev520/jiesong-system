@@ -569,3 +569,44 @@ test('archiveBufferFile: description 为数组时 400 且不落盘', async () =>
   }), error => error.statusCode === 400);
   assert.equal(persisted, 0);
 });
+
+test('deleteFileRecord: 库内路径逃逸出 UPLOAD_DIR（.. / 绝对路径 / 符号链接）时拒绝，不删记录也不删根外文件', async () => {
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-file-delete-outside-'));
+  const victim = path.join(outside, 'victim.txt');
+  fs.writeFileSync(victim, 'synthetic');
+  fs.symlinkSync(victim, path.join(testUploadRoot, 'escape-link.txt'));
+  let deletes = 0;
+  try {
+    for (const filePath of [`../${path.basename(outside)}/victim.txt`, victim, 'escape-link.txt']) {
+      await withMockDelegates({
+        contractFile: {
+          findUnique: async () => ({ id: 'f', contractType: 'PURCHASE', filePath }),
+          delete: async () => { deletes++; return {}; },
+        },
+        salesContractFile: { findUnique: async () => null },
+      }, async () => {
+        await assert.rejects(fileService.deleteFileRecord('f'), (error) => error.statusCode === 400, filePath);
+      });
+    }
+    assert.equal(deletes, 0);
+    assert.equal(fs.existsSync(victim), true);
+  } finally { fs.rmSync(outside, { recursive: true, force: true }); }
+});
+
+test('deleteFileRecord: 根内普通文件正常删除，物理文件已不存在不阻塞删记录', async () => {
+  const inside = path.join(testUploadRoot, 'deletable.txt');
+  fs.writeFileSync(inside, 'synthetic');
+  let deletes = 0;
+  await withMockDelegates({
+    contractFile: {
+      findUnique: async ({ where }) => ({ id: where.id, contractType: 'PURCHASE', filePath: where.id === 'gone' ? 'already-gone.txt' : 'deletable.txt' }),
+      delete: async () => { deletes++; return {}; },
+    },
+    salesContractFile: { findUnique: async () => null },
+  }, async () => {
+    await fileService.deleteFileRecord('present');
+    assert.equal(fs.existsSync(inside), false);
+    await fileService.deleteFileRecord('gone');
+  });
+  assert.equal(deletes, 2);
+});

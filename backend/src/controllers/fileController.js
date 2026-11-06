@@ -10,7 +10,6 @@ const path = require('path');
 const { success, created } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const fileService = require('../services/fileService');
-const { getFullPath } = require('../utils/upload');
 
 /**
  * 职责：上传合同附件
@@ -68,9 +67,8 @@ const downloadFile = async (req, res, next) => {
     if (!file) throw createError('文件不存在', 404);
     fileService.assertFileAccess(file, req.user);
 
-    const absolutePath = path.isAbsolute(file.filePath)
-      ? file.filePath
-      : getFullPath(file.filePath);
+    // realpath 包含校验：库内路径含 ..、符号链接逃逸或非普通文件一律拒绝
+    const { realPath: absolutePath } = fileService.resolveContainedUploadPath(file.filePath);
 
     res.download(absolutePath, file.fileName, (err) => {
       if (err && !res.headersSent) next(err);

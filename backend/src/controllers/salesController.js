@@ -305,16 +305,13 @@ const deleteFile = async (req, res, next) => {
 const downloadFile = async (req, res, next) => {
   try {
     const { fileId } = req.params;
-    const path = require('path');
-    const { getFullPath } = require('../utils/upload');
 
     const file = await fileService.findFileById(fileId);
     if (!file || file.contractType !== fileService.CONTRACT_TYPE.SALES) throw createError('文件不存在', 404);
     fileService.assertFileAccess(file, req.user);
 
-    const absolutePath = path.isAbsolute(file.filePath)
-      ? file.filePath
-      : getFullPath(file.filePath);
+    // realpath 包含校验：库内路径含 ..、符号链接逃逸或非普通文件一律拒绝
+    const { realPath: absolutePath } = fileService.resolveContainedUploadPath(file.filePath);
 
     res.download(absolutePath, file.fileName, (err) => {
       if (err && !res.headersSent) next(err);
