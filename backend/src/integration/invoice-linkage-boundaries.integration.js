@@ -79,7 +79,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
   const supplier = await db.supplier.create({ data: { name: 'Synthetic Invoice Supplier' } });
   const purchase = (fields = {}) => db.purchaseContract.create({ data: { contractNo: `CG-SYNTHETIC-INVOICE-${++sequence}`, supplierId: supplier.id, totalAmount: 110, signedAt: new Date('2026-10-01T00:00:00Z'), status: 'SIGNED', ...fields } });
   const batch = await db.financeDataBatch.create({ data: { type: 'INVOICE', fileName: 'synthetic-fixture-only', recordCount: 0 } });
-  const invoice = (fields = {}) => db.invoiceRecord.create({ data: { batchId: batch.id, invNo: `SYNTHETIC-INVOICE-${++sequence}`, invDate: '2026-10-02', seller: supplier.name, buyer: 'Synthetic Invoice Buyer', amount: 100, tax: 10, total: 110, status: '正常', isPositive: '是', ...fields } });
+  const invoice = (fields = {}) => db.invoiceRecord.create({ data: { batchId: batch.id, invNo: `SYNTHETIC-INVOICE-${++sequence}`, invDate: '2026-10-02', seller: supplier.name, buyer: '上海捷淞国际物流有限公司', amount: 100, tax: 10, total: 110, status: '正常', isPositive: '是', ...fields } });
   const workbook = () => {
     const xlsx = require('xlsx');
     const wb = xlsx.utils.book_new();
