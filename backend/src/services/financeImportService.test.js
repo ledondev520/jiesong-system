@@ -383,3 +383,28 @@ test('parseBankStatement: 错误行回显只保留账号末4位', () => {
   assert.ok(!text.includes('6222020200112233445'));
   assert.ok(text.includes('***************3445'));
 });
+
+// 合成 ZIP：一个 deflate 条目，解压后 8 MiB 全零（压缩比远超 1000）
+const zipOf = (name, data, level = 9) => {
+  const AdmZip = require('adm-zip');
+  const zip = new AdmZip();
+  zip.addFile(name, data);
+  return zip.toBuffer();
+};
+
+test('parseBankStatement/parseInvoices: 高压缩比 ZIP 炸弹在 SheetJS 解压前被拒绝', () => {
+  const bomb = zipOf('xl/worksheets/sheet1.xml', Buffer.alloc(8 * 1024 * 1024));
+  assert.ok(bomb.length < 20 * 1024);
+  for (const parse of [financeImportService.parseBankStatement, financeImportService.parseInvoices]) {
+    assert.throws(() => parse(bomb, 'generic'), (e) => e.statusCode === 400 && /Office 文件/.test(e.message));
+  }
+});
+
+test('parseBankStatement: <dimension> 声明超大范围的小文件在 sheet_to_json 前被拒绝', () => {
+  const ws = xlsx.utils.aoa_to_sheet([['日期', '金额'], ['2026-01-01', 1]]);
+  ws['!ref'] = 'A1:Z1048576';
+  const wb = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(wb, ws, 'S');
+  const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  assert.throws(() => financeImportService.parseBankStatement(buffer, 'generic'), (e) => e.statusCode === 400 && /行列限制/.test(e.message));
+});

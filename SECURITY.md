@@ -161,6 +161,8 @@ Legacy `/api/v1/import` and `/api/v1/system/import` share `tabularUpload` from `
 
 `tabularImport.js` checks worksheet XML row/cell/column bounds before ExcelJS allocations, rejects merged cells and limits sheet IDs to 65535. This prevents tiny XLSX metadata from expanding unbounded model regions.
 
+`tabularImport.js` also exports `assertSafeOfficeArchive` (synchronous; actually inflates each ZIP entry with a hard output cap, defaults 512 entries / 64 MiB expanded / 1000:1 ratio for entries over 1 MiB; ZIP64 and non-deflate methods rejected; non-ZIP input such as legacy .xls passes through) and `assertSafeWorksheetRange` (defaults 100000 rows / 200 columns / 5,000,000 cells, reject-only so physical row indices are preserved). Both run before SheetJS `XLSX.read`/`sheet_to_json` in `financeImportService.js`, `financialStatementsService.js` and `purchaseImportExportService.js`, and before AdmZip opens the contract template in `contractDocService.js` (that path uses AdmZip, not mammoth). Failures are 400 errors; no upload is written to disk.
+
 ## Export pricing configuration
 
 Pricing requires a finite positive spot rate and a positive adjusted rate rounded

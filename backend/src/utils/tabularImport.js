@@ -4,6 +4,7 @@
  * Pos: shared import boundary; never evaluates workbook formulas and never writes uploads to disk
  */
 const path = require('node:path');
+const zlib = require('node:zlib');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
 const Papa = require('papaparse');
@@ -83,6 +84,57 @@ async function checkWorkbookArchive(buffer) {
   }
 }
 
+// Synchronous ZIP-bomb guard for XLSX/DOCX buffers handed to SheetJS/AdmZip (both inflate everything).
+// Actually inflates each entry with a hard output cap, so forged central-directory sizes cannot hide a bomb.
+// shortcut: ZIP64 and non-stored/deflate methods are rejected, upgrade if real files ever need them.
+function assertSafeOfficeArchive(buffer, { maxEntries = 512, maxUncompressedBytes = 64 * 1024 * 1024, maxCompressionRatio = 1000 } = {}) {
+  const invalid = () => createError('Office 文件结构无效或解压后超出限制', 400);
+  if (!Buffer.isBuffer(buffer)) throw invalid();
+  if (buffer.length >= 2 && buffer.readUInt16LE(0) !== 0x4b50) return; // 非 ZIP（如旧版 .xls/CSV）无 ZIP 炸弹风险，行列范围另有守卫
+  if (buffer.length < 22) throw invalid();
+  let eocd = -1;
+  for (let i = buffer.length - 22; i >= Math.max(0, buffer.length - 22 - 65535); i--) {
+    if (buffer.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw invalid();
+  const count = buffer.readUInt16LE(eocd + 10);
+  let offset = buffer.readUInt32LE(eocd + 16);
+  if (count === 0xffff || offset === 0xffffffff || count > maxEntries) throw invalid();
+  let total = 0;
+  for (let n = 0; n < count; n++) {
+    if (offset + 46 > buffer.length || buffer.readUInt32LE(offset) !== 0x02014b50) throw invalid();
+    const method = buffer.readUInt16LE(offset + 10);
+    const compressed = buffer.readUInt32LE(offset + 20);
+    const declared = buffer.readUInt32LE(offset + 24);
+    const nameLen = buffer.readUInt16LE(offset + 28);
+    const next = offset + 46 + nameLen + buffer.readUInt16LE(offset + 30) + buffer.readUInt16LE(offset + 32);
+    const local = buffer.readUInt32LE(offset + 42);
+    if (compressed === 0xffffffff || declared === 0xffffffff || local + 30 > buffer.length || buffer.readUInt32LE(local) !== 0x04034b50) throw invalid();
+    const start = local + 30 + buffer.readUInt16LE(local + 26) + buffer.readUInt16LE(local + 28);
+    if (start + compressed > buffer.length) throw invalid();
+    let actual;
+    if (method === 0) actual = compressed;
+    else if (method === 8) {
+      try {
+        actual = zlib.inflateRawSync(buffer.subarray(start, start + compressed), { maxOutputLength: maxUncompressedBytes - total + 1 }).length;
+      } catch { throw invalid(); }
+    } else throw invalid();
+    total += actual;
+    if (total > maxUncompressedBytes) throw invalid();
+    if (actual > 1024 * 1024 && actual / Math.max(compressed, 1) > maxCompressionRatio) throw invalid();
+    offset = next;
+  }
+}
+
+// Bound the worksheet range before sheet_to_json walks it (a tiny file can declare a huge <dimension>).
+function assertSafeWorksheetRange(sheet, { maxRows = 100000, maxCols = 200, maxCells = 5000000 } = {}) {
+  if (!sheet?.['!ref']) return;
+  const range = require('xlsx').utils.decode_range(sheet['!ref']);
+  const rows = range.e.r + 1;
+  const cols = range.e.c + 1;
+  if (rows > maxRows || cols > maxCols || rows * cols > maxCells) throw createError('工作表范围超出行列限制', 400);
+}
+
 async function parseTabularFile({ originalname, buffer }) {
   const extension = path.extname(originalname || '').toLowerCase();
   if (!acceptsTabularFile(originalname)) throw createError('只支持 CSV 或 xlsx 文件', 400);
@@ -126,4 +178,4 @@ async function parseTabularFile({ originalname, buffer }) {
   return { headers, data, errors: [] };
 }
 
-module.exports = { parseTabularFile, acceptsTabularFile, tabularUpload, MAX_ROWS };
+module.exports = { assertSafeOfficeArchive, assertSafeWorksheetRange, parseTabularFile, acceptsTabularFile, tabularUpload, MAX_ROWS };

@@ -8,6 +8,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
+const { assertSafeOfficeArchive } = require('../utils/tabularImport');
 const PDFDocument = require('pdfkit');
 const {
   summarizePurchaseAmounts,
@@ -174,7 +175,9 @@ const generatePurchaseContract = async (purchaseContract, options = {}) => {
     throw new Error('合同模板文件不存在，请先上传模板');
   }
 
-  const zip = new AdmZip(getTemplatePath());
+  const templateBuffer = await fs.readFile(getTemplatePath());
+  assertSafeOfficeArchive(templateBuffer); // 模板由运维提供，仍在 AdmZip 全量解压前限界
+  const zip = new AdmZip(templateBuffer);
   const documentXml = zip.getEntry('word/document.xml');
   if (!documentXml) throw new Error('无效的 Word 文档模板');
 
