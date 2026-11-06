@@ -11,6 +11,7 @@ const {
   buildExportPacketWorkbook,
   evaluateExportPacket,
   historicalQuoteAllowed,
+  writePacketAmounts,
 } = require('./exportPacketService');
 
 const contract = (overrides = {}) => ({
@@ -185,4 +186,24 @@ test('第三方货物行不要求采购成本，沿用原申报单价且不按�
   assert.equal(packet.lines[0].pricingSource, 'declared');
   assert.equal(packet.lines[0].unitPriceUsd, 25);
   assert.equal(packet.lines[0].totalUsd, 250);
+});
+
+test('第三方货物行无任何单价时阻断（不写入 0 美元）', () => {
+  const base = contract().packingItems[0];
+  const packet = evaluateExportPacket(contract({
+    packingItems: [{ ...base, isOwnedByJiesong: false, purchaseCost: 0, unitPrice: 0 }],
+  }), readiness(), [], options());
+  assert.equal(packet.ready, false);
+  assert.ok(packet.issues.some((issue) => issue.code === 'MISSING_THIRD_PARTY_PRICE'));
+});
+
+test('writePacketAmounts 写回装箱价格与合同金额；锁定时调用方跳过（发运后生成不改价）', async () => {
+  const writes = [];
+  const tx = {
+    packingItem: { update: async (a) => writes.push(['item', a.where.id, a.data]) },
+    salesContract: { update: async (a) => writes.push(['contract', a.data]) },
+  };
+  const packet = { lines: [{ packingItemId: 'p1', unitPriceUsd: 13, totalUsd: 130 }], summary: { totalUsd: 130 }, pricingPolicy: { spotRate: 6.8, effectiveRate: 6.6 } };
+  await writePacketAmounts(tx, 's1', { amountSource: 'DERIVED' }, packet);
+  assert.deepEqual(writes, [['item', 'p1', { unitPrice: 13, totalPrice: 130 }], ['contract', { totalAmount: 130, exchangeRate: 6.8 }]]);
 });

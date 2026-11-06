@@ -7,7 +7,7 @@
 const ExcelJS = require('exceljs');
 const crypto = require('node:crypto');
 const prisma = require('../utils/prisma');
-const { getSalesCargoState, assertSalesCargoMutable } = require('./salesCargoLifecycle');
+const { getSalesCargoState, isSalesCargoLocked } = require('./salesCargoLifecycle');
 const { buildDerivedSalesAmountUpdate, isJiesongOwnedPackingItem } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
@@ -175,6 +175,9 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       pricingSource = 'declared';
       pricingReference = '第三方货物沿用原申报单价';
       roundingMethod = 'declared_unit_price';
+    }
+    if (!owned && !(unitPriceUsd > 0) && !(manualUnitPrice > 0)) {
+      lineIssues.push(makeIssue('MISSING_THIRD_PARTY_PRICE', 'error', '第三方货物缺少申报单价，请填写订单单价或人工确认单价', item.id, productName));
     }
     if (manualUnitPrice > 0) {
       unitPriceUsd = manualUnitPrice;
@@ -456,10 +459,28 @@ const buildExportPacketWorkbook = async (packet) => {
   return Buffer.from(arrayBuffer);
 };
 
+// 把冻结快照的价格/金额/汇率写回订单；货物已锁定时调用方不得调用。
+const writePacketAmounts = async (tx, salesContractId, contract, packet) => {
+  for (const line of packet.lines) {
+    await tx.packingItem.update({
+      where: { id: line.packingItemId },
+      data: { unitPrice: line.unitPriceUsd, totalPrice: line.totalUsd },
+    });
+  }
+  await tx.salesContract.update({
+    where: { id: salesContractId },
+    data: {
+      ...buildDerivedSalesAmountUpdate(contract, packet.summary.totalUsd),
+      // 写回保持订单口径：报价转换的订单仍存计价汇率，其余存现汇。
+      exchangeRate: contract.quoteId ? packet.pricingPolicy.effectiveRate : packet.pricingPolicy.spotRate,
+    },
+  });
+};
+
 const generateExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
   const config = loadPricingConfig();
-  // 生成会改写装箱价格与合同金额：发运后/已有出库记录不得再改。
-  assertSalesCargoMutable(await getSalesCargoState(prismaClient, salesContractId));
+  // 发运后/已有出库记录：仍可生成单证（退税资料流程需要），但不得改写装箱价格与合同金额。
+  const locked = isSalesCargoLocked(await getSalesCargoState(prismaClient, salesContractId));
   const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
   const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
   if (!packet.ready) {
@@ -471,20 +492,7 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
   const fileName = `${packet.contractNo}_出口合同_商业发票_装箱单_${dateTag}.xlsx`;
   let file;
   await prismaClient.$transaction(async (tx) => {
-    for (const line of packet.lines) {
-      await tx.packingItem.update({
-        where: { id: line.packingItemId },
-        data: { unitPrice: line.unitPriceUsd, totalPrice: line.totalUsd },
-      });
-    }
-    await tx.salesContract.update({
-      where: { id: salesContractId },
-      data: {
-        ...buildDerivedSalesAmountUpdate(sources.contract, packet.summary.totalUsd),
-        // 写回保持订单口径：报价转换的订单仍存计价汇率，其余存现汇。
-        exchangeRate: sources.contract.quoteId ? packet.pricingPolicy.effectiveRate : packet.pricingPolicy.spotRate,
-      },
-    });
+    if (!locked) await writePacketAmounts(tx, salesContractId, sources.contract, packet);
     file = await fileService.archiveGeneratedFile({
       contractId: salesContractId,
       contractType: fileService.CONTRACT_TYPE.SALES,
@@ -494,7 +502,7 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
       category: fileService.CONTRACT_FILE_CATEGORY.SYSTEM_GENERATED_XLSX,
       description: `${EXPORT_PACKET_DESCRIPTION}:${buildPackingSourceVersion(sources.contract.packingItems.map((item) => {
         const line = packet.lines.find((entry) => entry.packingItemId === item.id);
-        return line ? { ...item, unitPrice: line.unitPriceUsd, totalPrice: line.totalUsd } : item;
+        return line && !locked ? { ...item, unitPrice: line.unitPriceUsd, totalPrice: line.totalUsd } : item;
       }))}`,
       prismaClient: tx,
     });
@@ -514,6 +522,7 @@ module.exports = {
   configureSheet,
   evaluateExportPacket,
   generateExportPacket,
+  writePacketAmounts,
   historicalQuoteAllowed,
   previewExportPacket,
 };
