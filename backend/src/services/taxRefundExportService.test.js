@@ -175,3 +175,10 @@ test('exportTaxRefunds: 同一发票号关联多个采购合同时阻断整批�
     );
   });
 });
+
+test('buildCsv: 以公式触发符开头的单元格加单引号前缀', () => {
+  const csv = require('./taxRefundExportService').buildCsv([{ refund_no: '=HYPERLINK("http://x")', note: '@cmd', declared_amount: -5 }]);
+  const row = csv.split('\n')[1];
+  assert.ok(row.startsWith(`"'=HYPERLINK(""http://x"")"`), row);
+  assert.ok(row.endsWith(",'@cmd"), row);
+});
