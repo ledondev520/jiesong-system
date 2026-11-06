@@ -299,14 +299,15 @@ const remove = async (req, res, next) => {
         where: { id },
         select: { invoiceNo: true, _count: { select: { receipts: true, payments: true } } },
       });
-      const [invoiceFiles, matchedInvoices, matchedBank, packingItems] = await Promise.all([
+      const [invoiceFiles, matchedInvoices, matchedBank, packingItems, inventories] = await Promise.all([
         tx.contractFile.count({ where: { purchaseContractId: id, category: 'SUPPLIER_INVOICE' } }),
         tx.invoiceRecord.count({ where: { matchedContractId: id, matchedContractType: 'PURCHASE' } }),
         tx.bankTransaction.count({ where: { matchedContractId: id, matchedContractType: 'PURCHASE' } }),
         tx.packingItem.count({ where: { purchaseItem: { purchaseContractId: id } } }),
+        tx.inventory.count({ where: { purchaseItem: { purchaseContractId: id } } }),
       ]);
       if (contract._count.receipts > 0 || contract._count.payments > 0 || contract.invoiceNo
-        || invoiceFiles > 0 || matchedInvoices > 0 || matchedBank > 0 || packingItems > 0) {
+        || invoiceFiles > 0 || matchedInvoices > 0 || matchedBank > 0 || packingItems > 0 || inventories > 0) {
         throw createError('已有到货、付款、发票、银行流水、装箱或核销记录的合同不可删除', 409);
       }
       await tx.purchaseContract.delete({ where: { id } });
