@@ -269,18 +269,23 @@ export function PurchaseFlowPanel({
    * 职责：登记一笔付款（定金/尾款）到收付管理
    * @param data PaymentDialog 提交的金额/日期/方式/备注
    */
+  const attemptId = useRef(crypto.randomUUID());
   const handleCreatePayment = async (data: PaymentSubmitData) => {
     if (readOnly) throw new Error("当前账号仅可查看付款记录");
     // Let PaymentDialog retain the complete draft and show the API/network error.
-    await financeService.createPayment({
-      type: PaymentType.PAYABLE,
-      purchaseContractId: contract.id,
-      amount: data.amount,
-      currency: "CNY",
-      paymentMethod: data.paymentMethod,
-      paymentDate: data.paymentDate.toISOString(),
-      note: data.note || undefined,
-    });
+    await financeService.createPayment(
+      {
+        type: PaymentType.PAYABLE,
+        purchaseContractId: contract.id,
+        amount: data.amount,
+        currency: "CNY",
+        paymentMethod: data.paymentMethod,
+        paymentDate: data.paymentDate.toISOString(),
+        note: data.note || undefined,
+      },
+      { attemptId: attemptId.current },
+    );
+    attemptId.current = crypto.randomUUID();
     invalidateCache("purchase-contracts-list");
     invalidateCache("fin-payables");
     invalidateCache("fin-stats");

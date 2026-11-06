@@ -196,15 +196,18 @@ describe("SalesFinancePanel", () => {
     await user.click(screen.getByRole("button", { name: "提交测试收款" }));
 
     await waitFor(() => {
-      expect(mockCreatePayment).toHaveBeenCalledWith({
-        type: "RECEIVABLE",
-        salesContractId: "sales-1",
-        amount: 150,
-        currency: "USD",
-        paymentMethod: "bank",
-        paymentDate: "2026-07-10T00:00:00.000Z",
-        note: "尾款",
-      });
+      expect(mockCreatePayment).toHaveBeenCalledWith(
+        {
+          type: "RECEIVABLE",
+          salesContractId: "sales-1",
+          amount: 150,
+          currency: "USD",
+          paymentMethod: "bank",
+          paymentDate: "2026-07-10T00:00:00.000Z",
+          note: "尾款",
+        },
+        { attemptId: expect.any(String) },
+      );
       expect(mockGetFinanceSummary).toHaveBeenCalledTimes(2);
       expect(onChanged).toHaveBeenCalledTimes(1);
     });

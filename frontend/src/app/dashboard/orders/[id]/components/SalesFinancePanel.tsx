@@ -133,16 +133,21 @@ export function SalesFinancePanel({
     void requestSummary();
   }, [requestSummary]);
 
+  const attemptId = useRef(crypto.randomUUID());
   const handleReceipt = async (data: PaymentSubmitData) => {
-    await financeService.createPayment({
-      type: PaymentType.RECEIVABLE,
-      salesContractId,
-      amount: Number(data.amount),
-      currency: "USD",
-      paymentMethod: data.paymentMethod,
-      paymentDate: data.paymentDate.toISOString(),
-      note: data.note,
-    });
+    await financeService.createPayment(
+      {
+        type: PaymentType.RECEIVABLE,
+        salesContractId,
+        amount: Number(data.amount),
+        currency: "USD",
+        paymentMethod: data.paymentMethod,
+        paymentDate: data.paymentDate.toISOString(),
+        note: data.note,
+      },
+      { attemptId: attemptId.current },
+    );
+    attemptId.current = crypto.randomUUID();
     setPaymentOpen(false);
     toast.success("美元收款已登记");
     // Refresh failures must not invite retrying a payment already saved.
