@@ -12,7 +12,7 @@ const step = workflow.match(/^      - name: Deploy to Production via SSH\n[\s\S]
 assert.ok(step, 'cannot extract the production SSH run block');
 const runBlock = step[1].replace(/^          /gm, '');
 
-function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxTestStatus = 0, verifierStatus = 0, migrateStatus = 'ok', migrateDeployStatus = 0, databaseUrl = null, integrity = 'ok' } = {}) {
+function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxTestStatus = 0, verifierStatus = 0, migrateStatus = 'ok', migrateDeployStatus = 0, databaseUrl = null, integrity = 'ok', gitStatus = 0 } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'deploy-ssh-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const checkout = path.join(root, 'checkout');
@@ -55,7 +55,8 @@ exec /bin/bash -c "$4"`);
   executable(path.join(bin, 'npm'), `
 printf 'npm\\n' >> "$TEST_EVENTS"
 cat >> "$TEST_NPM_STDIN"`);
-  executable(path.join(bin, 'git'), `printf 'git\\n' >> "$TEST_EVENTS"`);
+  executable(path.join(bin, 'git'), `printf 'git\\n' >> "$TEST_EVENTS"
+exit "$TEST_GIT_STATUS"`);
   executable(path.join(bin, 'sqlite3'), `
 case "\${2-}" in
   .backup*) printf 'sqlite3 backup\\n' >> "$TEST_EVENTS"; cp "$1" "\${2#.backup }" ;;
@@ -133,6 +134,7 @@ exit "$TEST_VERIFIER_STATUS"`);
       TEST_MIGRATE_STATUS: migrateStatus,
       TEST_MIGRATE_DEPLOY_STATUS: String(migrateDeployStatus),
       TEST_INTEGRITY: integrity,
+      TEST_GIT_STATUS: String(gitStatus),
       DEPLOY_BACKUP_ROOT: path.join(root, 'backups'),
       TMPDIR: root,
     },
@@ -287,4 +289,20 @@ test('failed or errored migrate status aborts without stopping the backend', t =
     assert.equal(result.events.filter(e => e === 'npm').length, 1, 'abort before the frontend build');
     assert.ok(!result.events.some(e => e.startsWith('pm2 ')), 'no pm2 call at all');
   }
+});
+
+test('a failing git step still removes the private pricing backup temp file', t => {
+  const result = runDeployment(t, { gitStatus: 1 });
+  assert.notEqual(result.status, 0, result.stderr);
+  assert.ok(result.events.includes('mktemp'), 'the pricing backup branch must have run');
+  assert.deepEqual(readdirSync(result.root).filter(name => name.startsWith('tmp.')), [], 'no leaked pricing backup');
+});
+
+test('production deploy pins the SSH host key from a secret and never runs ssh-keyscan', () => {
+  assert.ok(!/ssh-keyscan\s+-/.test(workflow.replace(/^\s*#.*$/gm, '')), 'ssh-keyscan must not be executed');
+  const pin = workflow.match(/- name: Pin host key in known_hosts\n[\s\S]*?\n\n/);
+  assert.ok(pin, 'pin step missing');
+  assert.match(pin[0], /SSH_KNOWN_HOSTS: \$\{\{ secrets\.SSH_KNOWN_HOSTS \}\}/);
+  assert.match(pin[0], /-z "\$SSH_KNOWN_HOSTS"[\s\S]*exit 1/, 'empty secret must fail closed');
+  assert.match(pin[0], /umask 077/);
 });

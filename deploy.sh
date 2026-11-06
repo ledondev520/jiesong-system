@@ -35,6 +35,8 @@ log_info "正在安装系统依赖..."
 apt-get update
 apt-get install -y \
   curl \
+  openssl \
+  sqlite3 \
   git \
   ufw \
   fail2ban
@@ -105,10 +107,14 @@ npm run build
 # =============================================================================
 log_info "创建环境配置文件..."
 
-# 后端环境变量
-cat > $APP_DIR/backend/.env << 'EOF'
-# JWT 配置
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+# 后端环境变量：只在不存在时创建，绝不覆盖已有 .env（含生产密钥与 DATABASE_URL）
+if [ -e "$APP_DIR/backend/.env" ]; then
+  log_info "backend/.env 已存在，保持不变"
+else
+  JWT_SECRET_VALUE=$(openssl rand -hex 32)
+  (umask 077 && cat > "$APP_DIR/backend/.env" << EOF
+# JWT 配置（随机生成；上线前请核对其余配置）
+JWT_SECRET=$JWT_SECRET_VALUE
 JWT_EXPIRES_IN=7d
 
 # 数据库配置 (SQLite，绝对路径)
@@ -118,6 +124,10 @@ DATABASE_URL="file:/opt/jiesong-system/data/jiesong.db"
 PORT=3001
 NODE_ENV=production
 EOF
+  )
+  chmod 600 "$APP_DIR/backend/.env"
+  unset JWT_SECRET_VALUE
+fi
 
 # 后端环境变量示例
 cat > $APP_DIR/backend/.env.example << 'EOF'
@@ -161,8 +171,9 @@ module.exports = {
       name: 'jiesong-backend',
       cwd: './backend',
       script: 'src/app.js',
-      instances: 2,
-      exec_mode: 'cluster',
+      // SQLite + 进程内状态/定时任务：只能单进程 fork（多实例会拆分计数并重复跑 cron）
+      instances: 1,
+      exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
         PORT: 3001,
@@ -203,7 +214,15 @@ cd $APP_DIR
 # 运行数据库迁移
 cd backend
 log_info "执行数据库迁移..."
-npx prisma migrate deploy  # 禁止 db push（AGENTS.md）；迁移前先 npm run db:backup
+# 禁止 db push（AGENTS.md）。已有库先做 0600 的在线快照，失败则中止，不迁移。
+if [ -f "$APP_DIR/data/jiesong.db" ]; then
+  PREMIGRATE_SNAP="$APP_DIR/data/pre-migrate-$(date -u +%Y%m%dT%H%M%SZ).db"
+  (umask 077 && sqlite3 "$APP_DIR/data/jiesong.db" ".backup $PREMIGRATE_SNAP")
+  chmod 600 "$PREMIGRATE_SNAP"
+  [ "$(sqlite3 "$PREMIGRATE_SNAP" 'PRAGMA integrity_check;')" = ok ] || { log_error "迁移前快照完整性检查失败：$PREMIGRATE_SNAP"; exit 1; }
+  log_info "迁移前快照：$PREMIGRATE_SNAP"
+fi
+npx prisma migrate deploy
 # 全新服务器上 migrate 以默认 umask 创建库文件，收紧为 0600（路径同上方 .env 的 DATABASE_URL；上级目录已是 0700）
 if [ -f "$APP_DIR/data/jiesong.db" ]; then chmod 600 "$APP_DIR/data/jiesong.db"; fi
 
@@ -299,7 +318,7 @@ log_info "  重启服务：pm2 restart all"
 log_info "  Nginx 状态：systemctl status nginx"
 log_info ""
 log_info "⚠️  重要："
-log_info "  1. 请修改 backend/.env 中的 JWT_SECRET"
+log_info "  1. 请核对 backend/.env（JWT_SECRET 已随机生成，不要提交或打印）"
 log_info "  2. 默认管理员账号：admin / admin123"
 log_info "  3. 建议尽快修改默认密码"
 log_info ""
