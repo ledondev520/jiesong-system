@@ -203,6 +203,9 @@ test('authenticate: Agent token 认证成功后附加 agent 与 authActor', asyn
 
   try {
     const req = {
+      method: 'GET',
+      baseUrl: '/api/v1/search',
+      path: '/',
       headers: {
         authorization: `Bearer ${rawToken}`,
       },
@@ -223,6 +226,34 @@ test('authenticate: Agent token 认证成功后附加 agent 与 authActor', asyn
       { resource: 'search', action: 'read', scopeJson: null },
       { resource: 'purchase', action: 'create', scopeJson: null },
     ]);
+  } finally {
+    prisma.agentCredential = originalAgentCredential;
+  }
+});
+
+test('authenticate: Agent token 对未登记路由默认403（含零权限token）', async () => {
+  const originalAgentCredential = prisma.agentCredential;
+  prisma.agentCredential = {
+    findUnique: async () => ({
+      id: 'cred-0', credentialKey: 'key0', secretHash: hashAgentSecret('s0'), status: 'ACTIVE',
+      expiresAt: null, revokedAt: null,
+      agentAccount: { id: 'agent-0', name: 'zero', slug: 'zero', status: 'ACTIVE' },
+      grants: [],
+    }),
+  };
+  try {
+    for (const [method, baseUrl, path] of [
+      ['GET', '/api/v1/bank-flow', '/transactions'], ['GET', '/api/v1/finance', '/statements'],
+      ['GET', '/api/v1/suppliers', '/'], ['GET', '/api/v1/files', '/1/download'],
+      ['GET', '/api/v1/purchases', '/'], ['GET', '/api/v1/sales', '/1/export-excel'],
+    ]) {
+      const { next, capture } = createNextCapture();
+      await authenticate({ method, baseUrl, path, headers: { authorization: 'Bearer jsa_key0.s0' } }, {}, next);
+      assert.equal(capture.error?.statusCode, 403, `${method} ${baseUrl}${path}`);
+    }
+    const { next, capture } = createNextCapture();
+    await authenticate({ method: 'POST', baseUrl: '/mcp', path: '/', headers: { authorization: 'Bearer jsa_key0.s0' } }, {}, next);
+    assert.equal(capture.error, undefined);
   } finally {
     prisma.agentCredential = originalAgentCredential;
   }

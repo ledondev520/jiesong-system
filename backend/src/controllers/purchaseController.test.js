@@ -178,7 +178,7 @@ test('downloadFile: 相对附件路径从 UPLOAD_DIR 解析，兼容已有绝对
   const res = { download(filePath, fileName, callback) { downloaded.push({ filePath, fileName }); callback(null); } };
   for (const filePath of [storedPath, absolutePath]) {
     storedPath = filePath;
-    await purchaseController.downloadFile({ params: { fileId: 'attachment-1' } }, res, (error) => { throw error; });
+    await purchaseController.downloadFile({ params: { fileId: 'attachment-1' }, user: { role: 'PURCHASE' } }, res, (error) => { throw error; });
   }
   assert.equal(downloaded.length, 2);
   for (const file of downloaded) {
