@@ -4,7 +4,7 @@
  * Pos: 后端 Agent Runtime 工具层
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- * 纯搬移自 openAgentService.js，行为不变。
+ * 角色 allowedRoles 由 openAgentService 注入/复核；密钥类配置键拒绝读写；CreatePaymentRecord 映射 financeService.createPayment。
  */
 
 const prisma = require('../../../utils/prisma');
@@ -18,6 +18,8 @@ module.exports = ({
   PRICING_CONFIG_REFUSAL,
   SELLER_CONFIG_KEYS,
   SELLER_CONFIG_REFUSAL,
+  isSecretConfigKey,
+  SECRET_CONFIG_REFUSAL,
 }) => [
   {
     name: 'AllocatePayment',
@@ -98,26 +100,45 @@ module.exports = ({
     inputSchema: {
       type: 'object',
       properties: {
-        type: { type: 'string', description: '类型：RECEIVABLE_RECEIPT（收款）或 PAYABLE_PAYMENT（付款）' },
-        amount: { type: 'number', description: '金额' },
-        customerName: { type: 'string', description: '客户/供应商名称' },
+        type: { type: 'string', description: '类型：RECEIVABLE_RECEIPT（客户到账收款，USD）或 PAYABLE（采购付款，CNY，须给 purchaseContractNo；旧值 PAYABLE_PAYMENT 等同 PAYABLE）' },
+        amount: { type: 'number', description: '金额（最多两位小数）' },
+        purchaseContractNo: { type: 'string', description: 'PAYABLE 必填：采购合同号' },
+        customerName: { type: 'string', description: '客户名称（收款用）' },
+        paymentDate: { type: 'string', description: '付款/到账日期（ISO），缺省为确认当天' },
+        paymentMethod: { type: 'string', description: '付款方式，缺省 wire/bank' },
         note: { type: 'string', description: '备注（建议包含合同号）' },
       },
       required: ['type', 'amount'],
     },
     isReadOnly: false,
     async call(input, { userId, collectedIds }) {
-      const validTypes = ['RECEIVABLE_RECEIPT', 'PAYABLE_PAYMENT'];
-      if (!validTypes.includes(input.type)) {
-        return toJson({ error: `type 必须是 ${validTypes.join(' 或 ')}` });
+      const type = input.type === 'PAYABLE_PAYMENT' ? 'PAYABLE' : input.type;
+      if (!['RECEIVABLE_RECEIPT', 'PAYABLE'].includes(type)) {
+        return toJson({ error: 'type 必须是 RECEIVABLE_RECEIPT 或 PAYABLE' });
       }
-      const label = input.type === 'RECEIVABLE_RECEIPT' ? '收款' : '付款';
-      return createPendingAction(userId, 'CreatePaymentRecord', {
-        type: input.type,
+      const params = {
+        type,
         amount: Number(input.amount),
         customerName: input.customerName || '',
+        paymentMethod: input.paymentMethod || (type === 'PAYABLE' ? 'bank' : 'wire'),
         note: input.note || '',
-      }, `创建${label}记录：${input.customerName || ''}  ¥${input.amount}`, collectedIds);
+      };
+      if (input.paymentDate) params.paymentDate = input.paymentDate;
+      let label = `收款：${params.customerName}  $${input.amount}`;
+      if (type === 'PAYABLE') {
+        // 在建卡时解析合同，确认卡上显示确切合同号；执行时不再按名称猜
+        if (!input.purchaseContractNo) return toJson({ error: '采购付款必须提供 purchaseContractNo' });
+        const contract = await prisma.purchaseContract.findFirst({
+          where: { contractNo: input.purchaseContractNo },
+          select: { id: true, contractNo: true, status: true },
+        });
+        if (!contract) return toJson({ error: `采购合同 ${input.purchaseContractNo} 不存在` });
+        if (contract.status === 'CANCELLED') return toJson({ error: `采购合同 ${contract.contractNo} 已取消` });
+        params.purchaseContractId = contract.id;
+        params.purchaseContractNo = contract.contractNo;
+        label = `付款：合同 ${contract.contractNo}  ¥${input.amount}`;
+      }
+      return createPendingAction(userId, 'CreatePaymentRecord', params, `创建${label}`, collectedIds);
     },
   },
   {
@@ -140,6 +161,7 @@ module.exports = ({
     async call(input, { userId, collectedIds }) {
       if (PRICING_CONFIG_KEYS.includes(input.key)) return toJson({ error: PRICING_CONFIG_REFUSAL });
       if (SELLER_CONFIG_KEYS.includes(input.key)) return toJson({ error: SELLER_CONFIG_REFUSAL });
+      if (isSecretConfigKey(input.key)) return toJson({ error: SECRET_CONFIG_REFUSAL });
       const existing = await prisma.systemConfig.findUnique({ where: { key: input.key } });
       const oldDisplay = existing ? existing.value : '（不存在）';
       const displayValue = input.value;

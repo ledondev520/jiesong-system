@@ -4,7 +4,7 @@
  * Pos: 后端 Agent Runtime 工具层
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
- * 纯搬移自 openAgentService.js，行为不变。
+ * 角色 allowedRoles 由 openAgentService 注入/复核；密钥类配置键拒绝读写；CreatePaymentRecord 映射 financeService.createPayment。
  */
 
 const prisma = require('../../../utils/prisma');
@@ -27,6 +27,8 @@ module.exports = ({
   buildTradeComplianceReadinessDiagnostic,
   PRICING_CONFIG_KEYS,
   AGENT_HIDDEN_CONFIG_KEYS,
+  isSecretConfigKey,
+  SECRET_CONFIG_REFUSAL,
 }) => [
   {
     name: 'SearchEntities',
@@ -726,6 +728,7 @@ module.exports = ({
       }
       // Restricted company bank details are not exposed to the AI assistant.
       // 旧 invoiceTitleInfo 文本可能含开户行及账号，同样不可读。
+      if (isSecretConfigKey(input.key)) return toJson({ error: SECRET_CONFIG_REFUSAL });
       if (AGENT_HIDDEN_CONFIG_KEYS.includes(input.key)) return toJson({ error: '该配置项不可通过助手读取' });
       const row = await prisma.systemConfig.findUnique({ where: { key: input.key } });
       if (!row) return toJson({ error: `配置项 ${input.key} 不存在` });

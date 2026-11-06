@@ -137,7 +137,7 @@ test('AI 登记实际发运复用销售状态接口，执行结果不再虚报�
       .find(item => item.name === 'UpdateExportContractStatus');
     const action = JSON.parse(await tool.call({ contractNo: 'EXP-TEST', newStatus: 'SHIPPED' }));
     assert.equal(changed, false);
-    await openAgentService.executeAction(action.actionId, 'test-user');
+    await openAgentService.executeAction(action.actionId, 'test-user', { userRole: 'SALES' });
     assert.equal(changed, true);
   });
 });
@@ -503,6 +503,7 @@ test('materializeRecommendationPendingActions: 只为 confirmable_write 建议�
   await withPatched(fakePendingTable(), async () => {
   const pendingActions = await openAgentService.materializeRecommendationPendingActions({
     userId: 'user-1',
+    userRole: 'ADMIN',
     collectedIds,
     recommendations: [
       {
@@ -851,7 +852,7 @@ test('AI 库存确认执行时重新检查来源，不能绕开验货/发运', a
       .find(item => item.name === 'UpdateInventoryStatus');
     const action = JSON.parse(await tool.call({ id: 'synthetic-stock', status: 'OUTBOUND' }));
     managed = true;
-    await assert.rejects(openAgentService.executeAction(action.actionId, 'synthetic-user'), /验货.*发运/);
+    await assert.rejects(openAgentService.executeAction(action.actionId, 'synthetic-user', { userRole: 'WAREHOUSE' }), /验货.*发运/);
     assert.equal(updates, 0);
   });
 });
@@ -885,7 +886,7 @@ test('AI 不能读写遗留的汇率/利润率配置：写入被拒绝，读取�
       // 普通键仍可生成待确认动作；执行时对遗留的待确认定价动作再次拒绝
       const ok = JSON.parse(await write.call({ key: 'stampPlatformUrl', value: 'https://example.invalid' }));
       assert.ok(ok.actionId);
-      await openAgentService.executeAction(ok.actionId, 'test-admin');
+      await openAgentService.executeAction(ok.actionId, 'test-admin', { userRole: 'ADMIN' });
       assert.equal(upserts, 1);
 
       const read = openAgentService.buildToolPool(spec => spec, [], [])
@@ -926,7 +927,62 @@ test('AI 不能写卖方公司信息，也读不到银行资料或旧开票抬�
     }
     const ok = JSON.parse(await write.call({ key: 'stampPlatformUrl', value: 'https://example.invalid' }));
     assert.ok(ok.actionId);
-    await openAgentService.executeAction(ok.actionId, 'test-admin');
+    await openAgentService.executeAction(ok.actionId, 'test-admin', { userRole: 'ADMIN' });
     assert.equal(upserts, 1);
+  });
+});
+
+test('P0-6: 确认时按实时角色复核，SALES 拿不到 FINANCE 的收款分配，建议卡也不生成', async () => {
+  await withPatched({ ...fakePendingTable(), 'prisma.operationLog.create': async () => ({}) }, async () => {
+    const ids = [];
+    const rec = { code: 'finance.allocate', executionMode: 'confirmable_write', actionType: 'AllocatePayment', title: 't', domain: 'finance', priority: 'high', reason: 'r', params: { paymentId: 'p', salesContractId: 's', contractNo: 'C', amount: 1 } };
+    assert.deepEqual(await openAgentService.materializeRecommendationPendingActions({ userId: 'u', userRole: 'SALES', collectedIds: ids, recommendations: [rec] }), []);
+    assert.equal(ids.length, 0);
+    assert.equal((await openAgentService.materializeRecommendationPendingActions({ userId: 'u', userRole: 'FINANCE', collectedIds: ids, recommendations: [rec] })).length, 1);
+    // 已存在的 FINANCE 卡：SALES 角色（即使是同一用户）执行被 403 拒绝，卡仍可由合法角色确认
+    await assert.rejects(openAgentService.executeAction(ids[0], 'u', { userRole: 'SALES' }), (e) => e.statusCode === 403);
+    await assert.rejects(openAgentService.executeAction(ids[0], 'u'), (e) => e.statusCode === 403);
+  });
+});
+
+test('P0-6: 读工具按角色收口，密钥类配置助手既不能读也不能写', async () => {
+  for (const name of ['GetFinanceOverview', 'GetRecentEvents', 'GetSystemConfig']) {
+    assert.equal(openAgentService.isToolAllowedForRole(name, 'WAREHOUSE'), false, name);
+    assert.equal(openAgentService.isToolAllowedForRole(name, 'SALES'), false, name);
+  }
+  assert.equal(openAgentService.isToolAllowedForRole('GetFinanceOverview', 'FINANCE'), true);
+  assert.equal(openAgentService.isToolAllowedForRole('GetSystemConfig', 'FINANCE'), false);
+  await withPatched({
+    ...fakePendingTable(),
+    'prisma.systemConfig.findUnique': async ({ where }) => ({ key: where.key, value: '"SYNTHETIC-KEY"', note: null }),
+  }, async () => {
+    const read = openAgentService.buildToolPool(spec => spec, [], []).find((i) => i.name === 'GetSystemConfig');
+    const write = openAgentService.buildWriteToolPool(spec => spec, 'a', 'ADMIN', [], []).find((i) => i.name === 'UpdateSystemConfig');
+    for (const key of ['kimiApiKey', 'deepseekApiKey', 'hsciqApiKey', 'someSecret', 'authToken']) {
+      assert.equal((await read.call({ key })).includes('SYNTHETIC-KEY'), false, key);
+      assert.equal(JSON.parse(await write.call({ key, value: 'x' })).actionId, undefined, key);
+    }
+  });
+});
+
+test('P0-6: CreatePaymentRecord 一键确认映射到 financeService.createPayment（PAYABLE+CNY+合同ID+幂等键）', async () => {
+  let call;
+  await withPatched({
+    ...fakePendingTable(),
+    'prisma.purchaseContract.findFirst': async () => ({ id: 'pc-1', contractNo: 'PC-SYN-1', status: 'SIGNED' }),
+    'financeService.createPayment': async (data, options) => { call = { data, options }; return { payment: { id: 'pay-1' }, reused: false }; },
+    'prisma.operationLog.create': async () => ({}),
+  }, async () => {
+    const tool = openAgentService.buildWriteToolPool(spec => spec, 'u', 'FINANCE', [], []).find((i) => i.name === 'CreatePaymentRecord');
+    assert.match(JSON.parse(await tool.call({ type: 'PAYABLE', amount: 100 })).error, /purchaseContractNo/);
+    const action = JSON.parse(await tool.call({ type: 'PAYABLE_PAYMENT', amount: 100, purchaseContractNo: 'PC-SYN-1' }));
+    assert.match(action.description, /PC-SYN-1/);
+    const result = await openAgentService.executeAction(action.actionId, 'u', { userRole: 'FINANCE' });
+    assert.equal(result.success, true);
+    assert.equal(call.data.type, 'PAYABLE');
+    assert.equal(call.data.currency, 'CNY');
+    assert.equal(call.data.purchaseContractId, 'pc-1');
+    assert.ok(!Number.isNaN(new Date(call.data.paymentDate).getTime()));
+    assert.equal(call.options.idempotencyKey, `agent:${action.actionId}`);
   });
 });
