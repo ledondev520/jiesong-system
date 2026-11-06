@@ -162,6 +162,10 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
     expect(vi.mocked(financeService.createPayment).mock.calls[1][0]).toEqual(
       vi.mocked(financeService.createPayment).mock.calls[0][0],
     );
+    // 失败后重试沿用同一 attemptId（幂等重放），成功后才轮换。
+    const [first, second] = vi.mocked(financeService.createPayment).mock.calls;
+    expect(first[1]?.attemptId).toEqual(expect.any(String));
+    expect(second[1]?.attemptId).toBe(first[1]?.attemptId);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 

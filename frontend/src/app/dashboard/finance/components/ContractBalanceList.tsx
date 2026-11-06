@@ -5,7 +5,7 @@
  */
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -174,19 +174,24 @@ export function ContractBalanceList({
     void load();
   }, [load]);
 
+  const attemptId = useRef(crypto.randomUUID());
   const submit = async (data: PaymentSubmitData) => {
     if (!selected) throw new Error("请选择合同后重试");
-    await financeService.createPayment({
-      type: kind === "payable" ? PaymentType.PAYABLE : PaymentType.RECEIVABLE,
-      ...(kind === "payable"
-        ? { purchaseContractId: selected.id }
-        : { salesContractId: selected.id }),
-      amount: Number(data.amount),
-      currency: config.currency,
-      paymentMethod: data.paymentMethod,
-      paymentDate: data.paymentDate.toISOString(),
-      note: data.note,
-    });
+    await financeService.createPayment(
+      {
+        type: kind === "payable" ? PaymentType.PAYABLE : PaymentType.RECEIVABLE,
+        ...(kind === "payable"
+          ? { purchaseContractId: selected.id }
+          : { salesContractId: selected.id }),
+        amount: Number(data.amount),
+        currency: config.currency,
+        paymentMethod: data.paymentMethod,
+        paymentDate: data.paymentDate.toISOString(),
+        note: data.note,
+      },
+      { attemptId: attemptId.current },
+    );
+    attemptId.current = crypto.randomUUID();
     toast.success(kind === "payable" ? "付款记录已保存" : "收款记录已保存");
     setSelected(null);
     await load().catch((error) =>

@@ -313,6 +313,7 @@ describe.each([
         paymentDate: "2026-10-01T00:00:00.000Z",
         note: "合成中文备注",
       }),
+      { attemptId: expect.any(String) },
     );
     expect(screen.getByRole("dialog", { name: "登记" })).toBeInTheDocument();
     expect(toasts.success).not.toHaveBeenCalled();

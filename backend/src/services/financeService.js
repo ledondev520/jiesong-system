@@ -90,6 +90,36 @@ const validateContractPaymentCurrency = (data = {}) => {
   return currency;
 };
 
+// 直接创建只接受业务类型；RECEIVABLE_RECEIPT_ALLOCATED 只能由分配事务写入。
+const CREATABLE_PAYMENT_TYPES = new Set(Object.values(PAYMENT_TYPES)
+  .filter((type) => type !== PAYMENT_TYPES.RECEIVABLE_RECEIPT_ALLOCATED));
+// 采购付款聚合只统计付款类流水，防止收款/收款池记录混入 paidAmount。
+const PAYABLE_FLOW_TYPE_LIST = [...PAYABLE_FLOW_TYPES];
+
+/** 金额必须是大于 0 的有限数值且最多两位小数；日期必须可解析。返回规范化后的值。 */
+const validatePaymentInput = (data = {}) => {
+  if (!CREATABLE_PAYMENT_TYPES.has(data.type)) throw createError('付款类型无效', 400);
+  const amount = typeof data.amount === 'string' && data.amount.trim() ? Number(data.amount) : data.amount;
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+    throw createError('金额必须是大于 0 的有效数字', 400);
+  }
+  if (Math.abs(amount - roundMoney(amount)) > 1e-9) throw createError('金额最多保留两位小数', 400);
+  const paymentDate = new Date(data.paymentDate);
+  if (Number.isNaN(paymentDate.getTime())) throw createError('付款日期无效', 400);
+  const hasPurchase = Boolean(data.purchaseContractId);
+  const hasSales = Boolean(data.salesContractId);
+  if (hasPurchase && hasSales) throw createError('一笔流水不能同时关联采购合同和出口合同', 400);
+  if (hasPurchase && !PAYABLE_FLOW_TYPES.has(data.type)) throw createError('该类型不能关联采购合同', 400);
+  if (hasSales && !RECEIVABLE_FLOW_TYPES.has(data.type)) throw createError('该类型不能关联出口合同', 400);
+  if (data.type === PAYMENT_TYPES.PAYABLE && !hasPurchase) throw createError('采购付款必须关联采购合同', 400);
+  if (data.type === PAYMENT_TYPES.RECEIVABLE && !hasSales) throw createError('出口收款必须关联出口合同', 400);
+  if (data.type === PAYMENT_TYPES.RECEIVABLE_RECEIPT
+    && normalizeCurrency(data.currency) !== 'USD') {
+    throw createError('待分配收款只支持 USD', 400);
+  }
+  return { amount: roundMoney(amount), paymentDate };
+};
+
 const includePaymentRelations = {
   purchaseContract: { include: { supplier: true } },
   salesContract: true,
@@ -350,7 +380,7 @@ const findAutoMatchCandidatesBatch = async (payments) => {
 const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContractId }) => {
   if (purchaseContractId) {
     const total = await tx.payment.aggregate({
-      where: { purchaseContractId, currency: 'CNY' },
+      where: { purchaseContractId, currency: 'CNY', type: { in: PAYABLE_FLOW_TYPE_LIST } },
       _sum: { amount: true },
     });
     const contract = await tx.purchaseContract.update({
@@ -511,8 +541,22 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
       throw createError('分配金额超出该笔收款剩余可分配金额', 400);
     }
     const targetIds = [...new Set(allocations.map(item => item.salesContractId))];
-    const targets = await tx.salesContract.findMany({ where: { id: { in: targetIds } }, select: { id: true } });
+    const targets = await tx.salesContract.findMany({
+      where: { id: { in: targetIds } },
+      select: { id: true, contractNo: true, status: true, totalAmount: true, receivedAmount: true, ...SALES_OWNED_AMOUNT_SELECT },
+    });
     if (targets.length !== targetIds.length) throw createError('销售合同不存在', 400);
+    const requestedByContract = new Map();
+    for (const alloc of allocations) {
+      requestedByContract.set(alloc.salesContractId, (requestedByContract.get(alloc.salesContractId) || 0) + alloc.amount);
+    }
+    for (const target of targets) {
+      if (target.status === 'CANCELLED') throw createError(`销售合同 ${target.contractNo} 已取消，不能分配收款`, 400);
+      const open = getEffectiveSalesContractTotal(target) - Number(target.receivedAmount || 0);
+      if (requestedByContract.get(target.id) - open > AUTO_MATCH_AMOUNT_TOLERANCE) {
+        throw createError(`分配金额超出销售合同 ${target.contractNo} 的未收余额`, 400);
+      }
+    }
 
     const created = [];
     const affectedSalesContractIds = new Set();
@@ -583,18 +627,35 @@ const listPayments = async ({ page, pageSize, skip, type, purchaseContractId, sa
   };
 };
 
+// 同一幂等键只能对应同一笔业务：参数不一致说明键冲突，不能静默返回别人的记录。
+const assertSameIdempotentPayment = (existing, data, input) => {
+  const same = existing.type === data.type
+    && (existing.purchaseContractId || null) === (data.purchaseContractId || null)
+    && (existing.salesContractId || null) === (data.salesContractId || null)
+    && Math.abs(Number(existing.amount) - input.amount) < 1e-9
+    && normalizeCurrency(existing.currency) === input.currency
+    && new Date(existing.paymentDate).getTime() === input.paymentDate.getTime();
+  if (!same) throw createError('幂等键已被另一笔不同的付款使用', 409);
+};
+
 const createPayment = async (data = {}, options = {}) => {
-  const currency = validateContractPaymentCurrency(data);
+  const input = validatePaymentInput(data);
+  input.currency = validateContractPaymentCurrency(data);
   const idempotencyKey = trimIdempotencyKey(options.idempotencyKey);
 
-  if (idempotencyKey) {
+  const replay = async () => {
     const existing = await prisma.payment.findUnique({
       where: { idempotencyKey },
       include: includePaymentRelations,
     });
-    if (existing) {
-      return { payment: existing, reused: true };
-    }
+    if (!existing) return null;
+    assertSameIdempotentPayment(existing, data, input);
+    return { payment: existing, reused: true };
+  };
+
+  if (idempotencyKey) {
+    const hit = await replay();
+    if (hit) return hit;
   }
 
   // Source-linked collections must use the allocation transaction above. The
@@ -606,6 +667,17 @@ const createPayment = async (data = {}, options = {}) => {
 
   try {
     const payment = await prisma.$transaction(async (tx) => {
+      // 合同必须存在且未取消：取消合同不在应收/应付口径内，款项会凭空消失。
+      if (data.purchaseContractId) {
+        const contract = await tx.purchaseContract.findUnique({ where: { id: data.purchaseContractId }, select: { status: true } });
+        if (!contract) throw createError('采购合同不存在', 400);
+        if (contract.status === 'CANCELLED') throw createError('采购合同已取消，不能登记付款', 400);
+      }
+      if (data.salesContractId) {
+        const contract = await tx.salesContract.findUnique({ where: { id: data.salesContractId }, select: { status: true } });
+        if (!contract) throw createError('出口合同不存在', 400);
+        if (contract.status === 'CANCELLED') throw createError('出口合同已取消，不能登记收款', 400);
+      }
       const created = await tx.payment.create({
         data: {
           type: data.type,
@@ -615,10 +687,10 @@ const createPayment = async (data = {}, options = {}) => {
           customerName: data.customerName
             ? withDefaultCustomerName(data.customerName)
             : (RECEIPT_POOL_TYPES.has(data.type) ? DEFAULT_RECEIVABLE_CUSTOMER_NAME : null),
-          amount: data.amount,
-          currency,
+          amount: input.amount,
+          currency: input.currency,
           paymentMethod: data.paymentMethod,
-          paymentDate: new Date(data.paymentDate),
+          paymentDate: input.paymentDate,
           note: data.note,
           idempotencyKey,
         },
@@ -636,13 +708,8 @@ const createPayment = async (data = {}, options = {}) => {
   } catch (error) {
     // Concurrent requests with the same idempotency key can race on insert.
     if (idempotencyKey && error?.code === 'P2002') {
-      const existing = await prisma.payment.findUnique({
-        where: { idempotencyKey },
-        include: includePaymentRelations,
-      });
-      if (existing) {
-        return { payment: existing, reused: true };
-      }
+      const hit = await replay();
+      if (hit) return hit;
     }
     throw error;
   }
