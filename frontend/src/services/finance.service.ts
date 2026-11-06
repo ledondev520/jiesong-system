@@ -186,10 +186,20 @@ export const financeService = {
     >("/finance/receivables", { params });
   },
 
-  createPayment: async (data: FinanceCreatePaymentInput) => {
+  /**
+   * attemptId: one id per dialog submission (stable across retries of a failed
+   * submit, rotated after success) so two legitimate equal same-day payments
+   * are not collapsed into one by the payload-only key. Omitted = payload-only.
+   */
+  createPayment: async (
+    data: FinanceCreatePaymentInput,
+    options?: { attemptId?: string },
+  ) => {
     // Snapshot the flat payment payload before hashing so the body and key agree.
     const payload = { ...data };
-    const idempotencyKey = await buildIdempotencyKey(payload);
+    const idempotencyKey = await buildIdempotencyKey(
+      options?.attemptId ? { payload, attemptId: options.attemptId } : payload,
+    );
 
     return runIdempotentRequest(
       idempotencyKey,

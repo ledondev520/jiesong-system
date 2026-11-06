@@ -6,7 +6,7 @@
 "use client";
 
 import { formatAmount } from "@/lib/format";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, RefreshCw, Split } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -83,26 +83,35 @@ export function UnallocatedReceiptsPanel({
   };
 
   // 先记录到账（无合同，进入待分配池）
+  const receiptAttemptId = useRef(crypto.randomUUID());
   const handleReceiptSubmit = async (data: ReceiptSubmitData) => {
     try {
-      await financeService.createPayment({
-        type: PaymentType.RECEIVABLE_RECEIPT,
-        customerName: data.customerName,
-        amount: data.amount,
-        currency: data.currency,
-        paymentMethod: data.paymentMethod,
-        paymentDate: data.paymentDate.toISOString(),
-        note:
-          buildReceiptNote({
-            contractRef: data.contractRef,
-            note: data.note,
-          }) || undefined,
-      });
+      await financeService.createPayment(
+        {
+          type: PaymentType.RECEIVABLE_RECEIPT,
+          customerName: data.customerName,
+          amount: data.amount,
+          currency: data.currency,
+          paymentMethod: data.paymentMethod,
+          paymentDate: data.paymentDate.toISOString(),
+          note:
+            buildReceiptNote({
+              contractRef: data.contractRef,
+              note: data.note,
+            }) || undefined,
+        },
+        { attemptId: receiptAttemptId.current },
+      );
+      receiptAttemptId.current = crypto.randomUUID();
       toast.success("到账记录已保存，请前往分配");
       setReceiptOpen(false);
       void load();
-    } catch {
-      toast.error("记录到账失败");
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : "记录到账失败",
+      );
     }
   };
 

@@ -186,6 +186,7 @@ describe("UnallocatedReceiptsPanel", () => {
           paymentMethod: "wire",
           paymentDate: "2026-10-01T00:00:00.000Z",
         }),
+        { attemptId: expect.any(String) },
       );
       expect(mocks.createPayment.mock.calls[0][0]).not.toHaveProperty(
         "salesContractId",

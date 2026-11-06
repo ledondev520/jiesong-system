@@ -6,11 +6,11 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +18,9 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -28,23 +28,32 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { DatePicker } from '@/components/ui/date-picker';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { normalizeContractRef } from '@/lib/finance-note';
+} from "@/components/ui/form";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { normalizeContractRef } from "@/lib/finance-note";
 
 const receiptSchema = z.object({
-  amount: z.number().min(0.01, '金额必须大于0'),
-  currency: z.string().min(1, '请选择币种'),
+  amount: z.number().min(0.01, "金额必须大于0"),
+  currency: z.string().min(1, "请选择币种"),
   paymentDate: z.date(),
-  paymentMethod: z.string().min(1, '请选择到账方式'),
-  customerName: z.string().min(1, '请填写客户名称'),
+  paymentMethod: z.string().min(1, "请选择到账方式"),
+  customerName: z.string().min(1, "请填写客户名称"),
   contractRef: z
     .string()
     .optional()
     .transform((value) => normalizeContractRef(value))
-    .refine((value) => !value || /^EXP\d{5,}$/.test(value), '合同号格式应为 EXP250024'),
+    .refine(
+      (value) => !value || /^EXP\d{5,}$/.test(value),
+      "合同号格式应为 EXP250024",
+    ),
   note: z.string().optional(),
 });
 
@@ -69,17 +78,21 @@ interface ReceiptDialogProps {
  * 职责：录入一笔客户到账款（不绑定合同，进入待分配池）
  * 思路：表单收集金额、币种、日期、方式、备注后提交
  */
-export function ReceiptDialog({ open, onOpenChange, onSubmit }: ReceiptDialogProps) {
+export function ReceiptDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+}: ReceiptDialogProps) {
   const form = useForm<ReceiptFormValues>({
     resolver: zodResolver(receiptSchema),
     defaultValues: {
       amount: 0,
-      currency: 'USD',
+      currency: "USD",
       paymentDate: new Date(),
-      paymentMethod: '',
-      customerName: 'Sp food trading LLC',
-      contractRef: '',
-      note: '',
+      paymentMethod: "",
+      customerName: "Sp food trading LLC",
+      contractRef: "",
+      note: "",
     },
   });
 
@@ -98,7 +111,10 @@ export function ReceiptDialog({ open, onOpenChange, onSubmit }: ReceiptDialogPro
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className="space-y-4"
+          >
             <div className="flex gap-3">
               <FormField
                 control={form.control}
@@ -132,8 +148,6 @@ export function ReceiptDialog({ open, onOpenChange, onSubmit }: ReceiptDialogPro
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="CNY">CNY</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -149,7 +163,7 @@ export function ReceiptDialog({ open, onOpenChange, onSubmit }: ReceiptDialogPro
                   <DatePicker
                     date={field.value}
                     setDate={field.onChange}
-                    triggerProps={{ id: 'receipt-date', name: 'paymentDate' }}
+                    triggerProps={{ id: "receipt-date", name: "paymentDate" }}
                   />
                   <FormMessage />
                 </FormItem>
@@ -202,7 +216,9 @@ export function ReceiptDialog({ open, onOpenChange, onSubmit }: ReceiptDialogPro
                     <Input
                       placeholder="例如: EXP250024"
                       {...field}
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                      onChange={(e) =>
+                        field.onChange(e.target.value.toUpperCase())
+                      }
                     />
                   </FormControl>
                   <p className="text-xs text-muted-foreground">
@@ -219,7 +235,10 @@ export function ReceiptDialog({ open, onOpenChange, onSubmit }: ReceiptDialogPro
                 <FormItem>
                   <FormLabel>备注（选填）</FormLabel>
                   <FormControl>
-                    <Input placeholder="例如: 客户首笔回款, 尾款到账" {...field} />
+                    <Input
+                      placeholder="例如: 客户首笔回款, 尾款到账"
+                      {...field}
+                    />
                   </FormControl>
                 </FormItem>
               )}
@@ -227,9 +246,11 @@ export function ReceiptDialog({ open, onOpenChange, onSubmit }: ReceiptDialogPro
             <DialogFooter>
               <Button
                 type="submit"
-                disabled={!form.formState.isValid || form.formState.isSubmitting}
+                disabled={
+                  !form.formState.isValid || form.formState.isSubmitting
+                }
               >
-                {form.formState.isSubmitting ? '记录中...' : '确认到账'}
+                {form.formState.isSubmitting ? "记录中..." : "确认到账"}
               </Button>
             </DialogFooter>
           </form>

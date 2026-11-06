@@ -62,6 +62,33 @@ describe("financeService", () => {
     });
   });
 
+  it("createPayment: 不同 attemptId 的相同载荷使用不同幂等键，相同 attemptId 重试复用同一键", async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
+    const payload = {
+      type: PaymentType.PAYABLE,
+      purchaseContractId: "ct-attempt",
+      amount: 300,
+      currency: "CNY",
+      paymentMethod: "BANK_TRANSFER",
+      paymentDate: "2026-03-02T08:00:00.000Z",
+    };
+    const keyOf = (call: number) =>
+      (api.post as unknown as ReturnType<typeof vi.fn>).mock.calls[call][2]
+        .headers["X-Idempotency-Key"];
+    const before = (api.post as unknown as ReturnType<typeof vi.fn>).mock.calls
+      .length;
+
+    await financeService.createPayment(payload, { attemptId: "a1" });
+    await financeService.createPayment(payload, { attemptId: "a2" });
+    await financeService.createPayment(payload, { attemptId: "a1" });
+
+    // a1 重试命中 15 秒幂等缓存，不再发第三次请求。
+    expect(
+      (api.post as unknown as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBe(before + 2);
+    expect(keyOf(before)).not.toBe(keyOf(before + 1));
+  });
+
   it("createPayment: 并发重复请求复用幂等缓存", async () => {
     const payload = {
       type: PaymentType.RECEIVABLE,
