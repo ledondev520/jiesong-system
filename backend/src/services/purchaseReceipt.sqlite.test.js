@@ -76,15 +76,18 @@ test('真实SQLite：分批验货幂等、并发限量、故障回滚与老板�
   assert.equal((await service.createPurchaseReceipt(raceReplayContract.id, arrival('same-nonce', 4, raceReplayContract.items[0].id), admin.id, db)).idempotentReplay, true);
 
   // 签名中谎称ADMIN仍按数据库BOSS判定；两套用户维护入口必须即时清缓存。
-  const bossToken = jwt.sign({ userId: boss.id, role: 'ADMIN' }, config.jwt.secret);
-  const authorization = `Bearer ${bossToken}`;
+  // 角色变更会递增 sessionVersion 使旧令牌失效，故每次变更后按当前版本重签。
+  const tokenAt = (sessionVersion) => `Bearer ${jwt.sign({ userId: boss.id, role: 'ADMIN', sessionVersion }, config.jwt.secret)}`;
+  let authorization = tokenAt(0);
   const guard = async () => { let error; await authenticate({ headers: { authorization }, method: 'POST', originalUrl: '/api/v1/purchases' }, {}, (e) => { error = e; }); return error?.statusCode ?? 200; };
   assert.equal(await guard(), 403);
   await require('./authService').updateUser(boss.id, { role: 'ADMIN' });
+  authorization = tokenAt(1);
   assert.equal(await guard(), 200);
   let updateError;
   await require('../controllers/userController').update({ params: { id: boss.id }, body: { role: 'BOSS' } }, { status() { return this; }, json() {} }, (e) => { updateError = e; });
   assert.equal(updateError, undefined);
+  authorization = tokenAt(2);
   assert.equal(await guard(), 403);
   clearAuthCache(boss.id);
 
