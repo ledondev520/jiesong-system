@@ -94,32 +94,17 @@ async function getReconciliation(req, res, next) {
     const { counterpart } = req.query;
     if (!counterpart) return error(res, '缺少 counterpart 参数', 400);
 
-    // 0. 查银行流水
-    const txns = await bankFlowService.listTransactions({
-      search: counterpart, currency: 'CNY', page: 1, pageSize: 200,
-    });
-
-    // 1. 查发票
-    const invs = await invoiceRecordService.listInvoices({
-      search: counterpart, page: 1, pageSize: 200,
-    });
-
-    // 2. 汇总
-    let totalPaid = 0;
-    let totalReceived = 0;
-    for (const t of txns.items) {
-      if (t.direction === 'OUT') totalPaid += Math.abs(t.amount);
-      else totalReceived += t.amount;
-    }
-
-    let totalInvoice = 0;
-    let validInvoiceCount = 0;
-    for (const inv of invs.items) {
-      if (inv.status === '正常' && inv.isPositive === '是') {
-        totalInvoice += inv.total;
-        validInvoiceCount++;
-      }
-    }
+    // 合计走数据库聚合（精确户名、CNY），与展示用的前 50 行分页无关
+    const [totals, txns, invs, invTotals] = await Promise.all([
+      bankFlowService.getCounterpartTotals({ counterpart, currency: 'CNY' }),
+      bankFlowService.listTransactions({
+        counterpartNames: bankFlowService.counterpartNameVariants(counterpart), currency: 'CNY', page: 1, pageSize: 50,
+      }),
+      invoiceRecordService.listInvoices({ search: counterpart, page: 1, pageSize: 50 }),
+      invoiceRecordService.sumValidInvoices({ search: counterpart }),
+    ]);
+    const { totalPaid, totalReceived } = totals;
+    const { totalInvoice, validInvoiceCount } = invTotals;
 
     success(res, {
       counterpart,
@@ -128,7 +113,7 @@ async function getReconciliation(req, res, next) {
         totalPaid,
         totalReceived,
         netPaid: totalPaid - totalReceived,
-        txnCount: txns.total,
+        txnCount: totals.txnCount,
       },
       invoices: {
         items: invs.items.slice(0, 50),

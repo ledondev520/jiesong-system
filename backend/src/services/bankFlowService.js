@@ -2,6 +2,7 @@
  * Input: Prisma client、BankTransaction / FinanceDataBatch 模型
  * Output: 同币种银行流水查询、导入、统计接口（空币种仍使用默认人民币）
  * Pos: 财务模块-银行流水业务逻辑层
+ * 对账口径：单对手方合计走数据库聚合（精确户名）；全量对账先按规范化户名合并，包含匹配需名称≥4字且候选唯一，多别名合并后再比发票。
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
@@ -19,8 +20,8 @@ const COMPANY = '上海捷淞国际物流有限公司';
  * @param {number} pageSize
  * @returns {{ items, total }}
  */
-async function listTransactions({ search, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked, amountMin, amountMax, page = 1, pageSize = 20 }) {
-  const where = buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, amountMin, amountMax });
+async function listTransactions({ search, counterpartNames, direction, dateFrom, dateTo, batchId, currency = 'CNY', accountNoMasked, amountMin, amountMax, page = 1, pageSize = 20 }) {
+  const where = buildTxnWhere({ search, counterpartNames, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, amountMin, amountMax });
 
   const [items, total] = await Promise.all([
     prisma.bankTransaction.findMany({
@@ -41,7 +42,7 @@ async function listTransactions({ search, direction, dateFrom, dateTo, batchId, 
  * @param {object} filters - search, direction, dateFrom, dateTo, batchId
  * @returns {object} Prisma where clause
  */
-function buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, amountMin, amountMax } = {}) {
+function buildTxnWhere({ search, counterpartNames, direction, dateFrom, dateTo, batchId, currency, accountNoMasked, amountMin, amountMax } = {}) {
   const where = {};
   if (amountMin !== undefined && amountMin !== '' || amountMax !== undefined && amountMax !== '') {
     const min = amountMin === undefined || amountMin === '' ? 0 : Number(amountMin);
@@ -64,6 +65,8 @@ function buildTxnWhere({ search, direction, dateFrom, dateTo, batchId, currency,
     if (dateFrom) where.txnDate.gte = dateFrom;
     if (dateTo) where.txnDate.lte = dateTo;
   }
+  // 精确对方户名（含全角/半角括号变体），不匹配摘要/流水号
+  if (Array.isArray(counterpartNames) && counterpartNames.length) where.counterpart = { in: counterpartNames };
   if (search) {
     where.OR = [
       { counterpart: { contains: search } },
@@ -164,9 +167,43 @@ async function groupByCounterpart({ dateFrom, dateTo, limit = 50, currency = 'CN
 }
 
 /**
+ * 职责：单个对方户名的收付合计（数据库聚合，不受分页上限影响）
+ * 思路：按户名精确（含全角/半角括号变体）过滤，不再用 summary/txnId 子串搜索
+ */
+function counterpartNameVariants(name) {
+  const trimmed = String(name || '').trim();
+  const half = trimmed.replace(/（/g, '(').replace(/）/g, ')');
+  const full = trimmed.replace(/\(/g, '（').replace(/\)/g, '）');
+  return [...new Set([trimmed, half, full])].filter(Boolean);
+}
+
+async function getCounterpartTotals({ counterpart, currency = 'CNY' }) {
+  const where = buildTxnWhere({ counterpartNames: counterpartNameVariants(counterpart), currency });
+  const groups = await prisma.bankTransaction.groupBy({
+    by: ['direction'],
+    where,
+    _sum: { amount: true },
+    _count: { _all: true },
+  });
+  let totalPaid = 0;
+  let totalReceived = 0;
+  let txnCount = 0;
+  for (const g of groups) {
+    txnCount += g._count._all;
+    if (g.direction === 'OUT') totalPaid += Math.abs(g._sum.amount || 0);
+    else totalReceived += g._sum.amount || 0;
+  }
+  return { totalPaid, totalReceived, txnCount, nameVariants: where.counterpart.in };
+}
+
+/**
  * 职责：规范化公司名称用于匹配
  * 思路：统一全角/半角括号、空格、大小写等干扰字符
  */
+const MIN_FUZZY_NAME_LENGTH = 4;
+// 去掉通用后缀后再比较长度，避免「某某贸易」「有限公司」这类泛词互相包含
+const stripGenericSuffix = (name) => name.replace(/股份有限公司|有限责任公司|有限公司|贸易|商行/g, '');
+
 function normalizeName(name) {
   return (name || '')
     .replace(/（/g, '(')
@@ -191,11 +228,13 @@ async function runReconciliation() {
     select: { counterpart: true, direction: true, amount: true },
   });
 
+  // 按规范化户名先合并（全角/半角括号变体归入同一桶），再做匹配
   const payMap = {};
   for (const t of allTxns) {
-    const name = (t.counterpart || '').trim();
-    if (!name || name === COMPANY) continue;
-    if (!payMap[name]) payMap[name] = { totalOut: 0, totalIn: 0, outCount: 0, inCount: 0 };
+    const rawName = (t.counterpart || '').trim();
+    if (!rawName || rawName === COMPANY) continue;
+    const name = normalizeName(rawName);
+    if (!payMap[name]) payMap[name] = { displayName: rawName, totalOut: 0, totalIn: 0, outCount: 0, inCount: 0 };
     if (t.direction === 'OUT') {
       payMap[name].totalOut += Math.abs(t.amount);
       payMap[name].outCount++;
@@ -213,81 +252,76 @@ async function runReconciliation() {
 
   const invMap = {};
   for (const inv of allInvs) {
-    const name = (inv.seller || '').trim();
-    if (!name || name === COMPANY) continue;
-    if (!invMap[name]) invMap[name] = { totalInvoice: 0, totalTax: 0, invCount: 0 };
+    const rawName = (inv.seller || '').trim();
+    if (!rawName || rawName === COMPANY) continue;
+    const name = normalizeName(rawName);
+    if (!invMap[name]) invMap[name] = { displayName: rawName, totalInvoice: 0, totalTax: 0, invCount: 0 };
     invMap[name].totalInvoice += inv.total;
     invMap[name].totalTax += inv.tax;
     invMap[name].invCount++;
   }
 
-  // 2. 构建规范化名称索引以解决全角/半角差异
-  const normInvMap = {};
-  for (const iName of Object.keys(invMap)) {
-    normInvMap[normalizeName(iName)] = iName;
+  // 2. 匹配：先规范化精确，再对未命中的付款做包含匹配（要求名称足够长且候选唯一）。
+  //    多个付款别名命中同一发票销方时合并为一组再与发票比较，避免同一发票总额被重复计入。
+  const claims = new Map(); // invKey -> payKey[]
+  const claim = (invKey, payKey) => {
+    if (!claims.has(invKey)) claims.set(invKey, []);
+    claims.get(invKey).push(payKey);
+  };
+  const fallbackPays = [];
+  for (const [payKey, pay] of Object.entries(payMap)) {
+    if (pay.totalOut - pay.totalIn <= 1) continue;
+    if (invMap[payKey]) claim(payKey, payKey);
+    else fallbackPays.push(payKey);
+  }
+  for (const payKey of fallbackPays) {
+    const candidates = Object.keys(invMap).filter((invKey) => {
+      const shorter = payKey.length <= invKey.length ? payKey : invKey;
+      const longer = shorter === payKey ? invKey : payKey;
+      return stripGenericSuffix(shorter).length >= MIN_FUZZY_NAME_LENGTH && longer.includes(shorter);
+    });
+    if (candidates.length === 1) claim(candidates[0], payKey);
   }
 
-  // 3. 匹配（规范化精确 -> 规范化包含）
-  const matchedSet = new Set();
+  const matchedSet = new Set(); // 已匹配的 payMap / invMap 键
   const matched = [];
+  for (const [invKey, payKeys] of claims) {
+    const inv = invMap[invKey];
+    const pays = payKeys.map((k) => payMap[k]);
+    const netPaid = pays.reduce((sum, p) => sum + p.totalOut - p.totalIn, 0);
+    const gap = netPaid - inv.totalInvoice;
+    const gapPct = netPaid > 0 ? (gap / netPaid) * 100 : 0;
 
-  for (const [payName, pay] of Object.entries(payMap)) {
-    const netPaid = pay.totalOut - pay.totalIn;
-    if (netPaid <= 1) continue;
+    let category = 'normal';
+    if (gap > 100) category = 'under_invoiced';
+    else if (gap < -100) category = 'over_invoiced';
 
-    const normPay = normalizeName(payName);
-    let invName = null;
-
-    // 3.1. 规范化精确匹配
-    if (normInvMap[normPay]) {
-      invName = normInvMap[normPay];
-    } else if (invMap[payName]) {
-      invName = payName;
-    } else {
-      // 3.2. 规范化包含匹配
-      for (const [normInv, origInv] of Object.entries(normInvMap)) {
-        if (normPay.includes(normInv) || normInv.includes(normPay)) {
-          invName = origInv;
-          break;
-        }
-      }
-    }
-
-    if (invName) {
-      const inv = invMap[invName];
-      const gap = netPaid - inv.totalInvoice;
-      const gapPct = netPaid > 0 ? (gap / netPaid) * 100 : 0;
-
-      let category = 'normal';
-      if (gap > 100) category = 'under_invoiced';
-      else if (gap < -100) category = 'over_invoiced';
-
-      matched.push({
-        payName,
-        invName: invName !== payName ? invName : undefined,
-        netPaid: roundMoney(netPaid),
-        totalInvoice: roundMoney(inv.totalInvoice),
-        totalTax: roundMoney(inv.totalTax),
-        gap: roundMoney(gap),
-        gapPct: Math.round(gapPct * 10) / 10,
-        category,
-        txnCount: pay.outCount + pay.inCount,
-        invCount: inv.invCount,
-      });
-
-      matchedSet.add(payName);
-      matchedSet.add(invName);
-    }
+    const payName = pays.map((p) => p.displayName).join('、');
+    matched.push({
+      payName,
+      invName: inv.displayName !== payName ? inv.displayName : undefined,
+      netPaid: roundMoney(netPaid),
+      totalInvoice: roundMoney(inv.totalInvoice),
+      totalTax: roundMoney(inv.totalTax),
+      gap: roundMoney(gap),
+      gapPct: Math.round(gapPct * 10) / 10,
+      category,
+      txnCount: pays.reduce((sum, p) => sum + p.outCount + p.inCount, 0),
+      invCount: inv.invCount,
+    });
+    matchedSet.add(`pay:${invKey}`);
+    payKeys.forEach((k) => matchedSet.add(`pay:${k}`));
+    matchedSet.add(`inv:${invKey}`);
   }
 
   // 3. 未匹配的付款（仅有流水无票）
   const unmatchedPayments = [];
-  for (const [name, pay] of Object.entries(payMap)) {
-    if (matchedSet.has(name)) continue;
+  for (const [key, pay] of Object.entries(payMap)) {
+    if (matchedSet.has(`pay:${key}`)) continue;
     const netPaid = pay.totalOut - pay.totalIn;
     if (netPaid <= 1) continue;
     unmatchedPayments.push({
-      counterpart: name,
+      counterpart: pay.displayName,
       netPaid: roundMoney(netPaid),
       txnCount: pay.outCount + pay.inCount,
     });
@@ -295,10 +329,10 @@ async function runReconciliation() {
 
   // 4. 未匹配的发票（仅有发票无流水）
   const unmatchedInvoices = [];
-  for (const [name, inv] of Object.entries(invMap)) {
-    if (matchedSet.has(name)) continue;
+  for (const [key, inv] of Object.entries(invMap)) {
+    if (matchedSet.has(`inv:${key}`)) continue;
     unmatchedInvoices.push({
-      seller: name,
+      seller: inv.displayName,
       totalInvoice: roundMoney(inv.totalInvoice),
       invCount: inv.invCount,
     });
@@ -365,4 +399,4 @@ async function getIncomingSummary() {
   return { items, total: roundMoney(total) };
 }
 
-module.exports = { listTransactions, getStats, listBatches, groupByCounterpart, runReconciliation, getIncomingSummary };
+module.exports = { listTransactions, getCounterpartTotals, counterpartNameVariants, getStats, listBatches, groupByCounterpart, runReconciliation, getIncomingSummary };

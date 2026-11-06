@@ -154,4 +154,13 @@ async function findInvoicedPurchaseContractIds(db, contractIds) {
   return new Set(rows.map((r) => r.matchedContractId));
 }
 
-module.exports = { VALID_INVOICE_WHERE, listInvoices, findByExactNumbers, getStats, groupBySeller, findInvoicedPurchaseContractIds };
+/**
+ * 职责：按搜索词汇总有效发票价税合计（数据库聚合，不受分页上限影响）
+ */
+async function sumValidInvoices({ search }) {
+  const where = { ...buildInvWhere({ search }), ...VALID_INVOICE_WHERE };
+  const agg = await prisma.invoiceRecord.aggregate({ where, _sum: { total: true }, _count: { _all: true } });
+  return { totalInvoice: agg._sum.total || 0, validInvoiceCount: agg._count._all };
+}
+
+module.exports = { VALID_INVOICE_WHERE, listInvoices, sumValidInvoices, findByExactNumbers, getStats, groupBySeller, findInvoicedPurchaseContractIds };
