@@ -4,6 +4,7 @@
  * Pos: 后端 Agent Runtime 核心，衔接 LLM 与业务数据
  *
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * 角色边界：读工具 allowedRoles、建议卡生成与确认执行都按调用者实时角色复核；密钥类配置助手不可读写。
  */
 
 const crypto = require('node:crypto');
@@ -331,7 +332,7 @@ const isSamePendingAction = (action, recommendation) => action
   && action.actionType === recommendation.actionType
   && JSON.stringify(action.params || {}) === JSON.stringify(recommendation.params || {});
 
-const materializeRecommendationPendingActions = async ({ userId, recommendations, collectedIds = [] }) => {
+const materializeRecommendationPendingActions = async ({ userId, userRole, recommendations, collectedIds = [] }) => {
   if (!userId || !Array.isArray(recommendations) || !Array.isArray(collectedIds)) return [];
 
   const created = [];
@@ -339,6 +340,8 @@ const materializeRecommendationPendingActions = async ({ userId, recommendations
     if (recommendation.executionMode !== 'confirmable_write' || !recommendation.actionType || !recommendation.params) {
       continue;
     }
+    // 只读诊断的建议写动作也要按调用者角色过滤，否则 SALES 可借诊断拿到 FINANCE 的确认卡
+    if (!userRole || !isToolAllowedForRole(recommendation.actionType, userRole)) continue;
 
     let exists = false;
     for (const id of collectedIds) {
@@ -833,7 +836,25 @@ const PRICING_CONFIG_REFUSAL = '汇率和加价由报价配置统一维护，助
 // 卖方信息（公司名称/地址/电话/税号/银行 + 旧开票抬头别名）只经「设置 > 公司信息」维护；助手不能写，银行资料与旧抬头文本不能读。
 const SELLER_CONFIG_KEYS = ['companyName', 'companyAddress', 'companyPhone', 'companyTaxId', 'companyBankInfo', 'invoiceTitleInfo'];
 const AGENT_HIDDEN_CONFIG_KEYS = ['companyBankInfo', 'invoiceTitleInfo'];
+// 密钥/令牌类配置（kimiApiKey、deepseekApiKey、hsciqApiKey、*Secret*、*Token*）为只写：助手既不能读也不能写。
+const isSecretConfigKey = (key) => /api[-_]?key|secret|token|password|credential|private[-_]?key/i.test(String(key || ''));
+const SECRET_CONFIG_REFUSAL = '密钥类配置为只写，助手不能读取或修改，请由管理员在「设置」页面维护';
 const SELLER_CONFIG_REFUSAL = '卖方公司信息只能由管理员在「设置 > 公司信息」中维护，助手不能修改';
+
+// 读工具按 HTTP RBAC 收口：财务/事件账/审计/系统配置不对其他角色开放；未列出的工具保持全角色可读。
+const FINANCE_READ_ROLES = [ROLES.ADMIN, ROLES.FINANCE];
+const READ_TOOL_ROLES = {
+  GetFinanceOverview: FINANCE_READ_ROLES,
+  GetReceivablesByCustomer: FINANCE_READ_ROLES,
+  GetFinanceRiskOverview: FINANCE_READ_ROLES,
+  GetTaxComplianceOverview: FINANCE_READ_ROLES,
+  GetTaxRefundDetail: FINANCE_READ_ROLES,
+  GetForexVerificationDetail: FINANCE_READ_ROLES,
+  GetRecentEvents: FINANCE_READ_ROLES,
+  GetOpsOverview: FINANCE_READ_ROLES,
+  GetExecutiveOverview: FINANCE_READ_ROLES,
+  GetSystemConfig: [ROLES.ADMIN],
+};
 
 const READ_TOOL_SPECS = require('./agent/tools/readTools')({
   toJson,
@@ -842,7 +863,9 @@ const READ_TOOL_SPECS = require('./agent/tools/readTools')({
   buildTradeComplianceReadinessDiagnostic,
   PRICING_CONFIG_KEYS,
   AGENT_HIDDEN_CONFIG_KEYS,
-});
+  isSecretConfigKey,
+  SECRET_CONFIG_REFUSAL,
+}).map((tool) => (READ_TOOL_ROLES[tool.name] ? { ...tool, allowedRoles: READ_TOOL_ROLES[tool.name] } : tool));
 
 const WRITE_TOOL_SPECS = require('./agent/tools/writeTools')({
   toJson,
@@ -852,6 +875,8 @@ const WRITE_TOOL_SPECS = require('./agent/tools/writeTools')({
   PRICING_CONFIG_REFUSAL,
   SELLER_CONFIG_KEYS,
   SELLER_CONFIG_REFUSAL,
+  isSecretConfigKey,
+  SECRET_CONFIG_REFUSAL,
 });
 
 const listToolRegistry = () => [...READ_TOOL_SPECS, ...WRITE_TOOL_SPECS].map((tool) => ({
@@ -920,16 +945,17 @@ const assertToolAllowedForRole = (toolName, role) => {
 
 const resolveSystemPrompt = (preset, routePlan) => `${preset.prompt}${buildSpecialistFrame(routePlan)}`;
 
-const selectToolSpecsForRoute = (routePlan) => {
+const selectToolSpecsForRoute = (routePlan, userRole) => {
+  const forRole = (tools) => (userRole ? tools.filter((tool) => isToolAllowedForRole(tool.name, userRole)) : tools);
   if (!routePlan || routePlan.selectedDomains.includes('all')) {
     return {
-      readTools: READ_TOOL_SPECS,
+      readTools: forRole(READ_TOOL_SPECS),
       writeTools: WRITE_TOOL_SPECS,
     };
   }
 
   const selectedSet = new Set(routePlan.selectedDomains);
-  const readTools = READ_TOOL_SPECS.filter((tool) => selectedSet.has(tool.domain));
+  const readTools = forRole(READ_TOOL_SPECS.filter((tool) => selectedSet.has(tool.domain)));
   const allowedWriteDomains = new Set([...routePlan.selectedDomains, 'system']);
   const writeTools = WRITE_TOOL_SPECS.filter((tool) => allowedWriteDomains.has(tool.domain));
 
@@ -939,7 +965,7 @@ const selectToolSpecsForRoute = (routePlan) => {
   };
 };
 
-const buildToolPool = (defineTool, traceStore, recommendationStore, toolSpecs = READ_TOOL_SPECS) => toolSpecs.map((tool) => defineTool({
+const buildToolPool = (defineTool, traceStore, recommendationStore, toolSpecs = READ_TOOL_SPECS, userRole = null) => toolSpecs.map((tool) => defineTool({
   name: tool.name,
   description: tool.description,
   inputSchema: tool.inputSchema,
@@ -948,6 +974,7 @@ const buildToolPool = (defineTool, traceStore, recommendationStore, toolSpecs = 
   async call(input) {
     const startedAt = Date.now();
     try {
+      if (userRole) assertToolAllowedForRole(tool.name, userRole);
       const result = await tool.call(input || {});
       collectCompositeRecommendations(tool, result, recommendationStore);
       pushToolTrace(traceStore, {
@@ -1018,7 +1045,7 @@ const buildWriteToolPool = (defineTool, userId, userRole, collectedIds, traceSto
       if (!tool.confirmationRequired) {
         const pending = JSON.parse(result);
         if (pending.__pendingAction) {
-          result = toJson({ ...await executeAction(pending.actionId, userId, { automatic: true }), automatic: true });
+          result = toJson({ ...await executeAction(pending.actionId, userId, { automatic: true, userRole }), automatic: true });
           automaticResults.set(key, result);
         }
       }
@@ -1070,15 +1097,19 @@ const ACTION_EXECUTORS = {
   /**
    * 职责：创建收/付款记录
    */
-  async CreatePaymentRecord(params, userId) {
-    const record = await financeService.createPayment({
+  async CreatePaymentRecord(params, userId, { actionId } = {}) {
+    const isPayable = params.type === 'PAYABLE';
+    const { payment } = await financeService.createPayment({
       type: params.type,
       amount: params.amount,
-      customerName: params.customerName,
+      currency: isPayable ? 'CNY' : 'USD',
+      purchaseContractId: isPayable ? params.purchaseContractId : undefined,
+      customerName: params.customerName || undefined,
+      paymentMethod: params.paymentMethod,
+      paymentDate: params.paymentDate || new Date().toISOString(),
       note: params.note,
-      paidAt: new Date().toISOString(),
-    });
-    return { success: true, detail: `已创建收/付款记录`, record };
+    }, { idempotencyKey: `agent:${actionId}` });
+    return { success: true, detail: `已创建收/付款记录`, record: payment };
   },
 
   /**
@@ -1089,6 +1120,7 @@ const ACTION_EXECUTORS = {
     if (PRICING_CONFIG_KEYS.includes(params.key)) throw new Error(PRICING_CONFIG_REFUSAL);
     // 即使存在旧的待确认动作，也不得绕过「公司信息」的校验直接写卖方信息
     if (SELLER_CONFIG_KEYS.includes(params.key)) throw new Error(SELLER_CONFIG_REFUSAL);
+    if (isSecretConfigKey(params.key)) throw new Error(SECRET_CONFIG_REFUSAL);
     await prisma.systemConfig.upsert({
       where: { key: params.key },
       update: { value: params.value, note: params.note },
@@ -1239,12 +1271,14 @@ const PENDING_STATUS_MESSAGES = {
   failed: '该操作已失败，请重新向 Agent 提问',
 };
 
-const executeAction = async (actionId, userId, { automatic = false } = {}) => {
+const executeAction = async (actionId, userId, { automatic = false, userRole } = {}) => {
   const action = await pendingStore.getPendingRecord(actionId);
   if (!action) throw createError('该操作已过期或不存在，请重新向 Agent 提问', 404);
   if (action.userId !== userId) throw createError('无权执行此操作', 403);
   if (action.status !== 'pending') throw createError(PENDING_STATUS_MESSAGES[action.status] || '该操作已不可执行', 409);
 
+  // 确认时按实时角色复核（HTTP 入口放行 5 个角色），不依赖创建时的判断
+  assertToolAllowedForRole(action.actionType, userRole);
   const executor = ACTION_EXECUTORS[action.actionType];
   if (!executor) throw createError(`不支持的操作类型: ${action.actionType}`, 400);
 
@@ -1256,7 +1290,7 @@ const executeAction = async (actionId, userId, { automatic = false } = {}) => {
   }
 
   try {
-    const result = await executor(action.params, userId);
+    const result = await executor(action.params, userId, { actionId });
     // 写已生效：标记失败（如 SQLITE_BUSY）不得把它记成 failed 引发用户重复写；行保持 executing 直到过期，不可再次确认
     await pendingStore.finishClaimed(actionId, 'executed').catch((error) => {
       // Never log params or the raw message (may carry query values); the row stays executing until expiry.
@@ -1553,8 +1587,8 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
 
   // 0. 收集本次 run 产生的 pendingAction IDs
   const collectedActionIds = [];
-  const { readTools: readToolSpecs, writeTools: writeToolSpecs } = selectToolSpecsForRoute(routePlan);
-  const readTools = buildToolPool(sdk.defineTool, toolTrace, actionRecommendationTrace, readToolSpecs);
+  const { readTools: readToolSpecs, writeTools: writeToolSpecs } = selectToolSpecsForRoute(routePlan, userRole);
+  const readTools = buildToolPool(sdk.defineTool, toolTrace, actionRecommendationTrace, readToolSpecs, userRole);
   const writeTools = buildWriteToolPool(sdk.defineTool, userId, userRole, collectedActionIds, toolTrace, writeToolSpecs);
   const tools = [...readTools, ...writeTools];
   const selectedToolNames = [...readToolSpecs, ...writeToolSpecs].map((tool) => tool.name);
@@ -1593,6 +1627,7 @@ const runAgentPrompt = async ({ userId, userRole, agentType, message, sessionId 
     const actionRecommendations = summarizeActionRecommendations(actionRecommendationTrace);
     await materializeRecommendationPendingActions({
       userId,
+      userRole,
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });
@@ -1660,8 +1695,8 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
   const actionRecommendationTrace = [];
 
   const collectedActionIds = [];
-  const { readTools: readToolSpecs, writeTools: writeToolSpecs } = selectToolSpecsForRoute(routePlan);
-  const readTools = buildToolPool(sdk.defineTool, toolTrace, actionRecommendationTrace, readToolSpecs);
+  const { readTools: readToolSpecs, writeTools: writeToolSpecs } = selectToolSpecsForRoute(routePlan, userRole);
+  const readTools = buildToolPool(sdk.defineTool, toolTrace, actionRecommendationTrace, readToolSpecs, userRole);
   const writeTools = buildWriteToolPool(sdk.defineTool, userId, userRole, collectedActionIds, toolTrace, writeToolSpecs);
   const tools = [...readTools, ...writeTools];
   const selectedToolNames = [...readToolSpecs, ...writeToolSpecs].map((tool) => tool.name);
@@ -1721,6 +1756,7 @@ async function* runAgentPromptStream({ userId, userRole, agentType, message, ses
     const actionRecommendations = summarizeActionRecommendations(actionRecommendationTrace);
     await materializeRecommendationPendingActions({
       userId,
+      userRole,
       collectedIds: collectedActionIds,
       recommendations: actionRecommendations,
     });

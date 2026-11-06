@@ -44,20 +44,20 @@ test('agent pending actions are shared across processes and claimed atomically',
   await t.test('concurrent double confirm executes exactly once', async () => {
     const id = await propose(procA, 'Synthetic Supplier Race');
     const results = await Promise.allSettled([
-      procA.agent.executeAction(id, user.id),
-      procA.agent.executeAction(id, user.id),
-      procB.agent.executeAction(id, user.id),
+      procA.agent.executeAction(id, user.id, { userRole: 'ADMIN' }),
+      procA.agent.executeAction(id, user.id, { userRole: 'ADMIN' }),
+      procB.agent.executeAction(id, user.id, { userRole: 'ADMIN' }),
     ]);
     assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
     for (const r of results.filter((x) => x.status === 'rejected')) assert.equal(r.reason.statusCode, 409);
     assert.equal(await supplierCount('Synthetic Supplier Race'), 1);
     assert.equal(await procA.db.operationLog.count({ where: { entityId: id, action: 'AGENT_WRITE_EXECUTE' } }), 1);
-    await assert.rejects(procB.agent.executeAction(id, user.id), (e) => e.statusCode === 409);
+    await assert.rejects(procB.agent.executeAction(id, user.id, { userRole: 'ADMIN' }), (e) => e.statusCode === 409);
   });
 
   await t.test('confirm from a different process than the one that proposed', async () => {
     const id = await propose(procA, 'Synthetic Supplier Cross');
-    const result = await procB.agent.executeAction(id, user.id);
+    const result = await procB.agent.executeAction(id, user.id, { userRole: 'ADMIN' });
     assert.equal(result.success, true);
     assert.equal(await supplierCount('Synthetic Supplier Cross'), 1);
   });
@@ -66,14 +66,14 @@ test('agent pending actions are shared across processes and claimed atomically',
     const id = await propose(procA, 'Synthetic Supplier Cancel');
     await assert.rejects(procB.agent.executeAction(id, 'someone-else'), (e) => e.statusCode === 403);
     await procB.agent.cancelAction(id, user.id);
-    await assert.rejects(procA.agent.executeAction(id, user.id), (e) => e.statusCode === 409);
+    await assert.rejects(procA.agent.executeAction(id, user.id, { userRole: 'ADMIN' }), (e) => e.statusCode === 409);
     assert.equal(await supplierCount('Synthetic Supplier Cancel'), 0);
   });
 
   await t.test('expired action -> 404 and is purged by the next create', async () => {
     const id = await propose(procA, 'Synthetic Supplier Expired');
     await procA.db.agentPendingAction.update({ where: { id }, data: { expiresAt: new Date(Date.now() - 1000) } });
-    await assert.rejects(procB.agent.executeAction(id, user.id), (e) => e.statusCode === 404);
+    await assert.rejects(procB.agent.executeAction(id, user.id, { userRole: 'ADMIN' }), (e) => e.statusCode === 404);
     await propose(procA, 'Synthetic Supplier Trigger Cleanup');
     assert.equal(await procA.db.agentPendingAction.count({ where: { id } }), 0);
     assert.equal(await supplierCount('Synthetic Supplier Expired'), 0);
@@ -86,10 +86,10 @@ test('agent pending actions are shared across processes and claimed atomically',
     const id = JSON.parse(await tool.call({ id: supplier.id, name: 'Synthetic Renamed' })).actionId;
     assert.ok(id);
     await procA.db.supplier.delete({ where: { id: supplier.id } }); // vanishes between propose and confirm
-    await assert.rejects(procA.agent.executeAction(id, user.id));
+    await assert.rejects(procA.agent.executeAction(id, user.id, { userRole: 'ADMIN' }));
     const row = await procA.db.agentPendingAction.findUnique({ where: { id } });
     assert.equal(row.status, 'failed');
     assert.ok(row.failureReason);
-    await assert.rejects(procB.agent.executeAction(id, user.id), (e) => e.statusCode === 409);
+    await assert.rejects(procB.agent.executeAction(id, user.id, { userRole: 'ADMIN' }), (e) => e.statusCode === 409);
   });
 });
