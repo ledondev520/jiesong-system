@@ -164,6 +164,7 @@ SQL
 | Secret | 说明 |
 |--------|------|
 | `SSH_PRIVATE_KEY` | VPS 的 SSH 私钥 |
+| `SSH_KNOWN_HOSTS` | **必填**：VPS 的 known_hosts 行（在可信网络执行 `ssh-keyscan -p <端口> <主机>`，并带外核对指纹后粘贴）。为空则部署失败，不再运行时 ssh-keyscan |
 | `SSH_HOST` | VPS IP 或域名 |
 | `SSH_USER` | SSH 用户名 |
 | `SSH_PORT` | SSH 端口（默认 22）|

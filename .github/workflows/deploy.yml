@@ -42,7 +42,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Verify deployment check behavior
-        run: node --test scripts/verify-vps-runtime.test.cjs scripts/deploy-ssh.test.cjs
+        run: node --test scripts/verify-vps-runtime.test.cjs scripts/deploy-ssh.test.cjs scripts/deploy-sh.test.cjs
 
       - name: Install frontend dependencies
         working-directory: ./frontend
@@ -104,10 +104,19 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           log-public-key: false
 
-      - name: Add host to known_hosts
+      # Pinned host key only: ssh-keyscan trusts whatever the network answers (MITM). Add the secret once from a
+      # trusted network: `ssh-keyscan -p <port> <host>` and verify the fingerprint out of band (see DEPLOY.md).
+      - name: Pin host key in known_hosts
+        env:
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
+          if [ -z "$SSH_KNOWN_HOSTS" ]; then
+            echo "::error::SSH_KNOWN_HOSTS secret is required (pinned server host key); refusing to trust an unverified key"
+            exit 1
+          fi
+          umask 077
           mkdir -p ~/.ssh
-          ssh-keyscan -p ${{ secrets.SSH_PORT || '22' }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Deploy to Production via SSH
         env:
@@ -139,8 +148,11 @@ jobs:
               test -n "$GUARD_SCRIPT"
               . <(printf '%s' "$GUARD_SCRIPT")
               PRICING_BACKUP=""
+              # Private temp copy; removed on any early exit (git failure) as well as on success.
+              cleanup_pricing_backup() { [ -z "$PRICING_BACKUP" ] || rm -f "$PRICING_BACKUP"; }
+              trap cleanup_pricing_backup EXIT
               if [ -f config/pricing.json ]; then
-                PRICING_BACKUP="$(mktemp)"
+                PRICING_BACKUP="$(umask 077 && mktemp)"
                 cp -p config/pricing.json "$PRICING_BACKUP"
                 git checkout -- config/pricing.json 2>/dev/null || true
               fi
@@ -150,6 +162,7 @@ jobs:
               if [ -n "$PRICING_BACKUP" ]; then
                 cp -p "$PRICING_BACKUP" config/pricing.json
                 rm -f "$PRICING_BACKUP"
+                PRICING_BACKUP=""
                 echo "Preserved runtime pricing config across deploy"
               fi
               cd backend
