@@ -47,15 +47,29 @@ const buildReceivableReconciliation = ({
   const uniqueLedgerLines = new Map();
   const duplicateGroups = new Map();
   const reversalByContract = new Map();
-  ledgerEntries.forEach((entry) => {
+  // Pair each red-ink row with one same-contract, same-amount booking first, so a reversed
+  // booking cancels exactly once and a re-booking with the same summary is not collapsed into it.
+  const paired = new Set();
+  ledgerEntries.forEach((neg, ni) => {
+    const negNo = extractContractNo(neg.summary);
+    if (!negNo || Number(neg.debit || 0) >= 0) return;
+    const pi = ledgerEntries.findIndex((pos, i) => (
+      !paired.has(i) && Number(pos.debit || 0) > 0 && extractContractNo(pos.summary) === negNo
+      && roundMoney(pos.debit) === roundMoney(-neg.debit)
+    ));
+    if (pi >= 0) { paired.add(pi); paired.add(ni); }
+  });
+  ledgerEntries.forEach((entry, index) => {
     const contractNo = extractContractNo(entry.summary);
-    if (!contractNo) return;
+    if (!contractNo || paired.has(index)) return;
     // Red-ink (negative debit) rows reverse an earlier booking; they are netted below, not deduplicated.
     if (Number(entry.debit || 0) < 0) {
       reversalByContract.set(contractNo, roundMoney((reversalByContract.get(contractNo) || 0) + Number(entry.debit)));
       return;
     }
     if (Number(entry.debit || 0) === 0) return;
+    // voucherNumber is deliberately not in the key: same amount+summary in different vouchers is the
+    // double-booking this report exists to flag (owner-verified 7月 EXP260008); split lots show as a visible anomaly.
     const key = [
       contractNo,
       normalizeText(entry.summary),
@@ -84,7 +98,9 @@ const buildReceivableReconciliation = ({
   });
   reversalByContract.forEach((reversal, contractNo) => {
     if (!recognizedDebitByContract.has(contractNo)) return;
-    recognizedDebitByContract.set(contractNo, roundMoney(Math.max(recognizedDebitByContract.get(contractNo) + reversal, 0)));
+    const net = roundMoney(recognizedDebitByContract.get(contractNo) + reversal);
+    if (net > 0) recognizedDebitByContract.set(contractNo, net);
+    else recognizedDebitByContract.delete(contractNo); // fully reversed: unbooked, reported as missing
   });
   const periodContractByNo = new Map(periodContracts.map((contract) => [normalizeText(contract.contractNo), contract]));
   const recognizedPeriodContracts = Array.from(periodContractByNo.values()).filter((contract) => (
@@ -94,8 +110,11 @@ const buildReceivableReconciliation = ({
     Number(recognizedDebitByContract.get(normalizeText(contract.contractNo)) || 0) / Number(contract.totalAmount || 0)
   );
   const rated = recognizedPeriodContracts.filter((contract) => Number(contract.totalAmount || 0) > 0);
-  const rateCeiling = rated.length ? median(rated.map(contractRate)) * MAX_RATE_MULTIPLE : Infinity;
-  const rateOutlierContracts = rated.filter((contract) => contractRate(contract) > rateCeiling);
+  // shortcut: a median needs >=3 contracts to mean anything; below that nothing is excluded.
+  const mid = rated.length >= 3 ? median(rated.map(contractRate)) : null;
+  const rateOutlierContracts = mid === null ? [] : rated.filter((contract) => (
+    contractRate(contract) > mid * MAX_RATE_MULTIPLE || contractRate(contract) < mid / MAX_RATE_MULTIPLE
+  ));
   // Outliers stay out of the rate so one bad voucher cannot skew every other contract.
   const rateContracts = recognizedPeriodContracts.filter((contract) => !rateOutlierContracts.includes(contract));
   const recognizedPeriodUsd = rateContracts.reduce((sum, contract) => sum + Number(contract.totalAmount || 0), 0);

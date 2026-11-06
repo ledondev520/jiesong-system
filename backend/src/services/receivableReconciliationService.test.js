@@ -75,3 +75,47 @@ test('buildReceivableReconciliation: 改摘要重记的合同不拉偏其他合�
   assert.equal(result.effectiveExchangeRate, 7.2);
   assert.deepEqual(result.anomalies.rateOutlierContracts, ['EXP260003']);
 });
+
+test('buildReceivableReconciliation: 同摘要冲销后重记且另有合同，汇率不为0', () => {
+  const result = buildReceivableReconciliation({
+    ...base,
+    contracts: [contract('EXP1', 1000), contract('EXP2', 1000)],
+    ledgerEntries: [
+      { voucherNumber: '记-1', summary: 'EXP1 外销收入', debit: 7200, credit: 0 },
+      { voucherNumber: '记-2', summary: 'EXP1 外销收入', debit: -7200, credit: 0 },
+      { voucherNumber: '记-3', summary: 'EXP1 外销收入', debit: 7200, credit: 0 },
+      { voucherNumber: '记-4', summary: 'EXP2 外销收入', debit: 7200, credit: 0 },
+    ],
+  });
+  assert.equal(result.effectiveExchangeRate, 7.2);
+  assert.equal(result.anomalies.duplicateDebitCny, 0);
+  assert.deepEqual(result.anomalies.rateOutlierContracts, []);
+});
+
+test('buildReceivableReconciliation: 完全冲销的合同不进入汇率分母', () => {
+  const result = buildReceivableReconciliation({
+    ...base,
+    contracts: [contract('EXP1', 1000), contract('EXP2', 1000)],
+    ledgerEntries: [
+      { voucherNumber: '记-1', summary: 'EXP1 外销收入', debit: 7200, credit: 0 },
+      { voucherNumber: '记-2', summary: 'EXP1 外销收入', debit: -7200, credit: 0 },
+      { voucherNumber: '记-3', summary: 'EXP2 外销收入', debit: 7200, credit: 0 },
+    ],
+  });
+  assert.equal(result.effectiveExchangeRate, 7.2);
+  assert.equal(result.anomalies.missingContracts[0].contractNo, 'EXP1');
+});
+
+test('buildReceivableReconciliation: 偏低汇率的合同同样被排除', () => {
+  const result = buildReceivableReconciliation({
+    ...base,
+    contracts: [contract('EXP1', 1000), contract('EXP2', 1000), contract('EXP3', 1000)],
+    ledgerEntries: [
+      { voucherNumber: '记-1', summary: 'EXP1 外销收入', debit: 7200, credit: 0 },
+      { voucherNumber: '记-2', summary: 'EXP2 外销收入', debit: 7200, credit: 0 },
+      { voucherNumber: '记-3', summary: 'EXP3 外销收入', debit: 1000, credit: 0 },
+    ],
+  });
+  assert.equal(result.effectiveExchangeRate, 7.2);
+  assert.deepEqual(result.anomalies.rateOutlierContracts, ['EXP3']);
+});
