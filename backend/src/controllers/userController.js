@@ -14,6 +14,7 @@ const { assertPassword } = require('../utils/passwordPolicy');
 const { success, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const { createError } = require('../middleware/errorHandler');
+const { shouldRevokeSessions, revokeBrowserSessions } = require('../utils/userSessionRevocation');
 
 /**
  * 职责：获取用户列表
@@ -137,19 +138,27 @@ const update = async (req, res, next) => {
       updateData.sessionVersion = { increment: 1 };
     }
 
-    const user = await prisma.user.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        username: true,
-        name: true,
-        role: true,
-        avatar: true,
-        isActive: true,
-        lastLoginAt: true,
-        updatedAt: true,
-      },
+    const user = await prisma.$transaction(async (tx) => {
+      const existing = await tx.user.findUnique({ where: { id }, select: { role: true, isActive: true } });
+      if (!existing) throw createError('用户不存在', 404);
+      const revoke = shouldRevokeSessions(existing, { role, isActive });
+      if (revoke) updateData.sessionVersion = { increment: 1 };
+      const updated = await tx.user.update({
+        where: { id },
+        data: updateData,
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          role: true,
+          avatar: true,
+          isActive: true,
+          lastLoginAt: true,
+          updatedAt: true,
+        },
+      });
+      if (revoke) await revokeBrowserSessions(tx, id);
+      return updated;
     });
 
     clearAuthCache(id);
@@ -160,19 +169,29 @@ const update = async (req, res, next) => {
 };
 
 /**
- * 职责：删除用户
+ * 职责：停用用户（DELETE 语义改为软停用，保留 OperationLog/PurchaseReceipt 等不可变历史）
+ * 不能停用自己，也不能停用最后一个有效 ADMIN；会话立即撤销。
  */
 const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
 
     if (req.user && req.user.id === id) {
-      throw createError('不能删除自己', 400);
+      throw createError('不能停用自己', 400);
     }
 
-    await prisma.user.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      const target = await tx.user.findUnique({ where: { id }, select: { role: true, isActive: true } });
+      if (!target) throw createError('用户不存在', 404);
+      if (target.role === 'ADMIN' && target.isActive) {
+        const otherAdmins = await tx.user.count({ where: { role: 'ADMIN', isActive: true, id: { not: id } } });
+        if (otherAdmins === 0) throw createError('不能停用最后一个有效管理员', 400);
+      }
+      await tx.user.update({ where: { id }, data: { isActive: false, sessionVersion: { increment: 1 } } });
+      await revokeBrowserSessions(tx, id);
+    });
     clearAuthCache(id);
-    success(res, null, '用户已删除');
+    success(res, null, '用户已停用');
   } catch (error) {
     next(error);
   }

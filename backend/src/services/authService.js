@@ -14,6 +14,7 @@ const { ROLES } = require('../config/constants');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
 const { assertPassword } = require('../utils/passwordPolicy');
+const { shouldRevokeSessions, revokeBrowserSessions } = require('../utils/userSessionRevocation');
 
 /**
  * 职责：用户登录验证并生成Token
@@ -226,26 +227,33 @@ const updateUser = async (id, userData) => {
   const { name, role, email, phone, isActive } = userData;
   if (role !== undefined && !Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
   
-  const user = await prisma.user.update({
-    where: { id },
-    data: {
-      name,
-      role,
-      email,
-      phone,
-      isActive,
-      ...(email !== undefined ? { sessionVersion: { increment: 1 } } : {}),
-    },
-    select: {
-      id: true,
-      username: true,
-      name: true,
-      role: true,
-      email: true,
-      phone: true,
-      isActive: true,
-      createdAt: true,
-    },
+  const user = await prisma.$transaction(async (tx) => {
+    const existing = await tx.user.findUnique({ where: { id }, select: { role: true, isActive: true } });
+    if (!existing) throw createError('用户不存在', 404);
+    const revoke = shouldRevokeSessions(existing, { role, isActive });
+    const updated = await tx.user.update({
+      where: { id },
+      data: {
+        name,
+        role,
+        email,
+        phone,
+        isActive,
+        ...(email !== undefined || revoke ? { sessionVersion: { increment: 1 } } : {}),
+      },
+      select: {
+        id: true,
+        username: true,
+        name: true,
+        role: true,
+        email: true,
+        phone: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+    if (revoke) await revokeBrowserSessions(tx, id);
+    return updated;
   });
   
   clearAuthCache(id);
