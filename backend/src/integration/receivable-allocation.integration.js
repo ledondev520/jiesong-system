@@ -213,18 +213,21 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
 
   await t.test('current database roles permit ordinary allocation but deny BOSS, inactive and anonymous writes', async () => {
     const a = await sale(), source = await receipt();
-    for (const role of roles.filter(role => role !== 'BOSS')) {
+    for (const role of ['ADMIN', 'SALES', 'FINANCE']) {
       await good('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 1 }] }, role);
+    }
+    for (const role of ['PURCHASE', 'WAREHOUSE']) {
+      assert.equal((await call('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 1 }] }, role)).status, 403);
     }
     for (const [role, expected] of [['BOSS', 403], ['INACTIVE', 401], ['ANONYMOUS', 401]]) {
       const before = snapshot();
       assert.equal((await call('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 1 }] }, role)).status, expected);
       assert.deepEqual(snapshot(), before);
     }
-    assert.equal(balance(a.id), 5);
+    assert.equal(balance(a.id), 3);
     for (const role of ['SALES', 'FINANCE', 'BOSS']) {
-      assert.equal((await good('GET', '/finance/unallocated-payments', undefined, role)).find(row => row.id === source.id).remainingAmount, 95);
-      assert.equal((await good('GET', `/finance/payments?salesContractId=${a.id}`, undefined, role)).items.length, 5);
+      assert.equal((await good('GET', '/finance/unallocated-payments', undefined, role)).find(row => row.id === source.id).remainingAmount, 97);
+      assert.equal((await good('GET', `/finance/payments?salesContractId=${a.id}`, undefined, role)).items.length, 3);
     }
   });
 

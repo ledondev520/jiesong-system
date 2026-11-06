@@ -150,14 +150,21 @@ test('HTTP/SQLite: finance query filters, classifications and existing read boun
       await checkInvoices(filters, rows);
     });
   }
-  await t.test('existing role boundaries allow authenticated bank/invoice reads and restrict evidence', async () => {
+  await t.test('bank/invoice reads are ADMIN/FINANCE/BOSS only; evidence stays ADMIN/FINANCE', async () => {
     for (const role of ROLES) {
-      const list = await get('/bank-flow/transactions', { currency: 'USD' }, role);
-      assert.equal(list.pagination.total, 2);
-      const stats = await get('/bank-flow/transactions/stats', { currency: 'USD' }, role);
-      assert.equal(stats.txnCount, 2);
-      const related = await get('/bank-flow/invoices', { search: 'number-needle' }, role);
-      assert.equal(related.items[0].id, 'inv07');
+      const readable = ['ADMIN', 'FINANCE', 'BOSS'].includes(role);
+      if (readable) {
+        const list = await get('/bank-flow/transactions', { currency: 'USD' }, role);
+        assert.equal(list.pagination.total, 2);
+        const stats = await get('/bank-flow/transactions/stats', { currency: 'USD' }, role);
+        assert.equal(stats.txnCount, 2);
+        const related = await get('/bank-flow/invoices', { search: 'number-needle' }, role);
+        assert.equal(related.items[0].id, 'inv07');
+      } else {
+        await get('/bank-flow/transactions', { currency: 'USD' }, role, 403);
+        await get('/bank-flow/invoices/stats', {}, role, 403);
+        await get('/finance/statements', {}, role, 403);
+      }
       const expected = ['ADMIN', 'FINANCE'].includes(role) ? 200 : 403;
       await get('/finance/statements/evidence/summary', {}, role, expected);
       await get('/finance/statements/evidence/documents', {}, role, expected);

@@ -77,14 +77,13 @@ export function OrderDocsTab({
   const missingHsItems = (packingItems ?? [])
     .filter((item) => !item.product?.hsCode)
     .map((item) => item.product?.customsName || "未知商品");
-  // 同名只列一次，重复处以 ×N 标注
-  const missingHsCounts = new Map<string, number>();
-  for (const name of missingHsItems) {
-    missingHsCounts.set(name, (missingHsCounts.get(name) ?? 0) + 1);
-  }
-  const missingHsLabel = [...missingHsCounts]
-    .map(([name, n]) => (n > 1 ? `${name} ×${n}` : name))
-    .join("、");
+  // 同名商品只列一次并标注数量，如「密胺餐具 ×2」
+  const missingHsLabels = [
+    ...missingHsItems.reduce(
+      (counts, name) => counts.set(name, (counts.get(name) ?? 0) + 1),
+      new Map<string, number>(),
+    ),
+  ].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name));
 
   return (
     <div className="space-y-4">
@@ -105,7 +104,7 @@ export function OrderDocsTab({
                   <p className="font-medium">
                     仍有 {missingHsItems.length} 项装箱商品未匹配 HS 编码
                   </p>
-                  <p>未匹配：{missingHsLabel}</p>
+                  <p>未匹配：{missingHsLabels.join("、")}</p>
                   <p className="text-xs">
                     为避免申报遗漏，请先通过历史记录、AI
                     建议或人工确认补齐；申报三表会阻止不完整单据生成。

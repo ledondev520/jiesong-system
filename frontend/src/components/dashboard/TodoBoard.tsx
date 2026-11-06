@@ -212,9 +212,10 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                           </span>
                           {item.amount !== null && (
                             <span className="shrink-0 tabular-nums">
-                              {item.amount === 0
-                                ? "—"
-                                : money(item.amount, meta.currency)}
+                              {/* 0 视为未录入金额（如无明细的出口订单），显示「—」而不是 $0；老板数字的 0 仍照常显示 */}
+                              {item.amount
+                                ? money(item.amount, meta.currency)
+                                : "—"}
                             </span>
                           )}
                         </li>

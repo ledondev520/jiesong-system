@@ -9,12 +9,12 @@
 const express = require('express');
 const router = express.Router();
 const { getBusinessOverview } = require('../controllers/dashboardController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, roleAuth } = require('../middleware/auth');
 
 // 所有路由需要认证
 router.use(authenticate);
 
 // GET /api/v1/reports/business-overview - 获取经营数据报表（老板视角）
-router.get('/business-overview', getBusinessOverview);
+router.get('/business-overview', roleAuth('ADMIN', 'FINANCE', 'BOSS'), getBusinessOverview);
 
 module.exports = router;
