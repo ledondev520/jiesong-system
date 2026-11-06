@@ -14,6 +14,7 @@ describe("中文业务面包屑", () => {
     ["/dashboard/settings/customs-brokers", "报关行"],
     ["/dashboard/orders/x", "出口订单"],
     ["/dashboard/quotes", "报价"],
+    ["/dashboard/customers", "客户与门店"],
   ])("%s使用中文", (pathname, title) => {
     path = pathname;
     render(<Breadcrumbs />);
