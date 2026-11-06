@@ -175,3 +175,14 @@ test('评审 R1-1：报价转换的订单未填现汇时用保存的计价汇率
   const typed = evaluateExportPacket(converted, readiness(), [], { ...withoutSpot, spotRate: 6.8 });
   assert.equal(typed.pricingPolicy.effectiveRate, 6.6);
 });
+
+test('第三方货物行不要求采购成本，沿用原申报单价且不按公式重定价', () => {
+  const base = contract().packingItems[0];
+  const packet = evaluateExportPacket(contract({
+    packingItems: [{ ...base, isOwnedByJiesong: false, purchaseCost: 0, unitPrice: 25 }],
+  }), readiness(), [], options());
+  assert.equal(packet.issues.some((issue) => issue.code === 'MISSING_PURCHASE_COST'), false);
+  assert.equal(packet.lines[0].pricingSource, 'declared');
+  assert.equal(packet.lines[0].unitPriceUsd, 25);
+  assert.equal(packet.lines[0].totalUsd, 250);
+});

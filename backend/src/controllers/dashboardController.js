@@ -18,6 +18,7 @@ const { listLowStockAlerts } = require('../services/inventoryAlertService');
 const { parseShanghaiDateRange } = require('../utils/dateRange');
 const { listTradeWorkflows } = require('../services/tradeWorkflowService');
 const { roundMoney } = require('../utils/money');
+const { SALES_OWNED_AMOUNT_SELECT, getEffectiveSalesContractTotal } = require('../services/salesContractAmount');
 const { marginBlockers, cashOnlyBlockers, tallyReasons } = require('../services/marginReadiness');
 
 /**
@@ -271,7 +272,6 @@ const getAnalytics = async (req, res, next) => {
       prisma.salesContract.aggregate({
         where: { status: { not: 'CANCELLED' } },
         _count: true,
-        _sum: { totalAmount: true, receivedAmount: true },
       }),
       getFinanceStats(),
       prisma.purchaseContract.count({ where: { status: 'DRAFT' } }),
@@ -309,7 +309,7 @@ const getAnalytics = async (req, res, next) => {
       where: {
         signedAt: { not: null, gte: sixMonthsAgo },
       },
-      select: { signedAt: true, totalAmount: true, totalBoxes: true },
+      select: { signedAt: true, totalAmount: true, totalBoxes: true, ...SALES_OWNED_AMOUNT_SELECT },
     });
     
     // 按月聚合
@@ -322,7 +322,7 @@ const getAnalytics = async (req, res, next) => {
         }
         const m = monthMap.get(month);
         m.count++;
-        m.amount += c.totalAmount || 0;
+        m.amount += getEffectiveSalesContractTotal(c);
         m.boxes += c.totalBoxes || 0;
       }
     });
@@ -387,8 +387,9 @@ const getAnalytics = async (req, res, next) => {
         },
         sales: {
           count: salesStats._count,
-          totalAmount: salesStats._sum.totalAmount || 0,
-          receivedAmount: salesStats._sum.receivedAmount || 0,
+          // 应收口径统一取自 financeService（混装柜只计捷淞自有额）。
+          totalAmount: financeStats.receivable.total,
+          receivedAmount: financeStats.receivable.received,
           receivable,
         },
       },

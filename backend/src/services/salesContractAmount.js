@@ -62,6 +62,13 @@ const getEffectiveSalesReceived = (
   return roundMoney(Math.min(received * ownershipRatio, ownedTotalAmount));
 };
 
+// 查询选择：让 getEffectiveSalesContractTotal 能判断来源并扣除第三方装箱货值。
+// totalAmount 对 DERIVED 合同是整柜货值；捷淞自有额由本模块按装箱归属推导，库中无单独列。
+const SALES_OWNED_AMOUNT_SELECT = Object.freeze({
+  amountSource: true,
+  packingItems: { select: { totalPrice: true, isOwnedByJiesong: true, note: true } },
+});
+
 const buildDerivedSalesAmountUpdate = (contract, derivedTotalAmount) => (
   isFormalSalesAmount(contract)
     ? {}
@@ -70,6 +77,7 @@ const buildDerivedSalesAmountUpdate = (contract, derivedTotalAmount) => (
 
 module.exports = {
   SALES_AMOUNT_SOURCE,
+  SALES_OWNED_AMOUNT_SELECT,
   buildDerivedSalesAmountUpdate,
   getEffectiveSalesContractTotal,
   getEffectiveSalesReceived,

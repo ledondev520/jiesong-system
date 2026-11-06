@@ -7,7 +7,8 @@
 const ExcelJS = require('exceljs');
 const crypto = require('node:crypto');
 const prisma = require('../utils/prisma');
-const { buildDerivedSalesAmountUpdate } = require('./salesContractAmount');
+const { getSalesCargoState, assertSalesCargoMutable } = require('./salesCargoLifecycle');
+const { buildDerivedSalesAmountUpdate, isJiesongOwnedPackingItem } = require('./salesContractAmount');
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
 const fileService = require('./fileService');
@@ -112,7 +113,9 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     if (!evidence.hsEvidence) lineIssues.push(makeIssue('MISSING_CURRENT_HS_EVIDENCE', 'error', '缺少当前税则证据', item.id, productName));
     if (refundRate === null || refundRate === undefined) lineIssues.push(makeIssue('MISSING_REFUND_RATE', 'error', '缺少当期退税率', item.id, productName));
     if (!declaration) lineIssues.push(makeIssue('MISSING_DECLARATION', 'error', '缺少已确认申报要素', item.id, productName));
-    if (purchaseCostCny <= 0) lineIssues.push(makeIssue('MISSING_PURCHASE_COST', 'error', '缺少采购成本', item.id, productName));
+    // 第三方货值不是捷淞采购，不要求采购成本，也不按公式重定价。
+    const owned = isJiesongOwnedPackingItem(item);
+    if (owned && purchaseCostCny <= 0) lineIssues.push(makeIssue('MISSING_PURCHASE_COST', 'error', '缺少采购成本', item.id, productName));
 
     const categoryIds = item.product?.categoryIds || [];
     const targetMarkup = markupFor(categoryIds, config);
@@ -165,6 +168,13 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       pricingSource = 'order';
       pricingReference = '订单已确认单价';
       roundingMethod = 'order_confirmed';
+    }
+    if (!owned && toNumber(item.unitPrice) > 0) {
+      unitPriceUsd = toNumber(item.unitPrice);
+      totalUsd = round(unitPriceUsd * quantity, 4);
+      pricingSource = 'declared';
+      pricingReference = '第三方货物沿用原申报单价';
+      roundingMethod = 'declared_unit_price';
     }
     if (manualUnitPrice > 0) {
       unitPriceUsd = manualUnitPrice;
@@ -448,6 +458,8 @@ const buildExportPacketWorkbook = async (packet) => {
 
 const generateExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
   const config = loadPricingConfig();
+  // 生成会改写装箱价格与合同金额：发运后/已有出库记录不得再改。
+  assertSalesCargoMutable(await getSalesCargoState(prismaClient, salesContractId));
   const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
   const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
   if (!packet.ready) {

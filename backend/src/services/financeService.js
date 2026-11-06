@@ -12,6 +12,7 @@ const { attachPurchaseSubStatus } = require('./purchaseSubStatusService');
 const { getSalesSettlementStatus } = require('./salesStateMachine');
 const { roundMoney } = require('../utils/money');
 const {
+  SALES_OWNED_AMOUNT_SELECT,
   getEffectiveSalesContractTotal,
   getEffectiveSalesReceived,
   isFormalSalesAmount,
@@ -259,7 +260,7 @@ const evaluateMatch = (payment, contract) => {
     return { matched: false, reason: 'contract_not_found' };
   }
 
-  const unreceivedAmount = Math.max((contract.totalAmount || 0) - (contract.receivedAmount || 0), 0);
+  const unreceivedAmount = Math.max(roundMoney(getEffectiveSalesContractTotal(contract) - Number(contract.receivedAmount || 0)), 0);
   if (unreceivedAmount <= 0) {
     return { matched: false, reason: 'contract_fully_received' };
   }
@@ -296,6 +297,7 @@ const findAutoMatchCandidate = async (payment) => {
       totalAmount: true,
       receivedAmount: true,
       status: true,
+      ...SALES_OWNED_AMOUNT_SELECT,
     },
   });
 
@@ -329,6 +331,7 @@ const findAutoMatchCandidatesBatch = async (payments) => {
       totalAmount: true,
       receivedAmount: true,
       status: true,
+      ...SALES_OWNED_AMOUNT_SELECT,
     },
   });
 
@@ -370,8 +373,10 @@ const syncContractPaymentAmounts = async (tx, { purchaseContractId, salesContrac
     const contract = await tx.salesContract.update({
       where: { id: salesContractId },
       data: { receivedAmount: total._sum.amount || 0 },
+      select: { status: true, totalAmount: true, ...SALES_OWNED_AMOUNT_SELECT },
     });
-    const status = getSalesSettlementStatus(contract.status, contract.totalAmount, total._sum.amount || 0);
+    // 混装柜按捷淞自有额结清，不能要求收齐第三方货值。
+    const status = getSalesSettlementStatus(contract.status, getEffectiveSalesContractTotal(contract), total._sum.amount || 0);
     if (status && status !== contract.status) await tx.salesContract.update({ where: { id: salesContractId }, data: { status } });
   }
 };
@@ -847,7 +852,7 @@ const getOverdueReceivables = async (overdueDays = 30) => {
   const overdue = await prisma.salesContract.findMany({
     where: {
       shippedAt: { not: null, lte: cutoff },
-      // 仍有未收余额：receivedAmount < totalAmount
+      // 仍有未收余额：按捷淞自有额，差额超过 0.01
       NOT: { status: 'CANCELLED' },
     },
     select: {
@@ -857,19 +862,21 @@ const getOverdueReceivables = async (overdueDays = 30) => {
       receivedAmount: true,
       shippedAt: true,
       status: true,
+      ...SALES_OWNED_AMOUNT_SELECT,
     },
     orderBy: { shippedAt: 'asc' },
   });
 
   // 过滤出真正有未收余额的合同
   return overdue
-    .filter((c) => c.receivedAmount < c.totalAmount)
+    .map((c) => ({ ...c, ownedTotal: getEffectiveSalesContractTotal(c) }))
+    .filter((c) => c.ownedTotal - c.receivedAmount > AUTO_MATCH_AMOUNT_TOLERANCE)
     .map((c) => ({
       id: c.id,
       contractNo: c.contractNo,
-      totalAmount: c.totalAmount,
+      totalAmount: c.ownedTotal,
       receivedAmount: c.receivedAmount,
-      unreceived: c.totalAmount - c.receivedAmount,
+      unreceived: roundMoney(c.ownedTotal - c.receivedAmount),
       shippedAt: c.shippedAt,
       overdueDays: Math.floor((Date.now() - new Date(c.shippedAt).getTime()) / (24 * 60 * 60 * 1000)) - overdueDays,
       status: c.status,
