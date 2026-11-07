@@ -456,6 +456,7 @@ export interface SalesContract {
   hasTaxRefund?: boolean;
   // 订单级条款（迁移 A）
   customerId?: string | null;
+  customer?: { id: string; name: string } | null; // 列表接口附带
   currency?: string;
   incoterm?: string | null;
   paymentTerms?: string | null;
@@ -534,7 +535,10 @@ export interface Inventory {
   updatedAt: string;
   product?: Product;
   purchaseItem?: PurchaseItem & {
-    purchaseContract?: PurchaseContract;
+    store?: { id: string; name: string } | null;
+    purchaseContract?: PurchaseContract & {
+      supplier?: { id: string; name: string } | null;
+    };
   };
 }
 

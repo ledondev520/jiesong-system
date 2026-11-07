@@ -35,6 +35,7 @@ const reply = (contractNo: string) => ({
         status: "DRAFT",
         totalAmount: 1,
         receivedAmount: 0,
+        customer: { id: "c1", name: "合成客户" },
         createdAt: "2026-10-01T00:00:00.000Z",
       },
     ],
@@ -62,6 +63,7 @@ describe.each(["success", "failure"] as const)(
         target: { value: "x" },
       });
       expect((await screen.findAllByText("SC-NEW")).length).toBeGreaterThan(0);
+      expect(screen.getAllByText("合成客户").length).toBeGreaterThan(0);
       expect(window.location.search).toContain("q=x");
 
       await act(async () =>
