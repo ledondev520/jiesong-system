@@ -129,8 +129,9 @@ export default function ReconciliationPage() {
   // ========== 智能关联数据 ==========
   const [bankItems, setBankItems] = useState<BankTransaction[]>([]);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceRecord[]>([]);
-  const [bankTotal, setBankTotal] = useState(0);
-  const [invoiceTotal, setInvoiceTotal] = useState(0);
+  // null = 尚未加载：显示「—」而不是 0，避免 0 → 831 的闪烁
+  const [bankTotal, setBankTotal] = useState<number | null>(null);
+  const [invoiceTotal, setInvoiceTotal] = useState<number | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
 
   const [selectedBankId, setSelectedBankId] = useState<string | null>(null);
@@ -431,7 +432,8 @@ export default function ReconciliationPage() {
             }}
           />
           <span className="text-xs text-muted-foreground">
-            银行 {bankTotal} 条 / 发票 {invoiceTotal} 条，第 {page} 页
+            银行 {bankTotal ?? "—"} 条 / 发票 {invoiceTotal ?? "—"} 条，第{" "}
+            {page} 页
           </span>
           <Button
             variant="outline"
@@ -444,7 +446,9 @@ export default function ReconciliationPage() {
           <Button
             variant="outline"
             size="sm"
-            disabled={page * pageSize >= Math.max(bankTotal, invoiceTotal)}
+            disabled={
+              page * pageSize >= Math.max(bankTotal ?? 0, invoiceTotal ?? 0)
+            }
             onClick={() => setPage(page + 1)}
           >
             下一页
@@ -460,7 +464,7 @@ export default function ReconciliationPage() {
                 </p>
                 <p className="text-lg font-bold">{s.matchedCount}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  其中正常 {s.normalCount} 家
+                  供应商口径，其中正常 {s.normalCount} 家
                 </p>
               </CardContent>
             </Card>
@@ -490,15 +494,19 @@ export default function ReconciliationPage() {
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
-                <p className="text-xs text-muted-foreground mb-1">未匹配流水</p>
-                <p className="text-lg font-bold">{bankTotal}</p>
+                <p className="text-xs text-muted-foreground mb-1">
+                  未匹配流水（逐条口径）
+                </p>
+                <p className="text-lg font-bold">{bankTotal ?? "—"}</p>
                 <p className="text-[10px] text-muted-foreground">待人工核对</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-4 pb-3 px-4">
-                <p className="text-xs text-muted-foreground mb-1">未匹配发票</p>
-                <p className="text-lg font-bold">{invoiceTotal}</p>
+                <p className="text-xs text-muted-foreground mb-1">
+                  未匹配发票（逐条口径）
+                </p>
+                <p className="text-lg font-bold">{invoiceTotal ?? "—"}</p>
                 <p className="text-[10px] text-muted-foreground">待人工核对</p>
               </CardContent>
             </Card>
@@ -615,7 +623,7 @@ export default function ReconciliationPage() {
                     <Landmark className="h-4 w-4 text-status-blue" />
                     <CardTitle className="text-sm">未匹配银行流水</CardTitle>
                     <Badge variant="secondary" className="text-[10px]">
-                      {bankTotal}
+                      {bankTotal ?? "—"}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -798,7 +806,7 @@ export default function ReconciliationPage() {
                     <FileText className="h-4 w-4 text-chart-5" />
                     <CardTitle className="text-sm">未匹配发票</CardTitle>
                     <Badge variant="secondary" className="text-[10px]">
-                      {invoiceTotal}
+                      {invoiceTotal ?? "—"}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -882,7 +890,7 @@ export default function ReconciliationPage() {
                   范围：
                   {search
                     ? "全部未匹配的银行流水和发票（不受当前搜索限制）。"
-                    : `全部未匹配的银行流水 ${bankTotal} 条、发票 ${invoiceTotal} 张。`}
+                    : `全部未匹配的银行流水 ${bankTotal ?? "—"} 条、发票 ${invoiceTotal ?? "—"} 张。`}
                 </p>
                 <p>
                   命中规则的流水和发票会关联到合同并移出未匹配列表；供应商汇总按名称计算，不受影响。未命中的保留在未匹配列表。
