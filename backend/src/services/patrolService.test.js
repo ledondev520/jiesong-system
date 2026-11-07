@@ -76,6 +76,7 @@ it('业务巡检使用真实销售模型、发运时间与已收金额，沿用3
   const findings = await service.runBusinessPatrol();
   assert.deepEqual(Array.from(findings, (f) => f.rule), ['OVERDUE_RECEIVABLE', 'SHIPPED_NO_DECLARATION', 'OVERPAYMENT']);
   assert.ok(findings.every((f) => f.entityType === 'SalesContract'));
+  assert.match(findings[0].detail, /^截至 \d{4}-\d{2}-\d{2}，/);
   assert.match(findings[0].detail, /逾期 15 天/);
   assert.match(findings[0].detail, /50.00/);
   assert.ok(queries[0].where.shippedAt.lt instanceof Date);
