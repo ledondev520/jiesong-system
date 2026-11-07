@@ -204,3 +204,17 @@ it("confirmStep: flags a leftover of 1 or less as 尾差 (no write-off)", async 
     "尾差，不会自动核销",
   );
 });
+
+it("prefills the remaining amount without float residue and explains a disabled confirm", async () => {
+  render(<Harness submit={vi.fn()} remaining={0.1 + 0.2} />);
+  expect(screen.getByRole("spinbutton")).toHaveValue(0.3);
+  await waitFor(() => expect(screen.getByText("确认记录")).toBeDisabled());
+  expect(screen.getByTestId("confirm-disabled-reason")).toHaveTextContent(
+    "请先选择支付方式",
+  );
+  fireEvent.click(screen.getByText("其他"));
+  await waitFor(() => expect(screen.getByText("确认记录")).toBeEnabled());
+  expect(
+    screen.queryByTestId("confirm-disabled-reason"),
+  ).not.toBeInTheDocument();
+});
