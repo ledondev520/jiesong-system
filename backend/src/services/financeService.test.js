@@ -733,7 +733,7 @@ test('getReceivables: 只统计捷淞自有货物金额', async () => {
   }
 });
 
-test('getReceivables: 混柜合同回款按自有收入比例归属', async () => {
+test('getReceivables: 混柜合同回款按自有美元收款计入，不再按比例折算', async () => {
   const originalFindMany = prisma.salesContract.findMany;
   const originalCount = prisma.salesContract.count;
 
@@ -754,8 +754,8 @@ test('getReceivables: 混柜合同回款按自有收入比例归属', async () =
   try {
     const result = await financeService.getReceivables({ page: 1, pageSize: 20, skip: 0 });
     assert.equal(result.receivables[0].totalAmount, 600);
-    assert.equal(result.receivables[0].receivedAmount, 240);
-    assert.equal(result.receivables[0].unreceiveAmount, 360);
+    assert.equal(result.receivables[0].receivedAmount, 400);
+    assert.equal(result.receivables[0].unreceiveAmount, 200);
   } finally {
     prisma.salesContract.findMany = originalFindMany;
     prisma.salesContract.count = originalCount;
