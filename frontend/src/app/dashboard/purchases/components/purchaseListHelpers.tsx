@@ -8,6 +8,7 @@
 
 import { PurchaseContract, PurchaseItem, PurchaseStatus } from "@/types";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { formatMoney } from "@/lib/format";
 
 // 扩展类型
 export interface PurchaseContractDetail extends PurchaseContract {
@@ -87,7 +88,7 @@ export const getPurchaseStatusColor = (status: PurchaseStatus) => {
 export function formatAmount(amount: number) {
   return (
     <span className="font-medium tabular-nums text-status-green">
-      ¥{amount.toLocaleString()}
+      {formatMoney(amount)}
     </span>
   );
 }

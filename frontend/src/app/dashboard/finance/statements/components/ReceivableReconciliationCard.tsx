@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { formatMoney } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -15,19 +16,8 @@ import {
   type ReceivableReconciliation,
 } from "@/services/finance.service";
 
-const formatUsd = (value: number) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  }).format(value);
-
-const formatCny = (value: number) =>
-  new Intl.NumberFormat("zh-CN", {
-    style: "currency",
-    currency: "CNY",
-    minimumFractionDigits: 2,
-  }).format(value);
+const formatUsd = (value: number) => formatMoney(value, "USD");
+const formatCny = (value: number) => formatMoney(value, "CNY");
 
 export function ReceivableReconciliationCard({
   year,

@@ -87,7 +87,7 @@ describe("SupplierPriceComparison", () => {
     expect(view.getAllByText("最低")).toHaveLength(1);
     expect(view.getByText("质量问题")).toBeInTheDocument();
     expect(view.getByText("1%")).toBeInTheDocument();
-    expect(view.getByText("¥9")).toBeInTheDocument();
+    expect(view.getByText("¥9.00")).toBeInTheDocument();
     expect(view.getByText("2026-09-01 · CG-乙")).toBeInTheDocument();
     await userEvent.click(view.getAllByText("用此供应商")[1]);
     expect(onPick).toHaveBeenCalledWith(

@@ -7,6 +7,7 @@
  */
 import Link from "next/link";
 import type { BusinessOverview, ReasonCount } from "@/services/reports.service";
+import { formatMoney } from "@/lib/format";
 
 type Overview = BusinessOverview["overview"];
 
@@ -14,8 +15,7 @@ type Overview = BusinessOverview["overview"];
 export const formatReasonCounts = (reasons: ReasonCount[]) =>
   reasons.map((reason) => `${reason.label} ${reason.count} 笔`).join("、");
 
-const money = (value: number) =>
-  `¥${value.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = (value: number) => formatMoney(value);
 
 export function MarginPendingNotice({ overview }: { overview: Overview }) {
   const pending = overview.unavailableContracts.length;

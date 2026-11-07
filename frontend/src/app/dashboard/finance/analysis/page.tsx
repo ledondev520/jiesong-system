@@ -65,11 +65,11 @@ import {
   rotatedTickProps,
 } from "@/lib/chart-axis";
 import { MarginPendingNotice, formatReasonCounts } from "./MarginPendingNotice";
+import { formatMoney } from "@/lib/format";
 
 const formatCurrency = (amount: number | null, currency: "USD" | "CNY") => {
   if (amount === null) return "待核验";
-  const symbol = currency === "USD" ? "$" : "¥";
-  return `${symbol}${amount.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatMoney(amount, currency);
 };
 
 const formatPercent = (value: number | null) =>
