@@ -11,6 +11,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import PurchaseDetailPage from "./page";
+import { useAuthStore } from "@/store/auth.store";
 
 const mockIsMobile = vi.fn(() => false);
 const mockRouterPush = vi.fn();
@@ -125,6 +126,9 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     mockToastInfo.mockReset();
     mockIsMobile.mockReturnValue(false);
     mockReadOnly = false;
+    useAuthStore.setState({
+      user: { id: "synthetic", role: "PURCHASE" } as never,
+    });
     mockReceiptSummary.mockResolvedValue({
       data: { summary: { complete: false } },
     });
@@ -243,6 +247,26 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     expect(
       await screen.findByText("填写收货信息后，系统将自动生成标准购销合同文档"),
     ).toBeInTheDocument();
+  });
+
+  it("SALES 看不到生成/查看合同（含供应商银行信息，后端 403）", async () => {
+    useAuthStore.setState({
+      user: { id: "synthetic", role: "SALES" } as never,
+    });
+    mockGetById.mockResolvedValue({ data: draftContract });
+    const user = userEvent.setup();
+    renderPage("p-1");
+
+    await user.click(await screen.findByRole("button", { name: /单证/ }));
+    expect(
+      await screen.findByRole("menuitem", { name: /在线盖章/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /生成购销合同/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /查看合同/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("在线盖章与生成购销合同收进同一个「单证」菜单，不再是页头独立按钮", async () => {
@@ -736,6 +760,30 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     expect(screen.getByText("关联订单").nextSibling).toHaveTextContent("—");
     expect(screen.queryByRole("link", { name: "查看订单" })).toBeNull();
   });
+
+  it("供应商缺联系人与开户行时用「未登记」措辞，不出现孤立的「—」分隔", async () => {
+    mockGetById.mockResolvedValue({ data: signedContract });
+    renderPage();
+    await screen.findByRole("heading", { name: "CG2600009" });
+    expect(screen.getByText("开户行未登记")).toBeInTheDocument();
+    expect(screen.getByText("账号未登记")).toBeInTheDocument();
+    expect(screen.queryByText(/— · —/)).toBeNull();
+  });
+
+  it.each(["SALES", "WAREHOUSE"])(
+    "%s 看不到收款账户块，不被告知银行信息「未登记」",
+    async (role) => {
+      useAuthStore.setState({
+        user: { id: "synthetic", role } as never,
+      });
+      mockGetById.mockResolvedValue({ data: signedContract });
+      renderPage();
+      await screen.findByRole("heading", { name: "CG2600009" });
+      expect(screen.queryByText("收款账户")).toBeNull();
+      expect(screen.queryByText("开户行未登记")).toBeNull();
+      expect(screen.queryByText("账号未登记")).toBeNull();
+    },
+  );
 
   it("生产资料缺项挡住发货时，阻塞条说明原因，去处理直达生产页签", async () => {
     mockGetById.mockResolvedValue({

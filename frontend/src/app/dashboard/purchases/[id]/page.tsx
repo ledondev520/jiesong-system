@@ -257,6 +257,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const isMobile = useMobile();
   const router = useRouter();
   const userRole = useAuthStore((state) => state.user?.role);
+  // 与后端供应商银行字段可见角色一致；其余角色拿到的是被剔除的数据，不能显示成「未登记」
+  const canSeeSupplierBank = ["ADMIN", "FINANCE", "PURCHASE", "BOSS"].includes(
+    userRole || "",
+  );
   const [loadError, setLoadError] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const { id } = use(params);
@@ -689,20 +693,28 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   ];
 
   // 「单证」：对外法律文件（盖章、购销合同）仍先确认；老板只读时整组隐藏
+  const canGenerateDoc = ["ADMIN", "PURCHASE", "FINANCE"].includes(
+    userRole || "",
+  );
   const documentsMenu = readOnly
     ? []
     : [
-        {
-          key: "generate",
-          label: "生成购销合同",
-          onSelect: () => setDocConfirm("generate"),
-        },
-        {
-          key: "view",
-          label: "查看合同",
-          onSelect: viewContractPdf,
-          disabled: pdfLoading,
-        },
+        // 合同文档含供应商银行信息：SALES/WAREHOUSE 后端 403，不展示入口
+        ...(canGenerateDoc
+          ? [
+              {
+                key: "generate",
+                label: "生成购销合同",
+                onSelect: () => setDocConfirm("generate"),
+              },
+              {
+                key: "view",
+                label: "查看合同",
+                onSelect: viewContractPdf,
+                disabled: pdfLoading,
+              },
+            ]
+          : []),
         {
           key: "export",
           label: "导出 PDF",
@@ -907,7 +919,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <div>
                 <p className="text-xs text-muted-foreground">公司名称</p>
                 <p className="text-sm font-medium">
-                  {contract.supplier?.name || "—"}
+                  {contract.supplier?.name || "未登记"}
                 </p>
               </div>
             </div>
@@ -916,7 +928,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <div>
                 <p className="text-xs text-muted-foreground">联系人</p>
                 <p className="text-sm">
-                  {contract.supplier?.contactName || "—"}
+                  {contract.supplier?.contactName || "未登记"}
                 </p>
               </div>
             </div>
@@ -925,7 +937,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <div>
                 <p className="text-xs text-muted-foreground">联系电话</p>
                 <p className="text-sm">
-                  {contract.supplier?.contactPhone || "—"}
+                  {contract.supplier?.contactPhone || "未登记"}
                 </p>
               </div>
             </div>
@@ -933,29 +945,41 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">公司地址</p>
-                <p className="text-sm">{contract.supplier?.address || "—"}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">收款账户</p>
                 <p className="text-sm">
-                  户名：
-                  {contract.supplier?.bankAccountName ||
-                    contract.supplier?.name ||
-                    "—"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {contract.supplier?.bankName || "—"} ·{" "}
-                  {contract.supplier?.bankBranch || "—"} · 联行号{" "}
-                  {contract.supplier?.bankCode || "—"}
-                </p>
-                <p className="font-mono text-xs">
-                  账号 {contract.supplier?.bankAccount || "—"}
+                  {contract.supplier?.address || "未登记"}
                 </p>
               </div>
             </div>
+            {canSeeSupplierBank && (
+              <div className="flex items-start gap-3">
+                <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">收款账户</p>
+                  <p className="text-sm">
+                    户名：
+                    {contract.supplier?.bankAccountName ||
+                      contract.supplier?.name ||
+                      "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {[
+                      contract.supplier?.bankName,
+                      contract.supplier?.bankBranch,
+                      contract.supplier?.bankCode
+                        ? `联行号 ${contract.supplier.bankCode}`
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "开户行未登记"}
+                  </p>
+                  <p className="font-mono text-xs">
+                    {contract.supplier?.bankAccount
+                      ? `账号 ${contract.supplier.bankAccount}`
+                      : "账号未登记"}
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

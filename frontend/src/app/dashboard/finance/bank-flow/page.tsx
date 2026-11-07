@@ -56,7 +56,7 @@ import {
 import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
 import { runAwait } from "@/lib/run-await";
-import { txnKind } from "@/lib/finance-ledger";
+import { canLinkInvoices, txnKind } from "@/lib/finance-ledger";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { PaymentListCard } from "@/components/finance/PaymentListCard";
 import { BankFlowImportDialog } from "./components/BankFlowImportDialog";
@@ -565,13 +565,15 @@ export default function BankFlowPage() {
                             >
                               {item.counterpart}
                             </button>
-                            <Link
-                              href={`/dashboard/finance/invoices?search=${encodeURIComponent(item.counterpart)}`}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
-                              title="查看相关发票"
-                            >
-                              <FileText className="h-3.5 w-3.5" />
-                            </Link>
+                            {canLinkInvoices(item) && (
+                              <Link
+                                href={`/dashboard/finance/invoices?search=${encodeURIComponent(item.counterpart)}`}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+                                title="查看相关发票"
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                              </Link>
+                            )}
                           </span>
                         ) : (
                           "-"

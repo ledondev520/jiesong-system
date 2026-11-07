@@ -173,14 +173,15 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.deepEqual(project(report.overview, ['currency', 'contractCount', 'totalSales', 'totalPurchases', 'grossProfit', 'profitMargin', 'marginReady', 'cashReady', 'netCashCny', 'unavailableContracts']), {
       currency: 'CNY', contractCount: 2, totalSales: 900, totalPurchases: 700,
       grossProfit: 200, profitMargin: 200 / 900, marginReady: true, cashReady: true,
-      netCashCny: 125, unavailableContracts: [],
+      netCashCny: 195, unavailableContracts: [],
     });
     // D: USD 60 × 7 − CNY 300. F: formal USD 60 × 8 − CNY 400.
-    // Cash uses USD payments 25 × 60/100 and 20, not stored headers 50 and 30:
-    // CNY (15×7 − 300/1000×200) + (20×8 − 400/1000×200) = 125.
+    // Cash uses USD payments 25 and 20 as Jiesong's own receipts (R2 P0-1: no ownership-ratio scaling),
+    // not stored headers 50 and 30:
+    // CNY (25×7 − 300/1000×200) + (20×8 − 400/1000×200) = 195.
     assert.deepEqual(report.trends.monthlySales, [{ month: '2026-10', amount: 900 }]);
     assert.deepEqual(project(report.funds, ['totalReceivable', 'totalPayable', 'overdueReceivable', 'overduePayable']), {
-      totalReceivable: 115, totalPayable: 800, overdueReceivable: 0, overduePayable: 800,
+      totalReceivable: 105, totalPayable: 800, overdueReceivable: 0, overduePayable: 800,
     });
     // One active source product has the default zero alert threshold; no stock rows exist.
     // D and X are the two SHIPPED headers; ARRIVED/draft/cancelled headers are not in transit.
@@ -211,9 +212,9 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     const before = snapshot();
     const expected = {
       payable: { total: 1000, paid: 200, unpaid: 800 },
-      receivable: { total: 150, received: 60, unreceived: 90 },
+      receivable: { total: 150, received: 80, unreceived: 70 },
     };
-    // D contributes 60/30; F keeps formal 60/30 despite its third-party 40;
+    // D contributes 60/50 (own receipts, clamped to owned total, not scaled by 60/100); F keeps formal 60/30 despite its third-party 40;
     // next-day 10 and draft 20 remain current receivables, cancelled rows do not.
     for (const role of ROLES.filter(role => role !== 'WAREHOUSE')) assert.deepEqual(await get('/finance/stats', {}, role), expected);
     await get('/finance/stats', {}, 'WAREHOUSE', 403);
@@ -222,7 +223,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       { id: 'sale-draft', totalAmount: 20, receivedAmount: 0, unreceiveAmount: 20 },
       { id: 'sale-next-day', totalAmount: 10, receivedAmount: 0, unreceiveAmount: 10 },
       { id: 'sale-formal', totalAmount: 60, receivedAmount: 30, unreceiveAmount: 30 },
-      { id: 'sale-derived', totalAmount: 60, receivedAmount: 30, unreceiveAmount: 30 },
+      { id: 'sale-derived', totalAmount: 60, receivedAmount: 50, unreceiveAmount: 10 },
     ]);
     assert.equal(receivables.pagination.total, 4);
     const payables = await get('/finance/payables', { pageSize: 100 }, 'BOSS');

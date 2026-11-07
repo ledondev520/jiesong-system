@@ -35,6 +35,8 @@ const MODULES = {
   '/agents': './agents',
   '/system': './system',
   '/reports': './reports',
+  '/sales': './sales',
+  '/contract-doc': './contractDoc',
 };
 
 // 策略表：自上而下首个匹配生效。read=GET，write=POST/PUT/PATCH/DELETE。
@@ -60,6 +62,12 @@ const POLICY = [
   { re: /^\/system\/export\//, read: ['ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'], write: ADMIN },
   { re: /^\/system(\/|$)/, read: ADMIN, write: ADMIN },
   { re: /^\/reports(\/|$)/, read: AFB, write: ADMIN },
+  // 单柜账务/退税清单不含 WAREHOUSE（R2 P1-2）；其余 /sales 路由各自收紧，此处只兜底 BOSS 写入与 Agent
+  { re: /^\/sales\/[^/]+\/(finance-summary|tax-refund-preparation(\/export)?)$/, read: ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'], write: ALL },
+  { re: /^\/sales(\/|$)/, read: ALL, write: ALL },
+  // R2-Q1：合同文档生成/下载按 B60 读模型，SALES/WAREHOUSE 403；BOSS 未在只读白名单
+  { re: /^\/contract-doc\/(generate|pdf)\/[^/]+$/, read: ['ADMIN', 'PURCHASE', 'FINANCE'], write: ['ADMIN', 'PURCHASE', 'FINANCE'] },
+  { re: /^\/contract-doc(\/|$)/, read: ['ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'], write: ADMIN },
 ];
 
 // bossReadOnly.js 的自身写入例外：BOSS 只能写这些

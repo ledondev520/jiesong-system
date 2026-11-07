@@ -1,6 +1,7 @@
 "use client";
 
 import { formatAmount } from "@/lib/format";
+import { roundMoney } from "@/lib/money";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useForm } from "react-hook-form";
@@ -85,7 +86,7 @@ export function PaymentDialog({
     resolver: zodResolver(paymentSchema),
     mode: "onChange",
     defaultValues: {
-      amount: remainingAmount, // Default to full remaining
+      amount: roundMoney(remainingAmount), // Default to full remaining, without float residue
       paymentDate: new Date(),
       paymentMethod: "",
       note: "",
@@ -101,7 +102,7 @@ export function PaymentDialog({
     // A balance refresh while editing must not erase the draft or change retry data.
     if (!shouldReset) return;
     form.reset({
-      amount: remainingAmount,
+      amount: roundMoney(remainingAmount),
       paymentDate: new Date(),
       paymentMethod: "",
       note: "",
@@ -306,6 +307,16 @@ export function PaymentDialog({
                 )}
               />
             </fieldset>
+            {!form.formState.isValid && !isSaving && (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="confirm-disabled-reason"
+              >
+                {!form.watch("paymentMethod")
+                  ? "请先选择支付方式后再确认"
+                  : "请检查金额与日期后再确认"}
+              </p>
+            )}
             <DialogFooter>
               <Button
                 type="button"

@@ -11,6 +11,8 @@ const config = require('../config');
 const mail = require('./emailService');
 const { createError } = require('../middleware/errorHandler');
 const { assertPassword } = require('../utils/passwordPolicy');
+const { clearAuthCache } = require('../middleware/auth');
+const { revokeBrowserSessions } = require('../utils/userSessionRevocation');
 const INVALID_CODE = '验证码无效或已过期，请重新获取或联系管理员';
 const SEND_MESSAGE = '如果该邮箱绑定了可用账号，将收到验证码；未收到请稍后重试或联系管理员';
 const digest = (purpose, value) => createHmac('sha256', config.jwt.secret)
@@ -120,11 +122,13 @@ async function resetPassword({ email: rawEmail, code, newPassword }) {
     });
     if (updated.count !== 1) throw createError(INVALID_CODE, 400);
     await tx.passwordResetChallenge.updateMany({ where: { userId: user.id }, data: { ready: false, codeHash: '' } });
+    await revokeBrowserSessions(tx, user.id);
     // Audit metadata only, committed with the password and challenge consumption.
     await tx.operationLog.create({ data: { userId: user.id, action: 'RESET_PASSWORD', entity: 'User', entityId: user.id } });
-    return true;
+    return user.id;
   });
   if (!reset) throw createError(INVALID_CODE, 400);
+  clearAuthCache(reset);
   return null;
 }
 module.exports = { sendCode, resetPassword, SEND_MESSAGE };

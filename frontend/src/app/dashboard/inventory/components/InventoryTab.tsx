@@ -438,7 +438,7 @@ export function InventoryTab() {
   const showContractColumn = pagedInventory.some(
     (item) => item.purchaseItem?.purchaseContract?.contractNo,
   );
-  const columnCount = showContractColumn ? 7 : 6;
+  const columnCount = showContractColumn ? 9 : 6;
 
   const hasManualInventory = inventory.some(
     (item) => !item.purchaseItemId && !item.receiptInspectionId,
@@ -689,6 +689,14 @@ export function InventoryTab() {
                               "-"}
                           </p>
                         ) : null}
+                        {showContractColumn ? (
+                          <p className="text-sm text-muted-foreground">
+                            门店：{item.purchaseItem?.store?.name || "-"} ·
+                            供应商：
+                            {item.purchaseItem?.purchaseContract?.supplier
+                              ?.name || "-"}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     {getStatusBadge(item.status)}
@@ -797,6 +805,8 @@ export function InventoryTab() {
                   采购合同
                 </SortableTableHead>
               ) : null}
+              {showContractColumn ? <TableHead>门店</TableHead> : null}
+              {showContractColumn ? <TableHead>供应商</TableHead> : null}
               <SortableTableHead
                 sortKey="quantity"
                 currentSortKey={inventorySort.sortKey}
@@ -861,6 +871,17 @@ export function InventoryTab() {
                   {showContractColumn ? (
                     <TableCell className="text-muted-foreground">
                       {item.purchaseItem?.purchaseContract?.contractNo || "-"}
+                    </TableCell>
+                  ) : null}
+                  {showContractColumn ? (
+                    <TableCell className="text-muted-foreground">
+                      {item.purchaseItem?.store?.name || "-"}
+                    </TableCell>
+                  ) : null}
+                  {showContractColumn ? (
+                    <TableCell className="text-muted-foreground">
+                      {item.purchaseItem?.purchaseContract?.supplier?.name ||
+                        "-"}
                     </TableCell>
                   ) : null}
                   <TableCell>

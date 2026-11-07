@@ -86,6 +86,7 @@ const getSalesContracts = async ({ page, pageSize, status, storeId, customerId, 
       take: pageSize,
       include: {
         port: lite ? { select: { id: true, name: true } } : true,
+        customer: { select: { id: true, name: true } }, // 列表客户列；联系人字段不随列表返回
         packingItems: {
           select: {
             isOwnedByJiesong: true,

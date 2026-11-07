@@ -27,8 +27,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { SupplierPriceSummary } from "@/services/priceComparison";
+import { formatMoney } from "@/lib/format";
 
-const money = (value: number) => `¥${value.toLocaleString()}`;
+const money = (value: number) => formatMoney(value);
 
 interface SupplierPriceComparisonProps {
   rows: SupplierPriceSummary[];

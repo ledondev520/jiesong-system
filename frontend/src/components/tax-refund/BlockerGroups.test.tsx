@@ -26,6 +26,21 @@ describe("groupBlockers", () => {
     ]);
   });
 
+  it("后端 exportReadiness/工作台的真实文案不再落入「其他」", () => {
+    const groups = groupBlockers([
+      "缺少 10 位 HS 编码",
+      "缺少出口单价",
+      "当前税则未提供出口退税率",
+      "缺少与本柜对应的采购含税成本，无法形成外贸企业退税估算基数",
+      "缺少采购专票税率，无法从含税采购成本推导发票注明金额",
+      "尚未生成退税草稿",
+    ]);
+    expect(groups.map((g) => [g.label, g.entries.length])).toEqual([
+      ["退税计算", 4],
+      ["商品与报关要素", 2],
+    ]);
+  });
+
   it("空输入不产生分组", () => {
     expect(groupBlockers([])).toEqual([]);
     expect(groupBlockers(["", "；"])).toEqual([]);

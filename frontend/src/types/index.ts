@@ -268,6 +268,7 @@ export interface CustomsDeclaration {
   id: string;
   declarationNo: string;
   salesContractId?: string;
+  salesContract?: { id: string; contractNo: string } | null; // 列表接口附带
   status: CustomsDeclarationStatus;
   // 实际 schema 字段（与旧前端类型存在命名差异，用可选字段兼容两种命名）
   exporter?: string | null;
@@ -456,6 +457,7 @@ export interface SalesContract {
   hasTaxRefund?: boolean;
   // 订单级条款（迁移 A）
   customerId?: string | null;
+  customer?: { id: string; name: string } | null; // 列表接口附带
   currency?: string;
   incoterm?: string | null;
   paymentTerms?: string | null;
@@ -534,7 +536,10 @@ export interface Inventory {
   updatedAt: string;
   product?: Product;
   purchaseItem?: PurchaseItem & {
-    purchaseContract?: PurchaseContract;
+    store?: { id: string; name: string } | null;
+    purchaseContract?: PurchaseContract & {
+      supplier?: { id: string; name: string } | null;
+    };
   };
 }
 

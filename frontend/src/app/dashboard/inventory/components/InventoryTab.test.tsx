@@ -255,7 +255,13 @@ it("当前页没有任何采购合同来源时隐藏整列「采购合同」；�
     data: {
       items: [
         stockRow("a", {
-          purchaseItem: { purchaseContract: { contractNo: "PC-9" } },
+          purchaseItem: {
+            store: { name: "S-合成店" },
+            purchaseContract: {
+              contractNo: "PC-9",
+              supplier: { name: "合成供应商" },
+            },
+          },
         }),
       ] as unknown as Inventory[],
       pagination: { total: 1, totalPages: 1 },
@@ -266,4 +272,6 @@ it("当前页没有任何采购合同来源时隐藏整列「采购合同」；�
     await screen.findByRole("columnheader", { name: /采购合同/ }),
   ).toBeInTheDocument();
   expect(screen.getAllByText("PC-9").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("S-合成店").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("合成供应商").length).toBeGreaterThan(0);
 });

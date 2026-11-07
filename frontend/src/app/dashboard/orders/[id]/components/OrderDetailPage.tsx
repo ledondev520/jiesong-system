@@ -61,6 +61,7 @@ import { OrderContainerTab } from "./OrderContainerTab";
 import { OrderDocsTab } from "./OrderDocsTab";
 import { OrderDocsMenu, type OrderDocAction } from "./OrderDocsMenu";
 import { OrderRefundTab } from "./OrderRefundTab";
+import { DetailSkeleton } from "@/components/ui/detail-skeleton";
 
 const GenerateThreeFormsDialog = lazy(() =>
   import("@/components/dialog/GenerateThreeFormsDialog").then((module) => ({
@@ -105,6 +106,8 @@ const ForexVerificationPanel = lazy(() =>
 
 // 后端 POST /sales/:id/purchase-drafts 仅允许 ADMIN/PURCHASE
 const PURCHASE_DRAFT_ROLES: string[] = [Role.ADMIN, Role.PURCHASE];
+// 仓库角色无账务读权限（后端 403），不展示收款/退税页签。
+const FINANCE_TABS: string[] = ["receipts", "refund"];
 
 // Shared Axios rejects HTTP response DTOs; Error-only checks hide stock/RBAC guards.
 const errorMessage = (error: unknown, fallback: string) =>
@@ -124,6 +127,7 @@ export function OrderDetailPage({ id }: { id: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const role = useAuthStore((state) => state.user?.role);
+  const canViewFinance = role !== Role.WAREHOUSE;
   const [contract, setContract] = useState<SalesContract | null>(null);
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
@@ -294,9 +298,7 @@ export function OrderDetailPage({ id }: { id: string }) {
   };
 
   if (loading && !contract) {
-    return (
-      <div className="flex h-64 items-center justify-center">加载中...</div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (!contract) {
@@ -374,7 +376,9 @@ export function OrderDetailPage({ id }: { id: string }) {
       <Tabs value={activeTab} onValueChange={changeTab} className="min-w-0">
         <div className="overflow-x-auto pb-1">
           <TabsList>
-            {ORDER_TABS.map((tab) => (
+            {ORDER_TABS.filter(
+              (tab) => canViewFinance || !FINANCE_TABS.includes(tab.value),
+            ).map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>
                 {tab.label}
               </TabsTrigger>
@@ -434,7 +438,7 @@ export function OrderDetailPage({ id }: { id: string }) {
 
         {/* 单柜财务结算：仅进入标签时加载，避免阻塞首屏。 */}
         <TabsContent value="receipts" className="space-y-4">
-          {activeTab === "receipts" && (
+          {canViewFinance && activeTab === "receipts" && (
             <Suspense
               fallback={
                 <div className="py-10 text-center text-sm text-muted-foreground">
@@ -453,7 +457,9 @@ export function OrderDetailPage({ id }: { id: string }) {
         </TabsContent>
 
         <TabsContent value="refund">
-          <OrderRefundTab onOpen={() => setDialog("taxPreparation")} />
+          {canViewFinance && (
+            <OrderRefundTab onOpen={() => setDialog("taxPreparation")} />
+          )}
         </TabsContent>
       </Tabs>
 

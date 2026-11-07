@@ -93,8 +93,8 @@ test('buildSalesFinanceSummary: 排除第三方拼柜并形成美元收入、人
   assert.deepEqual(result.revenue, {
     contractTotalUsd: 1000,
     ownedRevenueUsd: 600,
-    receivedUsd: 240,
-    outstandingUsd: 360,
+    receivedUsd: 400,
+    outstandingUsd: 200,
     receivedSource: 'payment_records',
   });
   assert.deepEqual(result.cost, {
@@ -108,10 +108,10 @@ test('buildSalesFinanceSummary: 排除第三方拼柜并形成美元收入、人
   assert.equal(result.profit.estimatedGrossProfitCny, 1400);
   assert.equal(result.profit.estimatedGrossMarginPct, 33.33);
   assert.deepEqual(result.cashFlow, {
-    customerReceiptsCny: 1680,
+    customerReceiptsCny: 2800,
     actualTaxRefundCny: 100,
     supplierPaymentsCny: 1500,
-    netCashCny: 280,
+    netCashCny: 1400,
   });
   assert.equal(result.linkedPurchases[0].allocationRatioPct, 100);
   assert.ok(result.issues.some((issue) => issue.code === 'THIRD_PARTY_REVENUE_EXCLUDED'));

@@ -186,7 +186,9 @@ export function FinancialStatementsOverview({
       {hasData && (
         <>
           <p className="text-xs text-muted-foreground">
-            健康提示与预警基于最新账期：
+            {getStatementsStaleness(periods)?.stale
+              ? "以下为历史账期的提示与预警，不代表当前状况："
+              : "健康提示与预警基于最新账期："}
             {analytics?.latestPeriod?.periodLabel || "未知"}
           </p>
           {(dangerAlerts.length > 0 || warningAlerts.length > 0) && (

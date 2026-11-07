@@ -383,9 +383,46 @@ test('buildSalesContractFlowDiagnostic: 唯一高置信待分配收款会升级�
     assert.equal(receivableRecommendation.actionType, 'AllocatePayment');
     assert.deepEqual(receivableRecommendation.params, {
       paymentId: 'pay-1',
+      salesContractId: 'sc-fin-1',
       contractNo: 'EXP2600099',
       amount: 700,
     });
+  });
+});
+
+test('R2 P1-3: 诊断 → 建议卡 → 唯一一次确认 → allocatePaymentToContracts 收到合同ID，金额按本方应得未收封顶', async () => {
+  let allocation;
+  await withPatched({
+    ...fakePendingTable(),
+    'prisma.salesContract.findFirst': async () => ({
+      id: 'sc-fin-3', contractNo: 'EXP2600077', status: 'SHIPPED', amountSource: 'DERIVED',
+      totalAmount: 1000, receivedAmount: 0, hasTaxRefund: false, items: [],
+      // 整柜货值 1000，其中第三方 400 → 本方应得 600
+      packingItems: [
+        { id: 'p1', totalPrice: 600, isOwnedByJiesong: true, note: null },
+        { id: 'p2', totalPrice: 400, isOwnedByJiesong: false, note: null },
+      ],
+    }),
+    'prisma.inventory.findMany': async () => ([]),
+    'financeService.listUnallocatedPayments': async () => ([
+      { id: 'pay-3', note: '回款 EXP2600077', amount: 600, remainingAmount: 600, customerName: 'SYN' },
+    ]),
+    'financeService.allocatePaymentToContracts': async (paymentId, rows) => { allocation = { paymentId, rows }; return { ok: true }; },
+    'customsDeclarationService.listCustomsDeclarations': async () => ({ total: 1, items: [{ id: 'cd' }] }),
+    'forexVerificationService.listForexVerifications': async () => ({ total: 1, items: [{ id: 'fx' }] }),
+    'taxRefundService.listTaxRefunds': async () => ({ total: 0, items: [] }),
+    'prisma.operationLog.create': async () => ({}),
+  }, async () => {
+    const result = await openAgentService.buildSalesContractFlowDiagnostic({ contractNo: 'EXP2600077' });
+    const rec = result.recommendedActions.find((item) => item.actionType === 'AllocatePayment');
+    assert.equal(rec.params.salesContractId, 'sc-fin-3');
+    assert.equal(rec.params.amount, 600);
+    const ids = [];
+    const cards = await openAgentService.materializeRecommendationPendingActions({ userId: 'u', userRole: 'FINANCE', collectedIds: ids, recommendations: [rec] });
+    assert.equal(cards.length, 1); // 仍是需要人工确认的卡片，不自动执行
+    assert.equal(allocation, undefined);
+    await openAgentService.executeAction(ids[0], 'u', { userRole: 'FINANCE' });
+    assert.deepEqual(allocation, { paymentId: 'pay-3', rows: [{ salesContractId: 'sc-fin-3', amount: 600 }] });
   });
 });
 
@@ -943,6 +980,14 @@ test('P0-6: 确认时按实时角色复核，SALES 拿不到 FINANCE 的收款�
     await assert.rejects(openAgentService.executeAction(ids[0], 'u', { userRole: 'SALES' }), (e) => e.statusCode === 403);
     await assert.rejects(openAgentService.executeAction(ids[0], 'u'), (e) => e.statusCode === 403);
   });
+});
+
+test('R2 P1-2: WAREHOUSE 读不到合同金额类工具，业务角色保持可读', () => {
+  for (const name of ['GetPurchaseOverview', 'GetPurchaseContractDetail', 'GetSalesContractDetail', 'DiagnoseSalesContractFlow', 'DiagnosePurchaseExecution', 'DiagnoseTradeComplianceReadiness']) {
+    assert.equal(openAgentService.isToolAllowedForRole(name, 'WAREHOUSE'), false, name);
+    assert.equal(openAgentService.isToolAllowedForRole(name, 'SALES'), true, name);
+  }
+  assert.equal(openAgentService.isToolAllowedForRole('GetInventoryOverview', 'WAREHOUSE'), true);
 });
 
 test('P0-6: 读工具按角色收口，密钥类配置助手既不能读也不能写', async () => {

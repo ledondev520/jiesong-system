@@ -1,5 +1,6 @@
 "use client";
 
+import { roundRate } from "@/lib/money";
 import { formatUnitPrice } from "@/lib/format";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
@@ -114,7 +115,7 @@ function AdminPricingConfigCard() {
       Object.fromEntries(
         fields.map((f) => [
           f.key,
-          String(Number((next.config[f.key] * f.scale).toFixed(10))),
+          String(roundRate(next.config[f.key] * f.scale)),
         ]),
       ),
     );
@@ -122,7 +123,7 @@ function AdminPricingConfigCard() {
       next.config.categoryMarkups.map((c) => ({
         categoryId: c.categoryId,
         categoryName: c.categoryName,
-        percent: String(Number((c.markup * 100).toFixed(10))),
+        percent: String(roundRate(c.markup * 100)),
       })),
     );
   };

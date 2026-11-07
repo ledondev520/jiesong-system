@@ -73,24 +73,23 @@ const historicalTodos = (
 describe("TodoBoard historical note", () => {
   it("shows the uncounted historical total with a link to the full list", () => {
     render(<TodoBoard todos={historicalTodos(88)} />);
-    expect(screen.getByText(/另有 88 条/)).toHaveTextContent(
-      "签约早于 2026-01-01 的历史记录未计入",
-    );
-    expect(screen.getByRole("link", { name: "查看完整列表" })).toHaveAttribute(
-      "href",
-      "/dashboard/payments?tab=payable",
-    );
+    expect(screen.getByText(/（2026-01-01 起）/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "查看完整列表（含 88 条历史）" }),
+    ).toHaveAttribute("href", "/dashboard/payments?tab=payable");
   });
 
   it("hides the note when nothing is excluded", () => {
     render(<TodoBoard todos={historicalTodos(0)} />);
-    expect(screen.queryByText(/历史记录未计入/)).toBeNull();
+    expect(screen.queryByText(/（2026-01-01 起）/)).toBeNull();
   });
 
   it("does not say everything is done while historical rows remain", () => {
     render(<TodoBoard todos={historicalTodos(88, 0)} />);
     expect(screen.queryByText("全部处理完毕")).toBeNull();
-    expect(screen.getByText(/另有 88 条/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /含 88 条历史/ }),
+    ).toBeInTheDocument();
   });
 });
 

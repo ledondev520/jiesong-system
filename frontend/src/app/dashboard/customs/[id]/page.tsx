@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { CustomsDeclarationDetailPageContent } from "@/app/dashboard/customs/components/CustomsDeclarationDetailPageContent";
+import { DetailSkeleton } from "@/components/ui/detail-skeleton";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -7,11 +8,7 @@ interface PageProps {
 
 export default function CustomsDeclarationDetailPage({ params }: PageProps) {
   return (
-    <Suspense
-      fallback={
-        <div className="py-12 text-center text-muted-foreground">加载中...</div>
-      }
-    >
+    <Suspense fallback={<DetailSkeleton />}>
       <CustomsDeclarationDetailPageContent params={params} />
     </Suspense>
   );

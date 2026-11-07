@@ -25,7 +25,7 @@ const datePartOf = (now) => [
 ].join('');
 
 /** 在事务内取当日已用最大序号 + 1，避免同日多次调用撞 refundNo。 */
-const nextRefundNo = async (tx, now, offset = 0) => {
+const nextRefundNo = async (tx, now, retry = 0) => {
   const prefix = `${REFUND_NO_PREFIX}${datePartOf(now)}-`;
   const rows = await tx.taxRefund.findMany({
     where: { refundNo: { startsWith: prefix } },
@@ -35,7 +35,7 @@ const nextRefundNo = async (tx, now, offset = 0) => {
     const seq = Number(String(row.refundNo).slice(prefix.length));
     return Number.isInteger(seq) && seq > acc ? seq : acc;
   }, 0);
-  return `${prefix}${String(max + 1 + offset).padStart(3, '0')}`;
+  return `${prefix}${String(max + 1 + retry).padStart(3, '0')}`;
 };
 
 const buildWhere = ({ customsDeclarationId, salesContractId } = {}) => {
@@ -127,7 +127,7 @@ const isRefundNoConflict = (error) => (
   error?.code === 'P2002' && String(error?.meta?.target ?? 'refundNo').includes('refundNo')
 );
 
-const writeDraft = async (declaration, existing, computed, forexVerification, now, offset) => {
+const writeDraft = async (declaration, existing, computed, forexVerification, now) => {
   const data = {
     forexVerificationId: forexVerification?.id || null,
     declaredAmount: declaration.totalAmount || 0,
@@ -150,7 +150,7 @@ const writeDraft = async (declaration, existing, computed, forexVerification, no
         return tx.taxRefund.create({
           data: {
             ...data,
-            refundNo: await nextRefundNo(tx, now, offset + attempt),
+            refundNo: await nextRefundNo(tx, now, attempt),
             salesContractId: declaration.salesContractId,
             customsDeclarationId: declaration.id,
             status: 'DRAFT',
@@ -201,7 +201,6 @@ const generateTaxRefundDrafts = async (filters = {}) => {
   const items = [];
   let created = 0;
   let skipped = 0;
-  let offset = 0;
 
   for (const declaration of declarations) {
     const existing = existingByDeclaration.get(declaration.id);
@@ -229,8 +228,7 @@ const generateTaxRefundDrafts = async (filters = {}) => {
     }
 
     const forexVerification = await getLatestForexVerification(declaration.salesContractId, declaration.id);
-    const record = await writeDraft(declaration, existing, computed, forexVerification, now, offset);
-    if (!existing) offset += 1;
+    const record = await writeDraft(declaration, existing, computed, forexVerification, now);
     created += 1;
     items.push({
       created: true,

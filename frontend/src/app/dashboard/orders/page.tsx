@@ -190,6 +190,12 @@ function OrdersList() {
       hideable: false,
     },
     {
+      key: "customer",
+      header: "客户",
+      cell: (order) => order.customer?.name ?? "—",
+      sortValue: (order) => order.customer?.name ?? "",
+    },
+    {
       key: "stores",
       header: "门店",
       cell: (order) => (order.stores?.length ? order.stores.join("、") : "—"),

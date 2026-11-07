@@ -70,7 +70,24 @@ const markAllRead = async (userId) => {
 };
 
 /**
- * 职责：根据业务场景为用户生成通知（幂等：同一类型同一天只生成一条）
+ * 职责：写入一条摘要通知；当天已有同类型，或已有同类型同内容的未读通知时跳过
+ * 思路：未读的相同摘要隔天不再重复堆积（徽标不被同一件事刷高）；内容变化或已读后才重新提醒
+ */
+const createDigestOnce = async (userId, today, { type, title, content, link }) => {
+  const existing = await prisma.notification.findFirst({
+    where: {
+      userId,
+      type,
+      OR: [{ createdAt: { gte: today } }, { isRead: false, title, content }],
+    },
+    select: { id: true },
+  });
+  if (existing) return null;
+  return prisma.notification.create({ data: { userId, type, title, content, link } });
+};
+
+/**
+ * 职责：根据业务场景为用户生成通知（幂等：同一类型同一天只生成一条；相同内容的未读摘要不跨天重复）
  * 思路：
  *   1. 检查待起草采购合同
  *   2. 检查待补录出口参数
@@ -91,26 +108,14 @@ const generateForUser = async (userId) => {
     take: 5,
   });
   if (draftPurchases.length > 0) {
-    const existing = await prisma.notification.findFirst({
-      where: {
-        userId,
-        type: NOTIFICATION_TYPES.PURCHASE_DRAFT,
-        createdAt: { gte: today },
-      },
+    const titles = draftPurchases.map((c) => c.contractNo).join('、');
+    const n = await createDigestOnce(userId, today, {
+      type: NOTIFICATION_TYPES.PURCHASE_DRAFT,
+      title: `有待起草采购合同 ${draftPurchases.length} 份`,
+      content: titles + (draftPurchases.length >= 5 ? ' 等' : ''),
+      link: '/dashboard/purchases',
     });
-    if (!existing) {
-      const titles = draftPurchases.map((c) => c.contractNo).join('、');
-      const n = await prisma.notification.create({
-        data: {
-          userId,
-          type: NOTIFICATION_TYPES.PURCHASE_DRAFT,
-          title: `有待起草采购合同 ${draftPurchases.length} 份`,
-          content: titles + (draftPurchases.length >= 5 ? ' 等' : ''),
-          link: '/dashboard/purchases',
-        },
-      });
-      results.push(n);
-    }
+    if (n) results.push(n);
   }
 
   // 2. 待补录出口参数（DRAFT/CONFIRMED/PACKING 且缺少箱数/毛重/体积）
@@ -128,76 +133,40 @@ const generateForUser = async (userId) => {
     take: 5,
   });
   if (pendingSales.length > 0) {
-    const existing = await prisma.notification.findFirst({
-      where: {
-        userId,
-        type: NOTIFICATION_TYPES.SALES_DRAFT,
-        createdAt: { gte: today },
-      },
+    const titles = pendingSales.map((c) => c.contractNo).join('、');
+    const n = await createDigestOnce(userId, today, {
+      type: NOTIFICATION_TYPES.SALES_DRAFT,
+      title: `有待补录出口参数 ${pendingSales.length} 份`,
+      content: titles + (pendingSales.length >= 5 ? ' 等' : ''),
+      link: '/dashboard/orders',
     });
-    if (!existing) {
-      const titles = pendingSales.map((c) => c.contractNo).join('、');
-      const n = await prisma.notification.create({
-        data: {
-          userId,
-          type: NOTIFICATION_TYPES.SALES_DRAFT,
-          title: `有待补录出口参数 ${pendingSales.length} 份`,
-          content: titles + (pendingSales.length >= 5 ? ' 等' : ''),
-          link: '/dashboard/orders',
-        },
-      });
-      results.push(n);
-    }
+    if (n) results.push(n);
   }
 
   // 3. 与财务/经营报表共用发运后30天仍未收的运营预警。
   const overdueSales = await getOverdueReceivables();
   if (overdueSales.length > 0) {
-    const existing = await prisma.notification.findFirst({
-      where: {
-        userId,
-        type: NOTIFICATION_TYPES.OVERDUE_RECEIVABLE,
-        createdAt: { gte: today },
-      },
+    const titles = overdueSales.slice(0, 5).map((c) => c.contractNo).join('、');
+    const n = await createDigestOnce(userId, today, {
+      type: NOTIFICATION_TYPES.OVERDUE_RECEIVABLE,
+      title: `发运超过30天仍未收齐 ${overdueSales.length} 份`,
+      content: titles + (overdueSales.length >= 5 ? ' 等' : ''),
+      link: '/dashboard/payments?tab=receivable&overdue=true',
     });
-    if (!existing) {
-      const titles = overdueSales.slice(0, 5).map((c) => c.contractNo).join('、');
-      const n = await prisma.notification.create({
-        data: {
-          userId,
-          type: NOTIFICATION_TYPES.OVERDUE_RECEIVABLE,
-          title: `发运超过30天仍未收齐 ${overdueSales.length} 份`,
-          content: titles + (overdueSales.length >= 5 ? ' 等' : ''),
-          link: '/dashboard/payments?tab=receivable&overdue=true',
-        },
-      });
-      results.push(n);
-    }
+    if (n) results.push(n);
   }
 
   // 4. 低库存（数量低于预警线，使用 Product.lowStockThreshold）
   const { alerts: lowStockProducts } = await listLowStockAlerts(prisma);
   if (lowStockProducts.length > 0) {
-    const existing = await prisma.notification.findFirst({
-      where: {
-        userId,
-        type: NOTIFICATION_TYPES.LOW_STOCK,
-        createdAt: { gte: today },
-      },
+    const titles = lowStockProducts.slice(0, 5).map((p) => p.productName).join('、');
+    const n = await createDigestOnce(userId, today, {
+      type: NOTIFICATION_TYPES.LOW_STOCK,
+      title: `有 ${lowStockProducts.length} 个商品库存低于预警线`,
+      content: titles + (lowStockProducts.length >= 5 ? ' 等' : ''),
+      link: '/dashboard/products?lowStock=true',
     });
-    if (!existing) {
-      const titles = lowStockProducts.slice(0, 5).map((p) => p.productName).join('、');
-      const n = await prisma.notification.create({
-        data: {
-          userId,
-          type: NOTIFICATION_TYPES.LOW_STOCK,
-          title: `有 ${lowStockProducts.length} 个商品库存低于预警线`,
-          content: titles + (lowStockProducts.length >= 5 ? ' 等' : ''),
-          link: '/dashboard/products?lowStock=true',
-        },
-      });
-      results.push(n);
-    }
+    if (n) results.push(n);
   }
 
   return results;

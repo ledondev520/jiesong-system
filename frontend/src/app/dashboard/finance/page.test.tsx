@@ -12,6 +12,11 @@ import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { clearAllCache } from "@/lib/api-cache";
 import FinancePage from "./page";
+import { useAuthStore } from "@/store/auth.store";
+import { Role, type User } from "@/types";
+
+const asRole = (role: Role) =>
+  useAuthStore.setState({ user: { id: "u1", role } as User });
 
 const mockGetStats = vi.fn();
 const mockApiGet = vi.fn();
@@ -60,6 +65,7 @@ vi.mock("./components/MonthlyStatementsTrend", () => ({
 
 describe("FinancePage 交互逻辑", () => {
   beforeEach(() => {
+    asRole(Role.FINANCE);
     clearAllCache();
     mockClearApiGetCache.mockReset();
     mockGetStats.mockReset();
@@ -214,6 +220,40 @@ describe("FinancePage 交互逻辑", () => {
     expect(screen.getByText("收支对比")).toBeInTheDocument();
     expect(screen.getByText("现金流预测")).toBeInTheDocument();
   });
+
+  it("SALES 不请求银行/发票统计，也看不到会得到 403 的报表/流水/发票入口", async () => {
+    asRole(Role.SALES);
+    mockGetStats.mockResolvedValue({
+      payable: { total: 1200, paid: 400, unpaid: 800 },
+      receivable: { total: 3200, received: 1000, unreceived: 2200 },
+    });
+    render(<FinancePage />);
+    await screen.findByText("应付账款总额");
+    expect(mockGetTransactionStats).not.toHaveBeenCalled();
+    expect(mockGetInvoiceStats).not.toHaveBeenCalled();
+    for (const href of ["statements", "bank-flow", "invoices"]) {
+      expect(
+        document.querySelector(`a[href="/dashboard/finance/${href}"]`),
+      ).toBeNull();
+    }
+    expect(
+      mockApiGet.mock.calls.some(([url]) => String(url).includes("statements")),
+    ).toBe(false);
+  });
+
+  it.each([Role.SALES, Role.PURCHASE])(
+    "%s 看不到会得到 403 的月度趋势卡片",
+    async (role) => {
+      asRole(role);
+      mockGetStats.mockResolvedValue({
+        payable: { total: 1200, paid: 400, unpaid: 800 },
+        receivable: { total: 3200, received: 1000, unreceived: 2200 },
+      });
+      render(<FinancePage />);
+      await screen.findByText("应付账款总额");
+      expect(screen.queryByTestId("monthly-statements-trend-stub")).toBeNull();
+    },
+  );
 
   it("初始加载中会显示加载文案", () => {
     mockGetStats.mockReturnValue(new Promise(() => {}));

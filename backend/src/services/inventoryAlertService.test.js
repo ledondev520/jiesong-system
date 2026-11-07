@@ -65,12 +65,14 @@ test('createLowStockNotifications: 同日同商品去重，仅创建缺失通知
     { id: 'u-admin' },
     { id: 'u-warehouse' },
   ]);
-  prisma.notification.findMany = async () => ([
-    {
+  let existingWhere = null;
+  prisma.notification.findMany = async (args) => {
+    existingWhere = args.where;
+    return [{
       userId: 'u-admin',
       metadata: JSON.stringify({ productId: 'p-1' }),
-    },
-  ]);
+    }];
+  };
   prisma.notification.createMany = async (args) => {
     createManyArgs = args;
     return { count: args.data.length };
@@ -93,6 +95,8 @@ test('createLowStockNotifications: 同日同商品去重，仅创建缺失通知
       todayStart: new Date('2026-03-05T00:00:00.000Z'),
     });
 
+    // 当天已发或仍未读的旧提醒都算已通知
+    assert.deepEqual(existingWhere.OR[1], { isRead: false });
     assert.equal(result.created, 1);
     assert.equal(result.skipped, 1);
     assert.equal(result.recipients, 2);
