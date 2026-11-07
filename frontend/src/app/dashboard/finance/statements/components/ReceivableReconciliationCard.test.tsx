@@ -39,6 +39,8 @@ vi.mock("@/services/finance.service", () => ({
   },
 }));
 
+import { financeService } from "@/services/finance.service";
+
 describe("ReceivableReconciliationCard", () => {
   it("展示经营应收、报表应收和两类会计异常", async () => {
     render(<ReceivableReconciliationCard year={2026} month={7} />);
@@ -50,5 +52,23 @@ describe("ReceivableReconciliationCard", () => {
     expect(screen.getByText(/重复确认：EXP260008/)).toBeInTheDocument();
     expect(screen.getByText(/漏确认：EXP260009/)).toBeInTheDocument();
     expect(screen.getByText("-¥17,052.86")).toBeInTheDocument();
+  });
+
+  it("无分录异常但有剩余差额时不显示「已对平」", async () => {
+    const base = (await financeService.getReceivableReconciliation(2026, 7))!;
+    vi.mocked(financeService.getReceivableReconciliation).mockResolvedValueOnce(
+      {
+        ...base,
+        residualCny: 120.5,
+        anomalies: {
+          ...base.anomalies,
+          duplicateDebitCny: 0,
+          missingContracts: [],
+        },
+      },
+    );
+    render(<ReceivableReconciliationCard year={2026} month={7} />);
+    expect(await screen.findByText("有剩余差额")).toBeInTheDocument();
+    expect(screen.queryByText("已对平")).not.toBeInTheDocument();
   });
 });

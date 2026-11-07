@@ -94,10 +94,12 @@ export default function FinanceOverviewCharts({
           {cnyTrends.length === 0 ? (
             <EmptyState
               icon={BarChart3}
-              title={effectiveRate ? "近期没有收付款记录" : "结算汇率不可用"}
+              title={
+                effectiveRate ? "近期没有合同收付款登记" : "结算汇率不可用"
+              }
               description={
                 effectiveRate
-                  ? `近 ${trendDays} 天内没有登记收付款，所以没有柱子可画；可切换区间，或看下方按月的财务报表趋势。`
+                  ? `近 ${trendDays} 天内没有合同收付款登记（不含银行流水），所以没有柱子可画；银行流水汇总见下方，也可切换区间。`
                   : "应收需按结算汇率折算为 CNY，汇率暂不可用，收支对比无法绘制。"
               }
               className="py-10"

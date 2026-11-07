@@ -82,8 +82,8 @@ it("近期没有收付款时给出明确空状态和原因，汇率不可用时�
       onTrendDaysChange={() => {}}
     />,
   );
-  expect(screen.getByText("近期没有收付款记录")).toBeInTheDocument();
-  expect(screen.getByText(/近 90 天内没有登记收付款/)).toBeInTheDocument();
+  expect(screen.getByText("近期没有合同收付款登记")).toBeInTheDocument();
+  expect(screen.getByText(/近 90 天内没有合同收付款登记/)).toBeInTheDocument();
   rerender(
     <FinanceOverviewCharts
       cnyTrends={[]}
