@@ -72,9 +72,12 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
     }
     for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE', 'BOSS', 'FINANCE']) {
       for (const [record, file, type, legacy] of [[purchase, purchaseFile, 'PURCHASE', 'purchases'], [sales, salesFile, 'SALES', 'sales']]) {
+        // B112: signed purchase contracts are readable only by ADMIN/PURCHASE/FINANCE/BOSS; SALES/WAREHOUSE get no row and 403.
+        const blocked = type === 'PURCHASE' && ['SALES', 'WAREHOUSE'].includes(role);
         const files = await call('GET', `/contracts/${record.id}/files?contractType=${type}`, undefined, { role });
-        assert.ok(files.some(item => item.id === file.id && item.contractType === type));
+        assert.equal(files.some(item => item.id === file.id && item.contractType === type), !blocked);
         for (const url of [`/files/${file.id}/download`, `/${legacy}/files/${file.id}/download`]) {
+          if (blocked) { await call('GET', url, undefined, { role, expected: 403 }); continue; }
           const result = await call('GET', url, undefined, { role, binary: true });
           assert.deepEqual(result.bytes, generatedPdf);
           assert.match(result.headers.get('content-disposition'), /synthetic\.pdf/);
@@ -114,7 +117,7 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
       const before = await snapshot();
       await sub.test(url, async () => {
         let statusError;
-        try { await call('POST', url, form({ contractType }), { expected: 404 }); } catch (error) { statusError = error; }
+        try { await call('POST', url, form({ contractType }), { role: contractType === 'PURCHASE' ? 'PURCHASE' : 'SALES', expected: 404 }); } catch (error) { statusError = error; }
         assert.deepEqual(await snapshot(), before, 'rejected upload must not leave its new payload');
         if (statusError) throw statusError;
       });
@@ -191,11 +194,11 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
     const staticResponse = await fetch(base.replace(/\/api\/v1$/, '') + '/uploads/' + salesFile.filePath);
     assert.equal(staticResponse.status, 404);
     await call('GET', `/contracts/${purchase.id}/files?contractType=TYPO`, undefined, { expected: 400 });
-    for (const url of ['/files/synthetic-missing/download', `/purchases/files/${salesFile.id}/download`, `/sales/files/${purchaseFile.id}/download`]) await call('GET', url, undefined, { expected: 404 });
+    for (const url of ['/files/synthetic-missing/download', `/purchases/files/${salesFile.id}/download`, `/sales/files/${purchaseFile.id}/download`]) await call('GET', url, undefined, { role: 'PURCHASE', expected: 404 });
     // Removing only this worker's generated disposable payload simulates lost storage.
     fs.unlinkSync(path.join(config.upload.dir, purchaseFile.filePath));
     const before = await snapshot();
-    for (const url of [`/files/${purchaseFile.id}/download`, `/purchases/files/${purchaseFile.id}/download`]) await call('GET', url, undefined, { expected: 404 });
+    for (const url of [`/files/${purchaseFile.id}/download`, `/purchases/files/${purchaseFile.id}/download`]) await call('GET', url, undefined, { role: 'PURCHASE', expected: 404 });
     assert.deepEqual(await snapshot(), before);
   });
   assert.ok(requestCount <= 100, 'real global limiter budget must not be bypassed by the fixture');
