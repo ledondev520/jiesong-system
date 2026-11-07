@@ -237,3 +237,30 @@ it("切换合同类型清空已选合同，慢响应不会覆盖新类型列表"
   expect(screen.getByRole("button", { name: /确认关联/ })).toBeDisabled();
   expect(manualMatch).not.toHaveBeenCalled();
 });
+
+it("多个付款别名合并成「A、B」时，流水链接只搜第一个别名", async () => {
+  recon.mockResolvedValue({
+    ...emptyRecon,
+    matched: [
+      {
+        payName: "甲公司、甲公司(深圳)",
+        invName: "甲公司",
+        netPaid: 100,
+        totalInvoice: 100,
+        gap: 0,
+        category: "normal",
+      },
+    ],
+  });
+  const { container } = render(<ReconciliationPage />);
+  await screen.findByText("甲公司、甲公司(深圳)");
+  const hrefs = Array.from(container.querySelectorAll("a")).map((a) =>
+    a.getAttribute("href"),
+  );
+  expect(hrefs).toContain(
+    `/dashboard/finance/bank-flow?search=${encodeURIComponent("甲公司")}`,
+  );
+  expect(hrefs).toContain(
+    `/dashboard/finance/invoices?search=${encodeURIComponent("甲公司")}`,
+  );
+});
