@@ -130,6 +130,7 @@ test('uploadFile: 登记附件前收紧目录和文件权限，保持 201 响应
   try {
     await purchaseController.uploadFile({
       params: { id: 'purchase-1' },
+      user: { role: 'PURCHASE' },
       body: { description: 'synthetic test attachment', category: 'SUPPLIER_INVOICE' },
       file: { path: filePath, originalname: 'synthetic.pdf', mimetype: 'application/pdf', size: fs.statSync(filePath).size },
     }, res, (error) => { throw error; });
