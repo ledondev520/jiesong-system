@@ -306,3 +306,20 @@ it("多个付款别名合并成「A、B」时，流水链接只搜第一个别�
     `/dashboard/finance/invoices?search=${encodeURIComponent("甲公司")}`,
   );
 });
+
+it("未载入前银行/发票计数显示「—」而不是 0，载入后才出现真实数字", async () => {
+  let release: (v: unknown) => void = () => {};
+  unmatched.mockReturnValue(new Promise((resolve) => (release = resolve)));
+  render(<ReconciliationPage />);
+  expect(await screen.findByText(/银行 — 条 \/ 发票 — 条/)).toBeInTheDocument();
+  expect(screen.queryByText(/银行 0 条/)).toBeNull();
+  release({
+    bankItems: [],
+    invoiceItems: [],
+    bankTotal: 831,
+    invoiceTotal: 1265,
+  });
+  expect(
+    await screen.findByText(/银行 831 条 \/ 发票 1265 条/),
+  ).toBeInTheDocument();
+});
