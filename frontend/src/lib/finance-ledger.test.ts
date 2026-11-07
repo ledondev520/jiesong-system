@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canLinkInvoices,
   isResidual,
   matchRate,
   negativeInvoiceCount,
@@ -55,5 +56,25 @@ describe("txnKind", () => {
     expect(txnKind({ txnType: "对公结汇" })).toBe("结汇");
     expect(txnKind({ summary: "账户间划转" })).toBe("内部划转");
     expect(txnKind({ txnType: "转账", summary: "货款" })).toBeNull();
+  });
+});
+
+describe("canLinkInvoices", () => {
+  it("外部往来方显示；无往来方、结汇/内部划转、工资/报销不显示", () => {
+    expect(canLinkInvoices({ counterpart: "示例供应商A" })).toBe(true);
+    expect(canLinkInvoices({ counterpart: "" })).toBe(false);
+    expect(canLinkInvoices({ counterpart: null })).toBe(false);
+    expect(
+      canLinkInvoices({ counterpart: "示例公司", summary: "内部划转" }),
+    ).toBe(false);
+    expect(canLinkInvoices({ counterpart: "示例银行", txnType: "结汇" })).toBe(
+      false,
+    );
+    expect(canLinkInvoices({ counterpart: "张三", summary: "工资代发" })).toBe(
+      false,
+    );
+    expect(canLinkInvoices({ counterpart: "李四", summary: "差旅报销" })).toBe(
+      false,
+    );
   });
 });
