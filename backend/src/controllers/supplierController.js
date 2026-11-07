@@ -12,7 +12,9 @@ const { createError } = require('../middleware/errorHandler');
 const { archiveFilter } = require('../utils/archiveFilter');
 const { normalizePagination } = require('../utils/pagination');
 const supplierHardDelete = require('../services/supplierHardDeleteService');
-const { createSupplier, updateSupplier, assertActiveChangeAllowed } = require('../agent/commands/supplier');
+const {
+  createSupplier, updateSupplier, assertActiveChangeAllowed, redactSupplierForRole, sanitizeSupplierInput,
+} = require('../agent/commands/supplier');
 
 
 /**
@@ -57,7 +59,7 @@ const list = async (req, res, next) => {
       prisma.supplier.count({ where }),
     ]);
     
-    paginated(res, suppliers, total, page, pageSize);
+    paginated(res, suppliers.map((item) => redactSupplierForRole(req.user?.role, item)), total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -78,7 +80,7 @@ const getById = async (req, res, next) => {
       throw createError('供应商不存在', 404);
     }
     
-    success(res, supplier);
+    success(res, redactSupplierForRole(req.user?.role, supplier));
   } catch (error) {
     next(error);
   }
@@ -90,11 +92,11 @@ const getById = async (req, res, next) => {
 const create = async (req, res, next) => {
   try {
     const supplier = await createSupplier({
-      input: req.body,
+      input: sanitizeSupplierInput(req.user?.role, req.body),
       prismaClient: prisma,
     });
     
-    created(res, supplier, '供应商创建成功');
+    created(res, redactSupplierForRole(req.user?.role, supplier), '供应商创建成功');
   } catch (error) {
     next(error);
   }
@@ -108,11 +110,11 @@ const update = async (req, res, next) => {
     assertActiveChangeAllowed(req.user?.role, req.body?.isActive);
     const supplier = await updateSupplier({
       id: req.params.id,
-      input: req.body,
+      input: sanitizeSupplierInput(req.user?.role, req.body),
       prismaClient: prisma,
     });
     
-    success(res, supplier, '供应商更新成功');
+    success(res, redactSupplierForRole(req.user?.role, supplier), '供应商更新成功');
   } catch (error) {
     next(error);
   }

@@ -10,6 +10,8 @@ const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
+const { settlementFieldGuard } = require('../middleware/settlementFieldGuard');
+
 const router = Router();
 
 router.use(authenticate);
@@ -19,7 +21,7 @@ router.get('/workbench/monthly-export', roleAuth('ADMIN', 'FINANCE'), taxRefundC
 router.get('/workbench/:salesContractId/preparation', roleAuth('ADMIN', 'FINANCE'), taxRefundController.getShipmentPreparation);
 router.get('/workbench/:salesContractId/preparation-export', roleAuth('ADMIN', 'FINANCE'), taxRefundController.exportShipmentPreparation);
 router.post('/workbench/:salesContractId/confirm', roleAuth('ADMIN', 'FINANCE'), taxRefundController.confirmShipmentPreparation);
-router.get('/workbench/:salesContractId/invoice-verification', taxRefundController.getInvoiceVerification);
+router.get('/workbench/:salesContractId/invoice-verification', roleAuth('ADMIN', 'FINANCE'), taxRefundController.getInvoiceVerification);
 router.get('/', withPaginationValidation, taxRefundController.list);
 router.post(
   '/auto-drafts',
@@ -32,15 +34,21 @@ router.post(
   taxRefundController.exportTaxRefunds,
 );
 router.get('/:id', withIdValidation, taxRefundController.getById);
+const refundFieldGuard = settlementFieldGuard({
+  safeStatuses: ['DRAFT', 'APPLIED'],
+  fields: ['refundedAmount', 'refundedAt'],
+});
 router.post(
   '/',
   roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  refundFieldGuard,
   withAuditLog({ entity: 'TaxRefund', action: 'CREATE', model: 'taxRefund' }, taxRefundController.create),
 );
 router.put(
   '/:id',
   withIdValidation,
   roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  refundFieldGuard,
   withAuditLog({ entity: 'TaxRefund', action: 'UPDATE', model: 'taxRefund' }, taxRefundController.update),
 );
 router.delete(

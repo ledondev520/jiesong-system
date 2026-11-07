@@ -142,7 +142,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     before = snapshot();
     await good('/finance/unmatch', undo);
     assert.deepEqual(snapshot(), before, 'repeated undo does not recreate or change any source/ledger rows');
-    for (const role of ['ADMIN', 'FINANCE', 'SALES', 'PURCHASE', 'WAREHOUSE']) {
+    for (const role of ['ADMIN', 'FINANCE']) {
       await good('/finance/match', matchBody, role);
       await good('/finance/unmatch', undo, role);
     }

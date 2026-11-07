@@ -15,6 +15,8 @@ const { withPaginationValidation } = require('../utils/validators');
 const router = Router();
 
 router.use(authenticate);
+// 银行流水与发票为 Restricted：读仅 ADMIN/FINANCE/BOSS（BOSS 写入由 bossReadOnly 拒绝），导入仅 ADMIN/FINANCE
+router.use(roleAuth('ADMIN', 'FINANCE', 'BOSS'));
 
 // GET /api/v1/bank-flow/transactions
 router.get('/transactions', withPaginationValidation, ctrl.listTransactions);
