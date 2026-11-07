@@ -13,7 +13,7 @@ const prisma = require('../utils/prisma');
 const { isInEffect, payableWhere, outstandingOf } = require('./payablesService');
 const { createError } = require('../middleware/errorHandler');
 const { VALID_INVOICE_WHERE } = require('./invoiceRecordService');
-const { getEffectiveSalesContractTotal } = require('./salesContractAmount');
+const { getEffectiveSalesContractTotal, getOutstandingReceivableUsd } = require('./salesContractAmount');
 
 // ==================== 常量配置 ====================
 
@@ -242,7 +242,7 @@ async function loadSalesContracts() {
     return {
       ...c,
       nameCandidates: storeNames.length > 0 ? storeNames : [c.port?.name].filter(Boolean),
-      unpaidAmount: Math.max(getEffectiveSalesContractTotal(c) - c.receivedAmount, 0),
+      unpaidAmount: getOutstandingReceivableUsd(c),
     };
   });
 }
@@ -769,7 +769,12 @@ async function listContractsForMatch(contractType, search = '', purpose = MATCH_
       include: { supplier: true },
     });
     // payableWhere 只是粗过滤，旧别名/小写拼写的草稿、已取消行要在这里剔除
-    return purpose === MATCH_PURPOSE.INVOICE ? rows : rows.filter(isInEffect);
+    const listed = purpose === MATCH_PURPOSE.INVOICE ? rows : rows.filter(isInEffect);
+    // 未付余额与 loadPurchaseContracts 同口径，前端不再自行计算
+    return listed.map((c) => ({
+      ...c,
+      unpaidAmount: purpose === MATCH_PURPOSE.INVOICE ? Math.max(c.totalAmount - c.paidAmount, 0) : outstandingOf(c),
+    }));
   }
 
   if (contractType === CONTRACT_TYPE.SALES) {
@@ -785,7 +790,7 @@ async function listContractsForMatch(contractType, search = '', purpose = MATCH_
         : {}),
     };
 
-    return prisma.salesContract.findMany({
+    const sales = await prisma.salesContract.findMany({
       where,
       take: 50,
       orderBy: { contractNo: 'desc' },
@@ -794,6 +799,7 @@ async function listContractsForMatch(contractType, search = '', purpose = MATCH_
         port: true,
       },
     });
+    return sales.map((c) => ({ ...c, unpaidAmount: getOutstandingReceivableUsd(c) }));
   }
 
   return [];

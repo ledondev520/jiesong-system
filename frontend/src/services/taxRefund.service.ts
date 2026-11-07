@@ -1,7 +1,6 @@
+import { authFetchInit } from "@/lib/browser-session";
 /** Tax-refund APIs and exports share cookie CSRF protection with normal bearer requests. */
-import { getBrowserSessionHeaders } from "@/lib/browser-session";
 import api, { type ApiRequestConfig } from "@/lib/axios";
-import { getAuthToken } from "@/lib/auth-token";
 import { downloadResponseBlob, throwDownloadError } from "./fileDownload";
 import type { TaxRefund } from "@/types";
 import type { TaxRefundPreparation } from "./sales.service";
@@ -185,14 +184,13 @@ export const taxRefundService = {
     salesContractId: string,
     customsDeclarationId?: string,
   ) => {
-    const token = getAuthToken();
     const query = customsDeclarationId
       ? `?customsDeclarationId=${encodeURIComponent(customsDeclarationId)}`
       : "";
     const response = await fetch(
       `/api/v1/tax-refunds/workbench/${salesContractId}/preparation-export${query}`,
       {
-        headers: { Authorization: token ? `Bearer ${token}` : "" },
+        ...authFetchInit(),
       },
     );
     if (!response.ok)
@@ -218,11 +216,10 @@ export const taxRefundService = {
       }
     >(`/tax-refunds/workbench/${salesContractId}/confirm`, data),
   exportMonthlyPreparations: async (filingMonth: string) => {
-    const token = getAuthToken();
     const response = await fetch(
       `/api/v1/tax-refunds/workbench/monthly-export?filingMonth=${encodeURIComponent(filingMonth)}`,
       {
-        headers: { Authorization: token ? `Bearer ${token}` : "" },
+        ...authFetchInit(),
       },
     );
     if (!response.ok)
@@ -238,12 +235,11 @@ export const taxRefundService = {
       { data: ContractInvoiceVerification }
     >(`/tax-refunds/workbench/${salesContractId}/invoice-verification`),
   exportDeclarationCsv: async (ids?: string[]) => {
-    const token = getAuthToken();
     const response = await fetch("/api/v1/tax-refunds/export?download=1", {
       method: "POST",
+      ...authFetchInit(),
       headers: {
-        Authorization: token ? `Bearer ${token}` : "",
-        ...getBrowserSessionHeaders(),
+        ...authFetchInit().headers,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(ids?.length ? { ids } : {}),

@@ -158,3 +158,26 @@ test('rateLimit: 自定义 keyGenerator 可按 IP + 用户名分桶限流', asyn
   assert.equal(nextCalled, 2);
   assert.equal(blockedRes.statusCode, 429);
 });
+
+const callLimiter = (limiter, ip) => {
+  let status = 200;
+  const res = { setHeader: () => {}, status: (code) => { status = code; return res; }, json: () => {} };
+  limiter({ ip }, res, () => {});
+  return status;
+};
+
+test('rateLimit: 不同限流器计数互相隔离（同一 IP 不共享预算）', () => {
+  const a = rateLimit({ windowMs: 60000, max: 1 });
+  const b = rateLimit({ windowMs: 60000, max: 1 });
+  assert.equal(callLimiter(a, '10.9.0.1'), 200);
+  assert.equal(callLimiter(a, '10.9.0.1'), 429);
+  assert.equal(callLimiter(b, '10.9.0.1'), 200);
+});
+
+test('rateLimit: store 条目数有上限，满时淘汰最旧 key', () => {
+  const limiter = rateLimit({ windowMs: 60000, max: 1, maxEntries: 3 });
+  for (const ip of ['1', '2', '3', '4']) callLimiter(limiter, ip);
+  // key 1 已被淘汰，重新开始计数而不是 429；key 4 仍在
+  assert.equal(callLimiter(limiter, '1'), 200);
+  assert.equal(callLimiter(limiter, '4'), 429);
+});

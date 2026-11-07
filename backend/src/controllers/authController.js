@@ -140,7 +140,7 @@ const updateUser = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userData = req.body;
-    const user = await authService.updateUser(id, userData);
+    const user = await authService.updateUser(id, userData, req.user?.id);
     success(res, user, '用户更新成功');
   } catch (error) {
     next(error);

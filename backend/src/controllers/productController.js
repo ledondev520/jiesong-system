@@ -11,6 +11,7 @@ const { listLowStockAlerts } = require('../services/inventoryAlertService');
 const { success, created, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { INVENTORY_STATUS } = require('../config/constants');
+const { redactNestedSuppliers } = require('../agent/commands/supplier/bankFields');
 const { normalizePagination, parsePositiveInt } = require('../utils/pagination');
 
 // 可用库存 = 已入库(INBOUND)数量合计，与低库存预警(inventoryAlertService)同一口径；无库存记录按 0。
@@ -190,7 +191,7 @@ const getById = async (req, res, next) => {
     }
     
     const stock = await loadAvailableStock([product.id]);
-    success(res, { ...product, availableStock: stock.get(product.id) ?? 0 });
+    success(res, redactNestedSuppliers(req.user?.role, { ...product, availableStock: stock.get(product.id) ?? 0 }));
   } catch (error) {
     next(error);
   }
@@ -268,7 +269,7 @@ const getSuppliers = async (req, res, next) => {
       include: { supplier: true },
     });
     
-    success(res, suppliers);
+    success(res, redactNestedSuppliers(req.user?.role, suppliers));
   } catch (error) {
     next(error);
   }

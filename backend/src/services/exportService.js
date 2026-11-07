@@ -22,10 +22,10 @@ const { roundMoney } = require('../utils/money');
  * @param {Object} query - 查询参数
  * @returns {Object} { data, filename, contentType }
  */
-const exportData = async (type, query = {}) => {
+const exportData = async (type, query = {}, { includeBank = false } = {}) => {
   switch (type) {
     case 'suppliers':
-      return exportSuppliers(query);
+      return exportSuppliers(query, includeBank);
     case 'stores':
       return exportStores(query);
     case 'products':
@@ -62,13 +62,13 @@ const toCSV = (headers, rows) => {
 /**
  * 职责：导出供应商数据
  */
-const exportSuppliers = async (query) => {
+const exportSuppliers = async (query, includeBank = false) => {
   const suppliers = await prisma.supplier.findMany({
     include: { aliases: true },
     orderBy: { name: 'asc' },
   });
   
-  const headers = ['ID', '名称', '简称', '联系人', '电话', '邮箱', '地址', '银行账户', '质量问题', '昵称'];
+  const headers = ['ID', '名称', '简称', '联系人', '电话', '邮箱', '地址', ...(includeBank ? ['银行账户'] : []), '质量问题', '昵称'];
   const rows = suppliers.map(s => [
     s.id,
     s.name,
@@ -77,7 +77,7 @@ const exportSuppliers = async (query) => {
     s.contactPhone || '',
     s.contactEmail || '',
     s.address || '',
-    s.bankAccount || '',
+    ...(includeBank ? [s.bankAccount || ''] : []),
     s.hasQualityIssue ? '是' : '否',
     s.aliases.map(a => a.alias).join('; '),
   ]);

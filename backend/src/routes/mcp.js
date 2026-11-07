@@ -9,7 +9,10 @@ const { authenticate } = require('../middleware/auth');
 const { hasCapabilities, parseCapability } = require('../middleware/roleAuth');
 const { searchEntities } = require('../agent/commands/query');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
-const { createSupplier, updateSupplier, assertActiveChangeAllowed } = require('../agent/commands/supplier');
+const {
+  createSupplier, updateSupplier, assertActiveChangeAllowed, sanitizeSupplierInput,
+} = require('../agent/commands/supplier');
+const { redactNestedSuppliers } = require('../agent/commands/supplier/bankFields');
 const { createMcpServer } = require('../agent/mcp/server');
 const prisma = require('../utils/prisma');
 const { logOperation } = require('../utils/auditLog');
@@ -55,12 +58,12 @@ const createLocalClient = (req) => {
   const actorRole = req.authActor?.actorType === 'AGENT' ? null : req.user?.role;
   return {
     searchEntities,
-    createPurchase: audited('PurchaseContract', 'CREATE', (input) => createPurchaseWithItems({ input })),
-    updatePurchase: audited('PurchaseContract', 'UPDATE', (id, input) => updatePurchase({ id, input }), (id) => prisma.purchaseContract.findUnique({ where: { id } })),
-    createSupplier: audited('Supplier', 'CREATE', (input) => createSupplier({ input })),
+    createPurchase: audited('PurchaseContract', 'CREATE', async (input) => redactNestedSuppliers(actorRole, await createPurchaseWithItems({ input }))),
+    updatePurchase: audited('PurchaseContract', 'UPDATE', async (id, input) => redactNestedSuppliers(actorRole, await updatePurchase({ id, input })), (id) => prisma.purchaseContract.findUnique({ where: { id } })),
+    createSupplier: audited('Supplier', 'CREATE', (input) => createSupplier({ input: sanitizeSupplierInput(actorRole, input) })),
     updateSupplier: audited('Supplier', 'UPDATE', (id, input) => {
       assertActiveChangeAllowed(actorRole, input?.isActive);
-      return updateSupplier({ id, input });
+      return updateSupplier({ id, input: sanitizeSupplierInput(actorRole, input) });
     }, (id) => prisma.supplier.findUnique({ where: { id } })),
   };
 };
@@ -112,7 +115,8 @@ router.post('/', authenticate, async (req, res) => {
     return res.status(500).json({
       jsonrpc: '2.0',
       id: req.body?.id ?? null,
-      error: { code: -32000, message: error.message },
+      // Raw messages can carry Prisma/FS details; only expose them outside production.
+      error: { code: -32000, message: process.env.NODE_ENV === 'production' ? 'Internal error' : error.message },
     });
   }
 });

@@ -1,3 +1,4 @@
+import { authFetchInit } from "@/lib/browser-session";
 /**
  * Input: EXP 编号、本票现汇/买方/包装种类/单证日期及人工确认价格
  * Output: 出口三单只读预检、生成归档和受保护文件下载
@@ -5,7 +6,6 @@
  */
 
 import api from "@/lib/axios";
-import { getAuthToken } from "@/lib/auth-token";
 import { downloadResponseBlob } from "./fileDownload";
 import type { ApiResponse } from "@/types";
 
@@ -123,9 +123,8 @@ export const exportPacketService = {
     >(`/sales/${salesContractId}/export-packet/generate`, input),
 
   download: async (fileId: string, fileName: string) => {
-    const token = getAuthToken();
     const response = await fetch(`/api/v1/files/${fileId}/download`, {
-      headers: { Authorization: token ? `Bearer ${token}` : "" },
+      ...authFetchInit(),
     });
     await downloadResponseBlob(response, fileName);
   },

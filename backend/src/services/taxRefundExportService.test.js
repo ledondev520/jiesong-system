@@ -56,6 +56,7 @@ test('exportTaxRefunds: P0 缺失字段与税率不一致时阻断导出并写�
   const updateCalls = [];
 
   await withMockDelegates({
+    $transaction: async (ops) => Promise.all(ops),
     taxRefund: {
       findMany: async () => ([
         buildRecord({ id: 'tr-1', relation_no: null }),
@@ -103,6 +104,7 @@ test('exportTaxRefunds: 规范化可修复格式并仅导出 passed 记录', asy
   const updateCalls = [];
 
   await withMockDelegates({
+    $transaction: async (ops) => Promise.all(ops),
     taxRefund: {
       findMany: async () => ([
         buildRecord({
@@ -147,6 +149,7 @@ test('exportTaxRefunds: 同一发票号关联多个采购合同时阻断整批�
   const updateCalls = [];
 
   await withMockDelegates({
+    $transaction: async (ops) => Promise.all(ops),
     taxRefund: {
       findMany: async () => ([
         buildRecord({ id: 'tr-a', refundNo: 'TR-A', relation_no: 'PC-A', invoice_no: 'INV-DUP' }),
@@ -174,4 +177,11 @@ test('exportTaxRefunds: 同一发票号关联多个采购合同时阻断整批�
       ['blocked', 'blocked'],
     );
   });
+});
+
+test('buildCsv: 以公式触发符开头的单元格加单引号前缀', () => {
+  const csv = require('./taxRefundExportService').buildCsv([{ refund_no: '=HYPERLINK("http://x")', note: '@cmd', declared_amount: -5 }]);
+  const row = csv.split('\n')[1];
+  assert.ok(row.startsWith(`"'=HYPERLINK(""http://x"")"`), row);
+  assert.ok(row.endsWith(",'@cmd"), row);
 });

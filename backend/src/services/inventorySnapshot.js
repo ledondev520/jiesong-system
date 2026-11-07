@@ -33,9 +33,11 @@ const getInventorySnapshot = async (tx = prisma, filters = {}) => {
 
   const inventories = await getDefaultSnapshotInput(tx).inventory.findMany({
     where,
-    include: {
+    // Narrow projection: the snapshot is aggregated, so rows are never returned (no `records` dump).
+    select: {
+      productId: true, status: true, quantity: true,
       purchaseItem: { select: { unitPrice: true } },
-      product: { select: { id: true, customsName: true } },
+      product: { select: { customsName: true } },
     },
     orderBy: { createdAt: 'asc' },
   });
@@ -76,7 +78,6 @@ const getInventorySnapshot = async (tx = prisma, filters = {}) => {
   });
 
   return {
-    records: inventories,
     byProduct: Array.from(byProductMap.values()),
     totalQuantity: inventories.reduce((sum, item) => sum + clampNumber(item.quantity, 0), 0),
   };

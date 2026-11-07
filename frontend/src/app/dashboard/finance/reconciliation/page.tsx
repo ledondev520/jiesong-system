@@ -9,7 +9,7 @@
 "use client";
 
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ErrorState } from "@/components/ui/data-state";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
@@ -94,11 +94,21 @@ function contractLabel(c: ContractForMatch): string {
   return stores.length > 0 ? stores.join(", ") : c.port?.name || c.contractNo;
 }
 
+// 销售合同为美元，采购合同为人民币；银行流水按自身币种
+const currencyPrefix = (usd: boolean) => (usd ? "USD $" : "¥");
+
+function contractTotal(c: ContractForMatch): number {
+  return isPurchaseContract(c)
+    ? c.totalAmount
+    : (c.ownedTotalAmount ?? c.totalAmount);
+}
+
 function contractUnpaid(c: ContractForMatch): number {
+  if (typeof c.unpaidAmount === "number") return c.unpaidAmount;
   if (isPurchaseContract(c)) {
     return Math.max(c.totalAmount - (c.paidAmount || 0), 0);
   }
-  return Math.max(c.totalAmount - (c.receivedAmount || 0), 0);
+  return Math.max(contractTotal(c) - (c.receivedAmount || 0), 0);
 }
 
 export default function ReconciliationPage() {
@@ -140,6 +150,20 @@ export default function ReconciliationPage() {
     ? "PAYMENT"
     : "INVOICE";
   const [contracts, setContracts] = useState<ContractForMatch[]>([]);
+  // 列表所属的合同类型：切换类型后旧列表在新响应到达前不可用于关联
+  const [contractsType, setContractsType] = useState<"PURCHASE" | "SALES">(
+    "PURCHASE",
+  );
+  const [linking, setLinking] = useState(false);
+  const linkingRef = useRef(false); // 同一帧内的双击也只发一次关联请求
+  const [ignoringId, setIgnoringId] = useState<string | null>(null);
+  // 单调序号：只接受最新一次请求的响应
+  const unmatchedSeqRef = useRef(0);
+  const contractsSeqRef = useRef(0);
+  const changeContractType = (next: "PURCHASE" | "SALES") => {
+    setContractType(next);
+    setSelectedContractId(null);
+  };
   const [contractsLoading, setContractsLoading] = useState(false);
 
   // fetch*：状态只在请求回调中更新，可直接在 effect 中调用；load*：先重置加载/错误态再拉取（事件中使用）
@@ -167,50 +191,50 @@ export default function ReconciliationPage() {
     return fetchRecon();
   }, [fetchRecon]);
 
-  const fetchUnmatched = useCallback(
-    () =>
-      runAwait(
-        () =>
-          getUnmatchedItems({ page, pageSize, search: search || undefined }),
-        (result) => {
-          setBankItems(result.bankItems);
-          setInvoiceItems(result.invoiceItems);
-          setBankTotal(result.bankTotal);
-          setInvoiceTotal(result.invoiceTotal);
-        },
-        () => {
-          setUnmatchedError(true);
-        },
-      ),
-    [page, pageSize, search],
-  );
+  const fetchUnmatched = useCallback(() => {
+    const seq = ++unmatchedSeqRef.current;
+    return runAwait(
+      () => getUnmatchedItems({ page, pageSize, search: search || undefined }),
+      (result) => {
+        if (seq !== unmatchedSeqRef.current) return;
+        setBankItems(result.bankItems);
+        setInvoiceItems(result.invoiceItems);
+        setBankTotal(result.bankTotal);
+        setInvoiceTotal(result.invoiceTotal);
+      },
+      () => {
+        if (seq === unmatchedSeqRef.current) setUnmatchedError(true);
+      },
+    );
+  }, [page, pageSize, search]);
 
   const loadUnmatched = useCallback(() => {
     setUnmatchedError(false);
     return fetchUnmatched();
   }, [fetchUnmatched]);
 
-  const fetchContracts = useCallback(
-    () =>
-      runAwait(
-        () =>
-          getContractsForMatch(
-            contractType,
-            contractSearch || undefined,
-            pickerPurpose,
-          ),
-        (list) => {
-          setContracts(list);
-        },
-        () => {
-          setContractsError(true);
-        },
-        () => {
-          setContractsLoading(false);
-        },
-      ),
-    [contractType, contractSearch, pickerPurpose],
-  );
+  const fetchContracts = useCallback(() => {
+    const seq = ++contractsSeqRef.current;
+    return runAwait(
+      () =>
+        getContractsForMatch(
+          contractType,
+          contractSearch || undefined,
+          pickerPurpose,
+        ),
+      (list) => {
+        if (seq !== contractsSeqRef.current) return;
+        setContracts(list);
+        setContractsType(contractType);
+      },
+      () => {
+        if (seq === contractsSeqRef.current) setContractsError(true);
+      },
+      () => {
+        if (seq === contractsSeqRef.current) setContractsLoading(false);
+      },
+    );
+  }, [contractType, contractSearch, pickerPurpose]);
 
   const loadContracts = useCallback(() => {
     setContractsLoading(true);
@@ -254,7 +278,10 @@ export default function ReconciliationPage() {
 
   const selectedBank = bankItems.find((b) => b.id === selectedBankId);
   const selectedInvoice = invoiceItems.find((i) => i.id === selectedInvoiceId);
-  const selectedContract = contracts.find((c) => c.id === selectedContractId);
+  const selectedContract =
+    contractsType === contractType
+      ? contracts.find((c) => c.id === selectedContractId)
+      : undefined;
   const hasSelection = !!(selectedBank || selectedInvoice);
   const canLink = hasSelection && !!selectedContract;
 
@@ -271,7 +298,9 @@ export default function ReconciliationPage() {
   };
 
   const handleLink = async () => {
-    if (!canLink) return;
+    if (!canLink || linkingRef.current) return;
+    linkingRef.current = true;
+    setLinking(true);
     const entityType = selectedBank ? "BANK" : "INVOICE";
     const entityId = selectedBank ? selectedBank.id : selectedInvoice!.id;
     try {
@@ -288,6 +317,9 @@ export default function ReconciliationPage() {
       await loadRecon();
     } catch {
       toast.error("对账操作失败，请重试");
+    } finally {
+      linkingRef.current = false;
+      setLinking(false);
     }
   };
 
@@ -295,6 +327,8 @@ export default function ReconciliationPage() {
     entityType: "BANK" | "INVOICE",
     entityId: string,
   ) => {
+    if (ignoringId) return;
+    setIgnoringId(entityId);
     try {
       await postIgnore({ entityType, entityId });
       if (entityType === "BANK" && selectedBankId === entityId)
@@ -304,6 +338,8 @@ export default function ReconciliationPage() {
       await loadUnmatched();
     } catch {
       toast.error("对账操作失败，请重试");
+    } finally {
+      setIgnoringId(null);
     }
   };
 
@@ -515,7 +551,7 @@ export default function ReconciliationPage() {
               <Button
                 size="sm"
                 variant="default"
-                disabled={!canLink}
+                disabled={!canLink || linking}
                 onClick={handleLink}
               >
                 <Link2 className="h-4 w-4 mr-1" />
@@ -607,7 +643,7 @@ export default function ReconciliationPage() {
                               prev === txn.id ? null : txn.id,
                             );
                             setSelectedInvoiceId(null);
-                            setContractType(
+                            changeContractType(
                               txn.direction === "OUT" ? "PURCHASE" : "SALES",
                             );
                           }}
@@ -619,7 +655,8 @@ export default function ReconciliationPage() {
                             <span
                               className={`text-sm font-bold tabular-nums ${txn.direction === "OUT" ? "text-status-red" : "text-status-green"}`}
                             >
-                              {txn.direction === "OUT" ? "-" : "+"}¥
+                              {txn.direction === "OUT" ? "-" : "+"}
+                              {currencyPrefix(txn.currency === "USD")}
                               {fmt(Math.abs(txn.amount))}
                             </span>
                           </div>
@@ -637,6 +674,7 @@ export default function ReconciliationPage() {
                                 size="sm"
                                 variant="ghost"
                                 className="h-6 text-[10px] px-1"
+                                disabled={ignoringId !== null}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleIgnore("BANK", txn.id);
@@ -666,19 +704,27 @@ export default function ReconciliationPage() {
                     <CardTitle className="text-sm">合同列表</CardTitle>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <div className="flex rounded-md border overflow-hidden">
-                      <button
-                        className={`px-2 py-1 text-xs ${contractType === "PURCHASE" ? "bg-primary text-primary-foreground" : "bg-background"}`}
-                        onClick={() => setContractType("PURCHASE")}
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        variant={
+                          contractType === "PURCHASE" ? "default" : "outline"
+                        }
+                        onClick={() => changeContractType("PURCHASE")}
                       >
                         采购
-                      </button>
-                      <button
-                        className={`px-2 py-1 text-xs ${contractType === "SALES" ? "bg-primary text-primary-foreground" : "bg-background"}`}
-                        onClick={() => setContractType("SALES")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        variant={
+                          contractType === "SALES" ? "default" : "outline"
+                        }
+                        onClick={() => changeContractType("SALES")}
                       >
                         销售
-                      </button>
+                      </Button>
                     </div>
                     <div className="relative flex-1">
                       <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
@@ -729,10 +775,13 @@ export default function ReconciliationPage() {
                           </div>
                           <div className="flex items-center justify-between mt-1">
                             <span className="text-[10px] text-muted-foreground">
-                              总额 ¥{fmt(c.totalAmount)}
+                              总额 {currencyPrefix(contractsType === "SALES")}
+                              {fmt(contractTotal(c))}
                             </span>
                             <span className="text-[10px] font-medium text-status-amber">
-                              未收/付 ¥{fmt(contractUnpaid(c))}
+                              未收/付{" "}
+                              {currencyPrefix(contractsType === "SALES")}
+                              {fmt(contractUnpaid(c))}
                             </span>
                           </div>
                         </div>
@@ -777,7 +826,7 @@ export default function ReconciliationPage() {
                               prev === inv.id ? null : inv.id,
                             );
                             setSelectedBankId(null);
-                            setContractType("PURCHASE");
+                            changeContractType("PURCHASE");
                           }}
                         >
                           <div className="flex items-center justify-between">
@@ -802,6 +851,7 @@ export default function ReconciliationPage() {
                                 size="sm"
                                 variant="ghost"
                                 className="h-6 text-[10px] px-1"
+                                disabled={ignoringId !== null}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleIgnore("INVOICE", inv.id);
@@ -1009,8 +1059,9 @@ function ReconciliationAnalysisView({
                               className="h-7 w-7 p-0"
                               asChild
                             >
+                              {/* 同发票多个付款别名合并为「A、B」，流水只能按单个别名搜，取第一个 */}
                               <Link
-                                href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(m.payName)}`}
+                                href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(m.payName.split("、")[0])}`}
                               >
                                 <Landmark className="h-3.5 w-3.5" />
                               </Link>

@@ -33,6 +33,7 @@ const {
 } = require('../services/purchaseProductionService');
 const purchaseInvoiceService = require('../services/purchaseInvoiceService');
 const { roundMoney } = require('../utils/money');
+const { redactNestedSuppliers } = require('../agent/commands/supplier/bankFields');
 
 /**
  * 职责：检查商品价格是否高于历史均价并生成警告
@@ -188,10 +189,10 @@ const getById = async (req, res, next) => {
     }
     
     const [detail] = await attachPurchaseSubStatus([contract]);
-    success(res, {
+    success(res, redactNestedSuppliers(req.user?.role, {
       ...detail,
       productionReadiness: evaluatePurchaseProductionReadiness(contract.items),
-    });
+    }));
   } catch (error) {
     next(error);
   }
@@ -256,9 +257,9 @@ const create = async (req, res, next) => {
 
     if (warnings.length > 0) {
       const warningMessages = warnings.map((w) => w.message).join('；');
-      created(res, { contract, warnings }, `采购合同创建成功，但${warningMessages}`);
+      created(res, redactNestedSuppliers(req.user?.role, { contract, warnings }), `采购合同创建成功，但${warningMessages}`);
     } else {
-      created(res, contract, '采购合同创建成功');
+      created(res, redactNestedSuppliers(req.user?.role, contract), '采购合同创建成功');
     }
   } catch (error) {
     next(error);
@@ -276,7 +277,7 @@ const update = async (req, res, next) => {
       prismaClient: prisma,
     });
     
-    success(res, contract, '采购合同更新成功');
+    success(res, redactNestedSuppliers(req.user?.role, contract), '采购合同更新成功');
   } catch (error) {
     next(error);
   }
@@ -380,7 +381,7 @@ const updateProductionDetails = async (req, res, next) => {
       req,
       note: '更新采购生产资料（规格、箱数、重量、体积和可选箱体尺寸）',
     });
-    success(res, contract, req.body?.completeProduction === true ? '完工报告已保存，已进入待装柜' : '生产资料已保存');
+    success(res, redactNestedSuppliers(req.user?.role, contract), req.body?.completeProduction === true ? '完工报告已保存，已进入待装柜' : '生产资料已保存');
   } catch (error) {
     next(error);
   }

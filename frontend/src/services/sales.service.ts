@@ -1,5 +1,5 @@
+import { authFetchInit } from "@/lib/browser-session";
 /** 出口合同 Interface；完整创建复用请求键合并并发提交，表头和明细由后端原子持久化。 */
-import { getAuthToken } from "@/lib/auth-token";
 import api from "@/lib/axios";
 import type { ApiResponse, PackingItem, SalesContract } from "@/types";
 import type { ContainerTypeCode, LoadingPlan } from "@/lib/containerLoading";
@@ -400,11 +400,8 @@ export const salesService = {
    * 导出单份出口合同为三 Sheet 标准 Excel。
    */
   exportExcel: async (id: string, contractNo: string) => {
-    const token = getAuthToken();
     const response = await fetch(`/api/v1/sales/${id}/export-excel`, {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : "",
-      },
+      ...authFetchInit(),
     });
     await downloadResponseBlob(response, `${contractNo}_出口模板.xlsx`);
   },
@@ -413,11 +410,8 @@ export const salesService = {
    * 导出单份出口合同 PDF。
    */
   exportPdf: async (id: string, contractNo: string) => {
-    const token = getAuthToken();
     const response = await fetch(`/api/v1/sales/${id}/export-pdf`, {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : "",
-      },
+      ...authFetchInit(),
     });
     await downloadResponseBlob(response, `${contractNo}_sales_contract.pdf`);
   },
@@ -482,11 +476,10 @@ export const salesService = {
 
   /** 下载内部材料准备 Excel，不将其表述为税务机关正式回执。 */
   exportTaxRefundPreparation: async (id: string, contractNo: string) => {
-    const token = getAuthToken();
     const response = await fetch(
       `/api/v1/sales/${id}/tax-refund-preparation/export`,
       {
-        headers: { Authorization: token ? `Bearer ${token}` : "" },
+        ...authFetchInit(),
       },
     );
     await downloadResponseBlob(

@@ -126,7 +126,7 @@ const LISTS = {
     async load() {
       const { getOverdueReceivables } = require('./financeService');
       const rows = await getOverdueReceivables();
-      return asList(rows.length, rows.map((r) => item(r.id, r.contractNo, null, roundMoney(r.totalAmount - r.receivedAmount), r.shippedAt)));
+      return asList(rows.length, rows.map((r) => item(r.id, r.contractNo, null, r.unreceived, r.shippedAt)));
     },
   },
   refundable: {

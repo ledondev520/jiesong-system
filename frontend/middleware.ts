@@ -35,9 +35,7 @@ const SENSITIVE_EXTENSIONS = ['.env', '.config', '.ini', '.log', '.sql', '.backu
 // 定义敏感文件模式
 const SENSITIVE_PATTERNS = [
   /\.(env|config|ini|log|sql|backup|bak|key|pem|p12|pfx)$/i,
-  /\.git/i,
-  /\.svn/i,
-  /\.hg/i,
+  /(^|\/)\.(git|svn|hg)(\/|$)/i,
   /docker-compose/i,
   /Dockerfile/i,
   /package\.json/i,
@@ -79,7 +77,6 @@ export function middleware(request: NextRequest) {
           'Content-Type': 'application/json',
           'X-Content-Type-Options': 'nosniff',
           'X-Frame-Options': 'DENY',
-          'X-XSS-Protection': '1; mode=block',
           'Referrer-Policy': 'strict-origin-when-cross-origin',
           'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
         },
@@ -98,7 +95,6 @@ export function middleware(request: NextRequest) {
   // 添加安全头部
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
-  response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   if (isAuthPage) {

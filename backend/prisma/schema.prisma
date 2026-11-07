@@ -724,6 +724,7 @@ model Inventory {
   @@index([salesContractId])
   @@index([receiptInspectionId])
   @@index([createdAt])
+  @@index([productId, status, salesItemId, inboundAt])
   @@map("inventories")
 }
 
@@ -756,6 +757,9 @@ model Payment {
   @@index([purchaseContractId])
   @@index([salesContractId])
   @@index([createdAt])
+  @@index([purchaseContractId, type, currency])
+  @@index([salesContractId, type, currency])
+  @@index([type, paymentDate])
   @@map("payments")
 }
 
@@ -1479,6 +1483,8 @@ model BankTransaction {
   @@index([direction])
   @@index([matchStatus])
   @@index([matchedContractId])
+  @@index([currency, matchStatus, direction])
+  @@index([currency, txnDate])
   @@map("bank_transactions")
 }
 
@@ -1526,6 +1532,8 @@ model InvoiceRecord {
   @@index([status])
   @@index([matchStatus])
   @@index([matchedContractId])
+  @@index([matchStatus, status, isPositive])
+  @@index([seller, status, isPositive])
   @@map("invoice_records")
 }
 

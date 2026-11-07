@@ -48,7 +48,8 @@ test('真实 SQLite：限制验证码尝试、过期和重放；新账号待审�
   const migrations = path.resolve(__dirname, '../../prisma/migrations');
   const baseline = fs.readFileSync(path.join(migrations, '20260307090000_baseline/migration.sql'), 'utf8').split(';')[0] + ';';
   const migration = fs.readFileSync(path.join(migrations, '20261001163213_email_registration/migration.sql'), 'utf8')
-    + fs.readFileSync(path.join(migrations, '20261002113919_email_password_recovery/migration.sql'), 'utf8');
+    + fs.readFileSync(path.join(migrations, '20261002113919_email_password_recovery/migration.sql'), 'utf8')
+    + fs.readFileSync(path.join(migrations, '20261005070032_browser_sessions/migration.sql'), 'utf8'); // updateUser 撤销会话需要此表
   const prisma = require('../utils/prisma');
   t.after(async () => { await prisma.$disconnect(); fs.rmSync(dir, { recursive: true, force: true }); });
   const ddl = baseline + '\nCREATE UNIQUE INDEX users_username_key ON users(username);\n' + migration;

@@ -187,3 +187,9 @@ backend/state/wps-sync/
 # Atomic export pricing configuration updates
 config/pricing.json.lock
 config/pricing.json.*.tmp
+
+# Local debug artifacts (may contain Confidential screenshots/data)
+.playwright-mcp/
+screenshot_*.png
+frontend/screenshot-*.mjs
+backend/benchmark-logs/

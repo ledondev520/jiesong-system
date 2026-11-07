@@ -215,7 +215,8 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     };
     // D contributes 60/30; F keeps formal 60/30 despite its third-party 40;
     // next-day 10 and draft 20 remain current receivables, cancelled rows do not.
-    for (const role of ROLES) assert.deepEqual(await get('/finance/stats', {}, role), expected);
+    for (const role of ROLES.filter(role => role !== 'WAREHOUSE')) assert.deepEqual(await get('/finance/stats', {}, role), expected);
+    await get('/finance/stats', {}, 'WAREHOUSE', 403);
     const receivables = await get('/finance/receivables', { pageSize: 100 }, 'BOSS');
     assert.deepEqual(receivables.items.map(row => project(row, ['id', 'totalAmount', 'receivedAmount', 'unreceiveAmount'])), [
       { id: 'sale-draft', totalAmount: 20, receivedAmount: 0, unreceiveAmount: 20 },

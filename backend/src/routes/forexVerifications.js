@@ -10,21 +10,31 @@ const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
+const { settlementFieldGuard } = require('../middleware/settlementFieldGuard');
+
 const router = Router();
 
 router.use(authenticate);
+
+const forexFieldGuard = settlementFieldGuard({
+  safeStatuses: ['PENDING'],
+  fields: ['settledAmount', 'verifiedAt'],
+  model: 'forexVerification',
+});
 
 router.get('/', withPaginationValidation, forexVerificationController.list);
 router.get('/:id', withIdValidation, forexVerificationController.getById);
 router.post(
   '/',
   roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  forexFieldGuard,
   withAuditLog({ entity: 'ForexVerification', action: 'CREATE', model: 'forexVerification' }, forexVerificationController.create),
 );
 router.put(
   '/:id',
   withIdValidation,
   roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  forexFieldGuard,
   withAuditLog({ entity: 'ForexVerification', action: 'UPDATE', model: 'forexVerification' }, forexVerificationController.update),
 );
 router.delete(

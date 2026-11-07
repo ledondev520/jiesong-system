@@ -335,7 +335,7 @@ const exportSalesContractPdf = async (contractId) => {
   };
 };
 
-const exportSystemDataRows = async (type, query = {}) => {
+const exportSystemDataRows = async (type, query = {}, { includeBank = false } = {}) => {
   switch (type) {
     case 'suppliers': {
       const suppliers = await prisma.supplier.findMany({
@@ -344,7 +344,7 @@ const exportSystemDataRows = async (type, query = {}) => {
       });
       return {
         title: 'Suppliers',
-        headers: ['ID', 'Name', 'ShortName', 'Contact', 'Phone', 'Email', 'Address', 'Bank', 'QualityIssue', 'Aliases'],
+        headers: ['ID', 'Name', 'ShortName', 'Contact', 'Phone', 'Email', 'Address', ...(includeBank ? ['Bank'] : []), 'QualityIssue', 'Aliases'],
         rows: suppliers.map((item) => [
           item.id,
           item.name,
@@ -353,7 +353,7 @@ const exportSystemDataRows = async (type, query = {}) => {
           item.contactPhone || '',
           item.contactEmail || '',
           item.address || '',
-          item.bankAccount || '',
+          ...(includeBank ? [item.bankAccount || ''] : []),
           item.hasQualityIssue ? 'Yes' : 'No',
           item.aliases.map((alias) => alias.alias).join('; '),
         ]),
@@ -527,8 +527,8 @@ const exportSystemDataRows = async (type, query = {}) => {
   }
 };
 
-const exportSystemDataPdf = async (type, query = {}) => {
-  const { title, headers, rows, filename } = await exportSystemDataRows(type, query);
+const exportSystemDataPdf = async (type, query = {}, options = {}) => {
+  const { title, headers, rows, filename } = await exportSystemDataRows(type, query, options);
   const doc = new PDFDocument({
     margin: 40,
     size: 'A4',

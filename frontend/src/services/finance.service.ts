@@ -1,5 +1,6 @@
+import { getApiBaseUrl } from "@/lib/api-base-url";
+import { authFetchInit } from "@/lib/browser-session";
 import api from "@/lib/axios";
-import { getAuthToken } from "@/lib/auth-token";
 import {
   buildIdempotencyKey,
   runIdempotentRequest,
@@ -237,12 +238,12 @@ export const financeService = {
     type: FinanceReportPdfType,
     fallbackFilename?: string,
   ) => {
-    const token = getAuthToken();
-    const response = await fetch(`/api/v1/system/export/${type}/pdf`, {
-      headers: {
-        Authorization: token ? `Bearer ${token}` : "",
+    const response = await fetch(
+      `${getApiBaseUrl()}/system/export/${type}/pdf`,
+      {
+        ...authFetchInit(),
       },
-    });
+    );
     await downloadResponseBlob(response, fallbackFilename || `${type}.pdf`);
   },
 };

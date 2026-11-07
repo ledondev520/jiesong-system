@@ -54,6 +54,9 @@ import {
   type AiChatHistoryItem,
 } from "@/services/ai.service";
 import { getAuthToken } from "@/lib/auth-token";
+import { clearApiGetCache } from "@/lib/axios";
+import { clearAllCache } from "@/lib/api-cache";
+import { useBusinessReadOnly } from "@/lib/hooks/useBusinessReadOnly";
 
 interface PendingActionState extends AgentPendingAction {
   status: "pending" | "executing" | "executed" | "cancelled" | "failed";
@@ -149,6 +152,11 @@ export function AIAssistant({
   const router = useRouter();
   // 助手操作记录在「设置 > AI 用量」，仅管理员可进入
   const isAdmin = useAuthStore((state) => state.user?.role === Role.ADMIN);
+  const businessReadOnly = useBusinessReadOnly();
+  // 同步拦截重复点击（React 重渲染前 status 仍为 pending）；流中止与会话切换序号。
+  const executingIdsRef = useRef(new Set<string>());
+  const streamAbortRef = useRef<AbortController | null>(null);
+  const sessionSeqRef = useRef(0);
   const isWorkspace = presentation === "workspace";
   const isDocked = presentation === "docked";
   // 只有 floating 形态带可拖动的悬浮入口
@@ -230,6 +238,13 @@ export function AIAssistant({
       );
     },
     [clampFabPosition, getFabSize],
+  );
+
+  useEffect(
+    () => () => {
+      streamAbortRef.current?.abort();
+    },
+    [],
   );
 
   // 滚动到底部
@@ -332,12 +347,16 @@ export function AIAssistant({
   }, [loadSessions]);
 
   const handleSelectSession = useCallback(async (sid: string) => {
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null; // 被中止的流不再回写 loading 状态
+    const seq = ++sessionSeqRef.current;
     setShowSessionList(false);
     setSessionId(sid);
     setMessages([INITIAL_MESSAGE]);
     setIsLoading(true);
     try {
       const resp = await aiService.getChatHistory(sid);
+      if (seq !== sessionSeqRef.current) return;
       const history: Message[] = (resp.data ?? []).map(
         (item: AiChatHistoryItem) => ({
           id: item.id,
@@ -354,13 +373,18 @@ export function AIAssistant({
       );
       setMessages(history.length > 0 ? history : [INITIAL_MESSAGE]);
     } catch {
-      setMessages([INITIAL_MESSAGE]);
+      if (seq === sessionSeqRef.current) setMessages([INITIAL_MESSAGE]);
     } finally {
-      setIsLoading(false);
+      if (seq === sessionSeqRef.current) setIsLoading(false);
     }
   }, []);
 
   const handleNewSession = useCallback(() => {
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+    sessionSeqRef.current++;
+    setIsLoading(false);
+    setIsThinking(false);
     setSessionId(null);
     setMessages([INITIAL_MESSAGE]);
     setShowSessionList(false);
@@ -433,6 +457,8 @@ export function AIAssistant({
    */
   const handleConfirmAction = useCallback(
     async (messageId: string, actionId: string) => {
+      if (executingIdsRef.current.has(actionId)) return;
+      executingIdsRef.current.add(actionId);
       setMessages((prev) =>
         prev.map((msg) => {
           if (msg.id !== messageId) return msg;
@@ -449,6 +475,9 @@ export function AIAssistant({
 
       try {
         const result = await aiService.executeAgentAction(actionId);
+        // 写入已落库：3 分钟 GET 缓存与页面级缓存都会让列表/看板显示旧数据。
+        clearApiGetCache();
+        clearAllCache();
         setMessages((prev) =>
           prev.map((msg) => {
             if (msg.id !== messageId) return msg;
@@ -481,6 +510,8 @@ export function AIAssistant({
             };
           }),
         );
+      } finally {
+        executingIdsRef.current.delete(actionId);
       }
     },
     [],
@@ -604,6 +635,9 @@ export function AIAssistant({
     setPendingImage(null);
     setIsLoading(true);
     setIsThinking(true);
+    streamAbortRef.current?.abort();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
 
     try {
       const { getApiBaseUrl } = await import("@/lib/api-base-url");
@@ -611,6 +645,7 @@ export function AIAssistant({
       const resp = await fetch(`${getApiBaseUrl()}/ai/agents/prompt-stream`, {
         method: "POST",
         credentials: "include",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           ...getBrowserSessionHeaders(),
@@ -660,6 +695,9 @@ export function AIAssistant({
                 });
                 break;
               case "done": {
+                // 助手本轮可能已自动执行内部写入（采购/报关/核销/退税草稿），丢弃旧缓存。
+                clearApiGetCache();
+                clearAllCache();
                 const finalContent = accumulatedText || payload.content || "";
                 const pendingActions: PendingActionState[] | undefined = payload
                   .pendingActions?.length
@@ -686,13 +724,18 @@ export function AIAssistant({
         }
       }
     } catch (error: unknown) {
+      // 主动中止（卸载/新会话/切换会话）不是错误，也不应再写入已废弃的消息。
+      if (controller.signal.aborted) return;
       errorLogger.error("AIAssistant", error);
       updateMessageById(assistantMessage.id, {
         content: formatErrorMessage(error),
       });
     } finally {
-      setIsLoading(false);
-      setIsThinking(false);
+      if (streamAbortRef.current === controller) {
+        streamAbortRef.current = null;
+        setIsLoading(false);
+        setIsThinking(false);
+      }
     }
   };
 
@@ -1043,18 +1086,20 @@ export function AIAssistant({
                               </div>
                               {action.status === "pending" && (
                                 <div className="flex gap-2 mt-2">
-                                  <Button
-                                    size="sm"
-                                    className="h-7 rounded-md text-xs"
-                                    onClick={() =>
-                                      handleConfirmAction(
-                                        msg.id,
-                                        action.actionId,
-                                      )
-                                    }
-                                  >
-                                    确认执行
-                                  </Button>
+                                  {!businessReadOnly && (
+                                    <Button
+                                      size="sm"
+                                      className="h-7 rounded-md text-xs"
+                                      onClick={() =>
+                                        handleConfirmAction(
+                                          msg.id,
+                                          action.actionId,
+                                        )
+                                      }
+                                    >
+                                      确认执行
+                                    </Button>
+                                  )}
                                   <Button
                                     size="sm"
                                     variant="outline"

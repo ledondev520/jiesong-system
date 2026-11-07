@@ -123,6 +123,11 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       assert.equal(data.contracts.sales.receivable, 825);
       // Payables count only in-effect contracts (decision 12): drafts and cancelled excluded; SIGNED 300-100 = 200, COMPLETED 0.
       assert.equal(data.contracts.purchase.unpaidAmount, 200);
+      // B60: statements are ADMIN/FINANCE/BOSS only, so PURCHASE is refused.
+      if (role === 'PURCHASE') {
+        assert.equal((await f.call('/finance/statements', f.tokens[role])).status, 403);
+        continue;
+      }
       const periods = await read('/finance/statements', role);
       // The API lists periods ascending; the mounted workbench must choose max year/month, not its first row.
       assert.deepEqual(periods.map(row => [row.year, row.month, row.periodLabel]),

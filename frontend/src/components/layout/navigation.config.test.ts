@@ -220,4 +220,22 @@ describe("navigation.config helpers", () => {
       expect(getModuleByPath(path)?.key).toBe("documents");
     }
   });
+
+  it("财务：WAREHOUSE 看不到该模块；SALES/PURCHASE 不见账务读受限的页签", () => {
+    const financeChildren = (role: Role) =>
+      getVisibleModuleNavItems(role)
+        .find((item) => item.key === "finance")
+        ?.children.map((child) => child.label);
+    expect(financeChildren(Role.WAREHOUSE)).toBeUndefined();
+    for (const role of [Role.SALES, Role.PURCHASE]) {
+      expect(financeChildren(role)).toEqual([
+        "财务概览",
+        "应收",
+        "应付",
+        "经营分析",
+      ]);
+    }
+    expect(financeChildren(Role.FINANCE)).toContain("银行流水");
+    expect(financeChildren(Role.BOSS)).toContain("财务报表");
+  });
 });

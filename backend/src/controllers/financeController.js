@@ -9,6 +9,7 @@
 const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const financeService = require('../services/financeService');
+const { redactNestedSuppliers } = require('../agent/commands/supplier/bankFields');
 const receivableReconciliationService = require('../services/receivableReconciliationService');
 const { createError } = require('../middleware/errorHandler');
 
@@ -71,7 +72,7 @@ const getPayables = async (req, res, next) => {
       overdue: req.query.overdue === 'true',
     });
 
-    paginated(res, payables, total, page, pageSize);
+    paginated(res, redactNestedSuppliers(req.user?.role, payables), total, page, pageSize);
   } catch (error) {
     next(error);
   }
