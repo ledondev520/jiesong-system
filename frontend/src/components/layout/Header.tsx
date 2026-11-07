@@ -84,11 +84,11 @@ export function Header() {
       </Link>
 
       {/* 桌面端：面包屑 + 当前页标题（一行） */}
-      <div className="hidden min-w-0 flex-1 md:block">
+      <div className="hidden min-w-0 flex-1 overflow-hidden md:block">
         <Breadcrumbs />
       </div>
 
-      <div className="flex min-w-0 shrink items-center gap-4">
+      <div className="flex shrink-0 items-center gap-2 md:gap-4">
         <div className="hidden xl:block">
           <HeaderContextPills todayLabel={todayLabel} />
         </div>
