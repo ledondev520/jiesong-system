@@ -94,6 +94,8 @@ const list = async (req, res, next) => {
                     select: {
                       id: true,
                       contractNo: true,
+                      // 只取名称：供应商银行信息是 Restricted，不随库存列表返回
+                      supplier: { select: { id: true, name: true } },
                     },
                   },
                 },
