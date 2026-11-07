@@ -257,6 +257,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const isMobile = useMobile();
   const router = useRouter();
   const userRole = useAuthStore((state) => state.user?.role);
+  // 与后端供应商银行字段可见角色一致；其余角色拿到的是被剔除的数据，不能显示成「未登记」
+  const canSeeSupplierBank = ["ADMIN", "FINANCE", "PURCHASE", "BOSS"].includes(
+    userRole || "",
+  );
   const [loadError, setLoadError] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const { id } = use(params);
@@ -946,34 +950,36 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                 </p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">收款账户</p>
-                <p className="text-sm">
-                  户名：
-                  {contract.supplier?.bankAccountName ||
-                    contract.supplier?.name ||
-                    "—"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {[
-                    contract.supplier?.bankName,
-                    contract.supplier?.bankBranch,
-                    contract.supplier?.bankCode
-                      ? `联行号 ${contract.supplier.bankCode}`
-                      : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || "开户行未登记"}
-                </p>
-                <p className="font-mono text-xs">
-                  {contract.supplier?.bankAccount
-                    ? `账号 ${contract.supplier.bankAccount}`
-                    : "账号未登记"}
-                </p>
+            {canSeeSupplierBank && (
+              <div className="flex items-start gap-3">
+                <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div>
+                  <p className="text-xs text-muted-foreground">收款账户</p>
+                  <p className="text-sm">
+                    户名：
+                    {contract.supplier?.bankAccountName ||
+                      contract.supplier?.name ||
+                      "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {[
+                      contract.supplier?.bankName,
+                      contract.supplier?.bankBranch,
+                      contract.supplier?.bankCode
+                        ? `联行号 ${contract.supplier.bankCode}`
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "开户行未登记"}
+                  </p>
+                  <p className="font-mono text-xs">
+                    {contract.supplier?.bankAccount
+                      ? `账号 ${contract.supplier.bankAccount}`
+                      : "账号未登记"}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -241,6 +241,20 @@ describe("FinancePage 交互逻辑", () => {
     ).toBe(false);
   });
 
+  it.each([Role.SALES, Role.PURCHASE])(
+    "%s 看不到会得到 403 的月度趋势卡片",
+    async (role) => {
+      asRole(role);
+      mockGetStats.mockResolvedValue({
+        payable: { total: 1200, paid: 400, unpaid: 800 },
+        receivable: { total: 3200, received: 1000, unreceived: 2200 },
+      });
+      render(<FinancePage />);
+      await screen.findByText("应付账款总额");
+      expect(screen.queryByTestId("monthly-statements-trend-stub")).toBeNull();
+    },
+  );
+
   it("初始加载中会显示加载文案", () => {
     mockGetStats.mockReturnValue(new Promise(() => {}));
     mockApiGet.mockReturnValue(new Promise(() => {}));

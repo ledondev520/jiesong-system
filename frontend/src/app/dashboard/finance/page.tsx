@@ -514,9 +514,11 @@ export default function FinancePage() {
         />
       </Suspense>
 
-      <Suspense fallback={financeChartsFallback}>
-        <MonthlyStatementsTrend />
-      </Suspense>
+      {canReadLedger && (
+        <Suspense fallback={financeChartsFallback}>
+          <MonthlyStatementsTrend />
+        </Suspense>
+      )}
 
       {/* 银行流水 & 发票台账摘要 */}
       {(bankStats || invStats) && (

@@ -770,6 +770,21 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     expect(screen.queryByText(/— · —/)).toBeNull();
   });
 
+  it.each(["SALES", "WAREHOUSE"])(
+    "%s 看不到收款账户块，不被告知银行信息「未登记」",
+    async (role) => {
+      useAuthStore.setState({
+        user: { id: "synthetic", role } as never,
+      });
+      mockGetById.mockResolvedValue({ data: signedContract });
+      renderPage();
+      await screen.findByRole("heading", { name: "CG2600009" });
+      expect(screen.queryByText("收款账户")).toBeNull();
+      expect(screen.queryByText("开户行未登记")).toBeNull();
+      expect(screen.queryByText("账号未登记")).toBeNull();
+    },
+  );
+
   it("生产资料缺项挡住发货时，阻塞条说明原因，去处理直达生产页签", async () => {
     mockGetById.mockResolvedValue({
       data: {
