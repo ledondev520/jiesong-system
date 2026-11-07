@@ -44,9 +44,29 @@ const normalizeCategory = (value) => (
 );
 
 // 已确认清单含财务核验行；所有附件入口复用现有 ADMIN/FINANCE 边界。
-const assertFileAccess = (file, user) => {
+// 采购合同文书（含供应商银行信息的生成件、签章合同、供应商发票）与 B96 的 contract-doc 角色一致：
+// 读 ADMIN/PURCHASE/FINANCE/BOSS，写/删 ADMIN/PURCHASE/FINANCE；其余附件类别沿用原权限。
+const RESTRICTED_PURCHASE_FILE_CATEGORIES = new Set([
+  CONTRACT_FILE_CATEGORY.SYSTEM_GENERATED_WORD,
+  CONTRACT_FILE_CATEGORY.SYSTEM_GENERATED_PDF,
+  CONTRACT_FILE_CATEGORY.SIGNED_CONTRACT,
+  CONTRACT_FILE_CATEGORY.SUPPLIER_INVOICE,
+]);
+const PURCHASE_ARTIFACT_READ_ROLES = ['ADMIN', 'PURCHASE', 'FINANCE', 'BOSS'];
+const PURCHASE_ARTIFACT_WRITE_ROLES = ['ADMIN', 'PURCHASE', 'FINANCE'];
+const isRestrictedPurchaseFile = (file) => (
+  (file?.contractType === CONTRACT_TYPE.PURCHASE || Boolean(file?.purchaseContractId))
+  && RESTRICTED_PURCHASE_FILE_CATEGORIES.has(file?.category)
+);
+
+/** action: 'read'（默认）| 'write' | 'delete' */
+const assertFileAccess = (file, user, { action = 'read' } = {}) => {
   // Agent callers have no req.user; attachments are human-only.
   if (!user?.role) throw createError('无权访问附件', 403);
+  if (isRestrictedPurchaseFile(file)) {
+    const roles = action === 'read' ? PURCHASE_ARTIFACT_READ_ROLES : PURCHASE_ARTIFACT_WRITE_ROLES;
+    if (!roles.includes(user.role)) throw createError('无权访问采购合同文书附件', 403);
+  }
   if (String(file?.description || '').startsWith('退税出货清单确认:')
     && !['ADMIN', 'FINANCE'].includes(user?.role)) {
     throw createError('仅管理员或财务可访问已确认退税清单', 403);
@@ -139,6 +159,9 @@ const createFile = async (contractId, contractType, file, description, category,
     const normalizedCategory = normalizeCategory(optionalText(category, 'category'));
     const normalizedDescription = optionalText(description, 'description');
     assertReceiptPhotoAccess(contractType, normalizedCategory, user);
+    if (isRestrictedPurchaseFile({ contractType, category: normalizedCategory })) {
+      assertFileAccess({ contractType, category: normalizedCategory }, user, { action: 'write' });
+    }
     validateUploadedFileCategory(file, normalizedCategory);
     const isSales = contractType === CONTRACT_TYPE.SALES;
     const contract = await (isSales ? prisma.salesContract : prisma.purchaseContract).findUnique({
@@ -271,6 +294,11 @@ const listFiles = async (contractId, contractType = CONTRACT_TYPE.PURCHASE) => {
   return files.map((f) => ({ ...f, contractType: CONTRACT_TYPE.PURCHASE }));
 };
 
+/** 列表/详情内嵌附件：无权读取采购合同文书的角色看不到这些行。 */
+const filterVisibleFiles = (files, user) => (files || []).filter((f) => {
+  try { assertFileAccess({ ...f, contractType: f.contractType || CONTRACT_TYPE.PURCHASE }, user); return true; } catch { return false; }
+});
+
 /**
  * 职责：根据 fileId 查找文件（不区分合同类型，双表查询）
  * @param {string} fileId
@@ -324,6 +352,7 @@ module.exports = {
   CONTRACT_TYPE,
   CONTRACT_FILE_CATEGORY,
   assertFileAccess,
+  filterVisibleFiles,
   assertReceiptPhotoAccess,
   archiveBufferFile,
   archiveGeneratedFile,
