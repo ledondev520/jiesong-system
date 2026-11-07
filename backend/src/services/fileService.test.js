@@ -218,6 +218,12 @@ test('assertFileAccess: 财务确认附件权限共享，普通附件不增加�
   assert.throws(() => fileService.assertFileAccess({ description: '普通合成附件' }, undefined), error => error.statusCode === 403);
 });
 
+test('assertFileAccess: 出口三单归档文件拒绝 WAREHOUSE（R3 P1-3）', () => {
+  const packet = { description: '出口三单生成版本（外销合同、商业发票、装箱单）:v1' };
+  assert.throws(() => fileService.assertFileAccess(packet, { role: 'WAREHOUSE' }), error => error.statusCode === 403);
+  for (const role of ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE']) assert.doesNotThrow(() => fileService.assertFileAccess(packet, { role }));
+});
+
 test('createFile: 清理失败不覆盖原始错误或泄露文件路径', async t => {
   const directory = fs.mkdtempSync(path.join(testUploadRoot, 'upload-cleanup-failure-'));
   const current = path.join(directory, 'synthetic-current.pdf');
