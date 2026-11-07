@@ -99,3 +99,27 @@ test('AI 上下文汇率来自唯一报价配置，忽略遗留 SystemConfig.exc
   assert.doesNotMatch(context, /99/);
   assert.match(context, /财务概况/);
 });
+
+test('AI上下文查询不加载、不输出供应商银行/税号字段', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-context-bank-'));
+  fs.chmodSync(dir, 0o700);
+  const dbPath = path.join(dir, 'test.db');
+  let db;
+  try {
+    copyTemplate('schema', dbPath);
+    db = new PrismaClient({ datasources: { db: { url: `file:${dbPath}` } } });
+    // 合成数据：非真实账号。
+    const supplier = await db.supplier.create({ data: { name: '合成供应商甲', shortName: '甲', bankAccount: 'SYNTH-ACCT-0001', bankName: 'SYNTH-BANK', taxId: 'SYNTH-TAX-1' } });
+    await db.purchaseContract.create({ data: { contractNo: 'CG900', supplierId: supplier.id, totalAmount: 10 } });
+    const service = loadContext(db);
+    const { tasks } = service.buildContextQueries('合成供应商甲 CG900合同');
+    const rows = JSON.stringify(await Promise.all(tasks.map((t) => t.query())));
+    assert.match(rows, /合成供应商甲/);
+    assert.doesNotMatch(rows, /SYNTH-ACCT-0001|SYNTH-BANK|SYNTH-TAX-1|bankAccount|taxId/);
+    const context = await service.getDbContext('合成供应商甲 CG900合同');
+    assert.doesNotMatch(context, /SYNTH-ACCT-0001|SYNTH-BANK|SYNTH-TAX-1/);
+  } finally {
+    if (db) await db.$disconnect();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
