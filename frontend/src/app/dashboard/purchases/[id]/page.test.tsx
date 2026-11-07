@@ -737,6 +737,15 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     expect(screen.queryByRole("link", { name: "查看订单" })).toBeNull();
   });
 
+  it("供应商缺联系人与开户行时用「未登记」措辞，不出现孤立的「—」分隔", async () => {
+    mockGetById.mockResolvedValue({ data: signedContract });
+    renderPage();
+    await screen.findByRole("heading", { name: "CG2600009" });
+    expect(screen.getByText("开户行未登记")).toBeInTheDocument();
+    expect(screen.getByText("账号未登记")).toBeInTheDocument();
+    expect(screen.queryByText(/— · —/)).toBeNull();
+  });
+
   it("生产资料缺项挡住发货时，阻塞条说明原因，去处理直达生产页签", async () => {
     mockGetById.mockResolvedValue({
       data: {
