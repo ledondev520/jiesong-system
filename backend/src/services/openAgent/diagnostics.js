@@ -12,6 +12,8 @@ const customsDeclarationService = require('../customsDeclarationService');
 const taxRefundService = require('../taxRefundService');
 const forexVerificationService = require('../forexVerificationService');
 const { outstandingOf } = require('../payablesService');
+const { getOutstandingReceivableUsd } = require('../salesContractAmount');
+const { roundMoney } = require('../../utils/money');
 const { buildActionRecommendation, summarizeActionRecommendations } = require('./recommendations');
 
 const buildStatusBreakdown = (items = []) => items.reduce((acc, item) => {
@@ -63,7 +65,8 @@ const buildSalesContractFlowDiagnostic = async ({ contractNo }) => {
         select: { id: true, quantity: true, sellingPrice: true },
       },
       packingItems: {
-        select: { id: true, boxes: true, volume: true },
+        // totalPrice/isOwnedByJiesong/note: 与应收口径一致，扣除第三方装箱货值（SALES_OWNED_AMOUNT_SELECT）
+        select: { id: true, boxes: true, volume: true, totalPrice: true, isOwnedByJiesong: true, note: true },
       },
     },
   });
@@ -79,10 +82,11 @@ const buildSalesContractFlowDiagnostic = async ({ contractNo }) => {
     taxRefundService.listTaxRefunds({ page: 1, pageSize: 10, salesContractId: contract.id }),
   ]);
 
-  const outstandingAmount = Math.max(Number(contract.totalAmount || 0) - Number(contract.receivedAmount || 0), 0);
+  const outstandingAmount = getOutstandingReceivableUsd(contract);
   const allocationCandidate = outstandingAmount > 0
     ? await findHighConfidenceAllocationCandidate({ contractNo: contract.contractNo, outstandingAmount })
     : null;
+  const candidateAvailable = Number(allocationCandidate?.remainingAmount ?? allocationCandidate?.amount ?? 0);
   const inventoryStatusBreakdown = buildStatusBreakdown(inventories);
   const inventoryQuantityBreakdown = buildQuantityBreakdown(inventories);
   const blockers = uniqueMessages([
@@ -119,8 +123,10 @@ const buildSalesContractFlowDiagnostic = async ({ contractNo }) => {
       actionType: allocationCandidate ? 'AllocatePayment' : null,
       params: allocationCandidate ? {
         paymentId: allocationCandidate.id,
+        // 执行器需要合同 id，缺失会使唯一一次人工确认必然 400
+        salesContractId: contract.id,
         contractNo: contract.contractNo,
-        amount: Number(allocationCandidate.remainingAmount ?? allocationCandidate.amount ?? outstandingAmount),
+        amount: roundMoney(Math.min(candidateAvailable || outstandingAmount, outstandingAmount)),
       } : null,
       sourceTool: 'DiagnoseSalesContractFlow',
     }) : null,

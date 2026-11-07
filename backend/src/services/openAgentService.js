@@ -636,11 +636,14 @@ const ACTION_EXECUTORS = {
    * 职责：执行收款分配
    */
   async AllocatePayment(params, userId) {
+    // 兼容已入库、缺少 salesContractId 的旧确认卡：按合同号解析，仍是同一次人工确认
+    const salesContractId = params.salesContractId
+      || (await prisma.salesContract.findFirst({ where: { contractNo: params.contractNo }, select: { id: true } }))?.id;
     const result = await financeService.allocatePaymentToContracts(params.paymentId, [{
-      salesContractId: params.salesContractId,
+      salesContractId,
       amount: params.amount,
     }]);
-    return { success: true, detail: `已将 ¥${params.amount} 分配到合同 ${params.contractNo}`, result };
+    return { success: true, detail: `已将 USD $${params.amount} 分配到合同 ${params.contractNo}`, result };
   },
 
   /**
