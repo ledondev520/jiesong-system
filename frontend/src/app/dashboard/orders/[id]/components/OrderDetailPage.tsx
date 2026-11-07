@@ -338,7 +338,7 @@ export function OrderDetailPage({ id }: { id: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={contract.status} domain="salesOrder" />
             <BusinessWrite>
-              <OrderDocsMenu onSelect={runDocAction} />
+              <OrderDocsMenu onSelect={runDocAction} role={role} />
             </BusinessWrite>
             {nextStep && (
               <BusinessWrite>

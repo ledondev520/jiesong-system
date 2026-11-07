@@ -71,6 +71,11 @@ const assertFileAccess = (file, user, { action = 'read' } = {}) => {
     && !['ADMIN', 'FINANCE'].includes(user?.role)) {
     throw createError('仅管理员或财务可访问已确认退税清单', 403);
   }
+  // R3 P1-3：出口三单归档工作簿由 ADMIN/SALES/FINANCE 生成，仓库角色不得下载/删除（描述前缀见 exportPacketService）。
+  if (String(file?.description || '').startsWith('出口三单生成版本')
+    && user.role === 'WAREHOUSE') {
+    throw createError('仓库角色无权访问出口三单归档文件', 403);
+  }
 };
 
 // 到货照片是 Confidential 到货证据：仅采购合同、且仅能登记到货的人类角色可写/删。

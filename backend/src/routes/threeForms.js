@@ -7,6 +7,10 @@
 const { Router } = require('express');
 const { authenticate } = require('../middleware/auth');
 const { roleAuth } = require('../middleware/roleAuth');
+
+// R3 P1-3：含采购成本/退税的读取排除 WAREHOUSE；创建 ForexVerification/TaxRefund 与其路由写权限一致（/generate 会建这两类记录）。
+const COMMERCIAL_ROLES = ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE'];
+const SETTLEMENT_DOC_ROLES = ['ADMIN', 'SALES', 'FINANCE'];
 const { createError, wrapAsync } = require('../middleware/errorHandler');
 const { success } = require('../utils/response');
 const threeFormsService = require('../services/threeFormsService');
@@ -20,7 +24,7 @@ router.use(authenticate);
  * POST /api/three-forms/preview
  * 返回后端权威的全量装箱行、HS 证据、定价建议与单证阻塞项，不写业务数据。
  */
-router.post('/preview', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE'), wrapAsync(async (req, res) => {
+router.post('/preview', roleAuth(...COMMERCIAL_ROLES), wrapAsync(async (req, res) => {
   const readiness = await threeFormsService.previewThreeForms({
     salesContractId: req.body?.salesContractId,
     items: req.body?.items || [],
@@ -33,7 +37,7 @@ router.post('/preview', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREH
  * 一键生成三张表（报关单、外汇核销单、出口退税单）
  * 思路：SALES/PURCHASE/FINANCE/WAREHOUSE 均可发起，不限 ADMIN
  */
-router.post('/generate', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE'), wrapAsync(async (req, res) => {
+router.post('/generate', roleAuth(...SETTLEMENT_DOC_ROLES), wrapAsync(async (req, res) => {
   const {
     salesContractId,
     items,
@@ -67,7 +71,7 @@ router.post('/generate', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WARE
  * POST /api/three-forms/customs-declaration
  * 单独生成报关单
  */
-router.post('/customs-declaration', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE'), wrapAsync(async (req, res) => {
+router.post('/customs-declaration', roleAuth(...COMMERCIAL_ROLES), wrapAsync(async (req, res) => {
   const { salesContractId, items, extraData } = req.body;
 
   if (!salesContractId) {
@@ -87,7 +91,7 @@ router.post('/customs-declaration', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINA
  * POST /api/three-forms/forex-verification
  * 单独生成外汇核销单
  */
-router.post('/forex-verification', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE'), wrapAsync(async (req, res) => {
+router.post('/forex-verification', roleAuth(...SETTLEMENT_DOC_ROLES), wrapAsync(async (req, res) => {
   const { salesContractId, customsDeclarationId, extraData } = req.body;
 
   if (!salesContractId) {
@@ -111,7 +115,7 @@ router.post('/forex-verification', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINAN
  * POST /api/three-forms/tax-refund
  * 单独生成出口退税单
  */
-router.post('/tax-refund', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE'), wrapAsync(async (req, res) => {
+router.post('/tax-refund', roleAuth(...SETTLEMENT_DOC_ROLES), wrapAsync(async (req, res) => {
   const { salesContractId, customsDeclarationId, forexVerificationId, items } = req.body;
 
   if (!salesContractId) {
@@ -141,7 +145,7 @@ router.post('/tax-refund', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WA
  * 导出三张表为 Excel，可通过 query 参数指定具体单据 ID
  * 思路：查询最新一次生成的三张表，打包为三 Sheet Excel 下载
  */
-router.get('/export/:salesContractId', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE'), wrapAsync(async (req, res) => {
+router.get('/export/:salesContractId', roleAuth(...COMMERCIAL_ROLES), wrapAsync(async (req, res) => {
   const { salesContractId } = req.params;
   const { customsDeclarationId, forexId, taxRefundId } = req.query;
 

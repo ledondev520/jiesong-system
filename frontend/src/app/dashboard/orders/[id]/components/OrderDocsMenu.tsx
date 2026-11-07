@@ -23,11 +23,21 @@ export type OrderDocAction =
   | "exportWorkbook"
   | "threeForms";
 
+// 与后端 R3 P1-3 一致：WAREHOUSE 仅报关草稿/装箱核对；PURCHASE 无出口单证生成、报关草稿与三表（其余角色全部）。
+const ROLE_ACTIONS: Record<string, OrderDocAction[]> = {
+  WAREHOUSE: ["customsDraft", "packingCheck"],
+  PURCHASE: ["packingCheck", "exportWorkbook"],
+};
+
 export function OrderDocsMenu({
   onSelect,
+  role,
 }: {
   onSelect: (action: OrderDocAction) => void;
+  role?: string;
 }) {
+  const allowed = (action: OrderDocAction) =>
+    !role || !ROLE_ACTIONS[role] || ROLE_ACTIONS[role].includes(action);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -38,25 +48,35 @@ export function OrderDocsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
-        <DropdownMenuItem onSelect={() => onSelect("exportPacket")}>
-          生成出口单证（外销合同 / 商业发票 / 装箱单）
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => onSelect("customsDraft")}>
-          报关单草稿
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => onSelect("packingCheck")}>
-          船司装箱单核对
-        </DropdownMenuItem>
+        {allowed("exportPacket") && (
+          <DropdownMenuItem onSelect={() => onSelect("exportPacket")}>
+            生成出口单证（外销合同 / 商业发票 / 装箱单）
+          </DropdownMenuItem>
+        )}
+        {allowed("customsDraft") && (
+          <DropdownMenuItem onSelect={() => onSelect("customsDraft")}>
+            报关单草稿
+          </DropdownMenuItem>
+        )}
+        {allowed("packingCheck") && (
+          <DropdownMenuItem onSelect={() => onSelect("packingCheck")}>
+            船司装箱单核对
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
           其他
         </DropdownMenuLabel>
-        <DropdownMenuItem onSelect={() => onSelect("exportWorkbook")}>
-          导出出口工作簿
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => onSelect("threeForms")}>
-          申报三表（报关 / 核销 / 退税）
-        </DropdownMenuItem>
+        {allowed("exportWorkbook") && (
+          <DropdownMenuItem onSelect={() => onSelect("exportWorkbook")}>
+            导出出口工作簿
+          </DropdownMenuItem>
+        )}
+        {allowed("threeForms") && (
+          <DropdownMenuItem onSelect={() => onSelect("threeForms")}>
+            申报三表（报关 / 核销 / 退税）
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
