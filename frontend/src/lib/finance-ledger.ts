@@ -59,3 +59,22 @@ export function txnKind(txn: {
   if (/内部|划转|调拨/.test(text)) return "内部划转";
   return null;
 }
+
+const NON_INVOICE_TEXT = /工资|薪|代发|报销|社保|公积金|个税/;
+
+/**
+ * 「查看相关发票」只给可能有发票的外部往来方：无往来方、结汇/内部划转、
+ * 工资/报销类流水不显示。按文字识别，识别不到则显示（不猜）。
+ * shortcut: 本公司自身名称不在前端已知，靠「内部划转」文字识别，需要时改为后端标记。
+ */
+export function canLinkInvoices(txn: {
+  counterpart?: string | null;
+  txnType?: string | null;
+  summary?: string | null;
+}): boolean {
+  if (!txn.counterpart?.trim()) return false;
+  if (txnKind(txn)) return false;
+  return !NON_INVOICE_TEXT.test(
+    `${txn.txnType ?? ""} ${txn.summary ?? ""} ${txn.counterpart}`,
+  );
+}
