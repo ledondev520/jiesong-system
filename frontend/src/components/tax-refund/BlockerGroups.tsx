@@ -15,8 +15,10 @@ const GROUP_PREVIEW_ENTRIES = 5;
 const GROUP_RULES: ReadonlyArray<{ label: string; test: RegExp }> = [
   { label: "报关单", test: /报关|放行/ },
   { label: "供应商资料", test: /供应商(?!发票|开票)/ },
+  { label: "退税计算", test: /退税|采购含税成本|专票税率/ },
   { label: "发票核验", test: /发票|票号|票种|税号|进项/ },
   { label: "出货与装箱", test: /出货|发运|装箱|采购来源/ },
+  { label: "商品与报关要素", test: /HS|税则|申报要素|出口单价|总价/ },
 ];
 const OTHER_LABEL = "其他";
 

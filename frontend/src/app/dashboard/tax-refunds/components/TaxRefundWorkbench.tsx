@@ -369,17 +369,20 @@ export function TaxRefundWorkbench() {
         <span>{data?.disclaimer}</span>
         <span>资料变化后会重新核验，原归档保留</span>
       </div>
-      <p className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
-        阶段与退税记录状态对照：「已提交跟进」= 记录状态「已申报 /
-        已批准」；「已退税」=
-        记录状态「已退税」（两处含义相同）；其余阶段尚在准备，记录为「草稿」或还没有记录。
-      </p>
+      <details className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
+        <summary className="cursor-pointer">阶段与退税记录状态对照</summary>
+        <p className="mt-2">
+          「已提交跟进」= 记录状态「已申报 / 已批准」；「已退税」=
+          记录状态「已退税」（两处含义相同）；其余阶段尚在准备，记录为「草稿」或还没有记录。
+        </p>
+      </details>
 
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Input
             type="month"
             aria-label="申报月份"
+            lang="zh-CN"
             className="w-44"
             value={filingMonth}
             onChange={(event) => {
