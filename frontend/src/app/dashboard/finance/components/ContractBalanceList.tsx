@@ -38,6 +38,8 @@ export interface BalanceRow {
   subStatus?: SubStatus;
 }
 
+const SETTLEMENT_TOLERANCE = 0.01;
+
 const KIND = {
   payable: {
     title: "应付",
@@ -304,7 +306,8 @@ export function ContractBalanceList({
         filters={[
           {
             key: "outstanding",
-            label: `仅看${config.openLabel}`,
+            // shortcut: count only while the filter is on (total is then the 未收 count); upgrade to a separate count request if it must show when off
+            label: `仅看${config.openLabel}${outstandingOnly && !loading && !loadError ? `（${total}）` : ""}`,
             active: outstandingOnly,
             onToggle: () => {
               setOutstandingOnly(!outstandingOnly);
@@ -332,7 +335,8 @@ export function ContractBalanceList({
           },
         }}
         renderActions={(row) =>
-          config.open(row) > 0 ? (
+          // 0.01 及以下是尾差，与后端结算容差（B79）同口径，不再给登记入口
+          config.open(row) > SETTLEMENT_TOLERANCE ? (
             <Button
               size="sm"
               variant="outline"
