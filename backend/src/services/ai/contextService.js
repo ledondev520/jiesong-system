@@ -61,6 +61,7 @@ const buildContextQueries = (message) => {
     keywords.forEach((keyword) => addQuery(tasks, `supplier:${keyword}`, () =>
       safe(prisma.supplier.findMany({
         where: { OR: [{ name: { contains: keyword } }, { shortName: { contains: keyword } }] },
+        select: { name: true, shortName: true }, // 不加载银行/税号等字段：只有名称进入提示词
         take: 5,
       }))
     ));
@@ -71,7 +72,7 @@ const buildContextQueries = (message) => {
       addQuery(tasks, `purchase:exact:${purchaseKeyword}`, () =>
         safe(prisma.purchaseContract.findMany({
           where: { contractNo: { contains: purchaseKeyword.toUpperCase() } },
-          include: { supplier: true },
+          include: { supplier: { select: { name: true } } }, // 不含银行字段
           take: 3,
         }))
       );
