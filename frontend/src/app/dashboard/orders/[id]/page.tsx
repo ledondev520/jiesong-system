@@ -7,15 +7,12 @@
 
 import { Suspense, use } from "react";
 import { OrderDetailPage } from "./components/OrderDetailPage";
+import { DetailSkeleton } from "@/components/ui/detail-skeleton";
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   return (
-    <Suspense
-      fallback={
-        <div className="py-12 text-center text-muted-foreground">加载中...</div>
-      }
-    >
+    <Suspense fallback={<DetailSkeleton />}>
       <OrderDetailPage id={id} />
     </Suspense>
   );
