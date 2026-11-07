@@ -56,6 +56,7 @@ test('exportTaxRefunds: P0 缺失字段与税率不一致时阻断导出并写�
   const updateCalls = [];
 
   await withMockDelegates({
+    $transaction: async (ops) => Promise.all(ops),
     taxRefund: {
       findMany: async () => ([
         buildRecord({ id: 'tr-1', relation_no: null }),
@@ -103,6 +104,7 @@ test('exportTaxRefunds: 规范化可修复格式并仅导出 passed 记录', asy
   const updateCalls = [];
 
   await withMockDelegates({
+    $transaction: async (ops) => Promise.all(ops),
     taxRefund: {
       findMany: async () => ([
         buildRecord({
@@ -147,6 +149,7 @@ test('exportTaxRefunds: 同一发票号关联多个采购合同时阻断整批�
   const updateCalls = [];
 
   await withMockDelegates({
+    $transaction: async (ops) => Promise.all(ops),
     taxRefund: {
       findMany: async () => ([
         buildRecord({ id: 'tr-a', refundNo: 'TR-A', relation_no: 'PC-A', invoice_no: 'INV-DUP' }),
