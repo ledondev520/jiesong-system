@@ -23,7 +23,9 @@ test('isolated password recovery security boundaries', async (t) => {
     input: oldDdl + "\nINSERT INTO users (id, username, password, name, updatedAt) VALUES ('legacy', 'legacy', 'synthetic-old-hash', 'Synthetic', CURRENT_TIMESTAMP);\nINSERT INTO operation_logs (id, userId, action, entity) VALUES ('historical', 'legacy', 'CREATE', 'User');\n",
   });
   const backup = path.join(directory, 'before.db'); fs.copyFileSync(file, backup); fs.chmodSync(backup, 0o600);
-  const migration = fs.readFileSync(path.join(migrationDir, '20261002113919_email_password_recovery/migration.sql'), 'utf8');
+  // Recovery DDL plus browser_sessions: password rotation now purges that table in the same transaction.
+  const migration = ['20261002113919_email_password_recovery', '20261005070032_browser_sessions']
+    .map((name) => fs.readFileSync(path.join(migrationDir, name, 'migration.sql'), 'utf8')).join('\n');
   execFileSync('python3', ['-c', 'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.executescript(sys.stdin.read()); c.close()', file], { input: migration });
   fs.chmodSync(file, 0o600);
   const db = require('../utils/prisma');
@@ -159,6 +161,20 @@ test('isolated password recovery security boundaries', async (t) => {
     await require('../controllers/userController').update({ params: { id: user.id }, body: { password: crypto.randomBytes(18).toString('hex') } }, { status() { return this; }, json() {} }, (err) => { throw err; });
     await assert.rejects(check(fresh.token), { statusCode: 401 });
     assert.equal((await db.user.findUnique({ where: { id: user.id } })).sessionVersion, current.sessionVersion + 2);
+    await db.passwordResetChallenge.deleteMany();
+  });
+  await t.test('password change and email reset purge the account browser sessions', async () => {
+    const seed = async () => {
+      const row = (n) => ({ tokenHash: crypto.randomBytes(32).toString('hex'), userId: user.id, sessionVersion: n, expiresAt: new Date(Date.now() + 3600e3) });
+      await db.browserSession.createMany({ data: [row(0), row(1)] });
+    };
+    const password = crypto.randomBytes(18).toString('hex'); await db.user.update({ where: { id: user.id }, data: { password: await bcrypt.hash(password, 12) } });
+    await seed(); assert.equal(await db.browserSession.count({ where: { userId: user.id } }), 2);
+    await auth.changePassword(user.id, password, crypto.randomBytes(18).toString('hex'));
+    assert.equal(await db.browserSession.count({ where: { userId: user.id } }), 0);
+    await seed(); const issued = await issue();
+    await service.resetPassword(payload(issued.code));
+    assert.equal(await db.browserSession.count({ where: { userId: user.id } }), 0);
     await db.passwordResetChallenge.deleteMany();
   });
   await t.test('audit persistence failure rolls back code consumption, password and version', async () => {

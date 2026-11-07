@@ -174,15 +174,21 @@ const changePassword = async (userId, oldPassword, newPassword) => {
   const hashedPassword = await bcrypt.hash(newPassword, 12);
   let updated;
   try {
-    updated = await prisma.user.updateMany({
-      where: { id: userId, password: user.password, isActive: true },
-      data: { password: hashedPassword, sessionVersion: { increment: 1 } },
+    updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.user.updateMany({
+        where: { id: userId, password: user.password, isActive: true },
+        data: { password: hashedPassword, sessionVersion: { increment: 1 } },
+      });
+      // Purge browser sessions in the same commit as the credential rotation.
+      if (result.count === 1) await revokeBrowserSessions(tx, userId);
+      return result;
     });
   } catch {
     // Do not forward password-bearing Prisma diagnostics to the HTTP error logger.
     throw createError('密码修改暂不可用，请稍后重试', 503);
   }
   if (updated.count !== 1) throw createError('账号状态或密码已变更，请重新登录', 400);
+  clearAuthCache(userId);
 };
 
 /**
