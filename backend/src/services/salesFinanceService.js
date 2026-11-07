@@ -66,9 +66,6 @@ const buildSalesFinanceSummary = ({
   const packedRevenueUsd = computePackingTotals(packingItems).totalAmount;
   const contractTotalUsd = roundMoney(salesContract.totalAmount);
   const ownedRevenueUsd = roundMoney(getEffectiveSalesContractTotal(salesContract));
-  const ownershipRatio = contractTotalUsd > 0
-    ? Math.min(Math.max(ownedRevenueUsd / contractTotalUsd, 0), 1)
-    : 1;
 
   if (packingItems.length > 0 && Math.abs(packedRevenueUsd - contractTotalUsd) > 0.01) {
     issues.push(makeIssue(
@@ -126,7 +123,7 @@ const buildSalesFinanceSummary = ({
     totalReceivedUsd,
   ));
   const outstandingUsd = roundMoney(Math.max(ownedRevenueUsd - receivedUsd, 0));
-  if (totalReceivedUsd > contractTotalUsd + 0.01) {
+  if (totalReceivedUsd > ownedRevenueUsd + 0.01) {
     issues.push(makeIssue('RECEIPT_EXCEEDS_REVENUE', 'warning', '美元收款超过当前自有货物收入，超出部分未计入本柜收入'));
   }
   if (
@@ -241,9 +238,9 @@ const buildSalesFinanceSummary = ({
     : 0;
   const customerReceiptsCny = exchangeRate > 0 ? roundMoney(receivedUsd * exchangeRate) : 0;
   const netCashCny = roundMoney(customerReceiptsCny + actualRefundedCny - paidPurchaseCostCny);
-  const attributedReceiptTotal = totalReceivedUsd * ownershipRatio;
-  const receiptAttributionScale = attributedReceiptTotal > ownedRevenueUsd && attributedReceiptTotal > 0
-    ? ownedRevenueUsd / attributedReceiptTotal
+  // Own USD receipts show their wire amount; legacy whole-container receipts are capped to owned revenue.
+  const receiptAttributionScale = totalReceivedUsd > ownedRevenueUsd && totalReceivedUsd > 0
+    ? ownedRevenueUsd / totalReceivedUsd
     : 1;
 
   const marginReady = !issues.some((issue) => (
@@ -295,7 +292,7 @@ const buildSalesFinanceSummary = ({
     },
     receipts: usdReceipts.map((payment) => ({
       id: payment.id,
-      amountUsd: roundMoney(Number(payment.amount || 0) * ownershipRatio * receiptAttributionScale),
+      amountUsd: roundMoney(Number(payment.amount || 0) * receiptAttributionScale),
       paymentDate: payment.paymentDate || null,
       paymentMethod: payment.paymentMethod || null,
       note: payment.note || null,

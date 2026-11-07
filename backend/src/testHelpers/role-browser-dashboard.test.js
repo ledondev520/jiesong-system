@@ -119,8 +119,8 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       assert.deepEqual(data.alerts, { draftPurchases: 2, exportPendingParams: 1 });
       assert.equal(data.inventory.recordCount, 3);
       assert.equal(data.inventory.totalQuantity, 32);
-      // Derived: owned 700, proportional received 175 => 525. Formal: 400-100 => 300.
-      assert.equal(data.contracts.sales.receivable, 825);
+      // Derived: owned 700, own USD received 250 (not ratio-scaled) => 450. Formal: 400-100 => 300.
+      assert.equal(data.contracts.sales.receivable, 750);
       // Payables count only in-effect contracts (decision 12): drafts and cancelled excluded; SIGNED 300-100 = 200, COMPLETED 0.
       assert.equal(data.contracts.purchase.unpaidAmount, 200);
       // B60: statements are ADMIN/FINANCE/BOSS only, so PURCHASE is refused.

@@ -50,16 +50,11 @@ const getEffectiveSalesReceived = (
   ownedTotalAmount = getEffectiveSalesContractTotal(contract),
   receivedAmount = contract?.receivedAmount,
 ) => {
-  const contractTotal = Number(contract?.totalAmount || 0);
-  const received = Number(receivedAmount || 0);
-  if (contractTotal <= 0 || ownedTotalAmount <= 0 || received <= 0) return 0;
-
-  if (isFormalSalesAmount(contract)) {
-    return roundMoney(Math.min(received, ownedTotalAmount));
-  }
-
-  const ownershipRatio = Math.min(Math.max(ownedTotalAmount / contractTotal, 0), 1);
-  return roundMoney(Math.min(received * ownershipRatio, ownedTotalAmount));
+  // SalesContract.receivedAmount is Jiesong's own USD receipts, never the whole container:
+  // clamp to the owned total, do not scale by the ownership ratio (R2 P0-1).
+  const received = Math.max(Number(receivedAmount) || 0, 0);
+  const owned = Math.max(Number(ownedTotalAmount) || 0, 0);
+  return roundMoney(Math.min(received, owned));
 };
 
 // 查询选择：让 getEffectiveSalesContractTotal 能判断来源并扣除第三方装箱货值。
@@ -82,7 +77,8 @@ const getOwnedReceivableUsd = (contract) => getEffectiveSalesContractTotal(contr
 
 // receivedAmount 默认取合同表头原始收款；调用方已折算捷淞自有收款时可显式传入。
 const getOutstandingReceivableUsd = (contract, receivedAmount = contract?.receivedAmount) => {
-  const open = roundMoney(getOwnedReceivableUsd(contract) - Number(receivedAmount || 0));
+  const owned = getOwnedReceivableUsd(contract);
+  const open = roundMoney(owned - getEffectiveSalesReceived(contract, owned, receivedAmount));
   return open > SETTLEMENT_TOLERANCE ? open : 0;
 };
 
