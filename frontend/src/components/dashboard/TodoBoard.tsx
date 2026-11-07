@@ -153,7 +153,14 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
               <Card key={key} className="border-border/70">
                 <CardHeader className="flex-row items-center justify-between space-y-0">
                   <div className="min-w-0">
-                    <CardTitle className="text-base">{list.label}</CardTitle>
+                    <CardTitle className="text-base">
+                      {list.label}
+                      {list.historical && list.historical.count > 0 && (
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          （{list.historical.before} 起）
+                        </span>
+                      )}
+                    </CardTitle>
                     <p
                       className="mt-0.5 text-xs text-muted-foreground"
                       data-testid={`${key}-scope`}
@@ -225,20 +232,10 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
                     href={meta.all}
                     className="inline-block text-primary hover:underline"
                   >
-                    查看全部
+                    {list.historical && list.historical.count > 0
+                      ? `查看完整列表（含 ${list.historical.count} 条历史）`
+                      : "查看全部"}
                   </Link>
-                  {list.historical && list.historical.count > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      另有 {list.historical.count} 条签约早于{" "}
-                      {list.historical.before} 的历史记录未计入，
-                      <Link
-                        href={meta.all}
-                        className="text-primary hover:underline"
-                      >
-                        查看完整列表
-                      </Link>
-                    </p>
-                  )}
                 </CardContent>
               </Card>
             );
