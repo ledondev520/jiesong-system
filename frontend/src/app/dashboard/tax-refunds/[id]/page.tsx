@@ -1,5 +1,6 @@
-import { Suspense } from 'react';
-import { TaxRefundDetailPageContent } from '../components/TaxRefundDetailPageContent';
+import { Suspense } from "react";
+import { TaxRefundDetailPageContent } from "../components/TaxRefundDetailPageContent";
+import { DetailSkeleton } from "@/components/ui/detail-skeleton";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -7,7 +8,7 @@ interface PageProps {
 
 export default function TaxRefundDetailPage({ params }: PageProps) {
   return (
-    <Suspense fallback={<div className="py-12 text-center text-muted-foreground">加载中...</div>}>
+    <Suspense fallback={<DetailSkeleton />}>
       <TaxRefundDetailPageContent params={params} />
     </Suspense>
   );

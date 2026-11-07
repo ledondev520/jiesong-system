@@ -29,6 +29,7 @@ import { ForexVerificationPanel } from "@/components/finance/ForexVerificationPa
 import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
 import { TaxRefundStatusBadge } from "./TaxRefundStatusBadge";
+import { DetailSkeleton } from "@/components/ui/detail-skeleton";
 
 interface TaxRefundDetailPageContentProps {
   params: Promise<{ id: string }>;
@@ -98,9 +99,7 @@ export function TaxRefundDetailPageContent({
   }, [requestTaxRefund]);
 
   if (loading) {
-    return (
-      <div className="py-14 text-center text-muted-foreground">加载中...</div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (error)

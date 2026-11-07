@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
 import { TaxRefundForm } from "../../components/TaxRefundForm";
+import { DetailSkeleton } from "@/components/ui/detail-skeleton";
 
 interface EditTaxRefundContentProps {
   params: Promise<{ id: string }>;
@@ -98,9 +99,7 @@ function EditTaxRefundContent({ params }: EditTaxRefundContentProps) {
   };
 
   if (loading) {
-    return (
-      <div className="py-14 text-center text-muted-foreground">加载中...</div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (loadError)
@@ -150,11 +149,7 @@ interface PageProps {
 
 export default function EditTaxRefundPage({ params }: PageProps) {
   return (
-    <Suspense
-      fallback={
-        <div className="py-12 text-center text-muted-foreground">加载中...</div>
-      }
-    >
+    <Suspense fallback={<DetailSkeleton />}>
       <EditTaxRefundContent params={params} />
     </Suspense>
   );

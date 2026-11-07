@@ -61,6 +61,7 @@ import { OrderContainerTab } from "./OrderContainerTab";
 import { OrderDocsTab } from "./OrderDocsTab";
 import { OrderDocsMenu, type OrderDocAction } from "./OrderDocsMenu";
 import { OrderRefundTab } from "./OrderRefundTab";
+import { DetailSkeleton } from "@/components/ui/detail-skeleton";
 
 const GenerateThreeFormsDialog = lazy(() =>
   import("@/components/dialog/GenerateThreeFormsDialog").then((module) => ({
@@ -294,9 +295,7 @@ export function OrderDetailPage({ id }: { id: string }) {
   };
 
   if (loading && !contract) {
-    return (
-      <div className="flex h-64 items-center justify-center">加载中...</div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (!contract) {

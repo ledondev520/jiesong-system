@@ -18,6 +18,7 @@ import {
 } from "@/services/customsDeclaration.service";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CustomsDeclarationForm } from "@/app/dashboard/customs/components/CustomsDeclarationForm";
+import { DetailSkeleton } from "@/components/ui/detail-skeleton";
 
 interface EditCustomsDeclarationContentProps {
   params: Promise<{ id: string }>;
@@ -60,9 +61,7 @@ function EditCustomsDeclarationContent({
   };
 
   if (loading) {
-    return (
-      <div className="py-14 text-center text-muted-foreground">加载中...</div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (!declaration) {
@@ -95,11 +94,7 @@ interface PageProps {
 
 export default function EditCustomsDeclarationPage({ params }: PageProps) {
   return (
-    <Suspense
-      fallback={
-        <div className="py-12 text-center text-muted-foreground">加载中...</div>
-      }
-    >
+    <Suspense fallback={<DetailSkeleton />}>
       <EditCustomsDeclarationContent params={params} />
     </Suspense>
   );
