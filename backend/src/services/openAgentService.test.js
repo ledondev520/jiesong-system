@@ -945,6 +945,14 @@ test('P0-6: 确认时按实时角色复核，SALES 拿不到 FINANCE 的收款�
   });
 });
 
+test('R2 P1-2: WAREHOUSE 读不到合同金额类工具，业务角色保持可读', () => {
+  for (const name of ['GetPurchaseOverview', 'GetPurchaseContractDetail', 'GetSalesContractDetail', 'DiagnoseSalesContractFlow', 'DiagnosePurchaseExecution', 'DiagnoseTradeComplianceReadiness']) {
+    assert.equal(openAgentService.isToolAllowedForRole(name, 'WAREHOUSE'), false, name);
+    assert.equal(openAgentService.isToolAllowedForRole(name, 'SALES'), true, name);
+  }
+  assert.equal(openAgentService.isToolAllowedForRole('GetInventoryOverview', 'WAREHOUSE'), true);
+});
+
 test('P0-6: 读工具按角色收口，密钥类配置助手既不能读也不能写', async () => {
   for (const name of ['GetFinanceOverview', 'GetRecentEvents', 'GetSystemConfig']) {
     assert.equal(openAgentService.isToolAllowedForRole(name, 'WAREHOUSE'), false, name);

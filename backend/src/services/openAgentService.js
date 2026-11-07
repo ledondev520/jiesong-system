@@ -394,6 +394,7 @@ const SELLER_CONFIG_REFUSAL = '卖方公司信息只能由管理员在「设置 
 
 // 读工具按 HTTP RBAC 收口：财务/事件账/审计/系统配置不对其他角色开放；未列出的工具保持全角色可读。
 const FINANCE_READ_ROLES = [ROLES.ADMIN, ROLES.FINANCE];
+const COMMERCIAL_READ_ROLES = [ROLES.ADMIN, ROLES.FINANCE, ROLES.PURCHASE, ROLES.SALES];
 const READ_TOOL_ROLES = {
   GetFinanceOverview: FINANCE_READ_ROLES,
   GetReceivablesByCustomer: FINANCE_READ_ROLES,
@@ -404,6 +405,11 @@ const READ_TOOL_ROLES = {
   GetRecentEvents: FINANCE_READ_ROLES,
   GetOpsOverview: FINANCE_READ_ROLES,
   GetExecutiveOverview: FINANCE_READ_ROLES,
+  // 合同金额/单价/已付未付：WAREHOUSE 只保留库存与物流类工具。
+  ...Object.fromEntries([
+    'GetPurchaseOverview', 'GetPurchaseContractDetail', 'GetSalesContractDetail',
+    'DiagnoseSalesContractFlow', 'DiagnosePurchaseExecution', 'DiagnoseTradeComplianceReadiness',
+  ].map((name) => [name, COMMERCIAL_READ_ROLES])),
   GetSystemConfig: [ROLES.ADMIN],
 };
 
