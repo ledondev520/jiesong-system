@@ -408,12 +408,11 @@ const exportTaxRefunds = async (filters = {}) => {
     item.exportItem.match_status = item.match_status;
   });
 
-  for (const item of evaluations) {
-    await prisma.taxRefund.update({
-      where: { id: item.record.id },
-      data: { match_status: item.match_status },
-    });
-  }
+  // One transaction: a mid-loop failure must not leave half the records re-marked.
+  await prisma.$transaction(evaluations.map((item) => prisma.taxRefund.update({
+    where: { id: item.record.id },
+    data: { match_status: item.match_status },
+  })));
 
   const warnings = evaluations.flatMap((item) => item.warnings);
   const fixes = evaluations.flatMap((item) => item.fixes);

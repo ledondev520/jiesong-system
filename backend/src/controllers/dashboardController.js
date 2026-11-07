@@ -436,7 +436,7 @@ const getBusinessOverview = async (req, res, next) => {
     // 应付与其他页面同口径：只统计已生效合同（草稿/已取消除外）。
     const payables = summarizePayables(purchases);
     const sum = (items, pick) => roundMoney(items.reduce((total, item) => total + Number(pick(item) || 0), 0));
-    // ponytail: 逐合同复用现有单柜计算；规模扩大后再共享批量采购索引。
+    // 采购索引按 purchases 数组缓存（salesFinanceService.getPurchaseMap），逐合同复用同一份。
     const allSummaries = sales.map((contract) => ({
       contract,
       summary: buildSalesFinanceSummary({ salesContract: contract, purchases }),

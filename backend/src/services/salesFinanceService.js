@@ -32,11 +32,16 @@ const dedupeIssues = (issues) => Array.from(new Map(
   issues.map((issue) => [`${issue.code}:${issue.message}`, issue]),
 ).values());
 
+// Cached per purchases array so callers summarising many sales against one list index it once (O(S + P)).
+const purchaseMaps = new WeakMap();
 const getPurchaseMap = (purchases = []) => {
+  const cached = purchaseMaps.get(purchases);
+  if (cached) return cached;
   const map = new Map();
   purchases.forEach((purchase) => {
     contractNoAliases(purchase?.contractNo).forEach((alias) => map.set(alias, purchase));
   });
+  purchaseMaps.set(purchases, map);
   return map;
 };
 

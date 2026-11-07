@@ -171,13 +171,28 @@ const loadEvidence = async (contracts, prismaClient) => {
   return { purchases, invoiceRecords, invoiceUsages, invoiceAllocations };
 };
 
+// Invoice verification pools contracts that share an invoice number or purchase contract, so a single
+// preparation only needs the shipped contracts connected to this one that way, not every shipped contract.
+const loadInvoiceSiblings = async (salesContract, prismaClient) => {
+  const nos = new Set(), invNos = new Set();
+  const addPacking = list => list.forEach(p => { aliases(p.purchaseContractNo).forEach(n => nos.add(n)); normalizeInvoiceNumbers(p.invoiceNo).forEach(n => invNos.add(n)); });
+  addPacking(salesContract.packingItems || []);
+  const own = nos.size ? await prismaClient.purchaseContract.findMany({ where: { contractNo: { in: [...nos] } }, select: { invoiceNo: true } }) : [];
+  own.forEach(x => normalizeInvoiceNumbers(x.invoiceNo).forEach(n => invNos.add(n)));
+  const byInvoice = invNos.size ? await prismaClient.purchaseContract.findMany({ where: { OR: [...invNos].map(n => ({ invoiceNo: { contains: n } })) }, select: { contractNo: true } }) : [];
+  byInvoice.forEach(x => aliases(x.contractNo).forEach(n => nos.add(n)));
+  const links = [...(nos.size ? [{ purchaseContractNo: { in: [...nos] } }] : []), ...[...invNos].map(n => ({ invoiceNo: { contains: n } }))];
+  const siblings = links.length ? await prismaClient.salesContract.findMany({ where: { status: { in: ['SHIPPED', 'ARRIVED', 'COMPLETED'] }, packingItems: { some: { OR: links } } }, include: sourceInclude }) : [];
+  return siblings.some(x => x.id === salesContract.id) ? siblings : [...siblings, salesContract];
+};
+
 const getShipmentPreparation = async (salesContractId, customsDeclarationId, { prismaClient = prisma, readinessLoader = getExportReadiness } = {}) => {
   const salesContract = await prismaClient.salesContract.findUnique({ where: { id: salesContractId }, include: sourceInclude });
   if (!salesContract) throw createError('出口合同不存在', 404);
   const declarations = (salesContract.customsDeclarations || []).filter(x => x.status !== 'VOID');
   const declaration = customsDeclarationId ? declarations.find(x => x.id === customsDeclarationId) : declarations[0];
   if (customsDeclarationId && !declaration) throw createError('报关单不属于当前出货', 404);
-  const related = await prismaClient.salesContract.findMany({ where: { status: { in: ['SHIPPED', 'ARRIVED', 'COMPLETED'] } }, include: sourceInclude });
+  const related = await loadInvoiceSiblings(salesContract, prismaClient);
   const evidence = await loadEvidence(related.some(x => x.id === salesContract.id) ? related : [...related, salesContract], prismaClient);
   const exportReadiness = await readinessLoader(salesContractId);
   return buildShipmentPreparation({ salesContract, declaration, ...evidence, exportReadiness });
