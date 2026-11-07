@@ -37,6 +37,7 @@ router.get('/:id', withIdValidation, taxRefundController.getById);
 const refundFieldGuard = settlementFieldGuard({
   safeStatuses: ['DRAFT', 'APPLIED'],
   fields: ['refundedAmount', 'refundedAt'],
+  model: 'taxRefund',
 });
 router.post(
   '/',

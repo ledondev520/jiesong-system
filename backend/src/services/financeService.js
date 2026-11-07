@@ -743,6 +743,7 @@ const getPayables = async ({ page, pageSize, skip, search, outstandingOnly = fal
   };
 
   if (pastDelivery) where.expectedDate = { lt: new Date() };
+  // shortcut: 窄投影仍把全部匹配行读入 JS 再分页（isInEffect/归属口径无法下推 SQL），行数过万时改为 SQL 分页。
   // Two phases: filter on a narrow projection, then load full rows for the requested page only.
   const needle = search ? String(search).trim().toLowerCase() : '';
   const lite = (await prisma.purchaseContract.findMany({
@@ -765,6 +766,7 @@ const getReceivables = async ({ page, pageSize, skip, search, outstandingOnly = 
     NOT: { status: 'CANCELLED' },
   };
 
+  // shortcut: 同上，归属/搜索过滤在 JS 内完成，未下推 SQL 分页；行数过万时改造。
   // Two phases: ownership/search filtering on a narrow projection, full rows only for the requested page.
   const contracts = await prisma.salesContract.findMany({
     where,

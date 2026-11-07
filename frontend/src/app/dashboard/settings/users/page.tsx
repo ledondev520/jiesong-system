@@ -215,7 +215,7 @@ export default function UsersPage() {
       setUsers((current) => current.filter((u) => u.id !== target.id));
       setCurrentPage(1);
       setUserToDelete(null);
-      toast.success("用户已删除");
+      toast.success("用户已停用");
     } catch {
       toast.error("删除失败");
     } finally {

@@ -20,7 +20,12 @@ import { Role } from "@/types";
 export interface TabConfig {
   href: string;
   label: string;
+  /** 缺省沿用所属模块；仅用于隐藏后端已返回 403 的入口，不授予任何 API 权限 */
+  visibleRoles?: Role[];
 }
+
+// 与 backend/src/routes/bankFlow.js、finance.js 的账务读角色一致（WAREHOUSE 无账务读）
+const FINANCE_LEDGER_ROLES = [Role.ADMIN, Role.FINANCE, Role.BOSS];
 
 export type NavGroup = "main" | "business" | "data" | "system";
 
@@ -137,13 +142,36 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       { href: "/dashboard/finance", label: "财务概览" },
       { href: "/dashboard/finance/receivable", label: "应收" },
       { href: "/dashboard/finance/payable", label: "应付" },
-      { href: "/dashboard/finance/bank-flow", label: "银行流水" },
-      { href: "/dashboard/finance/invoices", label: "发票" },
-      { href: "/dashboard/finance/reconciliation", label: "对账" },
-      { href: "/dashboard/finance/statements", label: "财务报表" },
+      {
+        href: "/dashboard/finance/bank-flow",
+        label: "银行流水",
+        visibleRoles: FINANCE_LEDGER_ROLES,
+      },
+      {
+        href: "/dashboard/finance/invoices",
+        label: "发票",
+        visibleRoles: FINANCE_LEDGER_ROLES,
+      },
+      {
+        href: "/dashboard/finance/reconciliation",
+        label: "对账",
+        visibleRoles: FINANCE_LEDGER_ROLES,
+      },
+      {
+        href: "/dashboard/finance/statements",
+        label: "财务报表",
+        visibleRoles: FINANCE_LEDGER_ROLES,
+      },
       { href: "/dashboard/finance/analysis", label: "经营分析" },
     ],
     group: "business",
+    visibleRoles: [
+      Role.ADMIN,
+      Role.FINANCE,
+      Role.BOSS,
+      Role.SALES,
+      Role.PURCHASE,
+    ],
   },
   {
     key: "customers",
@@ -237,7 +265,14 @@ export const getVisibleModuleNavItems = (role?: Role | null) =>
     (item) =>
       (role !== Role.BOSS || item.key !== "ai") &&
       (!item.visibleRoles || (role ? item.visibleRoles.includes(role) : false)),
-  );
+  ).map((item) => ({
+    ...item,
+    children: item.children.filter(
+      (child) =>
+        !child.visibleRoles ||
+        (role ? child.visibleRoles.includes(role) : false),
+    ),
+  }));
 
 // 侧栏/底栏实际展示的菜单项。
 export const getMenuNavItems = (role?: Role | null) =>

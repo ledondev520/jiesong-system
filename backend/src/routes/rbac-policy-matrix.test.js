@@ -192,3 +192,32 @@ test('capabilities 为空的 Agent 令牌在每条路由上得到 403', async (t
   }
   assert.deepEqual(failures, [], `\n${failures.join('\n')}`);
 });
+
+test('WAREHOUSE 不能经通用导出读取付款流水；无银行权限的角色拿不到供应商银行字段', async (t) => {
+  stubAuth(t);
+  const bank = { bankAccount: 'SYN-ACCT-0001', bankName: 'SYN BANK', bankAccountName: 'SYN', bankBranch: 'SYN', bankCode: 'SYN' };
+  const supplier = { id: 'sup-1', name: 'SYN SUPPLIER', shortName: null, aliases: [], ...bank };
+  stub(t, prisma.payment, 'findMany', async () => []);
+  stub(t, prisma.supplier, 'findMany', async () => [supplier]);
+  stub(t, prisma.purchaseContract, 'findUnique', async () => ({ id: 'x1', status: 'DRAFT', totalAmount: 0, paidAmount: 0, supplier, items: [], payments: [], files: [] }));
+  stub(t, prisma.purchaseItem, 'findMany', async () => []);
+  stub(t, prisma.purchaseReceiptItem, 'groupBy', async () => []);
+  const base = await startApp(t);
+  const get = async (path, role) => {
+    const res = await fetch(`${base}/api/v1${path}`, { headers: { Authorization: `Bearer ${humanToken(role)}` } });
+    return { status: res.status, text: await res.text() };
+  };
+  for (const path of ['/system/export/payments', '/system/export/payments/pdf']) {
+    assert.equal((await get(path, 'WAREHOUSE')).status, 403, path);
+    assert.notEqual((await get(path, 'SALES')).status, 403, path);
+  }
+  for (const role of ['SALES', 'WAREHOUSE']) {
+    const csv = await get('/system/export/suppliers', role);
+    assert.equal(csv.status, 200);
+    assert.ok(!csv.text.includes('SYN-ACCT-0001') && !csv.text.includes('银行账户'), `${role} export leaks bank`);
+    const detail = await get('/purchases/x1', role);
+    assert.equal(detail.status, 200, detail.text);
+    assert.ok(!detail.text.includes('SYN-ACCT-0001') && !detail.text.includes('bankName'), `${role} purchase detail leaks bank`);
+  }
+  assert.ok((await get('/system/export/suppliers', 'PURCHASE')).text.includes('SYN-ACCT-0001'));
+});

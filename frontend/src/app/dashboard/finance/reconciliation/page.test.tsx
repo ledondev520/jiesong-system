@@ -2,7 +2,9 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { expect, it, vi, beforeEach } from "vitest";
 import ReconciliationPage from "./page";
 const unmatched = vi.fn();
-const contractsFor = vi.fn(async (..._args: unknown[]): Promise<unknown[]> => []);
+const contractsFor = vi.fn(
+  async (..._args: unknown[]): Promise<unknown[]> => [],
+);
 const recon = vi.fn();
 const manualMatch = vi.fn(async (..._args: unknown[]) => {});
 const autoMatch = vi.fn(async (..._args: unknown[]) => {});
@@ -191,24 +193,53 @@ it("搜索中确认自动匹配：范围说明不受搜索限制，且不声称�
 
 const goMatch = async () => {
   render(<ReconciliationPage />);
-  fireEvent.mouseDown(await screen.findByRole("tab", { name: /智能关联/ }), { button: 0 });
+  fireEvent.mouseDown(await screen.findByRole("tab", { name: /智能关联/ }), {
+    button: 0,
+  });
   fireEvent.click(screen.getByRole("tab", { name: /智能关联/ }));
 };
 const usdBank = {
-  id: "b1", currency: "USD", direction: "IN", amount: 500, counterpart: "SYN CUSTOMER", txnDate: "2026-07-01", summary: "",
+  id: "b1",
+  currency: "USD",
+  direction: "IN",
+  amount: 500,
+  counterpart: "SYN CUSTOMER",
+  txnDate: "2026-07-01",
+  summary: "",
 };
 const salesContract = {
-  id: "s1", contractNo: "EXP-SYN-1", totalAmount: 1000, ownedTotalAmount: 600, receivedAmount: 100, status: "SIGNED",
-  signedAt: null, portId: null, port: null, packingItems: [],
+  id: "s1",
+  contractNo: "EXP-SYN-1",
+  totalAmount: 1000,
+  ownedTotalAmount: 600,
+  receivedAmount: 100,
+  status: "SIGNED",
+  signedAt: null,
+  portId: null,
+  port: null,
+  packingItems: [],
 };
 const purchaseContract = {
-  id: "p1", contractNo: "PUR-SYN-1", supplierId: "x", totalAmount: 800, paidAmount: 0, status: "SIGNED",
-  signedAt: null, supplier: { id: "x", name: "SYN SUPPLIER" },
+  id: "p1",
+  contractNo: "PUR-SYN-1",
+  supplierId: "x",
+  totalAmount: 800,
+  paidAmount: 0,
+  status: "SIGNED",
+  signedAt: null,
+  supplier: { id: "x", name: "SYN SUPPLIER" },
 };
 
 it("美元流水与销售合同按 USD 显示，销售未收按本方应得额计算", async () => {
-  unmatched.mockResolvedValue({ bankItems: [usdBank], invoiceItems: [], bankTotal: 1, invoiceTotal: 0 });
-  contractsFor.mockImplementation(async (type: unknown) => (type === "SALES" ? [salesContract] : [purchaseContract]));
+  unmatched.mockResolvedValue({
+    bankItems: [usdBank],
+    invoiceItems: [],
+    bankTotal: 1,
+    invoiceTotal: 0,
+  });
+  contractsFor.mockImplementation(async (type: unknown) =>
+    type === "SALES" ? [salesContract] : [purchaseContract],
+  );
   await goMatch();
   fireEvent.click(await screen.findByText("SYN CUSTOMER"));
   expect(screen.getByText(/\+USD \$500\.00/)).toBeInTheDocument();
@@ -218,11 +249,20 @@ it("美元流水与销售合同按 USD 显示，销售未收按本方应得额�
 });
 
 it("切换合同类型清空已选合同，慢响应不会覆盖新类型列表", async () => {
-  unmatched.mockResolvedValue({ bankItems: [usdBank], invoiceItems: [], bankTotal: 1, invoiceTotal: 0 });
+  unmatched.mockResolvedValue({
+    bankItems: [usdBank],
+    invoiceItems: [],
+    bankTotal: 1,
+    invoiceTotal: 0,
+  });
   let releaseSales: (v: unknown) => void = () => {};
-  contractsFor.mockImplementation((type: unknown) => (
-    type === "SALES" ? new Promise<unknown[]>((r) => { releaseSales = r as (v: unknown) => void; }) : Promise.resolve([purchaseContract])
-  ));
+  contractsFor.mockImplementation((type: unknown) =>
+    type === "SALES"
+      ? new Promise<unknown[]>((r) => {
+          releaseSales = r as (v: unknown) => void;
+        })
+      : Promise.resolve([purchaseContract]),
+  );
   await goMatch();
   // 银行流水 IN -> SALES（慢）；立刻切回采购
   fireEvent.click(await screen.findByText("SYN CUSTOMER"));
@@ -230,7 +270,9 @@ it("切换合同类型清空已选合同，慢响应不会覆盖新类型列表"
   await screen.findByText("PUR-SYN-1");
   fireEvent.click(screen.getByText("PUR-SYN-1"));
   releaseSales([salesContract]);
-  await waitFor(() => expect(screen.queryByText("EXP-SYN-1")).not.toBeInTheDocument());
+  await waitFor(() =>
+    expect(screen.queryByText("EXP-SYN-1")).not.toBeInTheDocument(),
+  );
   expect(screen.getByText("PUR-SYN-1")).toBeInTheDocument();
   // 切到销售：已选采购合同被清空，不能带着旧 id 关联
   fireEvent.click(screen.getByRole("button", { name: "销售" }));

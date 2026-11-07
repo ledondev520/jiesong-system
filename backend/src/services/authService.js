@@ -14,7 +14,7 @@ const { ROLES } = require('../config/constants');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
 const { assertPassword } = require('../utils/passwordPolicy');
-const { shouldRevokeSessions, revokeBrowserSessions } = require('../utils/userSessionRevocation');
+const { shouldRevokeSessions, revokeBrowserSessions, assertAdminKept } = require('../utils/userSessionRevocation');
 
 /**
  * 职责：用户登录验证并生成Token
@@ -223,13 +223,14 @@ const getUsers = async (page = 1, pageSize = 20) => {
  * @param {Object} userData - 更新数据
  * @returns {Object} 更新后的用户
  */
-const updateUser = async (id, userData) => {
+const updateUser = async (id, userData, actorId) => {
   const { name, role, email, phone, isActive } = userData;
   if (role !== undefined && !Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
   
   const user = await prisma.$transaction(async (tx) => {
     const existing = await tx.user.findUnique({ where: { id }, select: { role: true, isActive: true } });
     if (!existing) throw createError('用户不存在', 404);
+    await assertAdminKept(tx, id, existing, { role, isActive }, actorId);
     const revoke = shouldRevokeSessions(existing, { role, isActive });
     const updated = await tx.user.update({
       where: { id },

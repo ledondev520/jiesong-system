@@ -104,6 +104,7 @@ function contractTotal(c: ContractForMatch): number {
 }
 
 function contractUnpaid(c: ContractForMatch): number {
+  if (typeof c.unpaidAmount === "number") return c.unpaidAmount;
   if (isPurchaseContract(c)) {
     return Math.max(c.totalAmount - (c.paidAmount || 0), 0);
   }
@@ -154,6 +155,7 @@ export default function ReconciliationPage() {
     "PURCHASE",
   );
   const [linking, setLinking] = useState(false);
+  const linkingRef = useRef(false); // 同一帧内的双击也只发一次关联请求
   const [ignoringId, setIgnoringId] = useState<string | null>(null);
   // 单调序号：只接受最新一次请求的响应
   const unmatchedSeqRef = useRef(0);
@@ -296,7 +298,8 @@ export default function ReconciliationPage() {
   };
 
   const handleLink = async () => {
-    if (!canLink || linking) return;
+    if (!canLink || linkingRef.current) return;
+    linkingRef.current = true;
     setLinking(true);
     const entityType = selectedBank ? "BANK" : "INVOICE";
     const entityId = selectedBank ? selectedBank.id : selectedInvoice!.id;
@@ -315,6 +318,7 @@ export default function ReconciliationPage() {
     } catch {
       toast.error("对账操作失败，请重试");
     } finally {
+      linkingRef.current = false;
       setLinking(false);
     }
   };
@@ -771,11 +775,12 @@ export default function ReconciliationPage() {
                           </div>
                           <div className="flex items-center justify-between mt-1">
                             <span className="text-[10px] text-muted-foreground">
-                              总额 {currencyPrefix(contractType === "SALES")}
+                              总额 {currencyPrefix(contractsType === "SALES")}
                               {fmt(contractTotal(c))}
                             </span>
                             <span className="text-[10px] font-medium text-status-amber">
-                              未收/付 {currencyPrefix(contractType === "SALES")}
+                              未收/付{" "}
+                              {currencyPrefix(contractsType === "SALES")}
                               {fmt(contractUnpaid(c))}
                             </span>
                           </div>

@@ -141,3 +141,30 @@ test('核对同币种报关和商业发票金额，不把人民币进货金额�
   const wrong = { ...declaration, items: declaration.items.map(x => ({ ...x, totalPrice: 100 })) };
   assert.equal(build({ salesContract: priced, declaration: wrong }).materialReady, false);
 });
+test('发票同伴只取相连合同：与旧的全量扫描结果一致，含 B 另有第二张发票的情形', async () => {
+  const inv2 = '26110000000000000002';
+  const mkInvoice = no => ({ ...invoice, invNo: no });
+  const mkPurchase = (id, no, invNo) => ({ ...purchase, id, contractNo: no, invoiceNo: invNo });
+  const mkContract = (id, rows) => ({ ...contract, id, contractNo: `EXP-${id}`, customsDeclarations: [{ ...contract.customsDeclarations[0], id: `cd-${id}`, items: [] }],
+    packingItems: rows.map((r, i) => ({ ...contract.packingItems[0], id: `${id}-${i}`, purchaseContractNo: r.no, invoiceNo: r.inv })) });
+  // A 与 B 共用 invoiceNo；B 另有 inv2（与 C 共用）。A 的核验只依赖 A 所涉发票，C 不应改变 A 的结果。
+  const A = mkContract('A', [{ no: 'CG-A', inv: invoiceNo }]);
+  const B = mkContract('B', [{ no: 'CG-B1', inv: invoiceNo }, { no: 'CG-B2', inv: inv2 }]);
+  const C = mkContract('C', [{ no: 'CG-C', inv: inv2 }]);
+  const D = mkContract('D', [{ no: 'CG-D', inv: '26110000000000000009' }]);
+  const all = [A, B, C, D];
+  const purchases = [mkPurchase('pa', 'CG-A', invoiceNo), mkPurchase('pb1', 'CG-B1', invoiceNo), mkPurchase('pb2', 'CG-B2', inv2), mkPurchase('pc', 'CG-C', inv2), mkPurchase('pd', 'CG-D', '26110000000000000009')];
+  const records = [mkInvoice(invoiceNo), mkInvoice(inv2), mkInvoice('26110000000000000009')];
+  const hit = (value, cond) => !cond || (cond.in ? cond.in.includes(value) : cond.contains ? String(value || '').includes(cond.contains) : true);
+  const base = (salesFilter) => ({
+    salesContract: { findUnique: async ({ where }) => all.find(x => x.id === where.id), findMany: async ({ where }) => salesFilter(where) },
+    purchaseContract: { findMany: async ({ where }) => purchases.filter(p => (!where.contractNo || hit(p.contractNo, where.contractNo)) && (!where.OR || where.OR.some(o => hit(p.invoiceNo, o.invoiceNo)))) },
+    invoiceRecord: { findMany: async ({ where }) => records.filter(r => where.invNo.in.includes(r.invNo)) },
+  });
+  const legacy = base(() => all); // 旧实现：所有已发运合同
+  const filtered = base(where => all.filter(x => x.packingItems.some(p => where.packingItems.some.OR.some(o => (o.purchaseContractNo ? hit(p.purchaseContractNo, o.purchaseContractNo) : hit(p.invoiceNo, o.invoiceNo))))));
+  const opts = prismaClient => ({ prismaClient, readinessLoader: async () => readiness });
+  for (const id of ['A', 'B', 'C']) {
+    assert.deepEqual(await service.getShipmentPreparation(id, null, opts(filtered)), await service.getShipmentPreparation(id, null, opts(legacy)), id);
+  }
+});

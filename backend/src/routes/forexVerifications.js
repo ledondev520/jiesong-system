@@ -19,6 +19,7 @@ router.use(authenticate);
 const forexFieldGuard = settlementFieldGuard({
   safeStatuses: ['PENDING'],
   fields: ['settledAmount', 'verifiedAt'],
+  model: 'forexVerification',
 });
 
 router.get('/', withPaginationValidation, forexVerificationController.list);

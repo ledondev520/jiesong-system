@@ -8,6 +8,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const { redactSupplierForRole, sanitizeSupplierInput } = require('../agent/commands/supplier');
+const { redactNestedSuppliers } = require('../agent/commands/supplier/bankFields');
+const prisma = require('../utils/prisma');
 const { settlementFieldGuard } = require('../middleware/settlementFieldGuard');
 
 const rolesOf = (router, method, path) => {
@@ -75,4 +77,28 @@ test('结算字段守卫：SALES 不能置 REFUNDED/VERIFIED 或写 refundedAmou
   assert.equal(run('SALES', { refundedAmount: 100 }), 403);
   assert.equal(run('SALES', { status: 'DRAFT', refundedAmount: 0 }), undefined);
   assert.equal(run('FINANCE', { status: 'REFUNDED', refundedAmount: 100 }), undefined);
+});
+
+test('结算字段守卫：SALES 不能修改已进入结算状态的记录（按库内当前状态）', async (t) => {
+  const original = prisma.taxRefund.findUnique;
+  t.after(() => { prisma.taxRefund.findUnique = original; });
+  const guard = settlementFieldGuard({ safeStatuses: ['DRAFT', 'APPLIED'], fields: ['refundedAmount'], model: 'taxRefund' });
+  const run = async (role, status, body) => {
+    prisma.taxRefund.findUnique = async () => ({ status });
+    let err;
+    await guard({ user: { role }, body, params: { id: 'r1' } }, {}, (e) => { err = e; });
+    return err?.statusCode;
+  };
+  assert.equal(await run('SALES', 'APPROVED', { status: 'DRAFT' }), 403);
+  assert.equal(await run('SALES', 'REFUNDED', { declaredAmount: 1 }), 403);
+  assert.equal(await run('SALES', 'DRAFT', { declaredAmount: 1 }), undefined);
+  assert.equal(await run('FINANCE', 'REFUNDED', { status: 'DRAFT' }), undefined);
+});
+
+test('嵌套 supplier 银行字段：无银行权限角色被剔除，其他字段保留', () => {
+  const row = { id: 'p1', supplier: { id: 's1', name: 'n', bankAccount: '1' }, suppliers: [{ supplier: { id: 's2', bankName: 'b' } }] };
+  const out = redactNestedSuppliers('SALES', row);
+  assert.deepEqual(out.supplier, { id: 's1', name: 'n' });
+  assert.deepEqual(out.suppliers[0].supplier, { id: 's2' });
+  assert.equal(redactNestedSuppliers('PURCHASE', row).supplier.bankAccount, '1');
 });

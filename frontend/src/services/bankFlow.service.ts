@@ -332,6 +332,8 @@ export interface PurchaseContractForMatch {
   status: string;
   signedAt: string | null;
   supplier: { id: string; name: string; shortName?: string | null };
+  /** 后端唯一口径的未付余额（financeMatchService） */
+  unpaidAmount?: number;
 }
 
 interface SalesContractForMatch {
@@ -341,6 +343,8 @@ interface SalesContractForMatch {
   /** 本方应得合同额（拆分合同）；接口未返回时按 totalAmount 计 */
   ownedTotalAmount?: number | null;
   receivedAmount: number;
+  /** 后端唯一口径的未收余额（getOutstandingReceivableUsd） */
+  unpaidAmount?: number;
   status: string;
   signedAt: string | null;
   portId: string | null;

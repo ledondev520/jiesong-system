@@ -238,9 +238,12 @@ export const financeService = {
     type: FinanceReportPdfType,
     fallbackFilename?: string,
   ) => {
-    const response = await fetch(`${getApiBaseUrl()}/system/export/${type}/pdf`, {
-      ...authFetchInit(),
-    });
+    const response = await fetch(
+      `${getApiBaseUrl()}/system/export/${type}/pdf`,
+      {
+        ...authFetchInit(),
+      },
+    );
     await downloadResponseBlob(response, fallbackFilename || `${type}.pdf`);
   },
 };

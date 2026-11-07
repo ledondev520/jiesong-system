@@ -238,7 +238,10 @@ export const taxRefundService = {
     const response = await fetch("/api/v1/tax-refunds/export?download=1", {
       method: "POST",
       ...authFetchInit(),
-      headers: { ...authFetchInit().headers, "Content-Type": "application/json" },
+      headers: {
+        ...authFetchInit().headers,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(ids?.length ? { ids } : {}),
     });
     if (!response.ok) {

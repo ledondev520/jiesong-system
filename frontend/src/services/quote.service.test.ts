@@ -43,7 +43,8 @@ describe("quoteService", () => {
     URL.revokeObjectURL = vi.fn();
     await quoteService.downloadXlsx("q1", "fallback.xlsx");
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/quotes/q1/export.xlsx", {
-      credentials: "include", headers: { Authorization: "Bearer tok" },
+      credentials: "include",
+      headers: { Authorization: "Bearer tok" },
     });
     vi.unstubAllGlobals();
   });

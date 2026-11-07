@@ -14,7 +14,10 @@ export const authFetchInit = (): RequestInit => {
   const token = getAuthToken();
   return {
     credentials: "include",
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...getBrowserSessionHeaders() },
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...getBrowserSessionHeaders(),
+    },
   };
 };
 

@@ -5,8 +5,8 @@ import { authFetchInit } from "@/lib/browser-session";
  * Pos: 前端系统运维服务层
  */
 
-import api, { type ApiRequestConfig } from '@/lib/axios';
-import { ApiResponse, PaginatedResponse, User } from '@/types';
+import api, { type ApiRequestConfig } from "@/lib/axios";
+import { ApiResponse, PaginatedResponse, User } from "@/types";
 
 export interface SystemLogItem {
   id: string;
@@ -19,7 +19,7 @@ export interface SystemLogItem {
   ipAddress?: string | null;
   userAgent?: string | null;
   createdAt: string;
-  user?: Pick<User, 'id' | 'name' | 'username'> | null;
+  user?: Pick<User, "id" | "name" | "username"> | null;
 }
 
 export interface GetSystemLogsParams {
@@ -35,14 +35,19 @@ export interface GetSystemLogsParams {
   endDate?: string;
 }
 
-export const getSystemLogs = async (params: GetSystemLogsParams = { page: 1, pageSize: 50 }) => {
-  return api.get<ApiResponse<PaginatedResponse<SystemLogItem>>, ApiResponse<PaginatedResponse<SystemLogItem>>>(
-    '/system/logs',
-    { params }
-  );
+export const getSystemLogs = async (
+  params: GetSystemLogsParams = { page: 1, pageSize: 50 },
+) => {
+  return api.get<
+    ApiResponse<PaginatedResponse<SystemLogItem>>,
+    ApiResponse<PaginatedResponse<SystemLogItem>>
+  >("/system/logs", { params });
 };
 
-export const exportSystemLogsCsv = async (params: GetSystemLogsParams = {}, fallbackFilename = 'operation_logs.csv') => {
+export const exportSystemLogsCsv = async (
+  params: GetSystemLogsParams = {},
+  fallbackFilename = "operation_logs.csv",
+) => {
   const query = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
@@ -52,9 +57,12 @@ export const exportSystemLogsCsv = async (params: GetSystemLogsParams = {}, fall
   });
 
   const queryString = query.toString();
-  const response = await fetch(`/api/v1/system/logs/export/csv${queryString ? `?${queryString}` : ''}`, {
-    ...authFetchInit(),
-  });
+  const response = await fetch(
+    `/api/v1/system/logs/export/csv${queryString ? `?${queryString}` : ""}`,
+    {
+      ...authFetchInit(),
+    },
+  );
 
   if (!response.ok) {
     let message = `导出失败（${response.status}）`;
@@ -71,12 +79,16 @@ export const exportSystemLogsCsv = async (params: GetSystemLogsParams = {}, fall
 
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  const disposition = response.headers.get('Content-Disposition') || '';
-  const filenameMatch = disposition.match(/filename\*=UTF-8''(.+)/i) || disposition.match(/filename="?([^"]+)"?/i);
+  const link = document.createElement("a");
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const filenameMatch =
+    disposition.match(/filename\*=UTF-8''(.+)/i) ||
+    disposition.match(/filename="?([^"]+)"?/i);
 
   link.href = url;
-  link.download = filenameMatch ? decodeURIComponent(filenameMatch[1]) : fallbackFilename;
+  link.download = filenameMatch
+    ? decodeURIComponent(filenameMatch[1])
+    : fallbackFilename;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -107,17 +119,19 @@ export interface SystemNotificationsResponse extends PaginatedResponse<SystemNot
 }
 
 export const getSystemNotifications = async (
-  params: GetSystemNotificationsParams = { page: 1, pageSize: 50 }
+  params: GetSystemNotificationsParams = { page: 1, pageSize: 50 },
 ) => {
   const config: ApiRequestConfig = { params, cache: { enabled: false } };
-  return api.get<ApiResponse<SystemNotificationsResponse>, ApiResponse<SystemNotificationsResponse>>(
-    '/system/notifications',
-    config
-  );
+  return api.get<
+    ApiResponse<SystemNotificationsResponse>,
+    ApiResponse<SystemNotificationsResponse>
+  >("/system/notifications", config);
 };
 
 export const markSystemNotificationRead = async (id: string) => {
-  return api.put<ApiResponse<null>, ApiResponse<null>>(`/system/notifications/${id}/read`);
+  return api.put<ApiResponse<null>, ApiResponse<null>>(
+    `/system/notifications/${id}/read`,
+  );
 };
 
 export interface SystemPortItem {
@@ -136,23 +150,38 @@ export interface GetSystemPortsParams {
   includeInactive?: boolean;
 }
 
-export const getSystemPorts = async (params: GetSystemPortsParams = { page: 1, pageSize: 100 }) => {
-  return api.get<ApiResponse<PaginatedResponse<SystemPortItem>>, ApiResponse<PaginatedResponse<SystemPortItem>>>(
-    '/system/ports',
-    { params }
+export const getSystemPorts = async (
+  params: GetSystemPortsParams = { page: 1, pageSize: 100 },
+) => {
+  return api.get<
+    ApiResponse<PaginatedResponse<SystemPortItem>>,
+    ApiResponse<PaginatedResponse<SystemPortItem>>
+  >("/system/ports", { params });
+};
+
+export const createSystemPort = async (
+  data: Pick<SystemPortItem, "name" | "code"> & { isActive?: boolean },
+) => {
+  return api.post<ApiResponse<SystemPortItem>, ApiResponse<SystemPortItem>>(
+    "/system/ports",
+    data,
   );
 };
 
-export const createSystemPort = async (data: Pick<SystemPortItem, 'name' | 'code'> & { isActive?: boolean }) => {
-  return api.post<ApiResponse<SystemPortItem>, ApiResponse<SystemPortItem>>('/system/ports', data);
-};
-
-export const updateSystemPort = async (id: string, data: Partial<Pick<SystemPortItem, 'name' | 'code' | 'isActive'>>) => {
-  return api.put<ApiResponse<SystemPortItem>, ApiResponse<SystemPortItem>>(`/system/ports/${id}`, data);
+export const updateSystemPort = async (
+  id: string,
+  data: Partial<Pick<SystemPortItem, "name" | "code" | "isActive">>,
+) => {
+  return api.put<ApiResponse<SystemPortItem>, ApiResponse<SystemPortItem>>(
+    `/system/ports/${id}`,
+    data,
+  );
 };
 
 export const deleteSystemPort = async (id: string) => {
-  return api.delete<ApiResponse<null>, ApiResponse<null>>(`/system/ports/${id}`);
+  return api.delete<ApiResponse<null>, ApiResponse<null>>(
+    `/system/ports/${id}`,
+  );
 };
 
 export interface SystemCategoryItem {
@@ -177,26 +206,38 @@ export interface GetSystemCategoriesParams {
   keyword?: string;
 }
 
-export const getSystemCategories = async (params: GetSystemCategoriesParams = { page: 1, pageSize: 100 }) => {
-  return api.get<ApiResponse<PaginatedResponse<SystemCategoryItem>>, ApiResponse<PaginatedResponse<SystemCategoryItem>>>(
-    '/system/categories',
-    { params }
-  );
+export const getSystemCategories = async (
+  params: GetSystemCategoriesParams = { page: 1, pageSize: 100 },
+) => {
+  return api.get<
+    ApiResponse<PaginatedResponse<SystemCategoryItem>>,
+    ApiResponse<PaginatedResponse<SystemCategoryItem>>
+  >("/system/categories", { params });
 };
 
-export const createSystemCategory = async (data: Pick<SystemCategoryItem, 'name'> & { parentId?: string | null }) => {
-  return api.post<ApiResponse<SystemCategoryItem>, ApiResponse<SystemCategoryItem>>('/system/categories', data);
+export const createSystemCategory = async (
+  data: Pick<SystemCategoryItem, "name"> & { parentId?: string | null },
+) => {
+  return api.post<
+    ApiResponse<SystemCategoryItem>,
+    ApiResponse<SystemCategoryItem>
+  >("/system/categories", data);
 };
 
 export const updateSystemCategory = async (
   id: string,
-  data: Partial<Pick<SystemCategoryItem, 'name' | 'parentId'>>
+  data: Partial<Pick<SystemCategoryItem, "name" | "parentId">>,
 ) => {
-  return api.put<ApiResponse<SystemCategoryItem>, ApiResponse<SystemCategoryItem>>(`/system/categories/${id}`, data);
+  return api.put<
+    ApiResponse<SystemCategoryItem>,
+    ApiResponse<SystemCategoryItem>
+  >(`/system/categories/${id}`, data);
 };
 
 export const deleteSystemCategory = async (id: string) => {
-  return api.delete<ApiResponse<null>, ApiResponse<null>>(`/system/categories/${id}`);
+  return api.delete<ApiResponse<null>, ApiResponse<null>>(
+    `/system/categories/${id}`,
+  );
 };
 
 export interface SystemCustomsBrokerItem {
@@ -218,36 +259,62 @@ export interface GetSystemCustomsBrokersParams {
   includeInactive?: boolean;
 }
 
-export const getSystemCustomsBrokers = async (params: GetSystemCustomsBrokersParams = { page: 1, pageSize: 100 }) => {
-  return api.get<ApiResponse<PaginatedResponse<SystemCustomsBrokerItem>>, ApiResponse<PaginatedResponse<SystemCustomsBrokerItem>>>(
-    '/system/customs-brokers',
-    { params }
-  );
+export const getSystemCustomsBrokers = async (
+  params: GetSystemCustomsBrokersParams = { page: 1, pageSize: 100 },
+) => {
+  return api.get<
+    ApiResponse<PaginatedResponse<SystemCustomsBrokerItem>>,
+    ApiResponse<PaginatedResponse<SystemCustomsBrokerItem>>
+  >("/system/customs-brokers", { params });
 };
 
-export const createSystemCustomsBroker = async (data: Pick<SystemCustomsBrokerItem, 'name' | 'contact' | 'phone' | 'email' | 'address'> & { isActive?: boolean }) => {
-  return api.post<ApiResponse<SystemCustomsBrokerItem>, ApiResponse<SystemCustomsBrokerItem>>('/system/customs-brokers', data);
+export const createSystemCustomsBroker = async (
+  data: Pick<
+    SystemCustomsBrokerItem,
+    "name" | "contact" | "phone" | "email" | "address"
+  > & { isActive?: boolean },
+) => {
+  return api.post<
+    ApiResponse<SystemCustomsBrokerItem>,
+    ApiResponse<SystemCustomsBrokerItem>
+  >("/system/customs-brokers", data);
 };
 
-export const updateSystemCustomsBroker = async (id: string, data: Partial<Pick<SystemCustomsBrokerItem, 'name' | 'contact' | 'phone' | 'email' | 'address' | 'isActive'>>) => {
-  return api.put<ApiResponse<SystemCustomsBrokerItem>, ApiResponse<SystemCustomsBrokerItem>>(`/system/customs-brokers/${id}`, data);
+export const updateSystemCustomsBroker = async (
+  id: string,
+  data: Partial<
+    Pick<
+      SystemCustomsBrokerItem,
+      "name" | "contact" | "phone" | "email" | "address" | "isActive"
+    >
+  >,
+) => {
+  return api.put<
+    ApiResponse<SystemCustomsBrokerItem>,
+    ApiResponse<SystemCustomsBrokerItem>
+  >(`/system/customs-brokers/${id}`, data);
 };
 
 export const deleteSystemCustomsBroker = async (id: string) => {
-  return api.delete<ApiResponse<null>, ApiResponse<null>>(`/system/customs-brokers/${id}`);
+  return api.delete<ApiResponse<null>, ApiResponse<null>>(
+    `/system/customs-brokers/${id}`,
+  );
 };
 
 export type SystemExportType =
-  | 'suppliers'
-  | 'stores'
-  | 'products'
-  | 'purchases'
-  | 'sales'
-  | 'containers'
-  | 'inventory'
-  | 'payments';
+  | "suppliers"
+  | "stores"
+  | "products"
+  | "purchases"
+  | "sales"
+  | "containers"
+  | "inventory"
+  | "payments";
 
-export const exportSystemData = async (type: SystemExportType, fallbackFilename?: string) => {
+export const exportSystemData = async (
+  type: SystemExportType,
+  fallbackFilename?: string,
+) => {
   const response = await fetch(`/api/v1/export/${type}`, {
     ...authFetchInit(),
   });
@@ -267,12 +334,16 @@ export const exportSystemData = async (type: SystemExportType, fallbackFilename?
 
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  const disposition = response.headers.get('Content-Disposition') || '';
-  const filenameMatch = disposition.match(/filename\*=UTF-8''(.+)/i) || disposition.match(/filename="?([^"]+)"?/i);
+  const link = document.createElement("a");
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const filenameMatch =
+    disposition.match(/filename\*=UTF-8''(.+)/i) ||
+    disposition.match(/filename="?([^"]+)"?/i);
 
   link.href = url;
-  link.download = filenameMatch ? decodeURIComponent(filenameMatch[1]) : (fallbackFilename || `${type}.csv`);
+  link.download = filenameMatch
+    ? decodeURIComponent(filenameMatch[1])
+    : fallbackFilename || `${type}.csv`;
   document.body.appendChild(link);
   link.click();
   link.remove();

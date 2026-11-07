@@ -10,6 +10,7 @@ const { success, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const financeMatchService = require('../services/financeMatchService');
 const { createError } = require('../middleware/errorHandler');
+const { redactNestedSuppliers } = require('../agent/commands/supplier/bankFields');
 
 /**
  * 职责：触发自动匹配
@@ -133,7 +134,7 @@ const listContracts = async (req, res, next) => {
     }
 
     const contracts = await financeMatchService.listContractsForMatch(contractType, search, purpose);
-    success(res, contracts);
+    success(res, redactNestedSuppliers(req.user?.role, contracts));
   } catch (error) {
     next(error);
   }

@@ -80,3 +80,17 @@ test('remove: 不能停用自己，也不能停用最后一个有效 ADMIN', asy
   assert.deepEqual(calls.updates, []);
   assert.deepEqual(calls.revoked, []);
 });
+
+test('update/updateUser: 不能经 PUT 降级或停用自己及最后一个有效 ADMIN', async (t) => {
+  const self = mockTx(t, { role: 'ADMIN', isActive: true });
+  const demoteSelf = await run(controller.update, { params: { id: 'admin' }, body: { role: 'SALES' }, user: { id: 'admin' } });
+  assert.equal(demoteSelf.error.statusCode, 400);
+  assert.deepEqual(self.updates, []);
+  mockTx(t, { role: 'ADMIN', isActive: true }, { otherAdmins: 0 });
+  const last = await run(controller.update, { params: { id: 'u1' }, body: { isActive: false }, user: { id: 'admin' } });
+  assert.equal(last.error.statusCode, 400);
+  await assert.rejects(authService.updateUser('u1', { role: 'SALES' }, 'admin'), /最后一个有效管理员/);
+  const ok = mockTx(t, { role: 'ADMIN', isActive: true }, { otherAdmins: 1 });
+  assert.equal((await run(controller.update, { params: { id: 'u1' }, body: { role: 'SALES' }, user: { id: 'admin' } })).error, undefined);
+  assert.equal(ok.updates.length, 1);
+});

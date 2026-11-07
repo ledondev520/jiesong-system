@@ -14,7 +14,7 @@ const { assertPassword } = require('../utils/passwordPolicy');
 const { success, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const { createError } = require('../middleware/errorHandler');
-const { shouldRevokeSessions, revokeBrowserSessions } = require('../utils/userSessionRevocation');
+const { shouldRevokeSessions, revokeBrowserSessions, assertAdminKept } = require('../utils/userSessionRevocation');
 
 /**
  * 职责：获取用户列表
@@ -141,6 +141,7 @@ const update = async (req, res, next) => {
     const user = await prisma.$transaction(async (tx) => {
       const existing = await tx.user.findUnique({ where: { id }, select: { role: true, isActive: true } });
       if (!existing) throw createError('用户不存在', 404);
+      await assertAdminKept(tx, id, existing, { role, isActive }, req.user?.id);
       const revoke = shouldRevokeSessions(existing, { role, isActive });
       if (revoke) updateData.sessionVersion = { increment: 1 };
       const updated = await tx.user.update({
