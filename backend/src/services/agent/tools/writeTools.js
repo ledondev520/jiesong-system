@@ -54,7 +54,7 @@ module.exports = ({
         contractNo: input.contractNo,
         amount: Number(input.amount),
         customerName: payment.customerName || '未知客户',
-      }, `将收款「${payment.customerName || '未知'}」¥${input.amount} 分配到合同 ${input.contractNo}`, collectedIds);
+      }, `将收款「${payment.customerName || '未知'}」USD $${input.amount} 分配到合同 ${input.contractNo}`, collectedIds);
     },
   },
   {
