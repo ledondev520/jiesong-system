@@ -49,7 +49,8 @@ const runBusinessPatrol = async () => {
         severity: c.overdueDays > 150 ? SEVERITY.CRITICAL : SEVERITY.WARNING,
         rule: 'OVERDUE_RECEIVABLE',
         title: `应收账款超期：${c.contractNo}`,
-        detail: `合同 ${c.contractNo} 按发运后30天口径已逾期 ${c.overdueDays} 天，未收金额 $${Number(c.unreceived).toFixed(2)}`,
+        // 通知内容是快照：注明截至日，避免后续阅读时被当成当前天数/金额。
+        detail: `截至 ${now.toLocaleDateString('en-CA')}，合同 ${c.contractNo} 按发运后30天口径已逾期 ${c.overdueDays} 天，未收金额 $${Number(c.unreceived).toFixed(2)}`,
         entityType: 'SalesContract',
         entityId: c.id,
         autoFixPolicy: AUTO_FIX_POLICY.REPORT_ONLY,
