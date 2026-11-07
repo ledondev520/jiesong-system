@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }));
 vi.mock("@/lib/axios", () => ({ default: mocks }));
-vi.mock("@/lib/auth-token", () => ({ getAuthToken: () => "tok" }));
+import { setAuthToken } from "@/lib/auth-token";
+setAuthToken("tok");
 
 import { quoteService } from "./quote.service";
 
@@ -42,7 +43,7 @@ describe("quoteService", () => {
     URL.revokeObjectURL = vi.fn();
     await quoteService.downloadXlsx("q1", "fallback.xlsx");
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/quotes/q1/export.xlsx", {
-      headers: { Authorization: "Bearer tok" },
+      credentials: "include", headers: { Authorization: "Bearer tok" },
     });
     vi.unstubAllGlobals();
   });

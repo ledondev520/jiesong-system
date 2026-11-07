@@ -1,4 +1,4 @@
-import { getBrowserSessionHeaders } from "@/lib/browser-session";
+import { authFetchInit } from "@/lib/browser-session";
 /**
  * Input: Cookie模式内存CSRF、共享 axios 实例、标签认证令牌与可取消文件请求
  * Output: 合同附件 API 与无缓存认证二进制读取，保留后端权限和可读错误
@@ -8,7 +8,6 @@ import { getBrowserSessionHeaders } from "@/lib/browser-session";
  */
 
 import api, { type ApiRequestConfig } from "@/lib/axios";
-import { getAuthToken } from "@/lib/auth-token";
 import type { ApiResponse } from "@/types";
 
 export interface ContractFile {
@@ -66,13 +65,9 @@ export const uploadContractFile = async (
   if (description) formData.append("description", description);
   formData.append("category", category);
 
-  const token = getAuthToken();
   const res = await fetch(`/api/v1/contracts/${contractId}/files`, {
     method: "POST",
-    headers: {
-      ...getBrowserSessionHeaders(),
-      Authorization: token ? `Bearer ${token}` : "",
-    },
+    ...authFetchInit(),
     body: formData,
   });
 

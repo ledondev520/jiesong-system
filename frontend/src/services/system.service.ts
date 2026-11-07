@@ -1,3 +1,4 @@
+import { authFetchInit } from "@/lib/browser-session";
 /**
  * Input: axios实例
  * Output: 系统运维相关 API 调用（日志、通知、导入记录、数据导出）
@@ -6,7 +7,6 @@
 
 import api, { type ApiRequestConfig } from '@/lib/axios';
 import { ApiResponse, PaginatedResponse, User } from '@/types';
-import { getAuthToken } from '@/lib/auth-token';
 
 export interface SystemLogItem {
   id: string;
@@ -43,7 +43,6 @@ export const getSystemLogs = async (params: GetSystemLogsParams = { page: 1, pag
 };
 
 export const exportSystemLogsCsv = async (params: GetSystemLogsParams = {}, fallbackFilename = 'operation_logs.csv') => {
-  const token = getAuthToken();
   const query = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
@@ -54,9 +53,7 @@ export const exportSystemLogsCsv = async (params: GetSystemLogsParams = {}, fall
 
   const queryString = query.toString();
   const response = await fetch(`/api/v1/system/logs/export/csv${queryString ? `?${queryString}` : ''}`, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-    },
+    ...authFetchInit(),
   });
 
   if (!response.ok) {
@@ -251,11 +248,8 @@ export type SystemExportType =
   | 'payments';
 
 export const exportSystemData = async (type: SystemExportType, fallbackFilename?: string) => {
-  const token = getAuthToken();
   const response = await fetch(`/api/v1/export/${type}`, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-    },
+    ...authFetchInit(),
   });
 
   if (!response.ok) {

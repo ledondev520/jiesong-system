@@ -11,6 +11,7 @@ vi.mock("@/lib/axios", () => ({ default: { get: apiGet } }));
 vi.mock("@/lib/auth-token", () => ({ getAuthToken: () => null }));
 vi.mock("@/lib/browser-session", () => ({
   getBrowserSessionHeaders: () => ({}),
+  authFetchInit: () => ({ credentials: "include", headers: {} }),
 }));
 
 const csv = "\uFEFF报关名,数量\r\n中文商品,001\r\n";

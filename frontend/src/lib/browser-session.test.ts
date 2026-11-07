@@ -1,18 +1,22 @@
-/** Auth generation listeners revoke ephemeral views without changing any credential policy. */
-import { expect, it, vi } from "vitest";
-import {
-  advanceAuthGeneration,
-  getAuthGeneration,
-  subscribeAuthGeneration,
-} from "./browser-session";
-it("notifies synchronously after generation change and unsubscribes cleanly", () => {
-  const initial = getAuthGeneration();
-  const seen: number[] = [];
-  const listener = vi.fn(() => seen.push(getAuthGeneration()));
-  const stop = subscribeAuthGeneration(listener);
-  advanceAuthGeneration();
-  expect(seen).toEqual([initial + 1]);
-  stop();
-  advanceAuthGeneration();
-  expect(listener).toHaveBeenCalledTimes(1);
+import { afterEach, describe, expect, it } from "vitest";
+import { clearAuthToken, setAuthToken } from "./auth-token";
+import { authFetchInit, setBrowserCsrf } from "./browser-session";
+
+describe("authFetchInit", () => {
+  afterEach(() => {
+    clearAuthToken();
+    setBrowserCsrf(null);
+  });
+
+  it("omits Authorization in cookie-session mode and sends cookies + CSRF", () => {
+    setBrowserCsrf("csrf-1");
+    const init = authFetchInit();
+    expect(init.credentials).toBe("include");
+    expect(init.headers).toEqual({ "X-CSRF-Token": "csrf-1" });
+  });
+
+  it("sends Bearer when a token exists", () => {
+    setAuthToken("t");
+    expect(authFetchInit().headers).toEqual({ Authorization: "Bearer t" });
+  });
 });
