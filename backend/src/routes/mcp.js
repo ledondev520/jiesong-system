@@ -114,7 +114,8 @@ router.post('/', authenticate, async (req, res) => {
     return res.status(500).json({
       jsonrpc: '2.0',
       id: req.body?.id ?? null,
-      error: { code: -32000, message: error.message },
+      // Raw messages can carry Prisma/FS details; only expose them outside production.
+      error: { code: -32000, message: process.env.NODE_ENV === 'production' ? 'Internal error' : error.message },
     });
   }
 });

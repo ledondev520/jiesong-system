@@ -21,13 +21,13 @@ router.use(authenticate);
  * 职责：返回CSV中所有门店的去重列表
  * GET /api/v1/procurement-template/stores
  */
-router.get('/stores', (req, res) => {
+router.get('/stores', (req, res, next) => {
   try {
     const stores = getStoreList();
     res.json({ success: true, data: stores });
   } catch (err) {
     console.error('[procurementTemplate] getStoreList error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    next(err);
   }
 });
 
@@ -35,13 +35,13 @@ router.get('/stores', (req, res) => {
  * 职责：返回跨所有门店的通用开业采购模板（含优先级、品类分组）
  * GET /api/v1/procurement-template/universal
  */
-router.get('/universal', (req, res) => {
+router.get('/universal', (req, res, next) => {
   try {
     const template = getUniversalTemplate();
     res.json({ success: true, data: template });
   } catch (err) {
     console.error('[procurementTemplate] getUniversalTemplate error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    next(err);
   }
 });
 
@@ -50,14 +50,15 @@ router.get('/universal', (req, res) => {
  * GET /api/v1/procurement-template/stores/:storeName
  * @param storeName URL编码的门店名称
  */
-router.get('/stores/:storeName', (req, res) => {
+router.get('/stores/:storeName', (req, res, next) => {
   try {
-    const storeName = decodeURIComponent(req.params.storeName);
+    // Express already decodes req.params; decoding again throws URIError on '%' store names.
+    const storeName = req.params.storeName;
     const template = getStoreTemplate(storeName);
     res.json({ success: true, data: template });
   } catch (err) {
     console.error('[procurementTemplate] getStoreTemplate error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    next(err);
   }
 });
 

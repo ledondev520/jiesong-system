@@ -12,13 +12,13 @@ const financialStatementsService = require('../services/financialStatementsServi
  * 职责：获取所有账期列表（含摘要指标）
  * GET /api/v1/finance/statements
  */
-const listStatements = async (req, res) => {
+const listStatements = async (req, res, next) => {
   try {
     const periods = await financialStatementsService.listPeriods();
     return res.json({ code: 200, message: 'ok', data: periods });
   } catch (err) {
     console.error('[financialStatements] listStatements error:', err);
-    return res.status(500).json({ code: 500, message: err.message });
+    return next(err);
   }
 };
 
@@ -28,7 +28,7 @@ const listStatements = async (req, res) => {
  * @param req.params.year - 年份（如 2025）
  * @param req.params.month - 月份（如 6）
  */
-const getStatementDetail = async (req, res) => {
+const getStatementDetail = async (req, res, next) => {
   try {
     const year = parseInt(req.params.year);
     const month = parseInt(req.params.month);
@@ -44,7 +44,7 @@ const getStatementDetail = async (req, res) => {
     return res.json({ code: 200, message: 'ok', data });
   } catch (err) {
     console.error('[financialStatements] getStatementDetail error:', err);
-    return res.status(500).json({ code: 500, message: err.message });
+    return next(err);
   }
 };
 
@@ -52,13 +52,13 @@ const getStatementDetail = async (req, res) => {
  * 职责：获取趋势分析数据和预警列表
  * GET /api/v1/finance/statements/analytics
  */
-const getAnalytics = async (req, res) => {
+const getAnalytics = async (req, res, next) => {
   try {
     const data = await financialStatementsService.getAnalytics();
     return res.json({ code: 200, message: 'ok', data });
   } catch (err) {
     console.error('[financialStatements] getAnalytics error:', err);
-    return res.status(500).json({ code: 500, message: err.message });
+    return next(err);
   }
 };
 
@@ -80,14 +80,15 @@ const parseUploadPeriod = (req, res, { requireSingleFile = true } = {}) => {
   };
 };
 
-const sendStatementError = (res, err, action) => {
+// Delegates to errorHandler so unexpected (Prisma/FS) messages are masked; explicit statuses are kept.
+const sendStatementError = (next, err, action) => {
   console.error(`[financialStatements] ${action} error:`, err);
-  const status = Number(err?.statusCode || err?.status || 500);
-  return res.status(status).json({ code: status, message: err.message });
+  if (err && err.statusCode === undefined && err.status) err.statusCode = Number(err.status);
+  return next(err);
 };
 
 /** 只读解析上传文件，返回关键科目、平衡校验和覆盖风险，不写数据库。 */
-const previewFile = async (req, res) => {
+const previewFile = async (req, res, next) => {
   const period = parseUploadPeriod(req, res);
   if (!period) return undefined;
   try {
@@ -103,12 +104,12 @@ const previewFile = async (req, res) => {
       data: preview,
     });
   } catch (err) {
-    return sendStatementError(res, err, 'previewFile');
+    return sendStatementError(next, err, 'previewFile');
   }
 };
 
 /** 使用同一文件与预览凭证确认写入；同账期覆盖必须显式勾选。 */
-const confirmFile = async (req, res) => {
+const confirmFile = async (req, res, next) => {
   const period = parseUploadPeriod(req, res);
   if (!period) return undefined;
   try {
@@ -130,7 +131,7 @@ const confirmFile = async (req, res) => {
       data: result,
     });
   } catch (err) {
-    return sendStatementError(res, err, 'confirmFile');
+    return sendStatementError(next, err, 'confirmFile');
   }
 };
 
@@ -158,7 +159,7 @@ const parseBundleFiles = (req, res) => {
 };
 
 /** 只读解析三类财务来源，返回期间/平衡/计数与覆盖风险。 */
-const previewBundle = async (req, res) => {
+const previewBundle = async (req, res, next) => {
   const period = parseUploadPeriod(req, res, { requireSingleFile: false });
   if (!period) return undefined;
   const sources = parseBundleFiles(req, res);
@@ -176,12 +177,12 @@ const previewBundle = async (req, res) => {
       data: preview,
     });
   } catch (err) {
-    return sendStatementError(res, err, 'previewBundle');
+    return sendStatementError(next, err, 'previewBundle');
   }
 };
 
 /** 使用同一组三文件和预览凭证确认单事务写入。 */
-const confirmBundle = async (req, res) => {
+const confirmBundle = async (req, res, next) => {
   const period = parseUploadPeriod(req, res, { requireSingleFile: false });
   if (!period) return undefined;
   const sources = parseBundleFiles(req, res);
@@ -205,7 +206,7 @@ const confirmBundle = async (req, res) => {
       data: result,
     });
   } catch (err) {
-    return sendStatementError(res, err, 'confirmBundle');
+    return sendStatementError(next, err, 'confirmBundle');
   }
 };
 
