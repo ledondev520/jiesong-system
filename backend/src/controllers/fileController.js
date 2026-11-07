@@ -49,7 +49,7 @@ const listFiles = async (req, res, next) => {
     const contractType = req.query.contractType || 'PURCHASE';
 
     const files = await fileService.listFiles(contractId, contractType);
-    success(res, files);
+    success(res, fileService.filterVisibleFiles(files, req.user));
   } catch (error) {
     next(error);
   }
@@ -87,7 +87,7 @@ const deleteFile = async (req, res, next) => {
     const { fileId } = req.params;
     const existing = await fileService.findFileById(fileId);
     if (!existing) throw createError('文件不存在', 404);
-    fileService.assertFileAccess(existing, req.user);
+    fileService.assertFileAccess(existing, req.user, { action: 'delete' });
     fileService.assertReceiptPhotoAccess(existing.contractType, existing.category, req.user);
     const file = await fileService.deleteFileRecord(fileId);
     if (!file) throw createError('文件不存在', 404);
