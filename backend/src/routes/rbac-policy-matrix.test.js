@@ -221,3 +221,30 @@ test('WAREHOUSE 不能经通用导出读取付款流水；无银行权限的角�
   }
   assert.ok((await get('/system/export/suppliers', 'PURCHASE')).text.includes('SYN-ACCT-0001'));
 });
+
+test('SALES/WAREHOUSE 的 PUT /purchases/:id 响应不含 supplier 银行字段，PURCHASE 保留', async (t) => {
+  stubAuth(t);
+  const supplier = { id: 'sup-1', name: 'SYN SUPPLIER', bankAccount: 'SYN-ACCT-0001', bankName: 'SYN BANK' };
+  const tx = {
+    purchaseContract: {
+      findUnique: async () => ({ id: 'x1', status: 'DRAFT', taxRate: 13, items: [], _count: { receipts: 0, payments: 0, files: 0 } }),
+      update: async () => ({ id: 'x1', supplier, items: [] }),
+    },
+  };
+  stub(t, prisma, '$transaction', async (cb) => cb(tx));
+  const base = await startApp(t);
+  const put = async (role) => {
+    const res = await fetch(`${base}/api/v1/purchases/x1`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${humanToken(role)}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: 'syn' }),
+    });
+    return { status: res.status, text: await res.text() };
+  };
+  for (const role of ['SALES', 'WAREHOUSE']) {
+    const out = await put(role);
+    assert.equal(out.status, 200, out.text);
+    assert.ok(!out.text.includes('SYN-ACCT-0001') && !out.text.includes('bankName'), `${role} PUT leaks bank`);
+  }
+  assert.ok((await put('PURCHASE')).text.includes('SYN-ACCT-0001'));
+});

@@ -257,9 +257,9 @@ const create = async (req, res, next) => {
 
     if (warnings.length > 0) {
       const warningMessages = warnings.map((w) => w.message).join('；');
-      created(res, { contract, warnings }, `采购合同创建成功，但${warningMessages}`);
+      created(res, redactNestedSuppliers(req.user?.role, { contract, warnings }), `采购合同创建成功，但${warningMessages}`);
     } else {
-      created(res, contract, '采购合同创建成功');
+      created(res, redactNestedSuppliers(req.user?.role, contract), '采购合同创建成功');
     }
   } catch (error) {
     next(error);
@@ -277,7 +277,7 @@ const update = async (req, res, next) => {
       prismaClient: prisma,
     });
     
-    success(res, contract, '采购合同更新成功');
+    success(res, redactNestedSuppliers(req.user?.role, contract), '采购合同更新成功');
   } catch (error) {
     next(error);
   }
