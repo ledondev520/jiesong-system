@@ -13,7 +13,7 @@ const prisma = require('../utils/prisma');
 const { isInEffect, payableWhere, outstandingOf } = require('./payablesService');
 const { createError } = require('../middleware/errorHandler');
 const { VALID_INVOICE_WHERE } = require('./invoiceRecordService');
-const { getEffectiveSalesContractTotal } = require('./salesContractAmount');
+const { getEffectiveSalesContractTotal, getOutstandingReceivableUsd } = require('./salesContractAmount');
 
 // ==================== 常量配置 ====================
 
@@ -242,7 +242,7 @@ async function loadSalesContracts() {
     return {
       ...c,
       nameCandidates: storeNames.length > 0 ? storeNames : [c.port?.name].filter(Boolean),
-      unpaidAmount: Math.max(getEffectiveSalesContractTotal(c) - c.receivedAmount, 0),
+      unpaidAmount: getOutstandingReceivableUsd(c),
     };
   });
 }

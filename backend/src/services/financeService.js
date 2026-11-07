@@ -15,8 +15,10 @@ const {
   SALES_OWNED_AMOUNT_SELECT,
   getEffectiveSalesContractTotal,
   getEffectiveSalesReceived,
+  getOutstandingReceivableUsd,
   isFormalSalesAmount,
   isJiesongOwnedPackingItem,
+  isSalesContractSettled,
 } = require('./salesContractAmount');
 
 const PAYMENT_TYPES = {
@@ -290,7 +292,7 @@ const evaluateMatch = (payment, contract) => {
     return { matched: false, reason: 'contract_not_found' };
   }
 
-  const unreceivedAmount = Math.max(roundMoney(getEffectiveSalesContractTotal(contract) - Number(contract.receivedAmount || 0)), 0);
+  const unreceivedAmount = getOutstandingReceivableUsd(contract);
   if (unreceivedAmount <= 0) {
     return { matched: false, reason: 'contract_fully_received' };
   }
@@ -478,7 +480,7 @@ const autoMatchUnallocatedPayments = async () => {
 
     const amount = Number(attachReceiptBalance(payment, allocationTotals).remainingAmount);
     const allocatedSoFar = allocatedPerContract.get(candidate.contract.id) || 0;
-    const open = getEffectiveSalesContractTotal(candidate.contract) - Number(candidate.contract.receivedAmount || 0);
+    const open = getOutstandingReceivableUsd(candidate.contract);
     if (allocatedSoFar + amount > open + AUTO_MATCH_AMOUNT_TOLERANCE) {
       skipped.push({ paymentId: payment.id, reason: 'contract_balance_exhausted' });
       continue;
@@ -570,7 +572,7 @@ const allocatePaymentToContracts = async (paymentId, allocations) => {
     }
     for (const target of targets) {
       if (target.status === 'CANCELLED') throw createError(`销售合同 ${target.contractNo} 已取消，不能分配收款`, 400);
-      const open = getEffectiveSalesContractTotal(target) - Number(target.receivedAmount || 0);
+      const open = getOutstandingReceivableUsd(target);
       if (requestedByContract.get(target.id) - open > AUTO_MATCH_AMOUNT_TOLERANCE) {
         throw createError(`分配金额超出销售合同 ${target.contractNo} 的未收余额`, 400);
       }
@@ -779,7 +781,7 @@ const getReceivables = async ({ page, pageSize, skip, search, outstandingOnly = 
       ...contract,
       totalAmount: ownedTotalAmount,
       receivedAmount: ownedReceivedAmount,
-      unreceiveAmount: roundMoney(Math.max(ownedTotalAmount - ownedReceivedAmount, 0)),
+      unreceiveAmount: getOutstandingReceivableUsd(contract, ownedReceivedAmount),
       stores,
       hasThirdPartyCargo: thirdPartySources.length > 0,
       sourceParties: thirdPartySources,
@@ -955,13 +957,13 @@ const getOverdueReceivables = async (overdueDays = 30) => {
   // 过滤出真正有未收余额的合同
   return overdue
     .map((c) => ({ ...c, ownedTotal: getEffectiveSalesContractTotal(c) }))
-    .filter((c) => c.ownedTotal - c.receivedAmount > AUTO_MATCH_AMOUNT_TOLERANCE)
+    .filter((c) => !isSalesContractSettled(c))
     .map((c) => ({
       id: c.id,
       contractNo: c.contractNo,
       totalAmount: c.ownedTotal,
       receivedAmount: c.receivedAmount,
-      unreceived: roundMoney(c.ownedTotal - c.receivedAmount),
+      unreceived: getOutstandingReceivableUsd(c),
       shippedAt: c.shippedAt,
       overdueDays: Math.floor((Date.now() - new Date(c.shippedAt).getTime()) / (24 * 60 * 60 * 1000)) - overdueDays,
       status: c.status,
