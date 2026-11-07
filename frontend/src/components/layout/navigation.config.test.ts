@@ -228,12 +228,7 @@ describe("navigation.config helpers", () => {
         ?.children.map((child) => child.label);
     expect(financeChildren(Role.WAREHOUSE)).toBeUndefined();
     for (const role of [Role.SALES, Role.PURCHASE]) {
-      expect(financeChildren(role)).toEqual([
-        "财务概览",
-        "应收",
-        "应付",
-        "经营分析",
-      ]);
+      expect(financeChildren(role)).toEqual(["财务概览", "应收", "应付"]);
     }
     expect(financeChildren(Role.FINANCE)).toContain("银行流水");
     expect(financeChildren(Role.BOSS)).toContain("财务报表");

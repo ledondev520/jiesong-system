@@ -54,6 +54,8 @@ import {
 import api, { clearApiGetCache } from "@/lib/axios";
 import { type ApiResponse } from "@/types";
 import { cachedFetch, invalidateCache } from "@/lib/api-cache";
+import { FINANCE_LEDGER_ROLES } from "@/components/layout/navigation.config";
+import { useAuthStore } from "@/store/auth.store";
 import { comparePeriods, NO_PRIOR_PERIOD } from "@/lib/period-comparison";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
@@ -115,6 +117,9 @@ interface ExchangeRate {
  *   3. 报表分析入口：三表分析放在专门页面，避免概览首屏重复加载重模块
  */
 export default function FinancePage() {
+  // 与 bankFlow/statements/business-overview 的后端角色一致；仅隐藏会得到 403 的入口与请求
+  const role = useAuthStore((state) => state.user?.role);
+  const canReadLedger = !!role && FINANCE_LEDGER_ROLES.includes(role);
   const [stats, setStats] = useState<FinanceStats | null>(null);
   const [exchangeRate, setExchangeRate] = useState<ExchangeRate | null>(null);
   const [trends, setTrends] = useState<PaymentTrendPoint[]>([]);
@@ -164,8 +169,8 @@ export default function FinancePage() {
               "/finance/overdue-receivables",
             ),
           ),
-          getTransactionStats().catch(() => null),
-          getInvoiceStats().catch(() => null),
+          canReadLedger ? getTransactionStats().catch(() => null) : null,
+          canReadLedger ? getInvoiceStats().catch(() => null) : null,
         ]);
         setStats(statsRes);
         if (rateRes.data) setExchangeRate(rateRes.data);
@@ -181,7 +186,7 @@ export default function FinancePage() {
         setRefreshing(false);
       }
     },
-    [trendDays],
+    [trendDays, canReadLedger],
   );
 
   useEffect(() => {
@@ -341,9 +346,11 @@ export default function FinancePage() {
               <Button asChild variant="outline" className="h-11 rounded-xl">
                 <Link href="/dashboard/finance/payable">查看待付风险</Link>
               </Button>
-              <Button asChild variant="outline" className="h-11 rounded-xl">
-                <Link href="/dashboard/finance/statements">查看报表分析</Link>
-              </Button>
+              {canReadLedger && (
+                <Button asChild variant="outline" className="h-11 rounded-xl">
+                  <Link href="/dashboard/finance/statements">查看报表分析</Link>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -739,55 +746,61 @@ export default function FinancePage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/finance/statements" className="group">
-          <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm border-primary/20 bg-primary/[0.03]">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-primary">
-                    财务报表分析
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    收入利润、成本结构、资产负债
-                  </p>
+        {canReadLedger && (
+          <Link href="/dashboard/finance/statements" className="group">
+            <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm border-primary/20 bg-primary/[0.03]">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-primary">
+                      财务报表分析
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      收入利润、成本结构、资产负债
+                    </p>
+                  </div>
+                  <BarChart3 className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
                 </div>
-                <BarChart3 className="h-5 w-5 text-primary group-hover:scale-110 transition-transform" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
-        <Link href="/dashboard/finance/bank-flow" className="group">
-          <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">银行流水查询</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    按对方名称、日期查看资金往来
-                  </p>
+        {canReadLedger && (
+          <Link href="/dashboard/finance/bank-flow" className="group">
+            <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">银行流水查询</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      按对方名称、日期查看资金往来
+                    </p>
+                  </div>
+                  <Landmark className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
-                <Landmark className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
 
-        <Link href="/dashboard/finance/invoices" className="group">
-          <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">发票台账查询</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    按销方、状态筛选发票明细
-                  </p>
+        {canReadLedger && (
+          <Link href="/dashboard/finance/invoices" className="group">
+            <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">发票台账查询</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      按销方、状态筛选发票明细
+                    </p>
+                  </div>
+                  <FileText className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
-                <FileText className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
       </div>
 
       {/* 无数据引导态 */}
