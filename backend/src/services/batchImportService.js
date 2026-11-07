@@ -4,6 +4,7 @@
  */
 
 const prisma = require('../utils/prisma');
+const { roundMoney } = require('../utils/money');
 const { defaultSpotRate } = require('./exportPricing');
 const { generateNextContractNo } = require('./shared/contractUtils');
 const { calculateNewLineTotal, normalizePurchaseTaxRate } = require('./purchaseAmountService');
@@ -59,7 +60,7 @@ async function batchImportSalesContracts(data, userId) {
           contractNo,
           status: 'DRAFT',
           exchangeRate: parseFloat(row.exchangeRate) || defaultSpotRate(),
-          totalAmount: quantity * sellingPrice,
+          totalAmount: roundMoney(quantity * sellingPrice),
         },
       });
 

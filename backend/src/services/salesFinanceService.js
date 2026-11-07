@@ -9,6 +9,7 @@ const { roundMoney } = require('../utils/money');
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
 const {
+  computePackingTotals,
   getEffectiveSalesContractTotal,
   getEffectiveSalesReceived,
   isJiesongOwnedPackingItem,
@@ -62,7 +63,7 @@ const buildSalesFinanceSummary = ({
   const thirdPartyItems = packingItems.filter((item) => !isJiesongOwnedPackingItem(item));
   const issues = [];
 
-  const packedRevenueUsd = roundMoney(packingItems.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0));
+  const packedRevenueUsd = computePackingTotals(packingItems).totalAmount;
   const contractTotalUsd = roundMoney(salesContract.totalAmount);
   const ownedRevenueUsd = roundMoney(getEffectiveSalesContractTotal(salesContract));
   const ownershipRatio = contractTotalUsd > 0

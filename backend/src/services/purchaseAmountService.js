@@ -5,6 +5,7 @@
  */
 
 const { roundMoney } = require('../utils/money');
+const { isInEffect, outstandingOf } = require('./payablesService');
 const MONEY_EPSILON = 0.02;
 const LEGACY_LINE_ROUNDING_TOLERANCE = 1;
 
@@ -117,7 +118,16 @@ const summarizePurchaseAmounts = ({ items = [], taxRate = 13, totalAmount = 0, p
   };
 };
 
+// 应付口径唯一来源是 payablesService；此处只提供采购金额 Module 的入口，不另算。
+const getOutstandingPayableCny = (purchaseContract) => outstandingOf(purchaseContract);
+
+const isPurchaseContractSettled = (purchaseContract) => (
+  isInEffect(purchaseContract) && getOutstandingPayableCny(purchaseContract) <= MONEY_EPSILON
+);
+
 module.exports = {
+  getOutstandingPayableCny,
+  isPurchaseContractSettled,
   calculateExpectedLineAmounts,
   calculateNewLineTotal,
   normalizePurchaseTaxRate,
