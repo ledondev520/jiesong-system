@@ -79,7 +79,10 @@ export function OrderLinesTab({
         <CardContent className="pt-0">
           {grid.rows.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              暂无订单明细
+              暂无订单明细行
+              {contract.packingItems?.length
+                ? `；装箱明细有 ${contract.packingItems.length} 行（发运条件以装箱明细为准，见“货柜”）`
+                : ""}
             </p>
           ) : (
             <div className="overflow-x-auto">
