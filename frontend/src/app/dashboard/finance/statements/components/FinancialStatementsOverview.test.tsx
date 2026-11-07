@@ -77,6 +77,9 @@ it("最新账期滞后超过 1 个月时不宣布「财务状况良好」，并�
   const note = screen.getByTestId("stale-health-note");
   expect(note).toHaveTextContent("2026年7月 账期内未触发预警");
   expect(note).toHaveTextContent("已滞后 4 个月");
+  expect(
+    screen.getByText(/以下为历史账期的提示与预警，不代表当前状况/),
+  ).toBeInTheDocument();
 });
 
 it("账期只滞后 1 个月属正常，仍显示「财务状况良好」", () => {

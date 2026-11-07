@@ -72,18 +72,25 @@ export function ReceivableReconciliationCard({
     data.anomalies.duplicateDebitCny > 0 ||
     data.anomalies.missingContracts.length > 0;
 
+  // 0.01 容差与 B79 结算口径一致；有残差时不能显示「已对平」。
+  const hasResidual = Math.abs(data.residualCny || 0) > 0.01;
+
   return (
     <Card data-testid="receivable-reconciliation-card">
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-base">客户美元应收对账</CardTitle>
           <Badge variant={hasAnomaly ? "destructive" : "secondary"}>
-            {hasAnomaly ? (
+            {hasAnomaly || hasResidual ? (
               <AlertTriangle className="mr-1 h-3 w-3" />
             ) : (
               <CheckCircle2 className="mr-1 h-3 w-3" />
             )}
-            {hasAnomaly ? "发现会计分录差异" : "已对平"}
+            {hasAnomaly
+              ? "发现会计分录差异"
+              : hasResidual
+                ? "有剩余差额"
+                : "已对平"}
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground">
