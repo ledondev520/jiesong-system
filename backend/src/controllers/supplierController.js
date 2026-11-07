@@ -200,7 +200,7 @@ const markQualityIssue = async (req, res, next) => {
       data: { hasQualityIssue, qualityNote },
     });
     
-    success(res, supplier, '质量问题标记成功');
+    success(res, redactSupplierForRole(req.user?.role, supplier), '质量问题标记成功');
   } catch (error) {
     next(error);
   }

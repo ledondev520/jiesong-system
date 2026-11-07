@@ -12,7 +12,7 @@ const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/p
 const {
   createSupplier, updateSupplier, assertActiveChangeAllowed, sanitizeSupplierInput,
 } = require('../agent/commands/supplier');
-const { redactNestedSuppliers } = require('../agent/commands/supplier/bankFields');
+const { redactNestedSuppliers, redactSupplierForRole } = require('../agent/commands/supplier/bankFields');
 const { createMcpServer } = require('../agent/mcp/server');
 const prisma = require('../utils/prisma');
 const { logOperation } = require('../utils/auditLog');
@@ -60,11 +60,11 @@ const createLocalClient = (req) => {
     searchEntities,
     createPurchase: audited('PurchaseContract', 'CREATE', async (input) => redactNestedSuppliers(actorRole, await createPurchaseWithItems({ input }))),
     updatePurchase: audited('PurchaseContract', 'UPDATE', async (id, input) => redactNestedSuppliers(actorRole, await updatePurchase({ id, input })), (id) => prisma.purchaseContract.findUnique({ where: { id } })),
-    createSupplier: audited('Supplier', 'CREATE', (input) => createSupplier({ input: sanitizeSupplierInput(actorRole, input) })),
-    updateSupplier: audited('Supplier', 'UPDATE', (id, input) => {
-      assertActiveChangeAllowed(actorRole, input?.isActive);
-      return updateSupplier({ id, input: sanitizeSupplierInput(actorRole, input) });
-    }, (id) => prisma.supplier.findUnique({ where: { id } })),
+    createSupplier: async (input) => redactSupplierForRole(actorRole, await audited('Supplier', 'CREATE', (i) => createSupplier({ input: sanitizeSupplierInput(actorRole, i) }))(input)),
+    updateSupplier: async (id, input) => redactSupplierForRole(actorRole, await audited('Supplier', 'UPDATE', (sid, i) => {
+      assertActiveChangeAllowed(actorRole, i?.isActive);
+      return updateSupplier({ id: sid, input: sanitizeSupplierInput(actorRole, i) });
+    }, (sid) => prisma.supplier.findUnique({ where: { id: sid } }))(id, input)),
   };
 };
 
