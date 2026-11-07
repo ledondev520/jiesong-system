@@ -522,7 +522,7 @@ export default function FinancePage() {
                     <div className="flex items-center gap-2">
                       <Landmark className="h-4 w-4 text-primary" />
                       <CardTitle className="text-sm font-medium">
-                        银行流水
+                        银行流水（人民币 CNY）
                       </CardTitle>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
