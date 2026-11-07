@@ -203,7 +203,7 @@ const getById = async (req, res, next) => {
 const getInvoicePreparation = async (req, res, next) => {
   try {
     const preparation = await purchaseInvoiceService.getPurchaseInvoicePreparation(req.params.id);
-    success(res, preparation);
+    success(res, { ...preparation, invoiceFiles: fileService.filterVisibleFiles(preparation.invoiceFiles, req.user) });
   } catch (error) {
     next(error);
   }

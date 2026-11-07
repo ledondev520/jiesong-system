@@ -15,6 +15,7 @@ import {
 import { useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { MobileListCard } from "@/components/mobile";
+import { useAuthStore } from "@/store/auth.store";
 import { useMobile } from "@/lib/hooks/useMobile";
 import { toast } from "sonner";
 import { invalidateCache } from "@/lib/api-cache";
@@ -127,6 +128,11 @@ export function PurchaseFlowPanel({
 }: PurchaseFlowPanelProps) {
   const isMobile = useMobile();
   const readOnly = useBusinessReadOnly();
+  const userRole = useAuthStore((state) => state.user?.role);
+  // 与后端一致：供应商发票原件仅 ADMIN/PURCHASE/FINANCE 可上传
+  const canUploadInvoiceFile = ["ADMIN", "PURCHASE", "FINANCE"].includes(
+    userRole || "",
+  );
   const invoiceFileInputRef = useRef<HTMLInputElement>(null);
   const [remitOpen, setRemitOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -680,7 +686,9 @@ export function PurchaseFlowPanel({
                   ref={invoiceFileInputRef}
                   id="supplier-invoice-file-input"
                   name="supplierInvoiceFile"
-                  disabled={readOnly || uploadingInvoice}
+                  disabled={
+                    readOnly || !canUploadInvoiceFile || uploadingInvoice
+                  }
                   type="file"
                   className="hidden"
                   aria-label="上传供应商发票原件"

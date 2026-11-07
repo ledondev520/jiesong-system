@@ -167,6 +167,8 @@ const createFile = async (contractId, contractType, file, description, category,
     if (isRestrictedPurchaseFile({ contractType, category: normalizedCategory })) {
       assertFileAccess({ contractType, category: normalizedCategory }, user, { action: 'write' });
     }
+    // Provenance: system-generated labels are reserved for archiveGeneratedFile/archiveBufferFile.
+    if (String(normalizedCategory).startsWith('SYSTEM_GENERATED_')) throw createError('不能手动上传系统生成类别的附件', 400);
     validateUploadedFileCategory(file, normalizedCategory);
     const isSales = contractType === CONTRACT_TYPE.SALES;
     const contract = await (isSales ? prisma.salesContract : prisma.purchaseContract).findUnique({

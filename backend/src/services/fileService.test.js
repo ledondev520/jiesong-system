@@ -637,3 +637,52 @@ test('采购合同文书类附件：SALES/WAREHOUSE 不能读、写、删，也�
   assert.deepEqual(fileService.filterVisibleFiles(all, { role: 'WAREHOUSE' }).map((f) => f.id), ['PRODUCTION_PHOTO', 'OTHER']);
   assert.equal(fileService.filterVisibleFiles(all, { role: 'FINANCE' }).length, 6);
 });
+
+
+test('createFile: SALES/WAREHOUSE 上传采购合同文书类别返回 403，且不留下本次上传文件（R3 P1-2）', async () => {
+  for (const role of ['SALES', 'WAREHOUSE']) {
+    for (const category of ['SIGNED_CONTRACT', 'SUPPLIER_INVOICE', 'SYSTEM_GENERATED_PDF', 'SYSTEM_GENERATED_WORD']) {
+      const tempDir = fs.mkdtempSync(path.join(testUploadRoot, 'restricted-upload-'));
+      const filePath = path.join(tempDir, 'synthetic.pdf');
+      fs.writeFileSync(filePath, '%PDF');
+      try {
+        await withMockDelegates({
+          purchaseContract: { findUnique: async () => ({ id: 'purchase-1' }) },
+          contractFile: { create: async () => { throw new Error('restricted upload must not persist'); } },
+        }, async () => {
+          await assert.rejects(
+            () => fileService.createFile('purchase-1', 'PURCHASE', { originalname: 'synthetic.pdf', path: filePath, mimetype: 'application/pdf', size: 4 }, null, category, { role }),
+            (error) => error.statusCode === 403,
+            `${role} ${category}`,
+          );
+        });
+        assert.equal(fs.existsSync(filePath), false);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  }
+});
+
+test('createFile: 人工上传 SYSTEM_GENERATED_* 类别返回 400 且不持久化（R3 P2-C）', async () => {
+  for (const [type, category, role] of [['SALES', 'SYSTEM_GENERATED_XLSX', 'SALES'], ['PURCHASE', 'SYSTEM_GENERATED_PDF', 'ADMIN']]) {
+    const tempDir = fs.mkdtempSync(path.join(testUploadRoot, 'generated-claim-'));
+    const filePath = path.join(tempDir, 'synthetic.pdf');
+    fs.writeFileSync(filePath, '%PDF');
+    try {
+      await withMockDelegates({
+        purchaseContract: { findUnique: async () => ({ id: 'c-1' }) },
+        salesContract: { findUnique: async () => ({ id: 'c-1' }) },
+        contractFile: { create: async () => { throw new Error('must not persist'); } },
+        salesContractFile: { create: async () => { throw new Error('must not persist'); } },
+      }, async () => {
+        await assert.rejects(
+          () => fileService.createFile('c-1', type, { originalname: 'synthetic.pdf', path: filePath, mimetype: 'application/pdf', size: 4 }, null, category, { role }),
+          (error) => error.statusCode === 400,
+        );
+      });
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+});

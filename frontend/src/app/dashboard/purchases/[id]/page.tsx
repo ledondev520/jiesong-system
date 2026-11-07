@@ -1263,8 +1263,13 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           description="支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB，用于归档原始合同或补充文件"
           emptyHint="暂无附件，点击「上传附件」归档合同文件"
           categoryOptions={[
-            { value: "SIGNED_CONTRACT", label: "供应商盖章件" },
-            { value: "SUPPLIER_INVOICE", label: "供应商发票" },
+            // 与后端 fileService.assertFileAccess 一致：合同文书类仅 ADMIN/PURCHASE/FINANCE 可上传
+            ...(["ADMIN", "PURCHASE", "FINANCE"].includes(userRole || "")
+              ? [
+                  { value: "SIGNED_CONTRACT" as const, label: "供应商盖章件" },
+                  { value: "SUPPLIER_INVOICE" as const, label: "供应商发票" },
+                ]
+              : []),
             { value: "OTHER", label: "其他附件" },
             // 与后端 assertReceiptPhotoAccess 一致：仅到货角色可补传到货照片
             ...(["ADMIN", "PURCHASE", "WAREHOUSE"].includes(userRole || "")
