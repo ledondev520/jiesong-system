@@ -181,6 +181,10 @@ export function CustomsDeclarationListPageContent({
   const draftCount = declarations.filter(
     (item) => item.status === "DRAFT",
   ).length;
+  // 自动生成的零金额草稿只是占位，不计入「本页单量」
+  const countedDeclarations = declarations.filter(
+    (item) => !(isDraftDeclaration(item) && item.totalAmount === 0),
+  ).length;
   const releasedCount = declarations.filter(
     (item) => item.status === "RELEASED",
   ).length;
@@ -288,9 +292,9 @@ export function CustomsDeclarationListPageContent({
 
       <div className="grid gap-4 md:grid-cols-3">
         <KpiStat
-          label="本页单量"
+          label="本页单量（不含零金额草稿）"
           loading={loading}
-          value={String(declarations.length)}
+          value={String(countedDeclarations)}
         />
         <KpiStat
           label="本页草稿 / 待完善"
@@ -323,6 +327,10 @@ export function CustomsDeclarationListPageContent({
                 <CustomsDeclarationStatusBadge status={declaration.status} />
               }
               fields={[
+                {
+                  label: "关联订单",
+                  value: declaration.salesContract?.contractNo || "-",
+                },
                 { label: "币种", value: declaration.currency },
                 {
                   label: "申报日期",
@@ -386,6 +394,7 @@ export function CustomsDeclarationListPageContent({
                 >
                   币种
                 </SortableTableHead>
+                <TableHead>关联订单</TableHead>
                 <TableHead>状态</TableHead>
                 <SortableTableHead
                   sortKey="declaredAt"
@@ -411,7 +420,7 @@ export function CustomsDeclarationListPageContent({
               {loading ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="py-14 text-center text-muted-foreground"
                   >
                     加载中...
@@ -420,7 +429,7 @@ export function CustomsDeclarationListPageContent({
               ) : declarations.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="py-14 text-center text-muted-foreground"
                   >
                     暂无报关单数据。
@@ -453,6 +462,9 @@ export function CustomsDeclarationListPageContent({
                     </TableCell>
                     <TableCell>{declaration.customsBroker || "-"}</TableCell>
                     <TableCell>{declaration.currency}</TableCell>
+                    <TableCell>
+                      {declaration.salesContract?.contractNo || "-"}
+                    </TableCell>
                     <TableCell>
                       <CustomsDeclarationStatusBadge
                         status={declaration.status}

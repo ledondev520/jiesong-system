@@ -57,6 +57,7 @@ const createCrudService = ({
   buildWhere = () => ({}),
   mapData = (input) => input,
   orderBy = { createdAt: 'desc' },
+  listInclude,
 }) => {
   const getDelegate = () => prisma[delegateName];
 
@@ -70,6 +71,7 @@ const createCrudService = ({
         skip,
         take: pageSize,
         orderBy,
+        ...(listInclude ? { include: listInclude } : {}),
       }),
       getDelegate().count({ where }),
     ]);

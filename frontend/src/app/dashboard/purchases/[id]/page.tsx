@@ -915,7 +915,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <div>
                 <p className="text-xs text-muted-foreground">公司名称</p>
                 <p className="text-sm font-medium">
-                  {contract.supplier?.name || "—"}
+                  {contract.supplier?.name || "未登记"}
                 </p>
               </div>
             </div>
@@ -924,7 +924,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <div>
                 <p className="text-xs text-muted-foreground">联系人</p>
                 <p className="text-sm">
-                  {contract.supplier?.contactName || "—"}
+                  {contract.supplier?.contactName || "未登记"}
                 </p>
               </div>
             </div>
@@ -933,7 +933,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <div>
                 <p className="text-xs text-muted-foreground">联系电话</p>
                 <p className="text-sm">
-                  {contract.supplier?.contactPhone || "—"}
+                  {contract.supplier?.contactPhone || "未登记"}
                 </p>
               </div>
             </div>
@@ -941,7 +941,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">公司地址</p>
-                <p className="text-sm">{contract.supplier?.address || "—"}</p>
+                <p className="text-sm">
+                  {contract.supplier?.address || "未登记"}
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -955,12 +957,20 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                     "—"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {contract.supplier?.bankName || "—"} ·{" "}
-                  {contract.supplier?.bankBranch || "—"} · 联行号{" "}
-                  {contract.supplier?.bankCode || "—"}
+                  {[
+                    contract.supplier?.bankName,
+                    contract.supplier?.bankBranch,
+                    contract.supplier?.bankCode
+                      ? `联行号 ${contract.supplier.bankCode}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "开户行未登记"}
                 </p>
                 <p className="font-mono text-xs">
-                  账号 {contract.supplier?.bankAccount || "—"}
+                  {contract.supplier?.bankAccount
+                    ? `账号 ${contract.supplier.bankAccount}`
+                    : "账号未登记"}
                 </p>
               </div>
             </div>

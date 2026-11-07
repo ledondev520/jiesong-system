@@ -268,6 +268,7 @@ export interface CustomsDeclaration {
   id: string;
   declarationNo: string;
   salesContractId?: string;
+  salesContract?: { id: string; contractNo: string } | null; // 列表接口附带
   status: CustomsDeclarationStatus;
   // 实际 schema 字段（与旧前端类型存在命名差异，用可选字段兼容两种命名）
   exporter?: string | null;

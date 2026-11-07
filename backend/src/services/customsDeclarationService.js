@@ -60,7 +60,9 @@ const mapItem = (item) => {
   if (data.itemNo != null && !Number.isInteger(data.itemNo)) throw createError('项号必须是整数', 400);
   return { id, data };
 };
-const service = createCrudService({ delegateName: 'customsDeclaration', notFoundMessage: '报关单不存在', buildWhere, mapData });
+const service = createCrudService({ delegateName: 'customsDeclaration', notFoundMessage: '报关单不存在', buildWhere, mapData,
+  // 列表「关联订单」列：只取订单号
+  listInclude: { salesContract: { select: { id: true, contractNo: true } } } });
 const getById = async (id, db = prisma) => {
   const record = await db.customsDeclaration.findUnique({ where: { id }, include });
   if (!record) throw createError('报关单不存在', 404);

@@ -60,6 +60,28 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     await waitFor(() => expect(screen.getByText(/共\s*0\s*条/)).toBeTruthy());
   });
 
+  it("显示关联订单号，零金额草稿不计入本页单量", async () => {
+    const row = (id: string, status: string, totalAmount: number) => ({
+      id,
+      declarationNo: `CUS-${id}`,
+      status,
+      currency: "USD",
+      totalAmount,
+      salesContract: { id: `so-${id}`, contractNo: `EXP-${id}` },
+    });
+    mocks.getAll.mockResolvedValue({
+      data: {
+        items: [row("1", "RELEASED", 500), row("2", "DRAFT", 0)],
+        pagination: { total: 2 },
+      },
+    });
+    render(<CustomsDeclarationListPageContent embedded />);
+    expect((await screen.findAllByText("EXP-1")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("EXP-2").length).toBeGreaterThan(0);
+    const kpi = screen.getByText("本页单量（不含零金额草稿）").parentElement!;
+    expect(kpi).toHaveTextContent("1");
+  });
+
   it("挂载时保留报关页签，不把父页面重定向回退税工作台", async () => {
     render(<CustomsDeclarationListPageContent embedded />);
     await waitFor(() => expect(mocks.getAll).toHaveBeenCalled());
