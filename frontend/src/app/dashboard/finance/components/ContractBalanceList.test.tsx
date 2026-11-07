@@ -118,6 +118,35 @@ describe("应付页签", () => {
     expect(screen.getByText("生产资料未齐")).toBeInTheDocument();
   });
 
+  it("待结 0.01 及以下不给登记入口；仅看未付显示数量", async () => {
+    mocks.getPayables.mockResolvedValue(
+      page([
+        {
+          id: "a",
+          contractNo: "CG1",
+          status: "SIGNED",
+          totalAmount: 100,
+          paidAmount: 99.99,
+          unpaidAmount: 0.01,
+        },
+        {
+          id: "b",
+          contractNo: "CG2",
+          status: "SIGNED",
+          totalAmount: 100,
+          paidAmount: 90,
+          unpaidAmount: 10,
+        },
+      ]),
+    );
+    render(<ContractBalanceList kind="payable" />);
+    await screen.findByText("CG1");
+    expect(screen.getAllByRole("button", { name: "登记付款" })).toHaveLength(1);
+    expect(
+      screen.getByRole("button", { name: /^仅看未付（\d+）$/ }),
+    ).toBeInTheDocument();
+  });
+
   it("待结不超过 1 的残额带「尾差」标签，其余不带；登记走确认步骤", async () => {
     const user = userEvent.setup();
     mocks.getPayables.mockResolvedValue(
