@@ -1,3 +1,4 @@
+import { authFetchInit } from "@/lib/browser-session";
 /**
  * Input: /api/v1/quotes (docs/redesign/DATA-MODEL-2026.md §4.4)
  * Output: quote CRUD-ish calls, status transitions (PUT {status}) and authenticated export/print downloads
@@ -5,7 +6,6 @@
  */
 import api from "@/lib/axios";
 import type { ApiResponse, PaginatedResponse } from "@/types";
-import { getAuthToken } from "@/lib/auth-token";
 import { downloadResponseBlob, throwDownloadError } from "./fileDownload";
 import type { QuoteStatus } from "@/lib/quote";
 
@@ -88,9 +88,8 @@ const send = <T>(method: "post" | "put", url: string, data: object): R<T> =>
   api[method]<ApiResponse<T>, ApiResponse<T>>(url, data);
 
 const authedFetch = (path: string) => {
-  const token = getAuthToken();
   return fetch(`/api/v1${path}`, {
-    headers: { Authorization: token ? `Bearer ${token}` : "" },
+    ...authFetchInit(),
   });
 };
 

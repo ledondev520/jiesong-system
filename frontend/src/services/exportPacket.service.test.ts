@@ -13,7 +13,8 @@ vi.mock('@/lib/axios', () => ({
   default: { post: (...args: unknown[]) => mockPost(...args) },
 }));
 
-vi.mock('@/lib/auth-token', () => ({ getAuthToken: () => 'test-token' }));
+import { setAuthToken } from '@/lib/auth-token';
+setAuthToken('test-token');
 
 vi.mock('./fileDownload', () => ({
   downloadResponseBlob: (...args: unknown[]) => mockDownload(...args),
@@ -49,7 +50,7 @@ describe('exportPacketService', () => {
     await exportPacketService.download('file-1', 'EXP260011_出口三单.xlsx');
     expect(mockPost).toHaveBeenCalledWith('/sales/sales-1/export-packet/generate', input);
     expect(fetch).toHaveBeenCalledWith('/api/v1/files/file-1/download', {
-      headers: { Authorization: 'Bearer test-token' },
+      credentials: 'include', headers: { Authorization: 'Bearer test-token' },
     });
     expect(mockDownload).toHaveBeenCalled();
   });
