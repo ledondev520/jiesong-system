@@ -36,6 +36,7 @@ const MODULES = {
   '/system': './system',
   '/reports': './reports',
   '/sales': './sales',
+  '/three-forms': './threeForms',
   '/contract-doc': './contractDoc',
 };
 
@@ -52,6 +53,8 @@ const POLICY = [
   { re: /^\/tax-refunds\/workbench\/(monthly-export|[^/]+\/preparation(-export)?|[^/]+\/confirm)$/, read: AF, write: AF },
   { re: /^\/tax-refunds\/(auto-drafts)$/, read: AF, write: AF },
   { re: /^\/tax-refunds(\/|$)/, read: ALL, write: ['ADMIN', 'SALES', 'FINANCE'] },
+  { re: /^\/three-forms\/(forex-verification|tax-refund|generate)$/, read: ['ADMIN', 'SALES', 'FINANCE'], write: ['ADMIN', 'SALES', 'FINANCE'] },
+  { re: /^\/three-forms(\/|$)/, read: ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'], write: ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'] },
   { re: /^\/forex-verifications(\/|$)/, read: ALL, write: ['ADMIN', 'SALES', 'FINANCE'] },
   { re: /^\/suppliers\/[^/]+\/hard-delete(-preview)?$/, read: ADMIN, write: ADMIN },
   { re: /^\/suppliers(\/|$)/, read: ALL, write: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'] },
@@ -63,6 +66,8 @@ const POLICY = [
   { re: /^\/system(\/|$)/, read: ADMIN, write: ADMIN },
   { re: /^\/reports(\/|$)/, read: AFB, write: ADMIN },
   // 单柜账务/退税清单不含 WAREHOUSE（R2 P1-2）；其余 /sales 路由各自收紧，此处只兜底 BOSS 写入与 Agent
+  { re: /^\/sales\/[^/]+\/export-packet\/(preview|generate)$/, read: ['ADMIN', 'SALES', 'FINANCE'], write: ['ADMIN', 'SALES', 'FINANCE'] },
+  { re: /^\/sales\/[^/]+\/export-(excel|pdf)$/, read: ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'], write: ALL },
   { re: /^\/sales\/[^/]+\/(finance-summary|tax-refund-preparation(\/export)?)$/, read: ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'], write: ALL },
   { re: /^\/sales(\/|$)/, read: ALL, write: ALL },
   // R2-Q1：合同文档生成/下载按 B60 读模型，SALES/WAREHOUSE 403；BOSS 未在只读白名单

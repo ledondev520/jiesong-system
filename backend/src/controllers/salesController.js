@@ -281,7 +281,7 @@ const getFiles = async (req, res, next) => {
 
     const files = await fileService.listFiles(id, fileService.CONTRACT_TYPE.SALES);
 
-    success(res, files);
+    success(res, fileService.filterVisibleFiles(files, req.user));
   } catch (error) {
     next(error);
   }

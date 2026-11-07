@@ -13,6 +13,7 @@ import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import ContractFiles from "@/components/contract/ContractFiles";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/auth.store";
 import {
   Card,
   CardContent,
@@ -40,6 +41,7 @@ export function OrderDocsTab({
   onFilesChange: (files: ContractFile[]) => void;
   onResolveHs: () => void;
 }) {
+  const role = useAuthStore((state) => state.user?.role);
   const packingItems = contract.packingItems;
 
   // 按 HS + 商品名分组：相同 HS 的不同商品不合并
@@ -111,12 +113,14 @@ export function OrderDocsTab({
                     建议或人工确认补齐；申报三表会阻止不完整单据生成。
                   </p>
                 </div>
+                {/* R3 P1-3：三表对话框仅 ADMIN/SALES/FINANCE 可用 */}
                 <BusinessWrite>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     className="shrink-0"
+                    disabled={role === "WAREHOUSE" || role === "PURCHASE"}
                     onClick={onResolveHs}
                   >
                     处理未匹配 HS 编码

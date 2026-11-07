@@ -191,6 +191,7 @@ const getById = async (req, res, next) => {
     const [detail] = await attachPurchaseSubStatus([contract]);
     success(res, redactNestedSuppliers(req.user?.role, {
       ...detail,
+      files: fileService.filterVisibleFiles(detail.files, req.user),
       productionReadiness: evaluatePurchaseProductionReadiness(contract.items),
     }));
   } catch (error) {
@@ -202,7 +203,7 @@ const getById = async (req, res, next) => {
 const getInvoicePreparation = async (req, res, next) => {
   try {
     const preparation = await purchaseInvoiceService.getPurchaseInvoicePreparation(req.params.id);
-    success(res, preparation);
+    success(res, { ...preparation, invoiceFiles: fileService.filterVisibleFiles(preparation.invoiceFiles, req.user) });
   } catch (error) {
     next(error);
   }
@@ -518,7 +519,7 @@ const getFiles = async (req, res, next) => {
       orderBy: { uploadedAt: 'desc' },
     });
     
-    success(res, files);
+    success(res, fileService.filterVisibleFiles(files, req.user));
   } catch (error) {
     next(error);
   }
@@ -539,7 +540,7 @@ const deleteFile = async (req, res, next) => {
     if (!file) {
       throw createError('文件不存在', 404);
     }
-    fileService.assertFileAccess(file, req.user);
+    fileService.assertFileAccess(file, req.user, { action: 'delete' });
     fileService.assertReceiptPhotoAccess(fileService.CONTRACT_TYPE.PURCHASE, file.category, req.user);
     
     // 旧采购入口继续保留物理归档；不改变现有留存约定。

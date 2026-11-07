@@ -99,6 +99,18 @@ vi.mock("@/services/purchaseReceipt.service", () => ({
     list: (...args: unknown[]) => mockReceiptSummary(...args),
   },
 }));
+vi.mock("@/components/contract/ContractFiles", () => {
+  const ContractFiles = ({
+    categoryOptions,
+  }: {
+    categoryOptions?: Array<{ value: string }>;
+  }) => (
+    <div data-testid="contract-files">
+      {(categoryOptions || []).map((option) => option.value).join(",")}
+    </div>
+  );
+  return { ContractFiles, default: ContractFiles };
+});
 vi.mock("./components/PurchaseReceiptPanel", () => ({
   PurchaseReceiptPanel: ({
     purchaseContractId,
@@ -856,4 +868,24 @@ describe("PurchaseDetailPage 交互逻辑", () => {
       expect(mockToastError).toHaveBeenCalledWith("导出失败：服务不可用"),
     );
   });
+
+  it.each([
+    ["SALES", false],
+    ["WAREHOUSE", false],
+    ["PURCHASE", true],
+    ["FINANCE", true],
+  ])(
+    "%s 附件类别：供应商盖章件/发票可选=%s（R3 P1-2）",
+    async (role, allowed) => {
+      useAuthStore.setState({ user: { id: "synthetic", role } as never });
+      window.history.replaceState(null, "", "/?tab=files");
+      mockGetById.mockResolvedValue({ data: draftContract });
+      renderPage("p-1");
+
+      const options = (await screen.findByTestId("contract-files")).textContent;
+      expect(options).toContain("OTHER");
+      expect(options?.includes("SIGNED_CONTRACT")).toBe(allowed);
+      expect(options?.includes("SUPPLIER_INVOICE")).toBe(allowed);
+    },
+  );
 });

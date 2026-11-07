@@ -130,6 +130,7 @@ test('uploadFile: 登记附件前收紧目录和文件权限，保持 201 响应
   try {
     await purchaseController.uploadFile({
       params: { id: 'purchase-1' },
+      user: { role: 'PURCHASE' },
       body: { description: 'synthetic test attachment', category: 'SUPPLIER_INVOICE' },
       file: { path: filePath, originalname: 'synthetic.pdf', mimetype: 'application/pdf', size: fs.statSync(filePath).size },
     }, res, (error) => { throw error; });
@@ -323,5 +324,33 @@ test('addItem: 与共享草稿更正一致，已签约/发货/完成/付款/归�
     await purchaseController.addItem({ params: { id: 'pc-1' }, body: { productId: 'product-1', quantity: 1, unitPrice: 10 } }, res, (error) => { caught = error; });
     if (contract === draft) { assert.equal(caught, undefined); assert.equal(added, true); }
     else { assert.equal(caught?.statusCode, 400); assert.equal(added, false); }
+  }
+});
+
+
+test('getById/getFiles: SALES/WAREHOUSE 看不到采购合同文书附件，读角色仍可见（R3 P1-2）', async () => {
+  const files = ['SIGNED_CONTRACT', 'SUPPLIER_INVOICE', 'SYSTEM_GENERATED_PDF', 'SYSTEM_GENERATED_WORD', 'PRODUCTION_PHOTO', 'OTHER']
+    .map((category) => ({ id: category, purchaseContractId: 'pc-1', category, fileName: `${category}.pdf` }));
+  const originals = { findUnique: prisma.purchaseContract.findUnique, items: prisma.purchaseItem.findMany, groupBy: prisma.purchaseReceiptItem.groupBy, files: prisma.contractFile.findMany };
+  prisma.purchaseContract.findUnique = async () => ({ id: 'pc-1', status: 'DRAFT', totalAmount: 0, paidAmount: 0, items: [], files });
+  prisma.purchaseItem.findMany = async () => [];
+  prisma.purchaseReceiptItem.groupBy = async () => [];
+  prisma.contractFile.findMany = async () => files;
+  const call = async (handler, role) => {
+    let payload = null;
+    const res = { status: () => res, json: (value) => { payload = value; } };
+    await purchaseController[handler]({ params: { id: 'pc-1' }, user: { role } }, res, (error) => { throw error; });
+    return (handler === 'getById' ? payload.data.files : payload.data).map((file) => file.id);
+  };
+  try {
+    for (const handler of ['getById', 'getFiles']) {
+      for (const role of ['SALES', 'WAREHOUSE']) assert.deepEqual(await call(handler, role), ['PRODUCTION_PHOTO', 'OTHER'], `${handler} ${role}`);
+      for (const role of ['ADMIN', 'PURCHASE', 'FINANCE', 'BOSS']) assert.equal((await call(handler, role)).length, 6, `${handler} ${role}`);
+    }
+  } finally {
+    prisma.purchaseContract.findUnique = originals.findUnique;
+    prisma.purchaseItem.findMany = originals.items;
+    prisma.purchaseReceiptItem.groupBy = originals.groupBy;
+    prisma.contractFile.findMany = originals.files;
   }
 });
