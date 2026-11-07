@@ -4,17 +4,21 @@
  * Pos: 防止 API 滥用和暴力攻击
  */
 
-// 内存存储：key -> { count, resetTime }
-const store = new Map();
+// 每个限流器独立内存存储（key -> { count, resetTime }），互不共享计数；stores 仅供清理/重置/查询遍历。
+const stores = new Set();
+// 单个 store 的条目上限：伪造 IP/用户名也只能占用有限内存，满时淘汰最旧条目（Map 按插入序）。
+const MAX_STORE_ENTRIES = 50000;
 
 const cleanupInterval = 60000; // 每分钟清理一次过期记录
 
 // 定期清理过期记录。unref() 避免模块初始化后阻塞进程退出。
 const cleanupTimer = setInterval(() => {
   const now = Date.now();
-  for (const [key, value] of store.entries()) {
-    if (value.resetTime < now) {
-      store.delete(key);
+  for (const store of stores) {
+    for (const [key, value] of store.entries()) {
+      if (value.resetTime < now) {
+        store.delete(key);
+      }
     }
   }
 }, cleanupInterval);
@@ -38,7 +42,10 @@ const rateLimit = (options = {}) => {
     max = 100, // 默认 100 次
     message = '请求过于频繁，请稍后再试',
     keyGenerator = (req) => req.ip || req.connection.remoteAddress || 'unknown',
+    maxEntries = MAX_STORE_ENTRIES,
   } = options;
+  const store = new Map();
+  stores.add(store);
 
   return (req, res, next) => {
     const key = keyGenerator(req);
@@ -51,6 +58,8 @@ const rateLimit = (options = {}) => {
         count: 0,
         resetTime: now + windowMs,
       };
+      store.delete(key);
+      if (store.size >= maxEntries) store.delete(store.keys().next().value);
       store.set(key, record);
     }
 
@@ -107,7 +116,7 @@ const gentleRateLimit = (options = {}) => {
  * @param {string} key - 要重置的 key
  */
 const resetLimit = (key) => {
-  store.delete(key);
+  for (const store of stores) store.delete(key);
 };
 
 /**
@@ -116,7 +125,11 @@ const resetLimit = (key) => {
  * @returns {Object|null} 限流状态或 null
  */
 const getLimitStatus = (key) => {
-  const record = store.get(key);
+  let record = null;
+  for (const store of stores) {
+    record = store.get(key);
+    if (record) break;
+  }
   if (!record) return null;
 
   return {
