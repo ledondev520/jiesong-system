@@ -25,7 +25,7 @@ export interface TabConfig {
 }
 
 // 与 backend/src/routes/bankFlow.js、finance.js 的账务读角色一致（WAREHOUSE 无账务读）
-const FINANCE_LEDGER_ROLES = [Role.ADMIN, Role.FINANCE, Role.BOSS];
+export const FINANCE_LEDGER_ROLES = [Role.ADMIN, Role.FINANCE, Role.BOSS];
 
 export type NavGroup = "main" | "business" | "data" | "system";
 
@@ -162,7 +162,11 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
         label: "财务报表",
         visibleRoles: FINANCE_LEDGER_ROLES,
       },
-      { href: "/dashboard/finance/analysis", label: "经营分析" },
+      {
+        href: "/dashboard/finance/analysis",
+        label: "经营分析",
+        visibleRoles: FINANCE_LEDGER_ROLES,
+      },
     ],
     group: "business",
     visibleRoles: [
