@@ -157,7 +157,8 @@ const createLowStockNotifications = async (tx = prisma, alerts = [], options = {
     where: {
       type: NOTIFICATION_TYPE.LOW_STOCK,
       userId: { in: userIds },
-      createdAt: { gte: todayStart },
+      // 当天已发，或仍未读的旧提醒：同一商品不隔天重复堆积
+      OR: [{ createdAt: { gte: todayStart } }, { isRead: false }],
     },
     select: {
       userId: true,
