@@ -8,13 +8,13 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("TaxRefundsPage", () => {
-  it("统一退税入口并跳转到 dashboard 业务页", () => {
-    try {
-      TaxRefundsPage();
-    } catch {
-      // next redirect throws by design
-    }
+  it("统一退税入口并跳转到 dashboard 业务页，保留查询参数", async () => {
+    await TaxRefundsPage({
+      searchParams: Promise.resolve({ view: "refunds" }),
+    });
 
-    expect(mockRedirect).toHaveBeenCalledWith("/dashboard/customs");
+    expect(mockRedirect).toHaveBeenCalledWith(
+      "/dashboard/customs?view=refunds",
+    );
   });
 });
