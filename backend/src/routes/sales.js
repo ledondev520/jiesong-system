@@ -26,6 +26,9 @@ const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
 // 装柜计划含 Confidential 箱规/重量：显式人类角色白名单（含 BOSS 只读）；Agent 无 req.user，roleAuth 返回 401。
 const LOADING_PLAN_ROLES = [...WRITE_ROLES, 'BOSS'];
 // 单柜财务/退税清单含 Confidential 收付款与成本：与 /finance/* 一致，WAREHOUSE 无账务读权限。
+// R3 P1-3：导出工作簿/PDF含采购成本与退税，定价预检/生成只给商务角色；均不含 WAREHOUSE。
+const EXPORT_DOC_ROLES = ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'];
+const EXPORT_PACKET_ROLES = ['ADMIN', 'SALES', 'FINANCE'];
 const FINANCE_VIEW_ROLES = ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'];
 
 router.use(authenticate);
@@ -123,10 +126,10 @@ router.post('/:id/purchase-drafts', withIdValidation, roleAuth('ADMIN', 'PURCHAS
 ));
 
 // POST /api/v1/sales/:id/export-packet/preview - 只读预检和定价草案
-router.post('/:id/export-packet/preview', withIdValidation, roleAuth(...WRITE_ROLES), exportPacketValidation, salesController.previewExportPacket);
+router.post('/:id/export-packet/preview', withIdValidation, roleAuth(...EXPORT_PACKET_ROLES), exportPacketValidation, salesController.previewExportPacket);
 
 // POST /api/v1/sales/:id/export-packet/generate - 确认价格后生成、归档出口三单
-router.post('/:id/export-packet/generate', withIdValidation, roleAuth(...WRITE_ROLES), exportPacketValidation, salesController.generateExportPacket);
+router.post('/:id/export-packet/generate', withIdValidation, roleAuth(...EXPORT_PACKET_ROLES), exportPacketValidation, salesController.generateExportPacket);
 
 // POST /api/v1/sales/:id/files - 上传出口合同附件
 router.post('/:id/files', withIdValidation, roleAuth(...WRITE_ROLES), upload.single('file'), withAuditLog(
@@ -218,7 +221,7 @@ router.put('/:id/status', withIdValidation, roleAuth(...WRITE_ROLES), withAuditL
 router.post('/calculate-price', roleAuth(...WRITE_ROLES), salesController.calculatePrice);
 
 // GET /api/v1/sales/:id/export-excel - 导出单份合同标准出口 Excel（三 Sheet）
-router.get('/:id/export-excel', withIdValidation, async (req, res, next) => {
+router.get('/:id/export-excel', roleAuth(...EXPORT_DOC_ROLES), withIdValidation, async (req, res, next) => {
   try {
     const { buffer, filename } = await exportSalesContractExcel(req.params.id);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -230,7 +233,7 @@ router.get('/:id/export-excel', withIdValidation, async (req, res, next) => {
 });
 
 // GET /api/v1/sales/:id/export-pdf - 导出单份合同 PDF
-router.get('/:id/export-pdf', withIdValidation, async (req, res, next) => {
+router.get('/:id/export-pdf', roleAuth(...EXPORT_DOC_ROLES), withIdValidation, async (req, res, next) => {
   try {
     const { buffer, filename } = await exportSalesContractPdf(req.params.id);
     res.setHeader('Content-Type', 'application/pdf');
