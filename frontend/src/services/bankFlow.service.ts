@@ -338,6 +338,8 @@ interface SalesContractForMatch {
   id: string;
   contractNo: string;
   totalAmount: number;
+  /** 本方应得合同额（拆分合同）；接口未返回时按 totalAmount 计 */
+  ownedTotalAmount?: number | null;
   receivedAmount: number;
   status: string;
   signedAt: string | null;

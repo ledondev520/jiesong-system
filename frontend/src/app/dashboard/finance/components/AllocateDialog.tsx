@@ -9,7 +9,7 @@
 "use client";
 
 import { formatAmount } from "@/lib/format";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { financeService } from "@/services/finance.service";
 import { loadPaginatedCatalog } from "@/services/paginatedCatalog";
 import { clearApiGetCache } from "@/lib/axios";
@@ -63,6 +63,7 @@ export function AllocateDialog({
 }: AllocateDialogProps) {
   const [rows, setRows] = useState<AllocationRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false); // 同步防重：state 在同一帧内的双击中尚未更新
 
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -128,6 +129,9 @@ export function AllocateDialog({
 
   const remaining = totalAmount - allocatedTotal;
   const isOverAllocated = allocatedTotal > totalAmount + 0.001;
+  const isRowOver = (r: AllocationRow) =>
+    r.selected && (parseFloat(r.amount) || 0) > r.unreceiveAmount + 0.01;
+  const hasRowOver = rows.some(isRowOver);
   const hasSelection = rows.some((r) => r.selected && parseFloat(r.amount) > 0);
 
   const toggleRow = (contractId: string) => {
@@ -150,7 +154,12 @@ export function AllocateDialog({
   const autoFill = (contractId: string) => {
     const row = rows.find((r) => r.contractId === contractId);
     if (!row) return;
-    const maxAmount = Math.min(remaining, row.unreceiveAmount);
+    // remaining 已扣除本行当前金额，先加回再封顶，重复点击结果不变
+    const currentRowVal = row.selected ? parseFloat(row.amount) || 0 : 0;
+    const maxAmount = Math.max(
+      0,
+      Math.min(remaining + currentRowVal, row.unreceiveAmount),
+    );
     setRows((prev) =>
       prev.map((r) =>
         r.contractId === contractId
@@ -161,7 +170,15 @@ export function AllocateDialog({
   };
 
   const handleSubmit = async () => {
-    if (!payment || isOverAllocated || !hasSelection) return;
+    if (
+      !payment ||
+      isOverAllocated ||
+      hasRowOver ||
+      !hasSelection ||
+      submittingRef.current
+    )
+      return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const allocations = rows
@@ -172,6 +189,7 @@ export function AllocateDialog({
         }));
       await onSubmit(payment.id, allocations);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -297,6 +315,12 @@ export function AllocateDialog({
                       自动
                     </Button>
                   </div>
+                  {isRowOver(row) && (
+                    <p className="basis-full flex items-center gap-1 text-destructive text-xs">
+                      <AlertCircle className="h-3 w-3" />
+                      超出该合同待收金额
+                    </p>
+                  )}
                 </div>
               ))
             )}
@@ -309,7 +333,9 @@ export function AllocateDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!hasSelection || isOverAllocated || submitting}
+            disabled={
+              !hasSelection || isOverAllocated || hasRowOver || submitting
+            }
           >
             {submitting
               ? "分配中..."
