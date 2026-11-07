@@ -142,7 +142,7 @@ export function HeaderSearch() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="搜索商品、供应商、合同"
-        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-input bg-background hover:bg-accent md:h-auto md:w-full md:max-w-md md:justify-start md:border-0"
+        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-input bg-background hover:bg-accent md:h-auto md:w-56 md:justify-start md:border-0 lg:w-64 xl:w-80"
       >
         <Search className="h-5 w-5 text-muted-foreground md:absolute md:left-3 md:top-1/2 md:h-4 md:w-4 md:-translate-y-1/2" />
         <div className="hidden h-10 w-full min-w-0 items-center rounded-lg border border-input/80 bg-muted/50 pl-9 pr-3 text-sm text-muted-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-muted md:flex">
