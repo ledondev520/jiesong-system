@@ -30,7 +30,7 @@ const listPayments = async (req, res, next) => {
       salesContractId: typeof salesContractId === 'string' && salesContractId ? salesContractId : undefined,
     });
 
-    paginated(res, payments, total, page, pageSize);
+    paginated(res, redactNestedSuppliers(req.user?.role, payments), total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -45,11 +45,11 @@ const createPayment = async (req, res, next) => {
     const { payment, reused } = await financeService.createPayment(req.body || {}, { idempotencyKey });
 
     if (reused) {
-      success(res, payment, '付款记录已存在，返回幂等结果');
+      success(res, redactNestedSuppliers(req.user?.role, payment), '付款记录已存在，返回幂等结果');
       return;
     }
 
-    created(res, payment, '付款记录创建成功');
+    created(res, redactNestedSuppliers(req.user?.role, payment), '付款记录创建成功');
   } catch (error) {
     next(error);
   }
