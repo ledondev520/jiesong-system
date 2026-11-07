@@ -29,11 +29,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatMoney } from "@/lib/format";
 
 const EMPTY_TEXT = "暂无装箱商品，可从已完工采购导入，也可手动添加";
 
 const money = (value?: number | null) =>
-  value ? `$${value.toLocaleString()}` : "-";
+  value ? formatMoney(value, "USD") : "-";
 
 interface PackingItemsCardProps {
   rows: PackingItem[];

@@ -79,6 +79,7 @@ import {
   calculatePurchaseLineAmounts,
   summarizePurchaseAmounts,
 } from "@/lib/purchase-amount";
+import { formatMoney } from "@/lib/format";
 
 /** 付款用途选项：定金/尾款/自定义，决定汇款文本与默认金额 */
 type RemitPurpose = "deposit" | "balance" | "custom";
@@ -103,9 +104,6 @@ const copyText = async (text: string) => {
     toast.error("复制失败，请手动选择文本复制");
   }
 };
-
-const formatMoney = (n: number) =>
-  `¥${n.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /**
  * 职责：渲染采购合同的付款与发票操作面板
