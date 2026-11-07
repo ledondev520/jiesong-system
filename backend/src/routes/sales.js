@@ -25,6 +25,8 @@ const router = Router();
 const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
 // 装柜计划含 Confidential 箱规/重量：显式人类角色白名单（含 BOSS 只读）；Agent 无 req.user，roleAuth 返回 401。
 const LOADING_PLAN_ROLES = [...WRITE_ROLES, 'BOSS'];
+// 单柜财务/退税清单含 Confidential 收付款与成本：与 /finance/* 一致，WAREHOUSE 无账务读权限。
+const FINANCE_VIEW_ROLES = ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'];
 
 router.use(authenticate);
 
@@ -171,13 +173,13 @@ router.post(
 router.get('/:id/packing-list-checks', withIdValidation, salesController.listPackingListChecks);
 
 // GET /api/v1/sales/:id/tax-refund-preparation - 退税申报/备案/收汇内部准备清单
-router.get('/:id/tax-refund-preparation', withIdValidation, salesController.getTaxRefundPreparation);
+router.get('/:id/tax-refund-preparation', roleAuth(...FINANCE_VIEW_ROLES), withIdValidation, salesController.getTaxRefundPreparation);
 
 // GET /api/v1/sales/:id/tax-refund-preparation/export - 导出内部准备清单 Excel
-router.get('/:id/tax-refund-preparation/export', withIdValidation, salesController.exportTaxRefundPreparation);
+router.get('/:id/tax-refund-preparation/export', roleAuth(...FINANCE_VIEW_ROLES), withIdValidation, salesController.exportTaxRefundPreparation);
 
 // GET /api/v1/sales/:id/finance-summary - 单柜收入、成本、退税与现金流统一口径
-router.get('/:id/finance-summary', withIdValidation, salesController.getFinanceSummary);
+router.get('/:id/finance-summary', roleAuth(...FINANCE_VIEW_ROLES), withIdValidation, salesController.getFinanceSummary);
 
 // PUT /api/v1/sales/:id/packing-list-checks/:checkId/review - 人工通过/驳回
 router.put(
