@@ -15,4 +15,10 @@ const toCents = (value) => {
 
 const roundMoney = (value) => toCents(value) / 100;
 
-module.exports = { roundMoney, toCents };
+// Rates/markups keep at most 6 decimals; strips float residue such as 6.500000000000001. Mirror: frontend roundRate.
+const roundRate = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Number(n.toFixed(6)) + 0 : 0;
+};
+
+module.exports = { roundMoney, toCents, roundRate };

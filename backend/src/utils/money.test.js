@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { roundMoney, toCents } = require('./money');
+const { roundMoney, toCents, roundRate } = require('./money');
 const { roundUnitPrice } = require('../services/exportPricing');
 
 test('roundMoney fixes binary float noise', () => {
@@ -34,4 +34,11 @@ test('toCents returns integer cents', () => {
 
 test('locked USD price rule stays single-sourced in exportPricing (13000 / 6.52 = 1993.87 -> 1994)', () => {
   assert.equal(roundUnitPrice(13000 / 6.52), 1994);
+});
+
+test('roundRate strips float residue to 6 decimals', () => {
+  assert.equal(roundRate(6.500000000000001), 6.5);
+  assert.equal(roundRate(0.1 + 0.2), 0.3);
+  assert.equal(roundRate(1.23456789), 1.234568);
+  assert.equal(roundRate('x'), 0);
 });

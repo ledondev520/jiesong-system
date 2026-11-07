@@ -7,4 +7,10 @@ export const toCents = (value: unknown): number => {
   ); // + 0 turns -0 into 0
 };
 
+/** Rates/markups keep at most 6 decimals; strips float residue such as 6.500000000000001. Mirror: backend roundRate. */
+export const roundRate = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Number(n.toFixed(6)) + 0 : 0; // + 0 turns -0 into 0
+};
+
 export const roundMoney = (value: unknown): number => toCents(value) / 100;
