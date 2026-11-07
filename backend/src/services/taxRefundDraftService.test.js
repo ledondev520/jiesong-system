@@ -156,6 +156,6 @@ test('同日连续调用与同批多单不撞 refundNo', async () => {
     await taxRefundDraftService.generateTaxRefundDrafts({});
     await taxRefundDraftService.generateTaxRefundDrafts({});
     const nos = state.created.map((c) => c.refundNo.slice(-3));
-    assert.equal(new Set(nos).size, 4);
+    assert.deepEqual(nos, ['001', '002', '003', '004']); // no skipped sequence numbers
   });
 });
