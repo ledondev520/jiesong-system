@@ -11,6 +11,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Suspense } from "react";
 import PurchaseDetailPage from "./page";
+import { useAuthStore } from "@/store/auth.store";
 
 const mockIsMobile = vi.fn(() => false);
 const mockRouterPush = vi.fn();
@@ -125,6 +126,9 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     mockToastInfo.mockReset();
     mockIsMobile.mockReturnValue(false);
     mockReadOnly = false;
+    useAuthStore.setState({
+      user: { id: "synthetic", role: "PURCHASE" } as never,
+    });
     mockReceiptSummary.mockResolvedValue({
       data: { summary: { complete: false } },
     });
@@ -243,6 +247,26 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     expect(
       await screen.findByText("填写收货信息后，系统将自动生成标准购销合同文档"),
     ).toBeInTheDocument();
+  });
+
+  it("SALES 看不到生成/查看合同（含供应商银行信息，后端 403）", async () => {
+    useAuthStore.setState({
+      user: { id: "synthetic", role: "SALES" } as never,
+    });
+    mockGetById.mockResolvedValue({ data: draftContract });
+    const user = userEvent.setup();
+    renderPage("p-1");
+
+    await user.click(await screen.findByRole("button", { name: /单证/ }));
+    expect(
+      await screen.findByRole("menuitem", { name: /在线盖章/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /生成购销合同/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /查看合同/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("在线盖章与生成购销合同收进同一个「单证」菜单，不再是页头独立按钮", async () => {

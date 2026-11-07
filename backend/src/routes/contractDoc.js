@@ -16,6 +16,9 @@ const { withAuditLog } = require('../middleware/auditLog');
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+// 合同文档含供应商银行信息（Restricted）：与 B60 读模型一致，SALES/WAREHOUSE 403；BOSS 为只读且生成文件默认拒绝。
+const DOC_ROLES = ['ADMIN', 'PURCHASE', 'FINANCE'];
+
 router.use(authenticate);
 
 // GET /api/v1/contract-doc/template/check - 检查模板状态
@@ -59,7 +62,7 @@ router.delete('/template', roleAuth('ADMIN'), withAuditLog(
 // POST /api/v1/contract-doc/generate/:id - 根据采购合同生成购销合同
 router.post(
   '/generate/:id',
-  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth(...DOC_ROLES),
   withIdValidation,
   withAuditLog(
     {
@@ -80,6 +83,7 @@ router.post(
 // GET /api/v1/contract-doc/pdf/:id - 获取采购合同PDF（用于预览）
 router.get(
   '/pdf/:id',
+  roleAuth(...DOC_ROLES),
   withIdValidation,
   contractDocController.getContractPdf
 );

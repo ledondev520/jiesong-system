@@ -689,20 +689,28 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   ];
 
   // 「单证」：对外法律文件（盖章、购销合同）仍先确认；老板只读时整组隐藏
+  const canGenerateDoc = ["ADMIN", "PURCHASE", "FINANCE"].includes(
+    userRole || "",
+  );
   const documentsMenu = readOnly
     ? []
     : [
-        {
-          key: "generate",
-          label: "生成购销合同",
-          onSelect: () => setDocConfirm("generate"),
-        },
-        {
-          key: "view",
-          label: "查看合同",
-          onSelect: viewContractPdf,
-          disabled: pdfLoading,
-        },
+        // 合同文档含供应商银行信息：SALES/WAREHOUSE 后端 403，不展示入口
+        ...(canGenerateDoc
+          ? [
+              {
+                key: "generate",
+                label: "生成购销合同",
+                onSelect: () => setDocConfirm("generate"),
+              },
+              {
+                key: "view",
+                label: "查看合同",
+                onSelect: viewContractPdf,
+                disabled: pdfLoading,
+              },
+            ]
+          : []),
         {
           key: "export",
           label: "导出 PDF",

@@ -102,6 +102,10 @@ export default function ContractsPageContent() {
   const canImportHistory = useAuthStore(
     (state) => state.user?.role === "ADMIN",
   );
+  // 合同文档含供应商银行信息：SALES/WAREHOUSE 后端 403，不展示入口
+  const canGenerateDoc = useAuthStore((state) =>
+    ["ADMIN", "PURCHASE", "FINANCE"].includes(state.user?.role ?? ""),
+  );
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status") || "ALL";
@@ -944,16 +948,18 @@ export default function ContractsPageContent() {
                         <Eye className="mr-1.5 h-3.5 w-3.5" />
                         查看详情
                       </Button>
-                      <BusinessWrite>
-                        <Button
-                          className="h-9 rounded-lg text-xs"
-                          onClick={() => openGenerateDialog(contract.id)}
-                          aria-label={`为 ${contract.contractNo} 生成购销合同`}
-                        >
-                          <FileDown className="mr-1.5 h-3.5 w-3.5" />
-                          生成合同
-                        </Button>
-                      </BusinessWrite>
+                      {canGenerateDoc && (
+                        <BusinessWrite>
+                          <Button
+                            className="h-9 rounded-lg text-xs"
+                            onClick={() => openGenerateDialog(contract.id)}
+                            aria-label={`为 ${contract.contractNo} 生成购销合同`}
+                          >
+                            <FileDown className="mr-1.5 h-3.5 w-3.5" />
+                            生成合同
+                          </Button>
+                        </BusinessWrite>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1166,21 +1172,23 @@ export default function ContractsPageContent() {
                             >
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
-                            <BusinessWrite>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 rounded-md"
-                                aria-label={`为 ${contract.contractNo} 生成购销合同`}
-                                title="生成购销合同"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openGenerateDialog(contract.id);
-                                }}
-                              >
-                                <FileDown className="h-3.5 w-3.5" />
-                              </Button>
-                            </BusinessWrite>
+                            {canGenerateDoc && (
+                              <BusinessWrite>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-md"
+                                  aria-label={`为 ${contract.contractNo} 生成购销合同`}
+                                  title="生成购销合同"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openGenerateDialog(contract.id);
+                                  }}
+                                >
+                                  <FileDown className="h-3.5 w-3.5" />
+                                </Button>
+                              </BusinessWrite>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
