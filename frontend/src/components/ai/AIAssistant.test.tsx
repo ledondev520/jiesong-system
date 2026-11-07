@@ -8,6 +8,7 @@
 
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -29,6 +30,15 @@ const mockExecuteAgentAction = vi.fn();
 const mockCancelAgentAction = vi.fn();
 const mockGetSessions = vi.fn();
 const mockGetChatHistory = vi.fn();
+
+const mockClearApiGetCache = vi.fn();
+const mockClearAllCache = vi.fn();
+vi.mock("@/lib/axios", () => ({
+  clearApiGetCache: () => mockClearApiGetCache(),
+}));
+vi.mock("@/lib/api-cache", () => ({
+  clearAllCache: () => mockClearAllCache(),
+}));
 
 const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -79,6 +89,8 @@ describe("AIAssistant", () => {
       createMockFileReader() as unknown as typeof FileReader;
     mockExecuteAgentAction.mockReset();
     mockCancelAgentAction.mockReset();
+    mockClearApiGetCache.mockReset();
+    mockClearAllCache.mockReset();
   });
 
   afterAll(() => {
@@ -413,6 +425,104 @@ describe("AIAssistant", () => {
     await waitFor(() => {
       expect(mockExecuteAgentAction).toHaveBeenCalledWith("pa_e1");
     });
+  });
+
+  const pendingActionStream = () =>
+    createMockSseReader([
+      'data: {"type":"session","sessionId":"c1"}\n\n',
+      `data: ${JSON.stringify({
+        type: "done",
+        model: "kimi",
+        pendingActions: [
+          {
+            actionId: "pa_c1",
+            actionType: "CreatePurchase",
+            description: "采购草稿",
+            params: {},
+          },
+        ],
+      })}\n\n`,
+    ]);
+
+  const sendOne = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.click(screen.getByRole("button", { name: "AI 助手" }));
+    await user.type(screen.getByPlaceholderText("输入问题或粘贴图片..."), "改");
+    await user.click(screen.getByRole("button", { name: "发送消息" }));
+  };
+
+  it("SSE done 与确认执行成功后都清空 API GET 缓存和页面缓存", async () => {
+    const reader = pendingActionStream();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+    } as unknown as Response);
+    mockExecuteAgentAction.mockResolvedValue({ data: { detail: "ok" } });
+
+    const user = userEvent.setup();
+    render(<AIAssistant />);
+    await sendOne(user);
+    await screen.findByText("确认执行");
+    expect(mockClearApiGetCache).toHaveBeenCalledTimes(1);
+    expect(mockClearAllCache).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByText("确认执行"));
+    await waitFor(() => expect(mockClearApiGetCache).toHaveBeenCalledTimes(2));
+    expect(mockClearAllCache).toHaveBeenCalledTimes(2);
+  });
+
+  it("确认执行在重渲染前连点两次也只调用一次 executeAgentAction", async () => {
+    const reader = pendingActionStream();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+    } as unknown as Response);
+    mockExecuteAgentAction.mockReturnValue(new Promise(() => {}));
+
+    const user = userEvent.setup();
+    render(<AIAssistant />);
+    await sendOne(user);
+    const confirm = await screen.findByText("确认执行");
+    // 同一 act 内两次点击：React 尚未重渲染，按钮仍在，只能靠同步 ref 拦截。
+    act(() => {
+      confirm.click();
+      confirm.click();
+    });
+    expect(mockExecuteAgentAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("老板只读角色看不到确认执行按钮", async () => {
+    useAuthStore.setState({ user: { role: Role.BOSS } as User });
+    const reader = pendingActionStream();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      body: { getReader: () => reader },
+    } as unknown as Response);
+
+    const user = userEvent.setup();
+    render(<AIAssistant />);
+    await sendOne(user);
+    await screen.findByText("采购草稿");
+    expect(screen.queryByText("确认执行")).not.toBeInTheDocument();
+    useAuthStore.setState({ user: null });
+  });
+
+  it("卸载时中止进行中的 SSE 请求", async () => {
+    let signal: AbortSignal | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      signal = init?.signal as AbortSignal;
+      return {
+        ok: true,
+        body: { getReader: () => ({ read: () => new Promise(() => {}) }) },
+      } as unknown as Response;
+    });
+
+    const user = userEvent.setup();
+    const { unmount } = render(<AIAssistant />);
+    await sendOne(user);
+    await waitFor(() => expect(signal).toBeDefined());
+    expect(signal?.aborted).toBe(false);
+    unmount();
+    expect(signal?.aborted).toBe(true);
   });
 
   it("done 事件返回 actionRecommendations 时展示诊断建议", async () => {
