@@ -187,3 +187,29 @@ it("搜索中确认自动匹配：范围说明不受搜索限制，且不声称�
   expect(dialog).not.toHaveTextContent("41 条");
   expect(dialog).toHaveTextContent("供应商汇总按名称计算，不受影响");
 });
+it("多个付款别名合并成「A、B」时，流水链接只搜第一个别名", async () => {
+  recon.mockResolvedValue({
+    ...emptyRecon,
+    matched: [
+      {
+        payName: "甲公司、甲公司(深圳)",
+        invName: "甲公司",
+        netPaid: 100,
+        totalInvoice: 100,
+        gap: 0,
+        category: "normal",
+      },
+    ],
+  });
+  const { container } = render(<ReconciliationPage />);
+  await screen.findByText("甲公司、甲公司(深圳)");
+  const hrefs = Array.from(container.querySelectorAll("a")).map((a) =>
+    a.getAttribute("href"),
+  );
+  expect(hrefs).toContain(
+    `/dashboard/finance/bank-flow?search=${encodeURIComponent("甲公司")}`,
+  );
+  expect(hrefs).toContain(
+    `/dashboard/finance/invoices?search=${encodeURIComponent("甲公司")}`,
+  );
+});

@@ -1009,8 +1009,9 @@ function ReconciliationAnalysisView({
                               className="h-7 w-7 p-0"
                               asChild
                             >
+                              {/* 同发票多个付款别名合并为「A、B」，流水只能按单个别名搜，取第一个 */}
                               <Link
-                                href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(m.payName)}`}
+                                href={`/dashboard/finance/bank-flow?search=${encodeURIComponent(m.payName.split("、")[0])}`}
                               >
                                 <Landmark className="h-3.5 w-3.5" />
                               </Link>
