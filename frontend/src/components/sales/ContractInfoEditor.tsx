@@ -13,7 +13,7 @@ import {
   useBusinessReadOnly,
 } from "@/lib/hooks/useBusinessReadOnly";
 import { useState } from "react";
-import { SalesContract, Store, SalesStatus } from "@/types";
+import { SalesContract, Store } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SemanticBadge } from "@/components/ui/status-badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Loader2,
   Save,
@@ -123,29 +123,6 @@ export function ContractInfoEditor({
     }
   };
 
-  const getStatusBadge = (status: SalesStatus) => {
-    const statusMap: Record<
-      SalesStatus,
-      {
-        label: string;
-        tone: React.ComponentProps<typeof SemanticBadge>["tone"];
-      }
-    > = {
-      [SalesStatus.DRAFT]: { label: "草稿", tone: "neutral" },
-      [SalesStatus.CONFIRMED]: { label: "已确认", tone: "info" },
-      [SalesStatus.PACKING]: { label: "装箱中", tone: "warning" },
-      [SalesStatus.SHIPPED]: { label: "已发运", tone: "progress" },
-      [SalesStatus.ARRIVED]: { label: "已到达", tone: "success" },
-      [SalesStatus.COMPLETED]: { label: "已完成", tone: "secondary" },
-      [SalesStatus.CANCELLED]: { label: "已取消", tone: "danger" },
-    };
-    const config = statusMap[status] || {
-      label: status,
-      tone: "neutral" as const,
-    };
-    return <SemanticBadge tone={config.tone}>{config.label}</SemanticBadge>;
-  };
-
   // 从 stores 中获取唯一的港口列表
   const ports = stores
     .filter((s) => s.port)
@@ -164,7 +141,7 @@ export function ContractInfoEditor({
     {
       icon: <CheckCircle2 className="h-4 w-4 text-muted-foreground" />,
       label: "状态",
-      value: getStatusBadge(contract.status),
+      value: <StatusBadge status={contract.status} domain="salesOrder" />,
       editable: false,
       isElement: true,
     },
