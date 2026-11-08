@@ -146,7 +146,7 @@ const parseAmount = (value) => {
  * @param {Object} query - 查询参数 { status, supplierId, dateFrom, dateTo }
  * @returns {Promise<{buffer: Buffer, filename: string}>}
  */
-const exportPurchasesExcel = async (query = {}) => {
+const exportPurchasesExcel = async (query = {}, { includeMoney = true } = {}) => {
   const { status, supplierId, dateFrom, dateTo } = query;
 
   const where = {};
@@ -168,7 +168,7 @@ const exportPurchasesExcel = async (query = {}) => {
     '合同编号': c.contractNo,
     '供应商名称': c.supplier?.name || '',
     '签订日期': formatDate(c.signedAt),
-    '总金额': c.totalAmount,
+    ...(includeMoney ? { '总金额': c.totalAmount } : {}), // OD-3：WAREHOUSE 无金额列
     '币种': 'CNY',
     '状态': STATUS_LABEL_MAP[c.status] || c.status,
     '备注': c.note || '',
@@ -183,7 +183,7 @@ const exportPurchasesExcel = async (query = {}) => {
     { wch: 16 }, // 合同编号
     { wch: 24 }, // 供应商名称
     { wch: 12 }, // 签订日期
-    { wch: 14 }, // 总金额
+    ...(includeMoney ? [{ wch: 14 }] : []), // 总金额
     { wch: 8 },  // 币种
     { wch: 10 }, // 状态
     { wch: 30 }, // 备注

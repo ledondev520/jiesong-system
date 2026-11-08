@@ -19,7 +19,8 @@ test('financeController: 付款列表/创建响应按角色剔除供应商银行
   const BANK = { bankAccountName: 'SYNTH-NAME', bankName: 'SYNTH-BANK', bankBranch: 'SYNTH-BRANCH', bankCode: 'SYNTH-CODE', bankAccount: 'SYNTH-0000' };
   const payment = () => ({ id: 'pay-1', purchaseContract: { id: 'pc-1', supplier: { id: 's-1', name: 'Synth Supplier', ...BANK } } });
   financeService.listPayments = async () => ({ payments: [payment()], total: 1 });
-  financeService.createPayment = async () => ({ payment: payment(), reused: false });
+  let reused = false;
+  financeService.createPayment = async () => ({ payment: payment(), reused });
   try {
     const { listPayments, createPayment } = require('./financeController');
     const call = async (fn, role) => {
@@ -28,14 +29,18 @@ test('financeController: 付款列表/创建响应按角色剔除供应商银行
       await fn({ query: {}, body: {}, get: () => undefined, user: { role } }, res, (e) => { throw e; });
       return JSON.stringify(body);
     };
-    for (const fn of [listPayments, createPayment]) {
-      for (const role of ['SALES', 'WAREHOUSE']) {
-        const text = await call(fn, role);
-        assert.ok(text.includes('Synth Supplier'), `${role} keeps supplier name`);
-        assert.ok(!/SYNTH-(NAME|BANK|BRANCH|CODE|0000)/.test(text), `${fn.name} ${role} must not carry bank fields`);
-      }
-      for (const role of ['ADMIN', 'FINANCE', 'PURCHASE', 'BOSS']) {
-        assert.ok((await call(fn, role)).includes('SYNTH-0000'), `${fn.name} ${role} keeps bank fields`);
+    // reused:true 是幂等重放分支（单独一处 redact），不能只测新建分支
+    for (const replay of [false, true]) {
+      reused = replay;
+      for (const fn of [listPayments, createPayment]) {
+        for (const role of ['SALES', 'WAREHOUSE']) {
+          const text = await call(fn, role);
+          assert.ok(text.includes('Synth Supplier'), `${role} keeps supplier name`);
+          assert.ok(!/SYNTH-(NAME|BANK|BRANCH|CODE|0000)/.test(text), `${fn.name} ${role} reused=${replay} must not carry bank fields`);
+        }
+        for (const role of ['ADMIN', 'FINANCE', 'PURCHASE', 'BOSS']) {
+          assert.ok((await call(fn, role)).includes('SYNTH-0000'), `${fn.name} ${role} reused=${replay} keeps bank fields`);
+        }
       }
     }
   } finally {

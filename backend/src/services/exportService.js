@@ -22,7 +22,7 @@ const { roundMoney } = require('../utils/money');
  * @param {Object} query - 查询参数
  * @returns {Object} { data, filename, contentType }
  */
-const exportData = async (type, query = {}, { includeBank = false } = {}) => {
+const exportData = async (type, query = {}, { includeBank = false, includeMoney = true } = {}) => {
   switch (type) {
     case 'suppliers':
       return exportSuppliers(query, includeBank);
@@ -31,7 +31,7 @@ const exportData = async (type, query = {}, { includeBank = false } = {}) => {
     case 'products':
       return exportProducts(query);
     case 'purchases':
-      return exportPurchases(query);
+      return exportPurchases(query, includeMoney);
     case 'sales':
       return exportSales(query);
     case 'containers':
@@ -145,7 +145,7 @@ const exportProducts = async (query) => {
 /**
  * 职责：导出采购合同数据
  */
-const exportPurchases = async (query) => {
+const exportPurchases = async (query, includeMoney = true) => {
   const contracts = await prisma.purchaseContract.findMany({
     include: {
       supplier: true,
@@ -154,17 +154,16 @@ const exportPurchases = async (query) => {
     orderBy: { createdAt: 'desc' },
   });
   
-  const headers = ['合同号', '供应商', '总金额', '已付金额', '未付金额', '状态', '签订日期', '预计交货', '发票号'];
+  // OD-2/OD-3：WAREHOUSE 无金额与发票号列（includeMoney=false），状态等保留
+  const headers = ['合同号', '供应商', ...(includeMoney ? ['总金额', '已付金额', '未付金额'] : []), '状态', '签订日期', '预计交货', ...(includeMoney ? ['发票号'] : [])];
   const rows = contracts.map(c => [
     c.contractNo,
     c.supplier?.name || '',
-    c.totalAmount,
-    c.paidAmount,
-    outstandingOf(c), // 与付款列表同口径：草稿/已取消为 0
+    ...(includeMoney ? [c.totalAmount, c.paidAmount, outstandingOf(c)] : []), // 与付款列表同口径：草稿/已取消为 0
     c.status,
     c.signedAt ? formatDate(c.signedAt) : '',
     c.expectedDate ? formatDate(c.expectedDate) : '',
-    c.invoiceNo || '',
+    ...(includeMoney ? [c.invoiceNo || ''] : []),
   ]);
   
   return {

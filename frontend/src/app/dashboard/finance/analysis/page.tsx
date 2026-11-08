@@ -437,12 +437,18 @@ function BusinessReportsContent() {
             value={formatCurrency(funds.totalReceivable, "USD")}
             icon={<ArrowUpRight className="h-4 w-4" />}
             footer={
-              <Link
-                className="mt-3 inline-block text-xs text-primary underline"
-                href="/dashboard/finance/receivable"
-              >
-                查看应收明细
-              </Link>
+              <>
+                {/* OD-5：两个应收口径并存，各自标明；本数字按收款流水（payment）口径 */}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  收款流水口径
+                </p>
+                <Link
+                  className="mt-1 inline-block text-xs text-primary underline"
+                  href="/dashboard/finance/receivable"
+                >
+                  查看应收明细
+                </Link>
+              </>
             }
           />
 

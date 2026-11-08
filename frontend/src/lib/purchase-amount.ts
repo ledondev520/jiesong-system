@@ -15,6 +15,9 @@ export interface PurchaseAmountIssue {
   message: string;
 }
 
+/** WAREHOUSE 看不到的金额一律显示这行字，不得显示成 ¥0 */
+export const HIDDEN_MONEY = "无权查看";
+
 type AmountLine = {
   quantity?: number | string | null;
   unitPrice?: number | string | null;

@@ -81,6 +81,7 @@ import {
   summarizePurchaseAmounts,
 } from "@/lib/purchase-amount";
 import { formatMoney } from "@/lib/format";
+import { HIDDEN_MONEY } from "@/lib/purchase-amount";
 
 /** 付款用途选项：定金/尾款/自定义，决定汇款文本与默认金额 */
 type RemitPurpose = "deposit" | "balance" | "custom";
@@ -133,6 +134,8 @@ export function PurchaseFlowPanel({
   const canUploadInvoiceFile = ["ADMIN", "PURCHASE", "FINANCE"].includes(
     userRole || "",
   );
+  // OD-2/OD-3：WAREHOUSE 服务端不返回发票号与金额；本面板只显示状态，不显示数字、不预填号码
+  const moneyHidden = userRole === "WAREHOUSE";
   const invoiceFileInputRef = useRef<HTMLInputElement>(null);
   const [remitOpen, setRemitOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -148,6 +151,8 @@ export function PurchaseFlowPanel({
   const [invoiceNoInput, setInvoiceNoInput] = useState(() =>
     normalizeInvoiceNoInput(contract.invoiceNo),
   );
+  const loadedNumbers = (prep: PurchaseInvoicePreparation) =>
+    (prep.invoiceNumbers ?? []).join("\n");
   const [savingInvoiceNo, setSavingInvoiceNo] = useState(false);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
@@ -193,6 +198,15 @@ export function PurchaseFlowPanel({
         .filter(Boolean),
     [contract.invoiceNo],
   );
+  const invoiceCount = contract.invoiceCount ?? invoiceNumbers.length;
+  const paymentStatusLabel = contract.subStatus
+    ? {
+        NONE: "无需付款",
+        UNPAID: "未付款",
+        PARTIAL: "部分付款",
+        PAID: "已付清",
+      }[contract.subStatus.payment]
+    : undefined;
 
   // 1. 按用途推导汇款金额
   const remitAmount = useMemo(() => {
@@ -236,6 +250,22 @@ export function PurchaseFlowPanel({
 
   // 3. 开票信息文本（品名/单位/数量/金额/税点 + 我方抬头）
   const invoiceText = useMemo(() => {
+    if (moneyHidden) {
+      // 无金额版：品名/数量/抬头，供仓库转交催票；单价、金额、税额均不出现
+      return [
+        `【开票信息】购销合同 ${cgNo}`,
+        `销方（供应商）：${supplier?.name || "—"}`,
+        "—— 商品明细 ——",
+        ...items.map(
+          (item, idx) =>
+            `${idx + 1}. ${item.product?.customsName || "未知商品"}｜${item.quantity}${item.unit || item.product?.unit || ""}`,
+        ),
+        ...(invoiceTitleText?.trim()
+          ? ["—— 购方开票抬头 ——", invoiceTitleText.trim()]
+          : []),
+        "请开具增值税专用发票后回传发票号码，谢谢！",
+      ].join("\n");
+    }
     const contractTotalDiffers = amountSummary.issues.some(
       (issue) => issue.code === "CONTRACT_LINE_MISMATCH",
     );
@@ -267,7 +297,7 @@ export function PurchaseFlowPanel({
     }
     lines.push("请开具增值税专用发票后回传发票号码，谢谢！");
     return lines.join("\n");
-  }, [cgNo, supplier, items, amountSummary, invoiceTitleText]);
+  }, [cgNo, supplier, items, amountSummary, invoiceTitleText, moneyHidden]);
 
   /**
    * 职责：登记一笔付款（定金/尾款）到收付管理
@@ -323,7 +353,7 @@ export function PurchaseFlowPanel({
       );
       if (response.data) {
         setInvoicePreparation(response.data);
-        setInvoiceNoInput(response.data.invoiceNumbers.join("\n"));
+        setInvoiceNoInput(loadedNumbers(response.data));
       }
       toast.success("供应商发票号码已登记");
       await Promise.resolve(onUpdated());
@@ -345,7 +375,7 @@ export function PurchaseFlowPanel({
       .then((response) => {
         if (!response.data) return;
         setInvoicePreparation(response.data);
-        setInvoiceNoInput(response.data.invoiceNumbers.join("\n"));
+        setInvoiceNoInput(loadedNumbers(response.data));
       })
       .catch(() => toast.error("发票准备状态加载失败"))
       .finally(() => setLoadingInvoice(false));
@@ -398,22 +428,25 @@ export function PurchaseFlowPanel({
             付款与发票
           </CardTitle>
           <CardDescription className="mt-1">
-            已付 {formatMoney(amountSummary.paidAmount)} / 合同含税额{" "}
-            {formatMoney(amountSummary.grossAmount)}
-            {amountSummary.overpaidAmount > 0
-              ? `，超付 ${formatMoney(amountSummary.overpaidAmount)}`
-              : remaining > 0
-                ? // 草稿/已取消合同不计应付（与摘要卡、列表同口径），不显示「待付」
-                  isPayable(contract)
-                  ? `，待付 ${formatMoney(remaining)}`
-                  : ""
-                : "，已付清"}
-            {invoiceNumbers.length > 0 ? (
+            {moneyHidden
+              ? `付款状态：${paymentStatusLabel ?? "—"}（金额${HIDDEN_MONEY}）`
+              : `已付 ${formatMoney(amountSummary.paidAmount)} / 合同含税额 ${formatMoney(amountSummary.grossAmount)}`}
+            {moneyHidden
+              ? ""
+              : amountSummary.overpaidAmount > 0
+                ? `，超付 ${formatMoney(amountSummary.overpaidAmount)}`
+                : remaining > 0
+                  ? // 草稿/已取消合同不计应付（与摘要卡、列表同口径），不显示「待付」
+                    isPayable(contract)
+                    ? `，待付 ${formatMoney(remaining)}`
+                    : ""
+                  : "，已付清"}
+            {invoiceCount > 0 ? (
               <Badge
                 variant="outline"
                 className="ml-2 border-status-green/30 bg-status-green-soft text-status-green"
               >
-                已登记 {invoiceNumbers.length} 个发票号
+                已登记 {invoiceCount} 个发票号
               </Badge>
             ) : (
               <Badge
@@ -426,26 +459,30 @@ export function PurchaseFlowPanel({
           </CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            onClick={() => setRemitOpen(true)}
-          >
-            <Copy className="mr-1.5 h-3.5 w-3.5" />
-            复制汇款信息
-          </Button>
-          <BusinessWrite>
+          {!moneyHidden && (
             <Button
               variant="outline"
               size="sm"
               className="h-8 text-xs"
-              onClick={() => setPayOpen(true)}
+              onClick={() => setRemitOpen(true)}
             >
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              登记付款
+              <Copy className="mr-1.5 h-3.5 w-3.5" />
+              复制汇款信息
             </Button>
-          </BusinessWrite>
+          )}
+          {!moneyHidden && (
+            <BusinessWrite>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setPayOpen(true)}
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                登记付款
+              </Button>
+            </BusinessWrite>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -458,7 +495,11 @@ export function PurchaseFlowPanel({
         </div>
       </CardHeader>
       <CardContent>
-        {payments.length === 0 ? (
+        {moneyHidden ? (
+          <div className="rounded-lg bg-muted/40 py-6 text-center text-sm text-muted-foreground">
+            付款记录与金额仅采购、财务可见。
+          </div>
+        ) : payments.length === 0 ? (
           <div className="rounded-lg bg-muted/40 py-6 text-center text-sm text-muted-foreground">
             暂无付款记录。付定金后点击「登记付款」，系统将自动计算剩余尾款。
           </div>
@@ -659,7 +700,9 @@ export function PurchaseFlowPanel({
                   readOnly={readOnly}
                   rows={3}
                   placeholder={
-                    "例如：\n25442000000012345678\n25442000000012345679"
+                    moneyHidden
+                      ? `已登记 ${invoiceCount} 个发票号（号码不显示）；在此输入的新号码会追加，不会覆盖已有号码`
+                      : "例如：\n25442000000012345678\n25442000000012345679"
                   }
                   value={invoiceNoInput}
                   onChange={(e) => setInvoiceNoInput(e.target.value)}
@@ -698,22 +741,24 @@ export function PurchaseFlowPanel({
                     if (file) void handleInvoiceFileUpload(file);
                   }}
                 />
-                <BusinessWrite>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={uploadingInvoice}
-                    onClick={() => invoiceFileInputRef.current?.click()}
-                  >
-                    {uploadingInvoice ? (
-                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <FileUp className="mr-1.5 h-3.5 w-3.5" />
-                    )}
-                    {uploadingInvoice ? "上传中..." : "上传发票原件"}
-                  </Button>
-                </BusinessWrite>
+                {canUploadInvoiceFile && (
+                  <BusinessWrite>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={uploadingInvoice}
+                      onClick={() => invoiceFileInputRef.current?.click()}
+                    >
+                      {uploadingInvoice ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <FileUp className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      {uploadingInvoice ? "上传中..." : "上传发票原件"}
+                    </Button>
+                  </BusinessWrite>
+                )}
               </div>
               {(invoicePreparation?.invoiceFiles.length || 0) > 0 && (
                 <div className="flex flex-wrap gap-2">

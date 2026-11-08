@@ -335,7 +335,7 @@ const exportSalesContractPdf = async (contractId) => {
   };
 };
 
-const exportSystemDataRows = async (type, query = {}, { includeBank = false } = {}) => {
+const exportSystemDataRows = async (type, query = {}, { includeBank = false, includeMoney = true } = {}) => {
   switch (type) {
     case 'suppliers': {
       const suppliers = await prisma.supplier.findMany({
@@ -409,17 +409,15 @@ const exportSystemDataRows = async (type, query = {}, { includeBank = false } = 
       });
       return {
         title: 'Purchases',
-        headers: ['Contract No.', 'Supplier', 'Total', 'Received', 'Outstanding', 'Status', 'Signed At', 'Expected', 'Invoice'],
+        headers: ['Contract No.', 'Supplier', ...(includeMoney ? ['Total', 'Received', 'Outstanding'] : []), 'Status', 'Signed At', 'Expected', ...(includeMoney ? ['Invoice'] : [])],
         rows: contracts.map((item) => [
           item.contractNo,
           item.supplier?.name || '',
-          formatMoney(item.totalAmount),
-          formatMoney(item.paidAmount),
-          formatMoney(outstandingOf(item)),
+          ...(includeMoney ? [formatMoney(item.totalAmount), formatMoney(item.paidAmount), formatMoney(outstandingOf(item))] : []),
           item.status || '',
           item.signedAt ? formatDate(item.signedAt) : '',
           item.expectedDate ? formatDate(item.expectedDate) : '',
-          item.invoiceNo || '',
+          ...(includeMoney ? [item.invoiceNo || ''] : []),
         ]),
         filename: `purchases_${toFilenameDate()}.pdf`,
       };

@@ -119,19 +119,22 @@ const registerPurchaseInvoiceNumbers = async (
   contractId,
   { invoiceNumbers } = {},
   prismaClient = prisma,
+  { appendOnly = false } = {},
 ) => {
   const normalized = normalizeInvoiceNumbers(invoiceNumbers);
   if (normalized.length === 0) throw createError('请至少登记一个发票号码', 400);
 
   const existing = await prismaClient.purchaseContract.findUnique({
     where: { id: contractId },
-    select: { id: true },
+    select: { id: true, invoiceNo: true },
   });
   if (!existing) throw createError('采购合同不存在', 404);
+  // appendOnly（WAREHOUSE）：保留已存号码，只并入新号码
+  const finalNumbers = appendOnly ? normalizeInvoiceNumbers([existing.invoiceNo, ...normalized]) : normalized;
 
   const contract = await prismaClient.purchaseContract.update({
     where: { id: contractId },
-    data: { invoiceNo: normalized.join('，') },
+    data: { invoiceNo: finalNumbers.join('，') },
     include: PURCHASE_INVOICE_INCLUDE,
   });
   return buildPurchaseInvoicePreparation(contract);

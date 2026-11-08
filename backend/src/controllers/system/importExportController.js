@@ -43,7 +43,7 @@ const exportData = async (req, res, next) => {
     const { type } = req.params;
     const exportService = require('../../services/exportService');
 
-    const result = await exportService.exportData(type, req.query, { includeBank: BANK_ROLES.includes(req.user?.role) });
+    const result = await exportService.exportData(type, req.query, { includeBank: BANK_ROLES.includes(req.user?.role), includeMoney: req.user?.role !== 'WAREHOUSE' });
 
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
@@ -58,7 +58,7 @@ const exportDataPdf = async (req, res, next) => {
     const { type } = req.params;
     const { exportSystemDataPdf } = require('../../services/pdfExportService');
 
-    const result = await exportSystemDataPdf(type, req.query, { includeBank: BANK_ROLES.includes(req.user?.role) });
+    const result = await exportSystemDataPdf(type, req.query, { includeBank: BANK_ROLES.includes(req.user?.role), includeMoney: req.user?.role !== 'WAREHOUSE' });
 
     res.setHeader('Content-Type', result.contentType);
     res.setHeader(

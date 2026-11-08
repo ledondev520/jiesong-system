@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { PURCHASE_STATUS_LABELS } from "@/components/ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuthStore } from "@/store/auth.store";
+import { HIDDEN_MONEY } from "@/lib/purchase-amount";
 import { ErrorState } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -99,6 +100,8 @@ import { PurchaseDetailDialog } from "./PurchaseDetailDialog";
 
 export default function ContractsPageContent() {
   const readOnly = useBusinessReadOnly();
+  // OD-2/OD-3：WAREHOUSE 响应不含合同金额，列表显示「无权查看」而不是 ¥0 / 未录入
+  const moneyHidden = useAuthStore((state) => state.user?.role === "WAREHOUSE");
   const canImportHistory = useAuthStore(
     (state) => state.user?.role === "ADMIN",
   );
@@ -903,7 +906,9 @@ export default function ContractsPageContent() {
                           合同总额
                         </p>
                         <p className="text-sm font-semibold tabular-nums text-status-green">
-                          {contract.totalAmount > 0 ? (
+                          {moneyHidden ? (
+                            HIDDEN_MONEY
+                          ) : contract.totalAmount > 0 ? (
                             `¥${contract.totalAmount.toLocaleString()}`
                           ) : (
                             <span className="text-status-amber">未录入</span>
@@ -931,7 +936,9 @@ export default function ContractsPageContent() {
                         size="sm"
                         className="text-base font-semibold tabular-nums"
                       >
-                        ¥{contract.paidAmount.toLocaleString()}
+                        {moneyHidden
+                          ? HIDDEN_MONEY
+                          : `¥${contract.paidAmount.toLocaleString()}`}
                       </AmountText>
                       <OverpaidFlag contract={contract} />
                     </div>
@@ -1124,7 +1131,9 @@ export default function ContractsPageContent() {
                             : "—"}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {contract.totalAmount > 0 ? (
+                          {moneyHidden ? (
+                            HIDDEN_MONEY
+                          ) : contract.totalAmount > 0 ? (
                             formatAmount(contract.totalAmount)
                           ) : (
                             <span
@@ -1142,7 +1151,9 @@ export default function ContractsPageContent() {
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           <AmountText tone={isUnpaid ? "warning" : "success"}>
-                            ¥{contract.paidAmount.toLocaleString()}
+                            {moneyHidden
+                              ? HIDDEN_MONEY
+                              : `¥${contract.paidAmount.toLocaleString()}`}
                           </AmountText>
                           <OverpaidFlag contract={contract} />
                         </TableCell>
