@@ -78,6 +78,10 @@ router.post('/:id/items', withIdValidation, roleAuth(...WRITE_ROLES), withAuditL
   salesController.addItem
 ));
 
+// POST /api/v1/sales/:id/items/:itemId/reprice - 改单行数量/售价（A84；审计行在服务事务内写入）
+// 不含 WAREHOUSE（OD-3：仓库看不到金额，也就不能改价）与只读的 BOSS。
+router.post('/:id/items/:itemId/reprice', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE'), salesController.updateItemLine);
+
 // ==================== 装箱明细 ====================
 
 // GET /api/v1/sales/:id/available-purchase-items - 已完工且尚有剩余箱数的采购明细

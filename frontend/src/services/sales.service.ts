@@ -333,6 +333,17 @@ export const salesService = {
     );
   },
 
+  repriceItem: async (
+    salesContractId: string,
+    itemId: string,
+    data: { quantity?: number; sellingPrice?: number },
+  ) => {
+    return api.post<ApiResponse<void>, ApiResponse<void>, typeof data>(
+      `/sales/${salesContractId}/items/${itemId}/reprice`,
+      data,
+    );
+  },
+
   updatePackingItem: async (
     salesContractId: string,
     itemId: string,

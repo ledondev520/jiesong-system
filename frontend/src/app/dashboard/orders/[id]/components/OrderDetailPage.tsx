@@ -21,6 +21,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Role,
+  SalesStatus,
   type Inventory,
   type Product,
   type SalesContract,
@@ -51,6 +52,7 @@ import {
   ORDER_TABS,
   evaluateOrderReadiness,
   getNextStep,
+  hasOrderShipped,
   resolveOrderTab,
   type OrderTab,
 } from "./orderDetailModel";
@@ -106,6 +108,13 @@ const ForexVerificationPanel = lazy(() =>
 
 // 后端 POST /sales/:id/purchase-drafts 仅允许 ADMIN/PURCHASE
 const PURCHASE_DRAFT_ROLES: string[] = [Role.ADMIN, Role.PURCHASE];
+// 与后端 POST /sales/:id/items/:itemId/reprice 一致；WAREHOUSE 看不到金额（OD-3），BOSS 只读。
+const LINE_EDIT_ROLES: string[] = [
+  Role.ADMIN,
+  Role.PURCHASE,
+  Role.SALES,
+  Role.FINANCE,
+];
 // 仓库角色无账务读权限（后端 403），不展示收款/退税页签。
 const FINANCE_TABS: string[] = ["receipts", "refund"];
 
@@ -399,6 +408,29 @@ export function OrderDetailPage({ id }: { id: string }) {
           <OrderLinesTab
             contract={contract}
             stores={stores}
+            canEditLines={
+              role !== undefined &&
+              LINE_EDIT_ROLES.includes(role) &&
+              !hasOrderShipped(contract.status) &&
+              contract.status !== SalesStatus.CANCELLED
+            }
+            onReprice={async (changes) => {
+              try {
+                for (const change of changes) {
+                  await salesService.repriceItem(
+                    id,
+                    change.itemId,
+                    change.data,
+                  );
+                }
+                toast.success("明细已更新");
+              } catch (error: unknown) {
+                toast.error(errorMessage(error, "明细更新失败"));
+                throw error;
+              } finally {
+                void loadData();
+              }
+            }}
             onSave={async (data) => {
               try {
                 await salesService.update(id, data);
