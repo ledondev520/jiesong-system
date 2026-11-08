@@ -219,7 +219,9 @@ test('assertFileAccess: 财务确认附件权限共享，普通附件不增加�
 });
 
 test('assertFileAccess: 出口三单归档文件拒绝 WAREHOUSE（R3 P1-3）', () => {
-  const packet = { description: '出口三单生成版本（外销合同、商业发票、装箱单）:v1' };
+  // 守卫在 fileService 里按前缀匹配；描述取自 exportPacketService 的常量，避免测试与实现各写一份字符串（fileService 不能反向 require，会循环）。
+  const { EXPORT_PACKET_DESCRIPTION } = require('./exportPacketService');
+  const packet = { description: `${EXPORT_PACKET_DESCRIPTION}:v1` };
   assert.throws(() => fileService.assertFileAccess(packet, { role: 'WAREHOUSE' }), error => error.statusCode === 403);
   for (const role of ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE']) assert.doesNotThrow(() => fileService.assertFileAccess(packet, { role }));
 });
@@ -681,6 +683,7 @@ test('createFile: 人工上传 SYSTEM_GENERATED_* 类别返回 400 且不持久�
           (error) => error.statusCode === 400,
         );
       });
+      assert.equal(fs.existsSync(filePath), false, `${category} 被拒后本次上传文件须从磁盘清除`);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

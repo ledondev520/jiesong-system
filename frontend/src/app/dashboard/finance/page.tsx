@@ -484,7 +484,7 @@ export default function FinancePage() {
         <KpiCard
           label="应收账款总额"
           value={`USD ${formatAmount(stats?.receivable.total ?? 0)}`}
-          subLabel={`已收 USD ${formatAmount(stats?.receivable.received ?? 0)}`}
+          subLabel={`已收 USD ${formatAmount(stats?.receivable.received ?? 0)} · 合同表头口径`}
           trend={receivableTrendDir}
           trendValue={receivableTrend}
           icon={<ArrowDownLeft className="h-4 w-4" />}
@@ -494,8 +494,8 @@ export default function FinancePage() {
           value={`USD ${formatAmount(stats?.receivable.unreceived ?? 0)}`}
           subLabel={
             receivableUrgent
-              ? "当前客户剩余欠款偏高，建议优先跟进"
-              : "当前客户剩余欠款"
+              ? "合同表头口径 · 当前客户剩余欠款偏高，建议优先跟进"
+              : "合同表头口径 · 当前客户剩余欠款"
           }
           trend="neutral"
           trendValue={receivableUrgent ? "需跟进" : "正常"}

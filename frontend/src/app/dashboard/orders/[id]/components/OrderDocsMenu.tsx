@@ -36,8 +36,9 @@ export function OrderDocsMenu({
   onSelect: (action: OrderDocAction) => void;
   role?: string;
 }) {
+  // 角色未知（登录态还在恢复）时一律不显示，避免短暂暴露本不该有的入口
   const allowed = (action: OrderDocAction) =>
-    !role || !ROLE_ACTIONS[role] || ROLE_ACTIONS[role].includes(action);
+    !!role && (!ROLE_ACTIONS[role] || ROLE_ACTIONS[role].includes(action));
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
