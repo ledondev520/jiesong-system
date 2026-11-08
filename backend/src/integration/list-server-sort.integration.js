@@ -79,6 +79,9 @@ test('HTTP/SQLite: sortBy/sortDir sort before pagination, compose with filters a
   assert.equal((await get('/purchases?sortBy=password')).status, 400);
   assert.equal((await get('/purchases?sortBy=totalAmount&sortDir=sideways')).status, 400);
   assert.equal((await get('/inventory?sortBy=__proto__')).status, 400);
+  assert.equal((await get('/inventory?sortBy=constructor')).status, 400);
+  assert.equal((await get('/inventory?sortBy=toString')).status, 400);
+  assert.equal((await get('/inventory?sortBy[]=quantity')).status, 400);
   assert.equal((await get('/inventory?sortDir=asc')).status, 400);
   assert.equal((await get('/purchases?sortBy=totalAmount', 'WAREHOUSE')).status, 400);
   assert.equal((await get('/purchases?sortBy=contractNo', 'WAREHOUSE')).status, 200);

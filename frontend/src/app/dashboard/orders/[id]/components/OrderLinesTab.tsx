@@ -113,11 +113,14 @@ export function OrderLinesTab({
   onSave: (data: Partial<SalesContract>) => Promise<void>;
   /** 角色允许且订单未发运/取消；后端仍会复核。 */
   canEditLines?: boolean;
-  onReprice?: (changes: LineChange[]) => Promise<void>;
+  onReprice?: (
+    changes: LineChange[],
+  ) => Promise<{ totalFromPacking?: boolean } | void>;
 }) {
   const grid = useMemo(() => buildGrid(contract), [contract]);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [packingNote, setPackingNote] = useState(false);
   const [qtyEdits, setQtyEdits] = useState<Record<string, string>>({});
   const [priceEdits, setPriceEdits] = useState<Record<string, string>>({});
   const singleItemCells = useMemo(() => {
@@ -138,7 +141,8 @@ export function OrderLinesTab({
     if (!changes.length || !onReprice) return stopEditing();
     setSaving(true);
     try {
-      await onReprice(changes);
+      const result = await onReprice(changes);
+      setPackingNote(Boolean(result?.totalFromPacking));
       stopEditing();
     } catch {
       // 失败时保留输入供重试；提示由调用方给出。
@@ -282,6 +286,11 @@ export function OrderLinesTab({
                 </TableBody>
               </Table>
             </div>
+          )}
+          {packingNote && (
+            <p role="status" className="mt-3 text-xs text-muted-foreground">
+              明细已更新；该订单已有装箱明细，合同总额以装箱明细为准，未随本次改价变化。
+            </p>
           )}
         </CardContent>
       </Card>

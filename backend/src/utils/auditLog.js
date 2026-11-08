@@ -41,7 +41,7 @@ const CRITICAL_FIELDS_BY_ENTITY = {
   PriceHistory: ['productId', 'price', 'supplierId', 'unitPrice'],
   Payment: ['type', 'amount', 'currency', 'paymentMethod', 'paymentDate', 'note', 'purchaseContractId', 'salesContractId'],
   SupplierAlias: ['alias', 'supplierId'],
-  Inventory: ['status', 'quantity', 'salesContractId', 'inboundAt', 'outboundAt'],
+  Inventory: ['status', 'quantity', 'salesContractId', 'inboundAt', 'outboundAt', 'lotNo', 'binLocation'],
   PackingItem: ['salesContractId', 'purchaseItemId', 'productId', 'storeId', 'quantity', 'unit', 'boxes', 'grossWeight', 'netWeight', 'volume', 'unitPrice', 'totalPrice', 'note'],
   SalesItem: ['salesContractId', 'productId', 'storeId', 'quantity', 'unit', 'costPrice', 'sellingPrice', 'specification', 'note'],
   ChatSession: ['sessionId', 'userId'],

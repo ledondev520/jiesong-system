@@ -340,6 +340,8 @@ const updateSalesItemLine = async (id, itemId, data = {}, context = {}) => {
     if (!Object.keys(newValue).length) return before;
     const item = await tx.salesItem.update({ where: { id: itemId }, data: newValue, include: { product: true, store: true } });
     await inventorySnapshot.reconcileSalesFinancials(tx, id);
+    // 有装箱明细时合同总额以装箱为准，改价不会改变它；让界面能如实提示。
+    const totalFromPacking = (await tx.packingItem.count({ where: { salesContractId: id } })) > 0;
     const req = context.req;
     await tx.operationLog.create({
       data: {
@@ -355,7 +357,7 @@ const updateSalesItemLine = async (id, itemId, data = {}, context = {}) => {
         userAgent: req?.headers?.['user-agent'] || null,
       },
     });
-    return item;
+    return { ...item, totalFromPacking };
   });
 };
 

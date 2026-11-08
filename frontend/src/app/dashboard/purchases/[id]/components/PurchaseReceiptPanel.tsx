@@ -104,7 +104,15 @@ interface InspectionForm {
   requestId: string;
   receipt: PurchaseReceipt;
   note: string;
-  quantities: Record<string, { accepted: number; reinspection: number }>;
+  quantities: Record<
+    string,
+    {
+      accepted: number;
+      reinspection: number;
+      lotNo: string;
+      binLocation: string;
+    }
+  >;
 }
 
 export function PurchaseReceiptPanel({
@@ -344,6 +352,10 @@ export function PurchaseReceiptPanel({
       receiptItemId: item.id,
       acceptedQuantity: inspection.quantities[item.id].accepted,
       reinspectionQuantity: inspection.quantities[item.id].reinspection,
+      // A83：批次号/库位随本次入库登记；留空 = 不登记。
+      lotNo: inspection.quantities[item.id].lotNo.trim() || undefined,
+      binLocation:
+        inspection.quantities[item.id].binLocation.trim() || undefined,
     }));
     if (
       inspection.receipt.items.some((original) => {
@@ -532,6 +544,8 @@ export function PurchaseReceiptPanel({
                                       {
                                         accepted: item.acceptedQuantity,
                                         reinspection: item.reinspectionQuantity,
+                                        lotNo: "",
+                                        binLocation: "",
                                       },
                                     ]),
                                   ),
@@ -788,7 +802,11 @@ export function PurchaseReceiptPanel({
                       quantities: Object.fromEntries(
                         inspection.receipt.items.map((item) => [
                           item.id,
-                          { accepted: item.arrivedQuantity, reinspection: 0 },
+                          {
+                            ...inspection.quantities[item.id],
+                            accepted: item.arrivedQuantity,
+                            reinspection: 0,
+                          },
                         ]),
                       ),
                     })
@@ -868,6 +886,50 @@ export function PurchaseReceiptPanel({
                                 [item.id]: {
                                   ...inspection.quantities[item.id],
                                   reinspection: event.target.valueAsNumber,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor={`lot-${item.id}`}>
+                          {item.productName} 批次号（可选）
+                        </Label>
+                        <Input
+                          id={`lot-${item.id}`}
+                          maxLength={50}
+                          value={inspection.quantities[item.id].lotNo}
+                          onChange={(event) =>
+                            changeInspection({
+                              quantities: {
+                                ...inspection.quantities,
+                                [item.id]: {
+                                  ...inspection.quantities[item.id],
+                                  lotNo: event.target.value,
+                                },
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`bin-${item.id}`}>
+                          {item.productName} 库位（可选）
+                        </Label>
+                        <Input
+                          id={`bin-${item.id}`}
+                          maxLength={50}
+                          value={inspection.quantities[item.id].binLocation}
+                          onChange={(event) =>
+                            changeInspection({
+                              quantities: {
+                                ...inspection.quantities,
+                                [item.id]: {
+                                  ...inspection.quantities[item.id],
+                                  binLocation: event.target.value,
                                 },
                               },
                             })

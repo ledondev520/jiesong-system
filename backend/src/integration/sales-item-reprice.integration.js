@@ -89,6 +89,14 @@ test('HTTP/SQLite: line re-price recomputes totals, audits every change, gates r
   assert.deepEqual(JSON.parse(rows[1].oldValue), { salesContractId: order.id, quantity: 10, sellingPrice: 3 });
   assert.deepEqual(JSON.parse(rows[1].newValue), { salesContractId: order.id, quantity: 8, sellingPrice: 3.5 });
   assert.ok(rows.every((row) => row.entityId === a.id));
+  // Packing rows own the contract total: the response says so (UI hint), and the total stays put.
+  assert.equal(priced.data.totalFromPacking, false);
+  await db.packingItem.create({ data: { salesContractId: order.id, productId: product.id, storeId: store.id, quantity: 8, totalPrice: 777 } });
+  await db.salesContract.update({ where: { id: order.id }, data: { totalAmount: 777 } });
+  const withPacking = await post(order.id, a.id, { sellingPrice: 3.6 }, 'SALES');
+  assert.equal(withPacking.status, 200);
+  assert.equal(withPacking.data.totalFromPacking, true);
+  assert.equal(await total(), 777);
   // An item of another order cannot be edited through this order.
   const other = await makeOrder('EXP-RP-002', 'DRAFT');
   assert.equal((await post(order.id, other.items[0].id, { quantity: 1 })).status, 404);

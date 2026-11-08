@@ -69,6 +69,36 @@ describe("OrderLinesTab 行内改价", () => {
     ]);
   });
 
+  it("订单已有装箱明细、合同总额未随改价变化时给出提示；否则不提示", async () => {
+    const user = userEvent.setup();
+    const onReprice = vi
+      .fn()
+      .mockResolvedValueOnce({ totalFromPacking: true })
+      .mockResolvedValueOnce({ totalFromPacking: false });
+    render(
+      <OrderLinesTab
+        contract={contract}
+        stores={[]}
+        onSave={vi.fn()}
+        canEditLines
+        onReprice={onReprice}
+      />,
+    );
+    const edit = async (price: string) => {
+      await user.click(screen.getByRole("button", { name: "编辑明细" }));
+      const input = screen.getByLabelText("商品p1 单价");
+      await user.clear(input);
+      await user.type(input, price);
+      await user.click(screen.getByRole("button", { name: "保存明细" }));
+    };
+    await edit("3");
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "合同总额以装箱明细为准",
+    );
+    await edit("4");
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
   it("未修改时保存不发请求", async () => {
     const onReprice = vi.fn();
     render(

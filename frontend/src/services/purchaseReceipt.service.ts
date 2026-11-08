@@ -68,7 +68,7 @@ export interface PurchaseReceiptCreateInput {
 export interface PurchaseReceiptInspectionInput {
   requestId: string;
   note: string;
-  items: Array<{ receiptItemId: string; acceptedQuantity: number; reinspectionQuantity: number }>;
+  items: Array<{ receiptItemId: string; acceptedQuantity: number; reinspectionQuantity: number; lotNo?: string; binLocation?: string }>;
 }
 export interface PurchaseReceiptMutation {
   receipt: PurchaseReceipt;

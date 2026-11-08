@@ -130,5 +130,17 @@ test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、
     await call('POST', `/inventory/${stock.id}/location`, { lotNo: 'X'.repeat(51) }, { expected: 400 });
     await call('POST', '/inventory/missing-id/location', { lotNo: 'L' }, { expected: 404 });
     assert.equal((await db.inventory.findUnique({ where: { id: stock.id } })).binLocation, 'B-02-03');
+
+    // 审计：每次成功的位置修改有一行 UPDATE_LOCATION，带修改前后的批次/库位（异步写入，轮询等待）。
+    let logs = [];
+    for (let attempt = 0; attempt < 50 && logs.length < 2; attempt += 1) {
+      logs = await db.operationLog.findMany({ where: { entity: 'Inventory', entityId: stock.id, action: 'UPDATE_LOCATION' }, orderBy: { createdAt: 'asc' } });
+      if (logs.length < 2) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    assert.equal(logs.length, 2);
+    assert.equal(JSON.parse(logs[0].oldValue).lotNo, 'LOT-2026-11');
+    assert.equal(JSON.parse(logs[0].newValue).binLocation, 'B-02-03');
+    assert.equal(JSON.parse(logs[1].oldValue).lotNo, 'LOT-2026-11');
+    assert.equal(JSON.parse(logs[1].newValue).lotNo, null);
   });
 });

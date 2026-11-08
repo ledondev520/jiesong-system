@@ -338,10 +338,11 @@ export const salesService = {
     itemId: string,
     data: { quantity?: number; sellingPrice?: number },
   ) => {
-    return api.post<ApiResponse<void>, ApiResponse<void>, typeof data>(
-      `/sales/${salesContractId}/items/${itemId}/reprice`,
-      data,
-    );
+    return api.post<
+      ApiResponse<{ totalFromPacking?: boolean }>,
+      ApiResponse<{ totalFromPacking?: boolean }>,
+      typeof data
+    >(`/sales/${salesContractId}/items/${itemId}/reprice`, data);
   },
 
   updatePackingItem: async (

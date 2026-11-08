@@ -416,14 +416,17 @@ export function OrderDetailPage({ id }: { id: string }) {
             }
             onReprice={async (changes) => {
               try {
+                let totalFromPacking = false;
                 for (const change of changes) {
-                  await salesService.repriceItem(
+                  const response = await salesService.repriceItem(
                     id,
                     change.itemId,
                     change.data,
                   );
+                  totalFromPacking ||= Boolean(response.data?.totalFromPacking);
                 }
                 toast.success("明细已更新");
+                return { totalFromPacking };
               } catch (error: unknown) {
                 toast.error(errorMessage(error, "明细更新失败"));
                 throw error;
