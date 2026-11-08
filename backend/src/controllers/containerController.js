@@ -9,7 +9,7 @@
 const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const containerService = require('../services/containerService');
-const { redactSalesContract } = require('../utils/warehouseRedaction');
+const { redactSalesContract, redactPackingSecrets } = require('../utils/warehouseRedaction');
 
 const list = async (req, res, next) => {
   try {
@@ -72,7 +72,7 @@ const remove = async (req, res, next) => {
 const addItem = async (req, res, next) => {
   try {
     const item = await containerService.addItem(req.params.id, req.body || {});
-    created(res, item, '装箱明细添加成功');
+    created(res, redactPackingSecrets(req.user?.role, item), '装箱明细添加成功');
   } catch (error) {
     next(error);
   }
@@ -82,7 +82,7 @@ const updateItem = async (req, res, next) => {
   try {
     const { id, itemId } = req.params;
     const item = await containerService.updateItem(id, itemId, req.body || {});
-    success(res, item, '装箱明细更新成功');
+    success(res, redactPackingSecrets(req.user?.role, item), '装箱明细更新成功');
   } catch (error) {
     next(error);
   }
@@ -119,7 +119,7 @@ const getNextContainerNo = async (req, res, next) => {
 const getProducts = async (req, res, next) => {
   try {
     const items = await containerService.getProducts(req.params.id);
-    success(res, items);
+    success(res, redactPackingSecrets(req.user?.role, items));
   } catch (error) {
     next(error);
   }
@@ -128,7 +128,7 @@ const getProducts = async (req, res, next) => {
 const getVisualization = async (req, res, next) => {
   try {
     const visualization = await containerService.getVisualization(req.params.id);
-    success(res, visualization);
+    success(res, redactPackingSecrets(req.user?.role, visualization));
   } catch (error) {
     next(error);
   }
@@ -142,7 +142,7 @@ const getVisualization = async (req, res, next) => {
 const listItems = async (req, res, next) => {
   try {
     const items = await containerService.listItems(req.params.id);
-    success(res, items);
+    success(res, redactPackingSecrets(req.user?.role, items));
   } catch (error) {
     next(error);
   }
