@@ -13,6 +13,7 @@ const { success, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { validateInventoryTransition } = require('../utils/inventoryStateMachine');
 const { normalizePagination } = require('../utils/pagination');
+const { parseListSort } = require('../utils/listSort');
 const { getInventorySnapshot } = require('../services/inventorySnapshot');
 const { listLowStockAlerts } = require('../services/inventoryAlertService');
 
@@ -27,8 +28,18 @@ const { listLowStockAlerts } = require('../services/inventoryAlertService');
  * @param {import('express').NextFunction} next 错误透传
  * @returns {Promise<void>}
  */
+// A85：库存列表可排序列白名单（无金额列）。
+const INVENTORY_SORT_COLUMNS = {
+  productName: (dir) => ({ product: { customsName: dir } }),
+  contractNo: (dir) => ({ purchaseItem: { purchaseContract: { contractNo: dir } } }),
+  quantity: (dir) => ({ quantity: dir }),
+  inboundAt: (dir) => ({ inboundAt: dir }),
+  status: (dir) => ({ status: dir }),
+};
+
 const list = async (req, res, next) => {
   try {
+    const orderBy = parseListSort(req.query, INVENTORY_SORT_COLUMNS, [{ createdAt: 'desc' }]);
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     const { status, productId, keyword } = req.query;
     const lite = req.query.lite === 'true' || req.query.lite === true;
@@ -101,7 +112,7 @@ const list = async (req, res, next) => {
                 },
               },
             },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
       prisma.inventory.count({ where }),
     ]);

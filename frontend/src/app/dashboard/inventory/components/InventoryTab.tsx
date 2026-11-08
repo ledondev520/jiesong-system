@@ -1,5 +1,5 @@
 /**
- * Input: 实时库存服务、采购合同店铺汇总、共享列表URL状态、SortableTableHead、useTableSort
+ * Input: 实时库存服务、采购合同店铺汇总、共享列表URL状态、SortableTableHead、useServerSort
  * Output: 支持当前筛选刷新、窄屏操作与长名称显示的库存状态管理 Tab 组件（店铺筛选、单条/批量状态流转（需确认）、桌面表列排序；入库日期列、无合同来源时隐藏采购合同列、可用库存口径说明；采购/验货来源库存自动流转）
  * Pos: 库存页（/dashboard/inventory）主体
  *
@@ -75,7 +75,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
-import { useTableSort } from "@/lib/hooks/useTableSort";
+import { useServerSort } from "@/lib/hooks/useServerSort";
 import { formatDate } from "@/lib/date-format";
 import { MISSING_VALUE } from "@/lib/missing-value";
 
@@ -115,6 +115,15 @@ export function InventoryTab() {
   const [loadError, setLoadError] = useState(false);
   const [{ keyword, store, page: currentPage, pageSize }, setListState] =
     useListUrlState(listUrlFields.inventory);
+  // A85：排序由服务端在分页前完成；换列/方向回到第 1 页。
+  const serverSort = useServerSort();
+  const inventorySort = {
+    ...serverSort,
+    onSort: (key: string) => {
+      serverSort.onSort(key);
+      setListState({ page: 1 });
+    },
+  };
   const [storeOptions, setStoreOptions] = useState<
     { id: string; name: string }[]
   >([]);
@@ -161,6 +170,14 @@ export function InventoryTab() {
             pageSize,
             keyword: searchKeyword || undefined,
             storeId: store || undefined,
+            sortBy:
+              serverSort.sortKey && serverSort.sortDir
+                ? serverSort.sortKey
+                : undefined,
+            sortDir:
+              serverSort.sortKey && serverSort.sortDir
+                ? serverSort.sortDir
+                : undefined,
           }),
         (response) => {
           if (request !== inventoryRequest.current) return;
@@ -183,7 +200,7 @@ export function InventoryTab() {
         },
       );
     },
-    [currentPage, pageSize, store],
+    [currentPage, pageSize, store, serverSort.sortKey, serverSort.sortDir],
   );
 
   /** 手动重试：先进入加载态再拉取 */
@@ -200,6 +217,8 @@ export function InventoryTab() {
   const inventoryQueryKey = JSON.stringify([
     debouncedKeyword,
     store,
+    serverSort.sortKey,
+    serverSort.sortDir,
     currentPage,
     pageSize,
     refreshVersion,
@@ -413,26 +432,8 @@ export function InventoryTab() {
     }
   };
 
-  /**
-   * 职责：库存表排序字段（商品名、合同号、数量）
-   */
-  const inventoryAccessor = useCallback((item: Inventory, key: string) => {
-    switch (key) {
-      case "productName":
-        return item.product?.customsName ?? "";
-      case "contractNo":
-        return item.purchaseItem?.purchaseContract?.contractNo ?? "";
-      case "quantity":
-        return item.quantity;
-      default:
-        return null;
-    }
-  }, []);
-
-  const inventorySort = useTableSort(inventory, inventoryAccessor);
-
   const totalPages = Math.ceil(total / pageSize);
-  const pagedInventory = inventorySort.sortedData;
+  const pagedInventory = inventory;
 
   // 采购合同只在「采购明细」来源的行上有值；当前页没有任何一行有值时整列不显示，避免一整列「—」。
   const showContractColumn = pagedInventory.some(

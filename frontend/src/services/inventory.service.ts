@@ -7,6 +7,8 @@ export const inventoryService = {
     pageSize?: number;
     keyword?: string;
     storeId?: string;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
     lite?: boolean;
   }) => {
     // 库存由验货与发运实时改变，不复用默认三分钟 GET 缓存。

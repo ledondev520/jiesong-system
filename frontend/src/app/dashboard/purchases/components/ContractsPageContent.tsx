@@ -1,5 +1,5 @@
 /**
- * Input: 采购合同服务、SortableTableHead、useTableSort
+ * Input: 采购合同服务、SortableTableHead、useServerSort
  * Output: 手机前置操作与双列紧凑概览的采购合同管理页面（合同号/供应商/商品服务端检索、分页、具名桌面操作）
  * Pos: 核心业务页面，管理供应商采购合同
  *
@@ -81,7 +81,7 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { TableRowsSkeleton } from "@/components/ui/data-state";
 import { formatMoney } from "@/lib/format";
 import { formatDate } from "@/lib/date-format";
-import { useTableSort } from "@/lib/hooks/useTableSort";
+import { useServerSort } from "@/lib/hooks/useServerSort";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import {
   Sheet,
@@ -151,38 +151,11 @@ export default function ContractsPageContent() {
 
   const filteredPurchaseContracts = purchaseContracts;
 
-  /**
-   * 职责：按列从采购合同中取出用于排序的可比字段
-   */
-  const purchaseAccessor = useCallback(
-    (item: PurchaseContract, key: string) => {
-      switch (key) {
-        case "contractNo":
-          return item.contractNo;
-        case "supplier":
-          return item.supplier?.name ?? "";
-        case "signedAt":
-          return item.signedAt ? new Date(item.signedAt).getTime() : null;
-        case "totalAmount":
-          return item.totalAmount;
-        case "paidAmount":
-          return item.paidAmount;
-        case "status":
-          return item.status;
-        default:
-          return null;
-      }
-    },
-    [],
-  );
-
-  const purchaseSort = useTableSort(
-    filteredPurchaseContracts,
-    purchaseAccessor,
-  );
+  // A85：排序在服务端、分页之前完成；本页不再对当前页做客户端排序。
+  const purchaseSort = useServerSort();
 
   const purchaseTotalPages = Math.ceil(purchaseTotal / pageSize);
-  const pagedPurchaseContracts = purchaseSort.sortedData;
+  const pagedPurchaseContracts = filteredPurchaseContracts;
   const procurementOverview = {
     activeContracts: ["DRAFT", "SIGNED", "PRODUCING", "READY"].reduce(
       (sum, status) => sum + (listSummary.statusCounts[status] ?? 0),
@@ -199,18 +172,24 @@ export default function ContractsPageContent() {
     storeFilter,
     productSearch,
     pageSize,
+    sortKey: purchaseSort.sortKey,
+    sortDir: purchaseSort.sortDir,
   });
   if (
     prevPageResetDeps.purchaseStatusFilter !== purchaseStatusFilter ||
     prevPageResetDeps.storeFilter !== storeFilter ||
     prevPageResetDeps.productSearch !== productSearch ||
-    prevPageResetDeps.pageSize !== pageSize
+    prevPageResetDeps.pageSize !== pageSize ||
+    prevPageResetDeps.sortKey !== purchaseSort.sortKey ||
+    prevPageResetDeps.sortDir !== purchaseSort.sortDir
   ) {
     setPrevPageResetDeps({
       purchaseStatusFilter,
       storeFilter,
       productSearch,
       pageSize,
+      sortKey: purchaseSort.sortKey,
+      sortDir: purchaseSort.sortDir,
     });
     setPurchasePage(1);
   }
@@ -271,6 +250,14 @@ export default function ContractsPageContent() {
           storeName:
             storeFilter && storeFilter !== "ALL" ? storeFilter : undefined,
           keyword: productSearch.trim() || undefined,
+          sortBy:
+            purchaseSort.sortKey && purchaseSort.sortDir
+              ? purchaseSort.sortKey
+              : undefined,
+          sortDir:
+            purchaseSort.sortKey && purchaseSort.sortDir
+              ? purchaseSort.sortDir
+              : undefined,
         };
         return cachedFetch(
           `purchase-contracts-list-${JSON.stringify(params)}`,
@@ -298,6 +285,8 @@ export default function ContractsPageContent() {
     purchaseStatusFilter,
     storeFilter,
     productSearch,
+    purchaseSort.sortKey,
+    purchaseSort.sortDir,
   ]);
 
   // 手动重新加载（重试、导入完成后）
@@ -314,13 +303,17 @@ export default function ContractsPageContent() {
     purchaseStatusFilter,
     storeFilter,
     productSearch,
+    sortKey: purchaseSort.sortKey,
+    sortDir: purchaseSort.sortDir,
   });
   if (
     prevPurchaseQuery.purchasePage !== purchasePage ||
     prevPurchaseQuery.pageSize !== pageSize ||
     prevPurchaseQuery.purchaseStatusFilter !== purchaseStatusFilter ||
     prevPurchaseQuery.storeFilter !== storeFilter ||
-    prevPurchaseQuery.productSearch !== productSearch
+    prevPurchaseQuery.productSearch !== productSearch ||
+    prevPurchaseQuery.sortKey !== purchaseSort.sortKey ||
+    prevPurchaseQuery.sortDir !== purchaseSort.sortDir
   ) {
     setPrevPurchaseQuery({
       purchasePage,
@@ -328,6 +321,8 @@ export default function ContractsPageContent() {
       purchaseStatusFilter,
       storeFilter,
       productSearch,
+      sortKey: purchaseSort.sortKey,
+      sortDir: purchaseSort.sortDir,
     });
     setPurchaseLoading(true);
     setPurchaseError(false);
@@ -1013,24 +1008,32 @@ export default function ContractsPageContent() {
                     >
                       签订日期
                     </SortableTableHead>
-                    <SortableTableHead
-                      sortKey="totalAmount"
-                      currentSortKey={purchaseSort.sortKey}
-                      currentSortDir={purchaseSort.sortDir}
-                      onSort={purchaseSort.onSort}
-                      className="text-right"
-                    >
-                      合同金额
-                    </SortableTableHead>
-                    <SortableTableHead
-                      sortKey="paidAmount"
-                      currentSortKey={purchaseSort.sortKey}
-                      currentSortDir={purchaseSort.sortDir}
-                      onSort={purchaseSort.onSort}
-                      className="text-right"
-                    >
-                      已付金额
-                    </SortableTableHead>
+                    {moneyHidden ? (
+                      <TableHead className="text-right">合同金额</TableHead>
+                    ) : (
+                      <SortableTableHead
+                        sortKey="totalAmount"
+                        currentSortKey={purchaseSort.sortKey}
+                        currentSortDir={purchaseSort.sortDir}
+                        onSort={purchaseSort.onSort}
+                        className="text-right"
+                      >
+                        合同金额
+                      </SortableTableHead>
+                    )}
+                    {moneyHidden ? (
+                      <TableHead className="text-right">已付金额</TableHead>
+                    ) : (
+                      <SortableTableHead
+                        sortKey="paidAmount"
+                        currentSortKey={purchaseSort.sortKey}
+                        currentSortDir={purchaseSort.sortDir}
+                        onSort={purchaseSort.onSort}
+                        className="text-right"
+                      >
+                        已付金额
+                      </SortableTableHead>
+                    )}
                     <SortableTableHead
                       sortKey="status"
                       currentSortKey={purchaseSort.sortKey}
