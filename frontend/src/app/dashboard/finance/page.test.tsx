@@ -198,6 +198,11 @@ describe("FinancePage 交互逻辑", () => {
         expect(screen.getByText("应付账款总额")).toBeInTheDocument();
         expect(screen.getByText("待收账款")).toBeInTheDocument();
         expect(screen.getByText(/当前客户剩余欠款/)).toBeInTheDocument();
+        // OD-5：两个应收口径并存，概览页的数字按合同表头口径，必须写明
+        expect(screen.getByText(/合同表头口径 · 完成率/)).toBeInTheDocument();
+        expect(
+          screen.getByText(/合同表头口径 · 当前客户剩余欠款/),
+        ).toBeInTheDocument();
         expect(screen.getByText("财务报表分析")).toBeInTheDocument();
         expect(
           screen.getByRole("link", { name: /查看报表分析/ }),
