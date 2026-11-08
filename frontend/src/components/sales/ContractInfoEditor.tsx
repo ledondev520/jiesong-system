@@ -61,6 +61,7 @@ const savedHeaderForm = (contract: SalesContract) => ({
   signedAt: formatDate(contract.signedAt, ""),
   estimatedArrival: formatDate(contract.estimatedArrival, ""),
   portId: contract.portId || "",
+  blNo: contract.blNo || "",
 });
 
 /**
@@ -113,6 +114,8 @@ export function ContractInfoEditor({
         signedAt: form.signedAt || undefined,
         estimatedArrival: form.estimatedArrival || undefined,
         portId: form.portId || undefined,
+        // 空串 = 清空提单号；其余字段沿用「空则不提交」语义
+        blNo: form.blNo.trim(),
       });
       setIsEditing(false);
     } catch {
@@ -216,6 +219,23 @@ export function ContractInfoEditor({
             ))}
           </SelectContent>
         </Select>
+      ),
+    },
+    {
+      icon: <Ship className="h-4 w-4 text-muted-foreground" />,
+      label: "提单号",
+      value: isEditing ? undefined : contract.blNo || "-",
+      editable: true,
+      editRender: (
+        <Input
+          aria-label="提单号"
+          value={form.blNo}
+          maxLength={50}
+          onChange={(e) =>
+            setForm((prev) => ({ ...prev, blNo: e.target.value }))
+          }
+          className="h-8"
+        />
       ),
     },
     {

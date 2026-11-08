@@ -138,7 +138,7 @@ const buildTimeline = (contract: SalesContract, readiness: OrderReadiness) => {
 /**
  * 职责：发运信息集中展示（订单号、柜号、发运/到港日期、目的港、报关行、提单号）。
  * 柜号 = SalesContract.containerLabel（物理货柜编号，发运导入填写）；没有填写则「未记录」，不用订单号冒充。
- * 提单号系统暂无字段，如实标「未记录」而不是留空。
+ * 提单号 = SalesContract.blNo；没有填写则如实标「未记录」而不是留空。
  */
 function ShippingInfoCard({
   contract,
@@ -158,7 +158,7 @@ function ShippingInfoCard({
     { label: "报关行", value: contract.customsBroker || "—" },
     {
       label: "提单号",
-      value: "未记录",
+      value: contract.blNo?.trim() || "未记录",
       hint: "提单原件请在「单证」页签归档附件",
     },
   ];

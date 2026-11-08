@@ -337,6 +337,7 @@ describe("OrderDetailPage 交互逻辑", () => {
       signedAt: "2026-10-03",
       estimatedArrival: "2026-11-03",
       portId: "port-1",
+      blNo: "",
     });
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "编辑" })).toBeInTheDocument(),

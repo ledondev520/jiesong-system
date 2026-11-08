@@ -3,7 +3,7 @@
  * Output: 阻塞原因 chips 与按原因筛选、历史待办标注与开关、草稿报关单展示、预计可退税额 KPI
  * Pos: TaxRefundWorkbench 单证与退税页（B54）回归
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TaxRefundWorkbench } from "./TaxRefundWorkbench";
@@ -67,6 +67,7 @@ const response = {
           declarationNo: "CD-0001-DRAFT",
           status: "DRAFT",
         },
+        historical: false,
         issues: ["报关单未放行"],
       },
       {
@@ -75,9 +76,18 @@ const response = {
         contractNo: "EXP-OLD",
         shippedAt: "2024-03-02T00:00:00.000Z",
         declaration: null,
+        historical: true,
         issues: ["进项发票缺失 2 张"],
       },
     ],
+    facets: {
+      scopeTotal: 2,
+      historyCount: 1,
+      reasons: [
+        { label: "报关单", count: 1 },
+        { label: "发票核验", count: 1 },
+      ],
+    },
     total: 2,
     page: 1,
     pageSize: 20,
@@ -94,8 +104,31 @@ const response = {
   },
 };
 
+// 模拟服务端：月份范围与原因筛选在返回前完成（组件本身不再过滤）。
+const reasonOf = (item: { issues: string[] }) =>
+  item.issues[0].includes("发票") ? "发票核验" : "报关单";
+const serve = (params: { includeHistory?: boolean; reason?: string }) => {
+  const items = response.data.items.filter(
+    (item) =>
+      (params.includeHistory !== false || !item.historical) &&
+      (!params.reason || reasonOf(item) === params.reason),
+  );
+  return Promise.resolve({
+    data: {
+      ...response.data,
+      items,
+      total: items.length,
+      facets: {
+        ...response.data.facets,
+        historyCount: 1,
+        scopeTotal: params.includeHistory === false ? 1 : 2,
+      },
+    },
+  });
+};
+
 async function renderLoaded() {
-  mocks.getWorkbench.mockResolvedValue(response);
+  mocks.getWorkbench.mockImplementation(serve);
   render(<TaxRefundWorkbench />);
   fireEvent.change(screen.getByLabelText("申报月份"), {
     target: { value: "2026-11" },
@@ -106,34 +139,46 @@ async function renderLoaded() {
 describe("TaxRefundWorkbench 单证与退税（B54）", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("阻塞原因 chips 带计数，点击只留下含该原因的出口", async () => {
+  it("阻塞原因 chips 取服务端计数；点击把 reason 交给服务端并翻回第 1 页", async () => {
     const user = userEvent.setup();
     await renderLoaded();
     expect(
       screen.getByRole("button", { name: "全部原因2" }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "发票核验1" }));
+    expect(mocks.getWorkbench).toHaveBeenLastCalledWith(
+      expect.objectContaining({ reason: "发票核验", page: 1 }),
+    );
+    expect(await screen.findAllByText("EXP-OLD")).not.toHaveLength(0);
     expect(screen.queryAllByText("EXP-CURRENT")).toHaveLength(0);
-    expect(screen.getAllByText("EXP-OLD").length).toBeGreaterThan(0);
     await user.click(screen.getByRole("button", { name: "全部原因2" }));
-    expect(screen.getAllByText("EXP-CURRENT").length).toBeGreaterThan(0);
+    expect(mocks.getWorkbench).toHaveBeenLastCalledWith(
+      expect.objectContaining({ reason: undefined }),
+    );
+    expect(await screen.findAllByText("EXP-CURRENT")).not.toHaveLength(0);
   });
 
-  it("月份筛选说明含历史，历史行有标注；关掉开关后隐藏历史并说明", async () => {
+  it("月份范围开关把 includeHistory=false 交给服务端；历史行有标注与服务端计数", async () => {
     const user = userEvent.setup();
     await renderLoaded();
     expect(
       screen.getByText(
-        /列表含 2026-10 出货（本期应申报），以及更早尚未处理的历史待办（1 条在本页）/,
+        /列表含 2026-10 出货（本期应申报），以及更早尚未处理的历史待办（共 1 条）/,
       ),
     ).toBeInTheDocument();
     expect(screen.getAllByText("历史")).toHaveLength(1);
+    expect(mocks.getWorkbench).toHaveBeenLastCalledWith(
+      expect.objectContaining({ includeHistory: true }),
+    );
     await user.click(screen.getByRole("switch", { name: "包含历史待办" }));
-    expect(screen.queryAllByText("EXP-OLD")).toHaveLength(0);
+    expect(mocks.getWorkbench).toHaveBeenLastCalledWith(
+      expect.objectContaining({ includeHistory: false, page: 1 }),
+    );
+    await waitFor(() =>
+      expect(screen.queryAllByText("EXP-OLD")).toHaveLength(0),
+    );
     expect(screen.getAllByText("EXP-CURRENT").length).toBeGreaterThan(0);
-    expect(
-      screen.getByText(/已隐藏本页 1 条历史待办；合计与分页仍含历史/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/已隐藏 1 条历史待办/)).toBeInTheDocument();
   });
 
   it("桌面表格：草稿报关单显示去掉 DRAFT 后缀的单号 + 草稿徽章 + 非正式单", async () => {

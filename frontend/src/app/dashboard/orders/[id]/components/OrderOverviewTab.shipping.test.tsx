@@ -55,6 +55,18 @@ describe("OrderOverviewTab 发运信息", () => {
     expect(screen.queryByText(/订单状态与外销合同文件相互独立/)).toBeNull();
   });
 
+  it("提单号取 blNo，没有则如实标未记录", () => {
+    render(
+      <OrderOverviewTab
+        contract={contract({ blNo: "MAEU123456789" })}
+        readiness={readiness}
+      />,
+    );
+    const info = document.getElementById("order-shipping-print-root")!;
+    expect(info).toHaveTextContent("提单号MAEU123456789");
+    expect(info).not.toHaveTextContent("提单号未记录");
+  });
+
   it("柜号取物理货柜编号 containerLabel，订单号单独显示", () => {
     render(
       <OrderOverviewTab
