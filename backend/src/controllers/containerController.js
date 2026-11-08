@@ -26,7 +26,7 @@ const list = async (req, res, next) => {
       lite,
     });
 
-    paginated(res, items, total, page, pageSize);
+    paginated(res, items.map((c) => redactSalesContract(req.user?.role, c)), total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -35,7 +35,7 @@ const list = async (req, res, next) => {
 const getById = async (req, res, next) => {
   try {
     const contract = await containerService.getById(req.params.id);
-    success(res, contract);
+    success(res, redactSalesContract(req.user?.role, contract));
   } catch (error) {
     next(error);
   }
@@ -156,7 +156,7 @@ const listItems = async (req, res, next) => {
 const getItemsSummary = async (req, res, next) => {
   try {
     const summary = await containerService.getItemsSummary(req.params.id);
-    success(res, summary);
+    success(res, redactSalesContract(req.user?.role, summary));
   } catch (error) {
     next(error);
   }
