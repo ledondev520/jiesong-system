@@ -58,7 +58,9 @@ describe("PurchaseDetailDialog 金额遮蔽", () => {
       <PurchaseDetailDialog
         open
         loading={false}
-        detail={{ ...strippedDetail, totalAmount: 1000 } as PurchaseContractDetail}
+        detail={
+          { ...strippedDetail, totalAmount: 1000 } as PurchaseContractDetail
+        }
         onClose={() => {}}
       />,
     );

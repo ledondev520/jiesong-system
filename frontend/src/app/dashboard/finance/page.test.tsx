@@ -232,7 +232,9 @@ describe("FinancePage 交互逻辑", () => {
     render(<FinancePage />);
 
     expect(
-      await screen.findByText("合同表头口径 · 当前客户剩余欠款", undefined, { timeout: 5000 }),
+      await screen.findByText("合同表头口径 · 当前客户剩余欠款", undefined, {
+        timeout: 5000,
+      }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/建议优先跟进/)).not.toBeInTheDocument();
     expect(screen.queryByText("需跟进")).not.toBeInTheDocument();
