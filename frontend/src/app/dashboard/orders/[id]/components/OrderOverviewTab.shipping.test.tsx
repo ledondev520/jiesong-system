@@ -92,3 +92,19 @@ describe("OrderOverviewTab 发运信息", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("OrderOverviewTab 金额（OD-3）", () => {
+  it("WAREHOUSE 不显示合同金额/已收款/未收款卡片，其他角色显示", async () => {
+    const { useAuthStore } = await import("@/store/auth.store");
+    useAuthStore.setState({ user: { id: "w", role: "WAREHOUSE" } as never });
+    const { unmount } = render(
+      <OrderOverviewTab contract={contract({ totalAmount: undefined, receivedAmount: undefined } as never)} readiness={readiness} />,
+    );
+    expect(screen.queryByText("合同金额")).toBeNull();
+    expect(screen.queryByText("已收款")).toBeNull();
+    unmount();
+    useAuthStore.setState({ user: { id: "s", role: "SALES" } as never });
+    render(<OrderOverviewTab contract={contract({})} readiness={readiness} />);
+    expect(screen.getByText("合同金额")).toBeInTheDocument();
+  });
+});

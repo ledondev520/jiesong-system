@@ -127,3 +127,21 @@ test('A3：出口合同 Excel 的总额/已收/未收用 B87 口径（扣除第�
   assert.equal(byField['已收金额 (USD)'], '$150.00'); // 500 封顶到自有额
   assert.equal(byField['未收金额 (USD)'], '$0.00'); // 原式 190−500 = −310
 });
+
+test('OD-3/OD-6：GET /sales/:id 对 WAREHOUSE 去掉合同总额、已收金额与收款记录，状态保留', async (t) => {
+  const salesService = require('./salesService');
+  stubPrisma(t, salesService, 'getSalesContractById', async () => ({
+    id: 'c1', contractNo: 'EXP-1', status: 'CONFIRMED', totalAmount: 5, receivedAmount: 2, payments: [{ amount: 2 }], items: [],
+  }));
+  const { getById } = require('../controllers/salesController');
+  const run = async (role) => {
+    let body;
+    const res = { status() { return this; }, json(b) { body = b; return this; } };
+    await getById({ params: { id: 'c1' }, user: { role } }, res, (e) => { throw e; });
+    return JSON.stringify(body);
+  };
+  const wh = await run('WAREHOUSE');
+  assert.doesNotMatch(wh, /totalAmount|receivedAmount|payments/);
+  assert.match(wh, /CONFIRMED/);
+  assert.match(await run('SALES'), /totalAmount/);
+});

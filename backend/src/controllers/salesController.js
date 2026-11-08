@@ -36,6 +36,11 @@ const list = async (req, res, next) => {
 const getById = async (req, res, next) => {
   try {
     const contract = await salesService.getSalesContractById(req.params.id);
+    // OD-3/OD-6：WAREHOUSE 详情同样只看状态，不含合同总额、已收金额与收款记录。
+    if (req.user?.role === 'WAREHOUSE') {
+      const { totalAmount, receivedAmount, payments, ...rest } = contract;
+      return success(res, rest);
+    }
     success(res, contract);
   } catch (error) {
     next(error);
