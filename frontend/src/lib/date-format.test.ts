@@ -27,7 +27,7 @@ describe('date-format', () => {
   });
 
   it('无效输入返回 fallback', () => {
-    expect(formatDate('not-a-date')).toBe('-');
+    expect(formatDate('not-a-date')).toBe('—');
     expect(formatDateTime(null, 'N/A')).toBe('N/A');
   });
 });

@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ErrorState,
   LoadingState,
+  TableRowsSkeleton,
   TableStateRow,
 } from "@/components/ui/data-state";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -453,3 +454,5 @@ export function DataTable<T>({
     </div>
   );
 }
+
+export { TableRowsSkeleton };

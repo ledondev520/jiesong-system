@@ -6,6 +6,8 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
+import { MISSING_VALUE } from "./missing-value";
+
 const BEIJING = 'Asia/Shanghai';
 
 const toDate = (value: unknown): Date | null => {
@@ -26,7 +28,7 @@ const toDate = (value: unknown): Date | null => {
  * 参数：@param value 可解析为时间的值
  * 返回：@returns 无效时返回 fallback
  */
-export const formatDate = (value: unknown, fallback = '-') => {
+export const formatDate = (value: unknown, fallback = MISSING_VALUE) => {
   const date = toDate(value);
   if (!date) {
     return fallback;
@@ -45,7 +47,7 @@ export const formatDate = (value: unknown, fallback = '-') => {
  * 参数：@param value 可解析为时间的值
  * 返回：@returns 无效时返回 fallback
  */
-export const formatDateTime = (value: unknown, fallback = '-') => {
+export const formatDateTime = (value: unknown, fallback = MISSING_VALUE) => {
   const date = toDate(value);
   if (!date) {
     return fallback;
@@ -67,7 +69,7 @@ export const formatDateTime = (value: unknown, fallback = '-') => {
 /**
  * 职责：仅格式化为北京时间时:分:秒
  */
-export const formatTime = (value: unknown, fallback = '-') => {
+export const formatTime = (value: unknown, fallback = MISSING_VALUE) => {
   const date = toDate(value);
   if (!date) {
     return fallback;
