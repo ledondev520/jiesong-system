@@ -58,6 +58,8 @@ describe("经营报表范围与追溯", () => {
   it("毛利使用CNY，期间保留至销售明细，当前风险连接原业务页面", async () => {
     render(<BusinessReportsPage />);
     expect(await screen.findByText("¥200.00")).toBeInTheDocument();
+    // OD-5：本页应收总额按收款流水口径，必须写明
+    expect(screen.getByText("收款流水口径")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "查看低库存商品" }),
     ).toHaveAttribute("href", "/dashboard/products?lowStock=true");
