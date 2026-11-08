@@ -301,6 +301,30 @@ describe("ContractsPage 交互逻辑", () => {
     expect(screen.getAllByText("未录入").length).toBe(2);
   });
 
+  it("WAREHOUSE：服务端不返回金额，列表两处表格都显示无权查看，不出现 ¥ 或 ¥0", async () => {
+    mockRole = "WAREHOUSE";
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "p-wh",
+            contractNo: "CG-WH",
+            status: "SIGNED",
+            supplier: { name: "供应商甲", hasQualityIssue: false },
+            items: [],
+          },
+        ],
+      },
+    });
+    const { container } = render(<ContractsPage />);
+
+    await screen.findAllByText("CG-WH");
+    // 桌面表格与移动卡片各一份，每份有合同金额与已付款两处
+    expect(screen.getAllByText("无权查看")).toHaveLength(4);
+    expect(screen.queryByText("未录入")).not.toBeInTheDocument();
+    expect(container.textContent).not.toContain("¥");
+  });
+
   it("管理员每次导入默认正常，明确勾选历史确认才提交historical", async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     render(<ContractsPage />);
