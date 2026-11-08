@@ -37,6 +37,8 @@ export type TaxRefundWorkbenchStage =
 export interface TaxRefundWorkbenchItem {
   shipmentKey?: string;
   materialReady?: boolean;
+  /** 申报月份下的历史待办（早于本期出货月）；仅按月份列表返回 */
+  historical?: boolean;
   confirmationStatus?: "PENDING" | "CONFIRMED" | "CHANGED";
   confirmedFile?: { id: string; fileName: string; uploadedAt?: string } | null;
   salesContractId: string;
@@ -79,6 +81,12 @@ export interface TaxRefundWorkbench {
   total: number;
   page: number;
   pageSize: number;
+  /** 阶段/关键词/月份范围筛选后全集的计数（不受原因筛选与分页影响） */
+  facets?: {
+    scopeTotal: number;
+    historyCount: number;
+    reasons: Array<{ label: string; count: number }>;
+  };
   summary: {
     materialReadyCount?: number;
     confirmedCount?: number;
@@ -161,6 +169,10 @@ export const taxRefundService = {
     keyword?: string;
     stage?: TaxRefundWorkbenchStage;
     filingMonth?: string;
+    /** false = 只看本期出货（隐藏历史待办）；服务端在分页前筛选 */
+    includeHistory?: boolean;
+    /** 阻塞原因类型标签（如「发票核验」）；服务端在分页前筛选 */
+    reason?: string;
   }) =>
     api.get<{ data: TaxRefundWorkbench }, { data: TaxRefundWorkbench }>(
       "/tax-refunds/workbench",

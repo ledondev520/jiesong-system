@@ -285,6 +285,8 @@ describe("TaxRefundsDashboardPage 交互逻辑", () => {
         keyword: undefined,
         stage: "ALL",
         filingMonth: expect.stringMatching(/^\d{4}-\d{2}$/),
+        includeHistory: true,
+        reason: undefined,
       }),
     );
   });

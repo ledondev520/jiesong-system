@@ -245,4 +245,4 @@ const buildMonthlyPreparationWorkbook = async (filingMonth, items) => {
   return Buffer.from(await wb.xlsx.writeBuffer());
 };
 
-module.exports = { buildShipmentPreparation, getShipmentPreparation, listShipmentPreparations, confirmShipmentPreparation, buildMonthlyPreparationWorkbook };
+module.exports = { monthOf, buildShipmentPreparation, getShipmentPreparation, listShipmentPreparations, confirmShipmentPreparation, buildMonthlyPreparationWorkbook };

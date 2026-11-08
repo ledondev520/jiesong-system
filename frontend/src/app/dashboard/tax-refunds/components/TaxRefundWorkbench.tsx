@@ -58,10 +58,7 @@ import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { ErrorState } from "@/components/ui/data-state";
 import { clearApiGetCache } from "@/lib/axios";
 import { InvoiceVerificationDialog } from "./InvoiceVerificationDialog";
-import {
-  BlockerChips,
-  blockerReasons,
-} from "@/components/tax-refund/BlockerChips";
+import { BlockerChips } from "@/components/tax-refund/BlockerChips";
 import { CustomsDeclarationStatusBadge } from "@/app/dashboard/customs/components/CustomsDeclarationStatusBadge";
 import { splitDraftSuffix } from "@/app/dashboard/customs/components/declarationNo";
 import type { CustomsDeclarationStatus } from "@/types";
@@ -108,27 +105,12 @@ const ALL_REASONS = "ALL";
 const count = (value: number | undefined) =>
   value === undefined ? undefined : String(value);
 
-// 后端 listShipmentPreparations 只返回「月份 < 申报月份」的出货：申报月份 M 的本期 = M-1 月出货，更早的是历史待办。
-// 月份与后端 monthOf 同取 Asia/Shanghai。
-function monthOf(value?: string | null) {
-  const date = value ? new Date(value) : null;
-  return date && !Number.isNaN(date.getTime())
-    ? new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" })
-        .format(date)
-        .slice(0, 7)
-    : null;
-}
-
+// 申报月份 M 的本期 = M-1 月出货，更早的是历史待办；月份范围与原因筛选由服务端在分页前完成。
 function previousMonth(filingMonth: string) {
   const [year, month] = filingMonth.split("-").map(Number);
   return month === 1
     ? `${year - 1}-12`
     : `${year}-${String(month - 1).padStart(2, "0")}`;
-}
-
-function isHistorical(item: TaxRefundWorkbenchItem, filingMonth: string) {
-  const month = monthOf(item.declaration?.exportDate || item.shippedAt);
-  return !month || month < previousMonth(filingMonth);
 }
 
 function DeclarationCell({
@@ -168,14 +150,14 @@ export function TaxRefundWorkbench() {
   const [pageSize, setPageSize] = useState(20);
   const [loadError, setLoadError] = useState(false);
   const [stage, setStage] = useState<TaxRefundWorkbenchStage>("ALL");
-  // 以下两个只过滤已加载的这一页（后端没有按月份范围/原因筛选的参数），合计与分页仍是服务端口径。
+  // 月份范围（含历史待办）与阻塞原因均由服务端在分页前筛选。
   const [includeHistory, setIncludeHistory] = useState(true);
   const [reason, setReason] = useState(ALL_REASONS);
-  // 原因筛选只作用于当前页，翻页、改条数或换月份/阶段/关键词时回到「全部原因」，避免新一页被旧原因筛成空。
-  const [prevPageKey, setPrevPageKey] = useState("");
-  const pageKey = `${page}|${pageSize}|${filingMonth}|${stage}|${keyword}`;
-  if (pageKey !== prevPageKey) {
-    setPrevPageKey(pageKey);
+  // 换月份/阶段/关键词/月份范围时原因集合会变，回到「全部原因」并回到第 1 页，避免旧原因筛成空页。
+  const [prevScopeKey, setPrevScopeKey] = useState("");
+  const scopeKey = `${filingMonth}|${stage}|${keyword}|${includeHistory}`;
+  if (scopeKey !== prevScopeKey) {
+    setPrevScopeKey(scopeKey);
     setReason(ALL_REASONS);
   }
   const [exporting, setExporting] = useState(false);
@@ -200,6 +182,8 @@ export function TaxRefundWorkbench() {
             keyword: keyword || undefined,
             stage,
             filingMonth,
+            includeHistory,
+            reason: reason === ALL_REASONS ? undefined : reason,
           }),
         (response) => {
           if (resetPendingRef.current !== "all") setData(response.data);
@@ -212,7 +196,7 @@ export function TaxRefundWorkbench() {
           if (resetPendingRef.current === null) setLoading(false);
         },
       ),
-    [keyword, stage, page, pageSize, filingMonth],
+    [keyword, stage, page, pageSize, filingMonth, includeHistory, reason],
   );
 
   // 重试、导入成功后调用：与原 load 相同，先置 loading/清 loadError，申报月份为空时不发请求。
@@ -228,7 +212,15 @@ export function TaxRefundWorkbench() {
   }, [filingMonth, requestWorkbench]);
 
   // 原先加载 effect 内的同步写入改为加载依赖变化时在渲染期执行；初值 null 使挂载时同样执行一次。
-  const loadKey = [keyword, stage, page, pageSize, filingMonth] as const;
+  const loadKey = [
+    keyword,
+    stage,
+    page,
+    pageSize,
+    filingMonth,
+    includeHistory,
+    reason,
+  ] as const;
   const [prevLoadKey, setPrevLoadKey] = useState<typeof loadKey | null>(null);
   if (
     prevLoadKey === null ||
@@ -265,27 +257,11 @@ export function TaxRefundWorkbench() {
 
   const summary = loadError ? undefined : data?.summary;
   const loaded = data?.items ?? [];
-  const historyCount = filingMonth
-    ? loaded.filter((item) => isHistorical(item, filingMonth)).length
-    : 0;
-  const monthItems = includeHistory
-    ? loaded
-    : loaded.filter((item) => !isHistorical(item, filingMonth));
-  const reasonCounts = new Map<string, number>();
-  for (const item of monthItems) {
-    for (const label of blockerReasons(item.issues)) {
-      reasonCounts.set(label, (reasonCounts.get(label) ?? 0) + 1);
-    }
-  }
-  const rows =
-    reason === ALL_REASONS
-      ? monthItems
-      : monthItems.filter((item) =>
-          blockerReasons(item.issues).includes(reason),
-        );
+  const historyCount = data?.facets?.historyCount ?? 0;
+  const rows = data?.items ?? [];
   const reasonChips = [
-    { key: ALL_REASONS, label: "全部原因", count: monthItems.length },
-    ...[...reasonCounts].map(([label, count]) => ({
+    { key: ALL_REASONS, label: "全部原因", count: data?.facets?.scopeTotal },
+    ...(data?.facets?.reasons ?? []).map(({ label, count }) => ({
       key: label,
       label,
       count,
@@ -394,7 +370,10 @@ export function TaxRefundWorkbench() {
           <label className="flex items-center gap-2 text-sm">
             <Switch
               checked={includeHistory}
-              onCheckedChange={setIncludeHistory}
+              onCheckedChange={(checked) => {
+                setIncludeHistory(checked);
+                setPage(1);
+              }}
               aria-label="包含历史待办"
             />
             含历史待办
@@ -422,10 +401,9 @@ export function TaxRefundWorkbench() {
         </div>
         <p className="text-xs text-muted-foreground">
           {filingMonth
-            ? `申报月份 ${filingMonth}：列表含 ${previousMonth(filingMonth)} 出货（本期应申报），以及更早尚未处理的历史待办（${loading ? "—" : historyCount} 条在本页）。`
+            ? `申报月份 ${filingMonth}：列表含 ${previousMonth(filingMonth)} 出货（本期应申报），以及更早尚未处理的历史待办（共 ${loading ? "—" : historyCount} 条）。`
             : "请选择申报月份。"}
-          {!includeHistory &&
-            ` 已隐藏本页 ${historyCount} 条历史待办；合计与分页仍含历史。`}
+          {!includeHistory && ` 已隐藏 ${historyCount} 条历史待办。`}
         </p>
       </div>
 
@@ -441,11 +419,14 @@ export function TaxRefundWorkbench() {
           }}
         />
         <StageChips
-          ariaLabel="阻塞原因（仅本页）"
+          ariaLabel="阻塞原因"
           stages={reasonChips}
           value={reason}
           loading={loading}
-          onChange={setReason}
+          onChange={(key) => {
+            setReason(key);
+            setPage(1);
+          }}
         />
       </div>
 
@@ -678,7 +659,7 @@ export function TaxRefundWorkbench() {
                           {item.shippedAt
                             ? formatDate(item.shippedAt)
                             : "未登记出货日期"}
-                          {isHistorical(item, filingMonth) && (
+                          {item.historical && (
                             <Badge variant="outline" className="ml-1.5">
                               历史
                             </Badge>
