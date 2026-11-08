@@ -122,6 +122,18 @@ const addItem = async (req, res, next) => {
   }
 };
 
+const updateItemLine = async (req, res, next) => {
+  try {
+    const item = await salesService.updateSalesItemLine(req.params.id, req.params.itemId, req.body || {}, {
+      userId: req.user?.id,
+      req,
+    });
+    success(res, item, '销售明细已更新');
+  } catch (error) {
+    next(error);
+  }
+};
+
 const updateStatus = async (req, res, next) => {
   try {
     const contract = await salesService.updateSalesStatus(req.params.id, req.body?.status, {
@@ -449,6 +461,7 @@ module.exports = {
   update,
   remove,
   addItem,
+  updateItemLine,
   updateStatus,
   getNextContractNo,
   calculatePrice,

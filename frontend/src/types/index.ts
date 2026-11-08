@@ -537,6 +537,8 @@ export interface Inventory {
   inboundAt?: string;
   outboundAt?: string;
   note?: string;
+  lotNo?: string | null;
+  binLocation?: string | null;
   createdAt: string;
   updatedAt: string;
   product?: Product;

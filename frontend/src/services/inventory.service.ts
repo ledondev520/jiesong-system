@@ -7,6 +7,10 @@ export const inventoryService = {
     pageSize?: number;
     keyword?: string;
     storeId?: string;
+    lotNo?: string;
+    binLocation?: string;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
     lite?: boolean;
   }) => {
     // 库存由验货与发运实时改变，不复用默认三分钟 GET 缓存。
@@ -15,6 +19,17 @@ export const inventoryService = {
       ApiResponse<PaginatedResponse<Inventory>>,
       ApiResponse<PaginatedResponse<Inventory>>
     >("/inventory", config);
+  },
+
+  updateLocation: async (
+    id: string,
+    data: { lotNo?: string; binLocation?: string },
+  ) => {
+    return api.post<
+      ApiResponse<Pick<Inventory, "id" | "lotNo" | "binLocation">>,
+      ApiResponse<Pick<Inventory, "id" | "lotNo" | "binLocation">>,
+      { lotNo?: string; binLocation?: string }
+    >(`/inventory/${id}/location`, data);
   },
 
   updateStatus: async (id: string, status: string) => {

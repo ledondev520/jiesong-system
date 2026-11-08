@@ -297,6 +297,39 @@ it("验货保留已入库合格量下限，待复验和未合格必须说明，�
     ),
   );
 });
+it("A83：验货可登记批次号/库位，随入库一起提交；全数合格不清空，留空则不提交", async () => {
+  render(<PurchaseReceiptPanel purchaseContractId="purchase-1" />);
+  fireEvent.click(await screen.findByText("登记验货"));
+  fireEvent.change(screen.getByLabelText("测试商品 批次号（可选）"), {
+    target: { value: "  LOT-7 " },
+  });
+  fireEvent.change(screen.getByLabelText("测试商品 库位（可选）"), {
+    target: { value: "A-01-02" },
+  });
+  fireEvent.click(screen.getByText("全数合格"));
+  fireEvent.change(screen.getByLabelText("验货说明"), {
+    target: { value: "合成批次库位登记" },
+  });
+  fireEvent.click(screen.getByText("保存验货"));
+  await waitFor(() =>
+    expect(inspect).toHaveBeenCalledWith(
+      "purchase-1",
+      "receipt-1",
+      expect.objectContaining({
+        items: [
+          {
+            receiptItemId: "ri-1",
+            acceptedQuantity: 10,
+            reinspectionQuantity: 0,
+            lotNo: "LOT-7",
+            binLocation: "A-01-02",
+          },
+        ],
+      }),
+    ),
+  );
+});
+
 it("未填写验货说明不能提交，初始到货全部待验", async () => {
   const fresh = structuredClone(data);
   fresh.items[0].items[0].acceptedQuantity = 0;

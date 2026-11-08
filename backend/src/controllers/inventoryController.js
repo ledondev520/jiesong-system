@@ -13,8 +13,10 @@ const { success, paginated } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 const { validateInventoryTransition } = require('../utils/inventoryStateMachine');
 const { normalizePagination } = require('../utils/pagination');
+const { parseListSort } = require('../utils/listSort');
 const { getInventorySnapshot } = require('../services/inventorySnapshot');
 const { listLowStockAlerts } = require('../services/inventoryAlertService');
+const { normalizeLocationField } = require('../utils/inventoryLocation');
 
 /**
  * 职责：获取库存列表并支持条件筛选。
@@ -27,8 +29,20 @@ const { listLowStockAlerts } = require('../services/inventoryAlertService');
  * @param {import('express').NextFunction} next 错误透传
  * @returns {Promise<void>}
  */
+// A85：库存列表可排序列白名单（无金额列）。
+const INVENTORY_SORT_COLUMNS = {
+  productName: (dir) => ({ product: { customsName: dir } }),
+  contractNo: (dir) => ({ purchaseItem: { purchaseContract: { contractNo: dir } } }),
+  quantity: (dir) => ({ quantity: dir }),
+  inboundAt: (dir) => ({ inboundAt: dir }),
+  status: (dir) => ({ status: dir }),
+  lotNo: (dir) => ({ lotNo: dir }),
+  binLocation: (dir) => ({ binLocation: dir }),
+};
+
 const list = async (req, res, next) => {
   try {
+    const orderBy = parseListSort(req.query, INVENTORY_SORT_COLUMNS, [{ createdAt: 'desc' }]);
     const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
     const { status, productId, keyword } = req.query;
     const lite = req.query.lite === 'true' || req.query.lite === true;
@@ -36,6 +50,13 @@ const list = async (req, res, next) => {
     const where = {};
     if (status) where.status = status;
     if (productId) where.productId = productId;
+    // A83：按批次号 / 库位筛选（包含匹配，运营标识，所有可读角色可用）
+    for (const field of ['lotNo', 'binLocation']) {
+      const value = req.query[field];
+      if (value === undefined) continue;
+      if (typeof value !== 'string') throw createError(`${field} 必须为文本`, 400);
+      if (value.trim()) where[field] = { contains: value.trim() };
+    }
     // 按采购明细的送往门店筛选（只读，PurchaseItem.storeId）；手工库存和旧明细(storeId=null)没有门店，不会匹配
     const storeId = typeof req.query.storeId === 'string' ? req.query.storeId.trim() : '';
     if (storeId) where.purchaseItem = { storeId };
@@ -101,7 +122,7 @@ const list = async (req, res, next) => {
                 },
               },
             },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
       }),
       prisma.inventory.count({ where }),
     ]);
@@ -165,6 +186,27 @@ const getById = async (req, res, next) => {
  * @param {import('express').NextFunction} next 错误透传
  * @returns {Promise<void>}
  */
+/**
+ * 职责：登记/修改库存的批次号与库位（A83）。省略字段保持原值，空串清空。
+ * 不触碰状态、数量与来源，因此对验货来源库存同样允许。
+ */
+const updateLocation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+    const data = {};
+    if (body.lotNo !== undefined) data.lotNo = normalizeLocationField(body.lotNo, '批次号');
+    if (body.binLocation !== undefined) data.binLocation = normalizeLocationField(body.binLocation, '库位');
+    if (Object.keys(data).length === 0) throw createError('请提供批次号或库位', 400);
+    const existing = await prisma.inventory.findUnique({ where: { id }, select: { id: true } });
+    if (!existing) throw createError('库存记录不存在', 404);
+    const updated = await prisma.inventory.update({ where: { id }, data, select: { id: true, lotNo: true, binLocation: true } });
+    success(res, updated, '库位信息已更新');
+  } catch (error) {
+    next(error);
+  }
+};
+
 const updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -400,6 +442,7 @@ module.exports = {
   list,
   getById,
   updateStatus,
+  updateLocation,
   batchUpdateStatus,
   getByProduct,
   getByContract,  // 原 getByContainer

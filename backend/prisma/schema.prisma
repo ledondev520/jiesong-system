@@ -711,6 +711,8 @@ model Inventory {
   inboundAt       DateTime?
   outboundAt      DateTime?
   note            String?
+  lotNo           String? // 批次号（A83，运营标识，验货入库时登记）
+  binLocation     String? // 库位（A83，运营标识）
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -726,6 +728,8 @@ model Inventory {
   @@index([receiptInspectionId])
   @@index([createdAt])
   @@index([productId, status, salesItemId, inboundAt])
+  @@index([lotNo])
+  @@index([binLocation])
   @@map("inventories")
 }
 

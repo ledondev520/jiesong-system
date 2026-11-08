@@ -12,6 +12,8 @@ type PurchaseContractQuery = {
   productKeyword?: string;
   storeName?: string;
   lite?: boolean;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
 };
 
 type PurchaseListResult = PaginatedResponse<PurchaseContract> & {

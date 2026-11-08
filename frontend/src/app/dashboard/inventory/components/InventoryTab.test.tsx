@@ -274,3 +274,47 @@ it("当前页没有任何采购合同来源时隐藏整列「采购合同」；�
   expect(screen.getAllByText("S-合成店").length).toBeGreaterThan(0);
   expect(screen.getAllByText("合成供应商").length).toBeGreaterThan(0);
 });
+
+it("点击列头由服务端排序：带 sortBy/sortDir 回到第 1 页，不在当前页重排，第三次点击取消排序", async () => {
+  const user = userEvent.setup();
+  const row = (id: string, quantity: number) => ({
+    id,
+    productId: `p-${id}`,
+    product: { customsName: `商品${id}`, unit: "件" },
+    quantity,
+    status: InventoryStatus.INBOUND,
+    createdAt: "2026-10-01",
+    updatedAt: "2026-10-01",
+  });
+  // 服务端给出的顺序（40 在 6 之前）必须原样显示。
+  getAll.mockResolvedValue({
+    data: {
+      items: [row("a", 40), row("b", 6)] as unknown as Inventory[],
+      pagination: { total: 302, totalPages: 16 },
+    },
+  });
+  render(<InventoryTab />);
+  await screen.findByText(/共 302 条/);
+  await user.click(screen.getByRole("button", { name: "下一页" }));
+  await screen.findByText(/第 2\/16 页/);
+  await user.click(screen.getByRole("columnheader", { name: /数量/ }));
+  await waitFor(() =>
+    expect(getAll).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, sortBy: "quantity", sortDir: "asc" }),
+    ),
+  );
+  await user.click(screen.getByRole("columnheader", { name: /数量/ }));
+  await waitFor(() =>
+    expect(getAll).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sortBy: "quantity", sortDir: "desc" }),
+    ),
+  );
+  await user.click(screen.getByRole("columnheader", { name: /数量/ }));
+  await waitFor(() =>
+    expect(getAll).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sortBy: undefined, sortDir: undefined }),
+    ),
+  );
+  const names = screen.getAllByText(/^商品[ab]$/).map((el) => el.textContent);
+  expect(names.slice(0, 2)).toEqual(["商品a", "商品b"]);
+});

@@ -246,6 +246,8 @@ const allocateInboundInventory = async ({
           purchaseItemId: item.purchaseItemId,
           receiptInspectionId: item.receiptInspectionId,
           inboundAt: item.inboundAt,
+          lotNo: item.lotNo,
+          binLocation: item.binLocation,
           salesItemId,
           salesContractId,
           quantity: outQty,

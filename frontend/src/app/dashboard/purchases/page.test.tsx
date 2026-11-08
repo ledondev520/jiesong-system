@@ -142,6 +142,58 @@ describe("ContractsPage 交互逻辑", () => {
     );
   });
 
+  it("点击列头由服务端排序（A85）：发送 sortBy/sortDir 并回到第 1 页；WAREHOUSE 的金额列不可排序", async () => {
+    mockGetAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "p-sort",
+            contractNo: "CG-SORT",
+            status: "SIGNED",
+            supplier: { name: "供应商甲", hasQualityIssue: false },
+            totalAmount: 100,
+            paidAmount: 0,
+            items: [],
+          },
+        ],
+        pagination: { total: 223, page: 1, pageSize: 20, totalPages: 12 },
+        summary: { statusCounts: {}, stores: [] },
+      },
+    });
+    const user = userEvent.setup();
+    const { unmount } = render(<ContractsPage />);
+    await screen.findByText(/共 223 条/);
+    await user.click(screen.getByRole("button", { name: "12" }));
+    await waitFor(() =>
+      expect(mockGetAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 12 }),
+      ),
+    );
+    await user.click(screen.getByRole("columnheader", { name: /合同金额/ }));
+    await waitFor(() =>
+      expect(mockGetAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          page: 1,
+          sortBy: "totalAmount",
+          sortDir: "asc",
+        }),
+      ),
+    );
+    await user.click(screen.getByRole("columnheader", { name: /合同金额/ }));
+    await waitFor(() =>
+      expect(mockGetAll).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sortBy: "totalAmount", sortDir: "desc" }),
+      ),
+    );
+    unmount();
+    mockRole = "WAREHOUSE";
+    render(<ContractsPage />);
+    await screen.findByText(/共 223 条/);
+    const before = mockGetAll.mock.calls.length;
+    await user.click(screen.getByRole("columnheader", { name: /合同金额/ }));
+    expect(mockGetAll.mock.calls.length).toBe(before);
+  });
+
   it("点击新增采购按钮会跳转创建页", async () => {
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     const user = userEvent.setup();

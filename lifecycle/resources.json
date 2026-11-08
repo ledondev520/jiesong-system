@@ -82,6 +82,20 @@
       "test": "backend/src/integration/purchase-drafts.integration.js"
     },
     {
+      "id": "inventory-location",
+      "kind": "action",
+      "routeFile": "backend/src/routes/inventory.js",
+      "routes": ["POST /:id/location"],
+      "test": "backend/src/integration/inventory-lot-bin.integration.js"
+    },
+    {
+      "id": "sales-item-reprice",
+      "kind": "action",
+      "routeFile": "backend/src/routes/sales.js",
+      "routes": ["POST /:id/items/:itemId/reprice"],
+      "test": "backend/src/integration/sales-item-reprice.integration.js"
+    },
+    {
       "id": "supplier-hard-delete",
       "kind": "action",
       "routeFile": "backend/src/routes/suppliers.js",

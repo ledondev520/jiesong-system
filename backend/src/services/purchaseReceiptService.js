@@ -9,6 +9,7 @@ const { createError } = require('../middleware/errorHandler');
 const { normalizePagination, buildPaginationMeta } = require('../utils/pagination');
 const { normalizePurchaseStatus, getPurchaseSettlementStatus, PURCHASE_STATUS } = require('./purchaseStateMachine');
 const { INVENTORY_STATUS } = require('../config/constants');
+const { normalizeLocationField } = require('../utils/inventoryLocation');
 
 const EPSILON = 1e-9;
 const quantity = (value, label, positive = false) => {
@@ -193,7 +194,7 @@ const inspectPurchaseReceipt = async (contractId, receiptId, input, actorId, db 
   input = input || {};
   const requestId = id(input.requestId, 'requestId');
   const note = text(input.note, '验货说明', true);
-  const items = normalizeItems(input.items, (row, index) => ({ receiptItemId: id(row.receiptItemId, '到货明细ID'), acceptedQuantity: quantity(row.acceptedQuantity, `第${index + 1}条合格数量`), reinspectionQuantity: quantity(row.reinspectionQuantity, `第${index + 1}条待复验数量`) }), 'receiptItemId');
+  const items = normalizeItems(input.items, (row, index) => ({ receiptItemId: id(row.receiptItemId, '到货明细ID'), acceptedQuantity: quantity(row.acceptedQuantity, `第${index + 1}条合格数量`), lotNo: normalizeLocationField(row.lotNo, '批次号'), binLocation: normalizeLocationField(row.binLocation, '库位'), reinspectionQuantity: quantity(row.reinspectionQuantity, `第${index + 1}条待复验数量`) }), 'receiptItemId');
   const requestHash = hash({ contractId, receiptId, note, items });
   return transaction(db, async (tx) => {
     const receipt = await tx.purchaseReceipt.findFirst({ where: { id: receiptId, purchaseContractId: contractId }, include: receiptInclude });
@@ -221,7 +222,7 @@ const inspectPurchaseReceipt = async (contractId, receiptId, input, actorId, db 
       const updated = await tx.purchaseReceiptItem.updateMany({ where: { id: item.id, acceptedQuantity: item.acceptedQuantity, reinspectionQuantity: item.reinspectionQuantity }, data: { acceptedQuantity: row.acceptedQuantity, reinspectionQuantity: row.reinspectionQuantity } });
       if (updated.count !== 1) throw createError('该批次已被他人验货，请刷新后重试', 409);
       const inspection = await tx.purchaseReceiptInspection.create({ data: { receiptId, receiptItemId: item.id, requestId, requestHash, acceptedQuantity: row.acceptedQuantity, acceptedIncrement, reinspectionQuantity: row.reinspectionQuantity, pendingQuantity: Math.max(0, item.arrivedQuantity - row.acceptedQuantity - row.reinspectionQuantity), note, inspectedById: actorId, inspectedAt } });
-      if (acceptedIncrement > 0) await tx.inventory.create({ data: { productId: item.purchaseItem.productId, purchaseItemId: item.purchaseItemId, receiptInspectionId: inspection.id, quantity: acceptedIncrement, unit: item.purchaseItem.unit || item.purchaseItem.product?.unit, status: INVENTORY_STATUS.INBOUND, inboundAt: inspectedAt, note: '采购验货合格入库' } });
+      if (acceptedIncrement > 0) await tx.inventory.create({ data: { productId: item.purchaseItem.productId, purchaseItemId: item.purchaseItemId, receiptInspectionId: inspection.id, quantity: acceptedIncrement, unit: item.purchaseItem.unit || item.purchaseItem.product?.unit, status: INVENTORY_STATUS.INBOUND, inboundAt: inspectedAt, lotNo: row.lotNo, binLocation: row.binLocation, note: '采购验货合格入库' } });
     }
     const summary = await getPurchaseReceiptSummary(tx, contractId);
     if (summary.complete) await tx.purchaseContract.update({ where: { id: contractId }, data: { status: getPurchaseSettlementStatus(PURCHASE_STATUS.RECEIVED, contract.totalAmount, contract.paidAmount) } });
