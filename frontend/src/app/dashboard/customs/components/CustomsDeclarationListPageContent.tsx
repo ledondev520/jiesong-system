@@ -51,7 +51,7 @@ import { CustomsDeclarationStatusBadge } from "./CustomsDeclarationStatusBadge";
 
 import { resolveCustomsReturnTo } from "./customs-return-context";
 import { splitDraftSuffix } from "./declarationNo";
-import { formatMoney } from "@/lib/format";
+import { formatAmount as formatNumberAmount, formatMoney } from "@/lib/format";
 
 // 报关单只会写入这四个状态（CustomsDeclarationForm），后端按精确值过滤；其余枚举值没有写入路径，不单列 chip。
 const statusChips = [
@@ -67,7 +67,9 @@ const isDraftDeclaration = (declaration: CustomsDeclaration) =>
   splitDraftSuffix(declaration.declarationNo).isDraft;
 
 const formatAmount = (amount: number, currency: string) =>
-  formatMoney(amount, currency === "CNY" ? "CNY" : "USD");
+  currency === "CNY" || currency === "USD"
+    ? formatMoney(amount, currency)
+    : `${currency} ${formatNumberAmount(amount)}`;
 
 export function CustomsDeclarationListPageContent({
   embedded = false,

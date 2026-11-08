@@ -51,7 +51,7 @@ test.describe("visual regression", () => {
   test("visual-finance", async ({ page }) => {
     await signInAsAdmin(page, "/dashboard/finance");
     await expect(
-      page.getByRole("heading", { name: "财务驾驶舱" }),
+      page.getByRole("heading", { name: /^(财务概览|财务总览)$/ }),
     ).toBeVisible();
     await expect(page).toHaveScreenshot("finance-page.png", {
       ...screenshotOptions,

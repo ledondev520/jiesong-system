@@ -405,7 +405,7 @@ export default function AiSessionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="AI 用量"
-        description="用量趋势见上图；下方用标签切换「聊天会话」与「其他 AI 调用」（含 HS 编码推荐）"
+        description="下方展示用量趋势；会话与独立调用分开统计，支持查看单轮工具轨迹，默认不保存提问原文。"
         actions={
           <Button
             variant="outline"
