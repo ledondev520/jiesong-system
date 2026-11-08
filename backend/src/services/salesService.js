@@ -26,7 +26,7 @@ const { buildLoadingPlanAsync, checkUtilisation, evaluateShipmentReadinessAsync 
 const { getContainerSpec } = require('./containerSpecs');
 const { evaluatePurchaseProductionReadiness } = require('./purchaseProductionService');
 const { buildDerivedSalesAmountUpdate, getEffectiveSalesContractTotal } = require('./salesContractAmount');
-const { getSalesCargoState, assertSalesContractDeletable, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
+const { getSalesCargoState, isSalesCargoLocked, assertSalesContractDeletable, assertSalesCargoMutable, assertSalesCargoUpdate } = require('./salesCargoLifecycle');
 
 const READY_PURCHASE_STATUSES = Object.freeze([
   'READY',
@@ -312,6 +312,51 @@ const addSalesItem = async (id, data = {}) => {
   await inventorySnapshot.reconcileSalesFinancials(prisma, id);
 
   return item;
+};
+
+const positiveNumber = (value, label) => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) throw createError(`${label}必须为大于 0 的数字`, 400);
+  return value;
+};
+
+// A84：改单行数量/售价。已发运、已到港、已完成、已取消或已有出库的订单不可改；
+// 变更、合同总额重算与审计行在同一事务内，没有无审计的改价。
+const updateSalesItemLine = async (id, itemId, data = {}, context = {}) => {
+  if (data.quantity === undefined && data.sellingPrice === undefined) throw createError('请提供数量或售价', 400);
+  const quantity = data.quantity === undefined ? undefined : positiveNumber(data.quantity, '数量');
+  const sellingPrice = data.sellingPrice === undefined ? undefined : positiveNumber(data.sellingPrice, '售价');
+  return prisma.$transaction(async (tx) => {
+    // SQLite writer lock first, as updateSalesStatus does, so a concurrent shipment cannot slip past the lock check.
+    if (await tx.$executeRaw`UPDATE sales_contracts SET id = id WHERE id = ${id}` !== 1) throw createError('出口合同不存在', 404);
+    const state = await getSalesCargoState(tx, id);
+    if (isSalesCargoLocked(state) || normalizeSalesStatus(state.status) === SALES_STATUS.CANCELLED) {
+      throw createError('订单已发运、完成、取消或已有出库记录，不能修改明细', 400);
+    }
+    const before = await tx.salesItem.findFirst({ where: { id: itemId, salesContractId: id } });
+    if (!before) throw createError('销售明细不存在', 404);
+    const oldValue = {}; const newValue = {};
+    if (quantity !== undefined && quantity !== before.quantity) { oldValue.quantity = before.quantity; newValue.quantity = quantity; }
+    if (sellingPrice !== undefined && sellingPrice !== before.sellingPrice) { oldValue.sellingPrice = before.sellingPrice; newValue.sellingPrice = sellingPrice; }
+    if (!Object.keys(newValue).length) return before;
+    const item = await tx.salesItem.update({ where: { id: itemId }, data: newValue, include: { product: true, store: true } });
+    await inventorySnapshot.reconcileSalesFinancials(tx, id);
+    const req = context.req;
+    await tx.operationLog.create({
+      data: {
+        actorType: 'USER',
+        userId: context.userId || null,
+        action: 'UPDATE_LINE',
+        entity: 'SalesItem',
+        entityId: itemId,
+        requestId: req?.headers?.['x-request-id'] || null,
+        oldValue: JSON.stringify({ salesContractId: id, ...oldValue }),
+        newValue: JSON.stringify({ salesContractId: id, ...newValue }),
+        ipAddress: req?.ip || null,
+        userAgent: req?.headers?.['user-agent'] || null,
+      },
+    });
+    return item;
+  });
 };
 
 const updateSalesStatus = async (id, status, context = {}) => {
@@ -825,6 +870,7 @@ module.exports = {
   updateSalesContract,
   removeSalesContract,
   addSalesItem,
+  updateSalesItemLine,
   updateSalesStatus,
   getNextContractNo,
   calculateSellingPrice,
