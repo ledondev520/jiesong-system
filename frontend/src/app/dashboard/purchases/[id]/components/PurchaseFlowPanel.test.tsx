@@ -153,11 +153,11 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
     fireEvent.change(screen.getByLabelText("备注"), {
       target: { value: "中文付款测试" },
     });
-    await user.click(screen.getByRole("button", { name: "确认记录" }));
+    await user.click(screen.getByRole("button", { name: "确认登记" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("合成保存失败");
     expect(screen.getByLabelText("备注")).toHaveValue("中文付款测试");
     expect(onUpdated).not.toHaveBeenCalled();
-    await user.click(screen.getByRole("button", { name: "确认记录" }));
+    await user.click(screen.getByRole("button", { name: "确认登记" }));
     await waitFor(() => expect(onUpdated).toHaveBeenCalledOnce());
     expect(vi.mocked(financeService.createPayment).mock.calls[1][0]).toEqual(
       vi.mocked(financeService.createPayment).mock.calls[0][0],
