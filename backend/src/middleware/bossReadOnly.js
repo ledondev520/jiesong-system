@@ -33,6 +33,7 @@ const READ_PATHS = [
   /^\/system\/(notifications|exchange-rate|seller-identity|ports|categories|customs-brokers)$/,
   /^\/notifications(\/unread-count)?$/,
   /^\/search$/,
+  /^\/contract-doc\/pdf\/[^/]+$/, // OD-4：只读 PDF 下载；/generate 为 POST，仍拒绝
 ];
 const SELF_WRITES = [
   ['POST', /^\/auth\/change-password$/],

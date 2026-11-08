@@ -51,11 +51,12 @@ module.exports = ({
     },
     isReadOnly: true,
     isConcurrencySafe: true,
-    async call(input) {
+    async call(input, { userRole } = {}) {
       const result = await searchEntities({
         query: input?.query,
         types: input?.types,
         limit: input?.limit,
+        includeAmounts: userRole !== 'WAREHOUSE', // OD-3
       });
       return toJson({
         total: result.length,
@@ -141,7 +142,7 @@ module.exports = ({
     },
     isReadOnly: true,
     isConcurrencySafe: true,
-    async call(input) {
+    async call(input, { userRole } = {}) {
       const limit = Math.max(1, Math.min(Number(input?.limit || 10), 20));
       const result = await salesService.getSalesContracts({
         page: 1,
@@ -154,8 +155,7 @@ module.exports = ({
         contracts: (result.contracts || []).slice(0, limit).map((contract) => ({
           contractNo: contract.contractNo,
           status: contract.status,
-          totalAmount: contract.totalAmount,
-          receivedAmount: contract.receivedAmount,
+          ...(userRole === 'WAREHOUSE' ? {} : { totalAmount: contract.totalAmount, receivedAmount: contract.receivedAmount }), // OD-3
           stores: contract.stores,
           hasThirdPartyCargo: contract.hasThirdPartyCargo,
           sourceParties: contract.sourceParties,

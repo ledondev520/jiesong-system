@@ -20,6 +20,7 @@ const search = async (req, res, next) => {
       query: req.query.q,
       types: rawTypes,
       limit: parsePositiveInt(req.query.limit, 10, 1, 20),
+      includeAmounts: req.user?.role !== 'WAREHOUSE', // OD-3
     });
 
     success(res, {

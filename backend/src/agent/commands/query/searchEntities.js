@@ -129,7 +129,7 @@ const searchPurchases = async (query, limit) => {
   }));
 };
 
-const searchSales = async (query, limit) => {
+const searchSales = async (query, limit, includeAmounts = true) => {
   const items = await prisma.salesContract.findMany({
     where: {
       contractNo: { contains: query },
@@ -147,7 +147,7 @@ const searchSales = async (query, limit) => {
     type: 'sales',
     id: item.id,
     title: item.contractNo,
-    subtitle: `$${Number(item.totalAmount || 0).toLocaleString()}`,
+    subtitle: includeAmounts ? `$${Number(item.totalAmount || 0).toLocaleString()}` : '出口合同',
     score: computeScore(query, item.contractNo),
   }));
 };
@@ -157,7 +157,8 @@ const sortResults = (results) => results.sort((a, b) => {
   return a.title.localeCompare(b.title, 'zh-CN');
 });
 
-const searchEntities = async ({ query, types, limit } = {}) => {
+// includeAmounts=false（WAREHOUSE，OD-3）：出口合同副标题不带合同总额。
+const searchEntities = async ({ query, types, limit, includeAmounts = true } = {}) => {
   const normalizedQuery = String(query || '').trim();
   if (normalizedQuery.length < 2) {
     return [];
@@ -177,7 +178,7 @@ const searchEntities = async ({ query, types, limit } = {}) => {
     tasks.push(searchPurchases(normalizedQuery, resolvedLimit));
   }
   if (resolvedTypes.includes('sales')) {
-    tasks.push(searchSales(normalizedQuery, resolvedLimit));
+    tasks.push(searchSales(normalizedQuery, resolvedLimit, includeAmounts));
   }
 
   const results = (await Promise.all(tasks)).flat();

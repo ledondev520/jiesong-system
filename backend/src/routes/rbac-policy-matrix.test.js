@@ -53,7 +53,7 @@ const POLICY = [
   { re: /^\/tax-refunds\/workbench\/(monthly-export|[^/]+\/preparation(-export)?|[^/]+\/confirm)$/, read: AF, write: AF },
   { re: /^\/tax-refunds\/(auto-drafts)$/, read: AF, write: AF },
   { re: /^\/tax-refunds(\/|$)/, read: ALL, write: ['ADMIN', 'SALES', 'FINANCE'] },
-  { re: /^\/three-forms\/(forex-verification|tax-refund|generate)$/, read: ['ADMIN', 'SALES', 'FINANCE'], write: ['ADMIN', 'SALES', 'FINANCE'] },
+  { re: /^\/three-forms\/(forex-verification|tax-refund|generate|customs-declaration)$/, read: ['ADMIN', 'SALES', 'FINANCE'], write: ['ADMIN', 'SALES', 'FINANCE'] },
   { re: /^\/three-forms(\/|$)/, read: ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'], write: ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'] },
   { re: /^\/forex-verifications(\/|$)/, read: ALL, write: ['ADMIN', 'SALES', 'FINANCE'] },
   { re: /^\/suppliers\/[^/]+\/hard-delete(-preview)?$/, read: ADMIN, write: ADMIN },
@@ -70,8 +70,9 @@ const POLICY = [
   { re: /^\/sales\/[^/]+\/export-(excel|pdf)$/, read: ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'], write: ALL },
   { re: /^\/sales\/[^/]+\/(finance-summary|tax-refund-preparation(\/export)?)$/, read: ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'], write: ALL },
   { re: /^\/sales(\/|$)/, read: ALL, write: ALL },
-  // R2-Q1：合同文档生成/下载按 B60 读模型，SALES/WAREHOUSE 403；BOSS 未在只读白名单
-  { re: /^\/contract-doc\/(generate|pdf)\/[^/]+$/, read: ['ADMIN', 'PURCHASE', 'FINANCE'], write: ['ADMIN', 'PURCHASE', 'FINANCE'] },
+  // R2-Q1：合同文档生成/下载按 B60 读模型，SALES/WAREHOUSE 403；OD-4：BOSS 仅可下载 PDF（只读白名单），生成仍 403
+  { re: /^\/contract-doc\/pdf\/[^/]+$/, read: ['ADMIN', 'PURCHASE', 'FINANCE', 'BOSS'], write: ['ADMIN', 'PURCHASE', 'FINANCE'] },
+  { re: /^\/contract-doc\/generate\/[^/]+$/, read: ['ADMIN', 'PURCHASE', 'FINANCE'], write: ['ADMIN', 'PURCHASE', 'FINANCE'] },
   { re: /^\/contract-doc(\/|$)/, read: ['ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'], write: ADMIN },
 ];
 

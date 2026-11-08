@@ -281,6 +281,25 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("BOSS（只读）只有「查看合同」下载入口，没有生成/盖章（OD-4）", async () => {
+    useAuthStore.setState({ user: { id: "synthetic", role: "BOSS" } as never });
+    mockReadOnly = true;
+    mockGetById.mockResolvedValue({ data: draftContract });
+    const user = userEvent.setup();
+    renderPage("p-1");
+
+    await user.click(await screen.findByRole("button", { name: /单证/ }));
+    expect(
+      await screen.findByRole("menuitem", { name: /查看合同/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /生成购销合同/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /在线盖章/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("在线盖章与生成购销合同收进同一个「单证」菜单，不再是页头独立按钮", async () => {
     mockGetById.mockResolvedValue({ data: draftContract });
     const user = userEvent.setup();

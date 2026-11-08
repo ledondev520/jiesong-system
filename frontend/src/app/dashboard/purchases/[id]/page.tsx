@@ -705,8 +705,18 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const canGenerateDoc = ["ADMIN", "PURCHASE", "FINANCE"].includes(
     userRole || "",
   );
+  // OD-4：老板只读，但可下载（查看）合同 PDF；生成/盖章仍隐藏
   const documentsMenu = readOnly
-    ? []
+    ? userRole === "BOSS"
+      ? [
+          {
+            key: "view",
+            label: "查看合同",
+            onSelect: viewContractPdf,
+            disabled: pdfLoading,
+          },
+        ]
+      : []
     : [
         // 合同文档含供应商银行信息：SALES/WAREHOUSE 后端 403，不展示入口
         ...(canGenerateDoc

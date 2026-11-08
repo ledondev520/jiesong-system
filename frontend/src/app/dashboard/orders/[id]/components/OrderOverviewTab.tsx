@@ -22,6 +22,7 @@ import { formatDate } from "@/lib/date-format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { useAuthStore } from "@/store/auth.store";
 import {
   Table,
   TableBody,
@@ -117,7 +118,11 @@ const buildTimeline = (contract: SalesContract, readiness: OrderReadiness) => {
       completed: currentStep >= STATUS_ORDER[SalesStatus.ARRIVED],
     });
   }
-  if (contract.payments && contract.payments.length > 0) {
+  if (
+    contract.payments &&
+    contract.payments.length > 0 &&
+    contract.totalAmount !== undefined
+  ) {
     const lastPayment = contract.payments[contract.payments.length - 1];
     timeline.push({
       date: lastPayment.paymentDate,
@@ -234,20 +239,26 @@ export function OrderOverviewTab({
   const currentStepIndex = STATUS_ORDER[contract.status] ?? 0;
   const total = contract.totalAmount || 0;
   const received = contract.receivedAmount || 0;
+  // OD-3：WAREHOUSE 的详情不含金额（后端已剔除），不显示金额卡片
+  const showAmounts = useAuthStore((state) => state.user?.role) !== "WAREHOUSE";
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Metric label="合同金额" value={usd(total)} />
-        <Metric label="已收款" value={usd(received)}>
-          {total > 0 && (
-            <Progress
-              value={Math.min((received / total) * 100, 100)}
-              className="mt-2 h-1.5"
-            />
-          )}
-        </Metric>
-        <Metric label="未收款" value={usd(Math.max(total - received, 0))} />
+        {showAmounts && (
+          <>
+            <Metric label="合同金额" value={usd(total)} />
+            <Metric label="已收款" value={usd(received)}>
+              {total > 0 && (
+                <Progress
+                  value={Math.min((received / total) * 100, 100)}
+                  className="mt-2 h-1.5"
+                />
+              )}
+            </Metric>
+            <Metric label="未收款" value={usd(Math.max(total - received, 0))} />
+          </>
+        )}
         <Metric
           label={`${readiness.totals.cartons} 箱 · 毛重 ${readiness.totals.grossKg.toLocaleString()} kg（${readiness.plan?.containerType ?? "—"}）`}
           value={`${readiness.totals.cargoCbm.toFixed(2)} CBM`}
