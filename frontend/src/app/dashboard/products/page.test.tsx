@@ -279,7 +279,7 @@ it("资料不全按钮把 incomplete 发送到后端，页面不再有库存页�
   expect(
     screen.queryByRole("tab", { name: "库存状态" }),
   ).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "资料不全" }));
+  await user.click(screen.getByRole("button", { name: "资料待补全" }));
   await waitFor(() =>
     expect(mockGetAll).toHaveBeenLastCalledWith(
       expect.objectContaining({ incomplete: true }),

@@ -31,6 +31,7 @@ import { Plus, Pencil, Search, Package, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMeasure } from "./measure";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/data-state";
 import { ProductDialog } from "./components/ProductDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { MobileListCard } from "@/components/mobile";
@@ -300,14 +301,14 @@ function ProductsPageContent() {
           onClick={() => setLowStock((value) => !value)}
           aria-pressed={lowStock}
         >
-          只看低库存商品
+          低库存
         </Button>
         <Button
           variant={incomplete ? "default" : "outline"}
           onClick={() => setIncomplete((value) => !value)}
           aria-pressed={incomplete}
         >
-          资料不全
+          资料待补全
         </Button>
       </div>
       {incomplete && (
@@ -321,15 +322,15 @@ function ProductsPageContent() {
         </p>
       )}
       {loadError && (
-        <div
-          role="alert"
-          className="rounded-lg border border-destructive/30 p-4 text-sm"
-        >
-          商品读取失败，不能视为没有商品。
-          <Button variant="outline" onClick={() => void loadProducts()}>
-            重试
-          </Button>
-        </div>
+        <ErrorState
+          title="商品列表加载失败"
+          description="请检查网络后重试。"
+          action={
+            <Button variant="outline" onClick={() => void loadProducts()}>
+              重试
+            </Button>
+          }
+        />
       )}
       {/* 移动端卡片列表 */}
       <div className="space-y-3 md:hidden">
@@ -456,8 +457,7 @@ function ProductsPageContent() {
               {pagedProducts.map((product) => (
                 <Card
                   key={product.id}
-                  className="cursor-pointer border-border/40 border-l-[3px] bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
-                  style={{ borderLeftColor: "oklch(0.55 0.14 150)" }}
+                  className="cursor-pointer border-border/40 border-l-[3px] border-l-status-green/70 bg-card/60 transition-all duration-300 hover:border-primary/20 hover:bg-card hover:shadow-md hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/10"
                   onClick={() =>
                     router.push(`/dashboard/products/${product.id}`)
                   }
@@ -475,11 +475,11 @@ function ProductsPageContent() {
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         {product.isActive === false && (
-                          <Badge variant="secondary" className="text-[11px]">
+                          <Badge variant="secondary" className="text-xs">
                             已停用
                           </Badge>
                         )}
-                        <Badge variant="outline" className="text-[11px]">
+                        <Badge variant="outline" className="text-xs">
                           {product.unit || "件"}
                         </Badge>
                       </div>
@@ -504,7 +504,7 @@ function ProductsPageContent() {
                     {/* 规格信息 */}
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div className="rounded-lg bg-muted/40 p-2">
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           毛重
                         </p>
                         <p className="text-sm font-bold tabular-nums">
@@ -512,7 +512,7 @@ function ProductsPageContent() {
                         </p>
                       </div>
                       <div className="rounded-lg bg-muted/40 p-2">
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           净重
                         </p>
                         <p className="text-sm font-bold tabular-nums">
@@ -520,7 +520,7 @@ function ProductsPageContent() {
                         </p>
                       </div>
                       <div className="rounded-lg bg-muted/40 p-2">
-                        <p className="text-[10px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           体积
                         </p>
                         <p className="text-sm font-bold tabular-nums">

@@ -75,6 +75,11 @@ import { contractDocService } from "@/services/contractDoc.service";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { Card, CardContent } from "@/components/ui/card";
+import { KpiStat } from "@/components/ui/kpi-stat";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
+import { TableRowsSkeleton } from "@/components/ui/data-state";
+import { formatMoney } from "@/lib/format";
+import { formatDate } from "@/lib/date-format";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import {
@@ -244,6 +249,8 @@ export default function ContractsPageContent() {
   );
   const [templateUploading, setTemplateUploading] = useState(false);
   const [templateDeleting, setTemplateDeleting] = useState(false);
+  const [templateDeleteConfirmOpen, setTemplateDeleteConfirmOpen] =
+    useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 1. 加载采购合同（带缓存，pageSize 降至 100 减少负载）
@@ -479,10 +486,7 @@ export default function ContractsPageContent() {
   };
 
   const handleTemplateDelete = async () => {
-    if (!window.confirm("确定删除当前模板吗？删除后将无法生成购销合同。")) {
-      return;
-    }
-
+    setTemplateDeleteConfirmOpen(false);
     setTemplateDeleting(true);
     try {
       await contractDocService.deleteTemplate();
@@ -531,7 +535,7 @@ export default function ContractsPageContent() {
       <>
         <div className={isMobile ? "space-y-2" : "contents"}>
           {isMobile && (
-            <Label className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            <Label className="text-xs font-medium text-muted-foreground">
               合同状态
             </Label>
           )}
@@ -560,7 +564,7 @@ export default function ContractsPageContent() {
 
         <div className={isMobile ? "space-y-2" : "contents"}>
           {isMobile && (
-            <Label className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            <Label className="text-xs font-medium text-muted-foreground">
               发货店铺
             </Label>
           )}
@@ -583,7 +587,7 @@ export default function ContractsPageContent() {
           {isMobile && (
             <Label
               htmlFor="mobile-product-search"
-              className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground"
+              className="text-xs font-medium text-muted-foreground"
             >
               合同搜索
             </Label>
@@ -691,85 +695,45 @@ export default function ContractsPageContent() {
           <h3 className="text-sm font-medium text-muted-foreground">
             采购执行概览
           </h3>
-          <Badge
-            variant="outline"
-            className="rounded-full border-border/60 bg-background px-3 py-1 text-xs shadow-[0_1px_3px_rgba(0,0,0,0.05)]"
-          >
-            当前活跃合同{" "}
-            {purchaseError || purchaseLoading
-              ? "—"
-              : procurementOverview.activeContracts}
-          </Badge>
         </div>
         <div className="grid grid-cols-2 gap-2 md:gap-3 xl:grid-cols-4">
-          <Card className="overflow-hidden py-0 md:py-6 rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <CardContent className="flex items-center justify-between gap-2 px-3 py-3 md:gap-3 md:px-6 md:pb-0 md:pt-5">
-              <div>
-                <p className="text-xs text-muted-foreground md:text-sm">
-                  待推进合同
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
-                  {purchaseError || purchaseLoading
-                    ? "—"
-                    : procurementOverview.activeContracts}
-                </p>
-              </div>
-              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-primary/10">
-                <ShoppingCart className="h-4 w-4 text-primary" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="overflow-hidden py-0 md:py-6 rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <CardContent className="flex items-center justify-between gap-2 px-3 py-3 md:gap-3 md:px-6 md:pb-0 md:pt-5">
-              <div>
-                <p className="text-xs text-muted-foreground md:text-sm">
-                  生产中
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
-                  {purchaseError || purchaseLoading
-                    ? "—"
-                    : procurementOverview.producingContracts}
-                </p>
-              </div>
-              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-status-amber-soft">
-                <Package className="h-4 w-4 text-status-amber" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="overflow-hidden py-0 md:py-6 rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <CardContent className="flex items-center justify-between gap-2 px-3 py-3 md:gap-3 md:px-6 md:pb-0 md:pt-5">
-              <div>
-                <p className="text-xs text-muted-foreground md:text-sm">
-                  已发货待收货
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
-                  {purchaseError || purchaseLoading
-                    ? "—"
-                    : procurementOverview.shippedPendingReceipt}
-                </p>
-              </div>
-              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-status-green-soft">
-                <Truck className="h-4 w-4 text-status-green" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="overflow-hidden py-0 md:py-6 rounded-xl border-border/40 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <CardContent className="flex items-center justify-between gap-2 px-3 py-3 md:gap-3 md:px-6 md:pb-0 md:pt-5">
-              <div>
-                <p className="text-xs text-muted-foreground md:text-sm">
-                  合作店铺
-                </p>
-                <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">
-                  {purchaseError || purchaseLoading
-                    ? "—"
-                    : procurementOverview.activeStores}
-                </p>
-              </div>
-              <div className="flex h-7 w-7 shrink-0 items-center md:h-9 md:w-9 justify-center rounded-lg bg-status-blue-soft">
-                <Store className="h-4 w-4 text-status-blue" />
-              </div>
-            </CardContent>
-          </Card>
+          <KpiStat
+            label="合同总数"
+            value={purchaseError || purchaseLoading ? "—" : purchaseTotal}
+            icon={<FileText className="h-4 w-4 text-primary" />}
+          />
+          <KpiStat
+            label="待推进合同"
+            value={
+              purchaseError || purchaseLoading
+                ? "—"
+                : procurementOverview.activeContracts
+            }
+            subLabel={
+              purchaseError || purchaseLoading
+                ? undefined
+                : `生产中 ${procurementOverview.producingContracts}`
+            }
+            icon={<ShoppingCart className="h-4 w-4 text-status-amber" />}
+          />
+          <KpiStat
+            label="已发货待收货"
+            value={
+              purchaseError || purchaseLoading
+                ? "—"
+                : procurementOverview.shippedPendingReceipt
+            }
+            icon={<Truck className="h-4 w-4 text-status-green" />}
+          />
+          <KpiStat
+            label="合作店铺"
+            value={
+              purchaseError || purchaseLoading
+                ? "—"
+                : procurementOverview.activeStores
+            }
+            icon={<Store className="h-4 w-4 text-status-blue" />}
+          />
         </div>
       </section>
 
@@ -891,7 +855,7 @@ export default function ContractsPageContent() {
 
                     <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-3">
                       <div className="space-y-1">
-                        <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           供应商
                         </p>
                         <p className="text-sm font-medium">
@@ -899,18 +863,18 @@ export default function ContractsPageContent() {
                         </p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           合同总额
                         </p>
                         <p className="text-sm font-semibold tabular-nums text-status-green">
                           {contract.totalAmount > 0 ? (
-                            `¥${contract.totalAmount.toLocaleString()}`
+                            formatMoney(contract.totalAmount, "CNY")
                           ) : (
                             <span className="text-status-amber">未录入</span>
                           )}
                         </p>
                         {!isPayable(contract) && (
-                          <p className="text-[11px] text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             不计应付
                           </p>
                         )}
@@ -918,7 +882,7 @@ export default function ContractsPageContent() {
                     </div>
 
                     <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2.5">
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         已付金额
                       </p>
                       <AmountText
@@ -931,7 +895,7 @@ export default function ContractsPageContent() {
                         size="sm"
                         className="text-base font-semibold tabular-nums"
                       >
-                        ¥{contract.paidAmount.toLocaleString()}
+                        {formatMoney(contract.paidAmount, "CNY")}
                       </AmountText>
                       <OverpaidFlag contract={contract} />
                     </div>
@@ -985,8 +949,12 @@ export default function ContractsPageContent() {
               }
             />
           ) : purchaseLoading ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              加载中...
+            <div className="overflow-x-auto">
+              <Table framed={false}>
+                <TableBody>
+                  <TableRowsSkeleton columns={8} rows={6} />
+                </TableBody>
+              </Table>
             </div>
           ) : pagedPurchaseContracts.length === 0 ? (
             <div className="py-12">
@@ -1012,7 +980,7 @@ export default function ContractsPageContent() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table framed={false}>
                 <TableHeader>
                   <TableRow className="border-b border-border/60 bg-muted/40 hover:bg-muted/40">
                     <SortableTableHead
@@ -1108,7 +1076,7 @@ export default function ContractsPageContent() {
                             {contract.supplier?.hasQualityIssue && (
                               <Badge
                                 variant="destructive"
-                                className="mt-1 w-fit rounded px-1 py-0 text-[10px]"
+                                className="mt-1 w-fit rounded px-1.5 py-0 text-xs"
                               >
                                 质量问题
                               </Badge>
@@ -1119,9 +1087,7 @@ export default function ContractsPageContent() {
                           {contract.storeName || "—"}
                         </TableCell>
                         <TableCell className="text-sm tabular-nums text-muted-foreground">
-                          {contract.signedAt
-                            ? format(new Date(contract.signedAt), "yyyy-MM-dd")
-                            : "—"}
+                          {formatDate(contract.signedAt)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {contract.totalAmount > 0 ? (
@@ -1135,14 +1101,14 @@ export default function ContractsPageContent() {
                             </span>
                           )}
                           {!isPayable(contract) && (
-                            <span className="block text-[11px] text-muted-foreground">
+                            <span className="block text-xs text-muted-foreground">
                               不计应付
                             </span>
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           <AmountText tone={isUnpaid ? "warning" : "success"}>
-                            ¥{contract.paidAmount.toLocaleString()}
+                            {formatMoney(contract.paidAmount, "CNY")}
                           </AmountText>
                           <OverpaidFlag contract={contract} />
                         </TableCell>
@@ -1204,7 +1170,7 @@ export default function ContractsPageContent() {
         {purchaseTotalPages > 0 && (
           <div className="flex flex-col gap-3 py-2 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
-              共 {purchaseTotal} 条（表列排序仅当前页）
+              共 {purchaseTotal} 条
               {purchaseTotalPages > 1 &&
                 `，第 ${purchasePage}/${purchaseTotalPages} 页`}
             </div>
@@ -1384,7 +1350,7 @@ export default function ContractsPageContent() {
               合同模板
             </DialogTitle>
             <DialogDescription>
-              采购合同生成文档时使用的 Word 模板，作为采购合同页内部工具管理。
+              管理生成盖章购销合同所使用的 Word 模板。
             </DialogDescription>
           </DialogHeader>
 
@@ -1438,12 +1404,21 @@ export default function ContractsPageContent() {
             <Button
               variant="outline"
               className="text-destructive hover:bg-destructive/10"
-              onClick={() => void handleTemplateDelete()}
+              onClick={() => setTemplateDeleteConfirmOpen(true)}
               disabled={!currentTemplate || templateDeleting}
             >
               <X className="mr-2 h-4 w-4" />
               {templateDeleting ? "删除中..." : "删除模板"}
             </Button>
+            <ConfirmActionDialog
+              open={templateDeleteConfirmOpen}
+              onOpenChange={setTemplateDeleteConfirmOpen}
+              title="删除合同模板？"
+              description="删除后将无法生成购销合同文档，需重新上传 .docx 模板后方可继续生成。"
+              confirmLabel="删除模板"
+              destructive
+              onConfirm={() => void handleTemplateDelete()}
+            />
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -1547,7 +1522,7 @@ export default function ContractsPageContent() {
                   失败明细：
                 </p>
                 <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-border/70">
-                  <Table>
+                  <Table framed={false}>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-16">行号</TableHead>

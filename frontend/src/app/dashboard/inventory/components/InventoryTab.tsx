@@ -471,7 +471,7 @@ export function InventoryTab() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        「可用库存」（商品页、低库存预警）只统计状态为「已入库」的数量，其他状态不计入。系统目前不记录仓库/库位和批次号，「入库日期」是该条库存转为已入库的日期。
+        仅「已入库」状态计入可用库存；入库日期为验收入库当日。
       </p>
       <div className="hidden flex-wrap items-center gap-2 md:flex">
         <div className="relative w-full sm:w-64">
@@ -704,7 +704,7 @@ export function InventoryTab() {
 
                   <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/55 p-3">
                     <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         数量
                       </p>
                       <p className="text-sm font-medium">
@@ -712,7 +712,7 @@ export function InventoryTab() {
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         入库日期
                       </p>
                       <p className="text-sm font-medium">
@@ -720,7 +720,7 @@ export function InventoryTab() {
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         当前状态
                       </p>
                       <p className="text-sm font-medium">
@@ -770,7 +770,7 @@ export function InventoryTab() {
       </div>
 
       <div className="hidden overflow-hidden surface-panel md:block">
-        <Table>
+        <Table framed={false}>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[48px]">
