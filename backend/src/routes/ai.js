@@ -139,12 +139,12 @@ router.get('/greeting/stream', aiController.getGreetingStream);
 const aiUsageController = require('../controllers/aiUsageController');
 
 // GET /api/v1/ai/usage/trend - 用量趋势（按日期聚合）
-router.get('/usage/trend', aiUsageController.getUsageTrend);
+router.get('/usage/trend', roleAuth('ADMIN'), aiUsageController.getUsageTrend);
 
 // GET /api/v1/ai/usage/calls - 调用明细列表
-router.get('/usage/calls', aiUsageController.getCallDetails);
+router.get('/usage/calls', roleAuth('ADMIN'), aiUsageController.getCallDetails);
 
 // GET /api/v1/ai/usage/summary - 用量汇总（今日/本周/本月/总计）
-router.get('/usage/summary', aiUsageController.getUsageSummary);
+router.get('/usage/summary', roleAuth('ADMIN'), aiUsageController.getUsageSummary);
 
 module.exports = router;

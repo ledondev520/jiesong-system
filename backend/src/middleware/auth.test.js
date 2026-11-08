@@ -276,7 +276,7 @@ test('BOSS以数据库角色判定：拒绝业务/AI/MCP写及生成文件GET，
       ['POST', '/api/v1/finance/payments', false], ['PUT', '/api/v1/purchases/record', false],
       ['POST', '/api/v1/ai/agents/execute-action', false], ['POST', '/mcp', false],
       ['GET', '/api/v1/sales/record/export-excel', false], ['GET', '/api/v1/purchases/export', false],
-      ['GET', '/api/v1/contract-doc/pdf/record', false], ['GET', '/api/v1/system/configs', false],
+      ['GET', '/api/v1/contract-doc/pdf/record', true], ['POST', '/api/v1/contract-doc/generate/record', false], ['GET', '/api/v1/system/configs', false],
       ['GET', '/api/v1/users', false], ['GET', '/api/v1/finance/statements/evidence/documents', false],
       ['POST', '/api/v1/auth/change-password', true], ['POST', '/api/v1/notifications/read-all', true],
       ['PUT', '/api/v1/system/notifications/record/read', true], ['POST', '/api/v1/notifications/generate', false],

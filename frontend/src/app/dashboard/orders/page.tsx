@@ -22,6 +22,7 @@ import { formatMoney } from "@/lib/format";
 import { listUrlFields, useListUrlState } from "@/lib/hooks/useListUrlState";
 import { useLatestRequest } from "@/lib/hooks/useLatestRequest";
 import { salesService } from "@/services/sales.service";
+import { useAuthStore } from "@/store/auth.store";
 import { SalesStatus, type SalesContract } from "@/types";
 
 // 发运阶段是状态预设，不是新页面（E1）；口径与工作台待办一致：CONFIRMED=待装柜，PACKING=装柜中（待发运），与订单状态徽章「装柜中」同名
@@ -174,6 +175,8 @@ function OrdersList() {
     void load();
   }, [load]);
 
+  // OD-3：WAREHOUSE 只看状态，后端不返回金额，列表也不显示金额列。
+  const showAmounts = useAuthStore((state) => state.user?.role) !== "WAREHOUSE";
   const columns: DataTableColumn<OrderRow>[] = [
     {
       key: "contractNo",
@@ -250,6 +253,11 @@ function OrdersList() {
       sortValue: (order) => order.createdAt,
     },
   ];
+  const visibleColumns = showAmounts
+    ? columns
+    : columns.filter(
+        (column) => column.key !== "totalAmount" && column.key !== "receivedAmount",
+      );
 
   return (
     <div className="space-y-5">
@@ -307,16 +315,20 @@ function OrdersList() {
                   {formatDate(order.estimatedArrival, "—")}
                 </p>
                 <div className="flex items-center justify-between gap-2">
-                  <AmountText>
-                    {formatMoney(order.totalAmount, "USD")}
-                  </AmountText>
+                  {showAmounts ? (
+                    <AmountText>
+                      {formatMoney(order.totalAmount, "USD")}
+                    </AmountText>
+                  ) : (
+                    <span />
+                  )}
                   <UtilisationBadge order={order} />
                 </div>
               </CardContent>
             </Card>
           </Link>
         )}
-        columns={columns}
+        columns={visibleColumns}
         data={items}
         rowKey={(order) => order.id}
         loading={loading}

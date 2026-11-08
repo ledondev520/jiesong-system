@@ -532,7 +532,7 @@ const buildToolPool = (defineTool, traceStore, recommendationStore, toolSpecs = 
     const startedAt = Date.now();
     try {
       if (userRole) assertToolAllowedForRole(tool.name, userRole);
-      const result = await tool.call(input || {});
+      const result = await tool.call(input || {}, { userRole });
       collectCompositeRecommendations(tool, result, recommendationStore);
       pushToolTrace(traceStore, {
         name: tool.name,

@@ -37,6 +37,7 @@ test('searchController.search: 调用查询命令并返回统一响应', async (
       query: '瓷砖',
       types: ['product', 'supplier'],
       limit: 5,
+      includeAmounts: true,
     });
     assert.equal(payload.code, 200);
     assert.equal(payload.data.items.length, 1);

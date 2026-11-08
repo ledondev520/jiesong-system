@@ -138,7 +138,7 @@ test('exportData: 设置响应头并返回二进制内容', async () => {
     });
 
     assert.equal(capturedError, null);
-    assert.deepEqual(exportArgs, ['sales', { month: '2026-03' }, { includeBank: false }]);
+    assert.deepEqual(exportArgs, ['sales', { month: '2026-03' }, { includeBank: false, includeAmounts: true }]);
     assert.equal(res.headers['Content-Type'], 'text/csv');
     assert.equal(res.headers['Content-Disposition'], 'attachment; filename=\"report.csv\"');
     assert.deepEqual(res.sentData, fakeBuffer);

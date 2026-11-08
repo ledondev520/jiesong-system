@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import OrdersPage from "./page";
+import { useAuthStore } from "@/store/auth.store";
 
 const mocks = vi.hoisted(() => ({ getAll: vi.fn(), push: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -45,6 +46,7 @@ const reply = (contractNo: string) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useAuthStore.setState({ user: null });
   window.history.replaceState({}, "", "/dashboard/orders");
 });
 
@@ -213,4 +215,26 @@ it("B55: 计数请求失败时 chip 显示「—」而不是 0，列表仍可用
     await screen.findByRole("button", { name: "待装柜—" }),
   ).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "待装柜0" })).toBeNull();
+});
+
+describe("WAREHOUSE 只看状态（OD-3）", () => {
+  it("不显示金额列和卡片金额", async () => {
+    useAuthStore.setState({ user: { id: "w", role: "WAREHOUSE" } as never });
+    const { totalAmount: _t, receivedAmount: _r, ...row } = reply("SC-W").data.items[0];
+    mocks.getAll.mockResolvedValue({
+      data: { ...reply("SC-W").data, items: [row] },
+    });
+    render(<OrdersPage />);
+    expect((await screen.findAllByText("SC-W")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("金额 (USD)")).toBeNull();
+    expect(screen.queryByText(/\$/)).toBeNull();
+  });
+
+  it("其他角色仍显示金额列", async () => {
+    useAuthStore.setState({ user: { id: "s", role: "SALES" } as never });
+    mocks.getAll.mockResolvedValue(reply("SC-S"));
+    render(<OrdersPage />);
+    expect((await screen.findAllByText("SC-S")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("金额 (USD)").length).toBeGreaterThan(0);
+  });
 });
