@@ -12,6 +12,7 @@ import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ErrorState } from "@/components/ui/data-state";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { ListPager, sliceByPager } from "@/components/ui/list-pager";
 import {
@@ -94,8 +95,8 @@ function contractLabel(c: ContractForMatch): string {
   return stores.length > 0 ? stores.join(", ") : c.port?.name || c.contractNo;
 }
 
-// 销售合同为美元，采购合同为人民币；银行流水按自身币种
-const currencyPrefix = (usd: boolean) => (usd ? "USD $" : "¥");
+// 出口订单为美元，采购合同为人民币；银行流水按自身币种
+const currencyPrefix = (usd: boolean) => (usd ? "$" : "¥");
 
 function contractTotal(c: ContractForMatch): number {
   return isPurchaseContract(c)
@@ -367,41 +368,38 @@ export default function ReconciliationPage() {
         />
       )}
       <div className="px-1 space-y-4">
-        {/* 操作栏 */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">对账中心</h2>
-            <p className="text-xs text-muted-foreground">
-              银行流水与发票自动匹配 + 合同智能关联引擎
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                clearApiGetCache();
-                void loadAll();
-              }}
-              disabled={matchLoading || reconLoading}
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-1 ${matchLoading || reconLoading ? "animate-spin" : ""}`}
-              />
-              刷新
-            </Button>
-            <BusinessWrite>
+        <PageHeader
+          title="对账中心"
+          description="核对银行流水、增值税发票与采购/出口单据的关联关系"
+          actions={
+            <div className="flex items-center gap-2">
               <Button
+                variant="outline"
                 size="sm"
-                onClick={() => setConfirmAutoMatch(true)}
-                disabled={matchLoading}
+                onClick={() => {
+                  clearApiGetCache();
+                  void loadAll();
+                }}
+                disabled={matchLoading || reconLoading}
               >
-                <Zap className="h-4 w-4 mr-1" />
-                自动匹配
+                <RefreshCw
+                  className={`h-4 w-4 mr-1 ${matchLoading || reconLoading ? "animate-spin" : ""}`}
+                />
+                刷新
               </Button>
-            </BusinessWrite>
-          </div>
-        </div>
+              <BusinessWrite>
+                <Button
+                  size="sm"
+                  onClick={() => setConfirmAutoMatch(true)}
+                  disabled={matchLoading}
+                >
+                  <Zap className="h-4 w-4 mr-1" />
+                  自动匹配
+                </Button>
+              </BusinessWrite>
+            </div>
+          }
+        />
 
         <div className="flex flex-wrap items-center gap-2">
           <Input
@@ -463,7 +461,7 @@ export default function ReconciliationPage() {
                   已匹配供应商
                 </p>
                 <p className="text-lg font-bold">{s.matchedCount}</p>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   供应商口径，其中正常 {s.normalCount} 家
                 </p>
               </CardContent>
@@ -474,7 +472,7 @@ export default function ReconciliationPage() {
                 <p className="text-lg font-bold text-status-red">
                   {s.underInvoicedCount}
                 </p>
-                <p className="text-[10px] text-status-red">
+                <p className="text-xs text-status-red">
                   缺票总额 ¥{fmt(s.underInvoicedGap)}
                 </p>
               </CardContent>
@@ -487,7 +485,7 @@ export default function ReconciliationPage() {
                 <p className="text-lg font-bold text-status-amber">
                   {s.overInvoicedCount}
                 </p>
-                <p className="text-[10px] text-status-amber">
+                <p className="text-xs text-status-amber">
                   多开总额 ¥{fmt(s.overInvoicedGap)}
                 </p>
               </CardContent>
@@ -498,7 +496,7 @@ export default function ReconciliationPage() {
                   未匹配流水（逐条口径）
                 </p>
                 <p className="text-lg font-bold">{bankTotal ?? "—"}</p>
-                <p className="text-[10px] text-muted-foreground">待人工核对</p>
+                <p className="text-xs text-muted-foreground">待人工核对</p>
               </CardContent>
             </Card>
             <Card>
@@ -507,7 +505,7 @@ export default function ReconciliationPage() {
                   未匹配发票（逐条口径）
                 </p>
                 <p className="text-lg font-bold">{invoiceTotal ?? "—"}</p>
-                <p className="text-[10px] text-muted-foreground">待人工核对</p>
+                <p className="text-xs text-muted-foreground">待人工核对</p>
               </CardContent>
             </Card>
           </div>
@@ -548,7 +546,7 @@ export default function ReconciliationPage() {
                 <>
                   <ArrowRightLeft className="inline h-3 w-3 mx-1 text-muted-foreground" />
                   <span className="font-medium">
-                    {contractType === "PURCHASE" ? "采购" : "销售"}合同{" "}
+                    {contractType === "PURCHASE" ? "采购合同" : "出口订单"}{" "}
                     {contractLabel(selectedContract)}
                   </span>
                 </>
@@ -615,14 +613,14 @@ export default function ReconciliationPage() {
 
           {/* 智能关联 Tab */}
           <TabsContent value="match">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 @6xl/main:grid-cols-3 gap-4">
               {/* 左：未匹配银行流水 */}
               <Card className="flex flex-col max-h-[70vh]">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <Landmark className="h-4 w-4 text-status-blue" />
                     <CardTitle className="text-sm">未匹配银行流水</CardTitle>
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-xs">
                       {bankTotal ?? "—"}
                     </Badge>
                   </div>
@@ -669,10 +667,10 @@ export default function ReconciliationPage() {
                             </span>
                           </div>
                           <div className="flex items-center justify-between mt-1">
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               {txn.txnDate}
                             </span>
-                            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                            <span className="text-xs text-muted-foreground truncate max-w-[120px]">
                               {txn.summary || ""}
                             </span>
                           </div>
@@ -681,7 +679,7 @@ export default function ReconciliationPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 text-[10px] px-1"
+                                className="h-6 text-xs px-1.5"
                                 disabled={ignoringId !== null}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -700,7 +698,7 @@ export default function ReconciliationPage() {
                 </div>
               </Card>
 
-              {/* 中：合同列表 */}
+              {/* 中：采购 / 出口单据 */}
               <Card className="flex flex-col max-h-[70vh]">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
@@ -709,7 +707,7 @@ export default function ReconciliationPage() {
                     ) : (
                       <Ship className="h-4 w-4 text-chart-2" />
                     )}
-                    <CardTitle className="text-sm">合同列表</CardTitle>
+                    <CardTitle className="text-sm">采购 / 出口单据</CardTitle>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <div className="flex gap-1">
@@ -731,13 +729,13 @@ export default function ReconciliationPage() {
                         }
                         onClick={() => changeContractType("SALES")}
                       >
-                        销售
+                        出口
                       </Button>
                     </div>
                     <div className="relative flex-1">
                       <Search className="absolute left-2 top-1.5 h-3 w-3 text-muted-foreground" />
                       <Input
-                        placeholder="搜索合同或客户"
+                        placeholder="搜索单号、供应商或门店"
                         value={contractSearch}
                         onChange={(e) => setContractSearch(e.target.value)}
                         className="pl-6 h-7 text-xs"
@@ -774,19 +772,19 @@ export default function ReconciliationPage() {
                             <span className="text-sm font-medium">
                               {c.contractNo}
                             </span>
-                            <Badge variant="outline" className="text-[10px]">
-                              {contractType === "PURCHASE" ? "采购" : "销售"}
+                            <Badge variant="outline" className="text-xs">
+                              {contractType === "PURCHASE" ? "采购" : "出口"}
                             </Badge>
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5 truncate">
                             {contractLabel(c)}
                           </div>
                           <div className="flex items-center justify-between mt-1">
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               总额 {currencyPrefix(contractsType === "SALES")}
                               {fmt(contractTotal(c))}
                             </span>
-                            <span className="text-[10px] font-medium text-status-amber">
+                            <span className="text-xs font-medium text-status-amber">
                               未收/付{" "}
                               {currencyPrefix(contractsType === "SALES")}
                               {fmt(contractUnpaid(c))}
@@ -800,12 +798,12 @@ export default function ReconciliationPage() {
               </Card>
 
               {/* 右：未匹配发票 */}
-              <Card className="flex flex-col max-h-[70vh]">
+              <Card className="flex flex-col max-h-[70vh] md:col-span-2 @6xl/main:col-span-1">
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-chart-5" />
                     <CardTitle className="text-sm">未匹配发票</CardTitle>
-                    <Badge variant="secondary" className="text-[10px]">
+                    <Badge variant="secondary" className="text-xs">
                       {invoiceTotal ?? "—"}
                     </Badge>
                   </div>
@@ -846,10 +844,10 @@ export default function ReconciliationPage() {
                             </span>
                           </div>
                           <div className="flex items-center justify-between mt-1">
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               {inv.invDate}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               {inv.invNo || "-"}
                             </span>
                           </div>
@@ -858,7 +856,7 @@ export default function ReconciliationPage() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 text-[10px] px-1"
+                                className="h-6 text-xs px-1.5"
                                 disabled={ignoringId !== null}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -983,7 +981,7 @@ function ReconciliationAnalysisView({
               （发票多于付款）。
             </p>
             <div className="overflow-x-auto px-4 pb-4">
-              <Table>
+              <Table framed={false}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>供应商</TableHead>
@@ -1021,7 +1019,7 @@ function ReconciliationAnalysisView({
                             {m.payName}
                           </span>
                           {m.invName && (
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               发票名: {m.invName}
                             </span>
                           )}
@@ -1040,20 +1038,17 @@ function ReconciliationAnalysisView({
                         </TableCell>
                         <TableCell>
                           {m.category === "under_invoiced" ? (
-                            <Badge
-                              variant="destructive"
-                              className="text-[10px]"
-                            >
+                            <Badge variant="destructive" className="text-xs">
                               缺票 ¥{fmt(m.gap)}
                             </Badge>
                           ) : m.category === "over_invoiced" ? (
-                            <Badge className="text-[10px] bg-status-amber hover:bg-status-amber">
+                            <Badge className="text-xs bg-status-amber hover:bg-status-amber">
                               多开 ¥{fmt(Math.abs(m.gap))}
                             </Badge>
                           ) : (
                             <Badge
                               variant="outline"
-                              className="text-status-green border-status-green/40 text-[10px]"
+                              className="text-status-green border-status-green/40 text-xs"
                             >
                               已匹配
                             </Badge>
@@ -1110,7 +1105,7 @@ function ReconciliationAnalysisView({
               </div>
             </CardHeader>
             <div className="overflow-x-auto px-4 pb-4">
-              <Table>
+              <Table framed={false}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>付款对方</TableHead>
@@ -1177,7 +1172,7 @@ function ReconciliationAnalysisView({
               </div>
             </CardHeader>
             <div className="overflow-x-auto px-4 pb-4">
-              <Table>
+              <Table framed={false}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>发票销方</TableHead>

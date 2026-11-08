@@ -55,6 +55,8 @@ import {
   type FinanceDataBatch,
 } from "@/services/bankFlow.service";
 import { ErrorState } from "@/components/ui/data-state";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { formatDate } from "@/lib/date-format";
 import { clearApiGetCache } from "@/lib/axios";
 import { runAwait } from "@/lib/run-await";
 import { InvoiceImportDialog } from "./components/InvoiceImportDialog";
@@ -69,20 +71,20 @@ function fmt(n: number) {
 function statusBadge(status: string, isPositive: string) {
   if (status.includes("红冲"))
     return (
-      <Badge variant="destructive" className="text-[10px]">
+      <Badge variant="destructive" className="text-xs">
         已红冲
       </Badge>
     );
   if (isPositive === "否")
     return (
-      <Badge variant="secondary" className="text-[10px]">
+      <Badge variant="secondary" className="text-xs">
         红冲负数
       </Badge>
     );
   return (
     <Badge
       variant="outline"
-      className="text-status-green border-status-green/40 text-[10px]"
+      className="text-status-green border-status-green/40 text-xs"
     >
       正常
     </Badge>
@@ -207,6 +209,10 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-4">
+      <PageHeader
+        title="发票台账"
+        description="查询与核对进项发票及抵扣状态"
+      />
       {loadError && (
         <ErrorState
           title="发票台账读取失败"
@@ -270,10 +276,10 @@ export default function InvoicesPage() {
                 <p className="text-lg font-bold" data-testid="negative-count">
                   {negativeInvoiceCount(stats).toLocaleString()}
                 </p>
-                <p className="text-[10px] text-muted-foreground">
-                  有效 {stats.validCount.toLocaleString()} + 已红冲{" "}
-                  {stats.reversedCount.toLocaleString()} + 负数及其他 = 共{" "}
-                  {stats.totalCount.toLocaleString()}
+                <p className="text-xs text-muted-foreground">
+                  有效 {stats.validCount.toLocaleString()} 张 · 红冲{" "}
+                  {stats.reversedCount.toLocaleString()} 张 · 共{" "}
+                  {stats.totalCount.toLocaleString()} 张
                 </p>
               </CardContent>
             </Card>
@@ -292,12 +298,12 @@ export default function InvoicesPage() {
                 <FileText className="h-3 w-3" />
                 <Badge
                   variant="outline"
-                  className="max-w-full whitespace-normal break-all text-[10px]"
+                  className="max-w-full whitespace-normal break-all text-xs"
                 >
                   {b.fileName}
                 </Badge>
                 {b.dataStartDate}~{b.dataEndDate}
-                ・导入于 {new Date(b.importedAt).toLocaleDateString("zh-CN")}
+                ・导入于 {formatDate(b.importedAt)}
               </span>
             ))}
           </div>
@@ -442,7 +448,7 @@ export default function InvoicesPage() {
         {/* 桌面端表格 */}
         <Card className="hidden md:block">
           <div className="overflow-x-auto">
-            <Table>
+            <Table framed={false}>
               <TableHeader>
                 <TableRow>
                   <SortableTableHead
@@ -567,9 +573,9 @@ export default function InvoicesPage() {
                       <TableCell>
                         {statusBadge(item.status, item.isPositive)}
                       </TableCell>
-                      <TableCell className="text-[10px] text-muted-foreground">
+                      <TableCell className="text-xs text-muted-foreground">
                         {item.invoiceType?.includes("专用") ? (
-                          <Badge variant="default" className="text-[10px]">
+                          <Badge variant="default" className="text-xs">
                             专票
                           </Badge>
                         ) : (

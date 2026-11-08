@@ -5,6 +5,7 @@ import InvoicesPage from "./page";
 const invoices = vi.fn();
 const stats = vi.fn();
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
   useSearchParams: () => ({ get: () => null }),
   usePathname: () => "/dashboard/finance/invoices",
 }));
@@ -72,7 +73,7 @@ it("KPI 显示负数发票张数，使有效+已红冲+负数=总数", async () 
   render(<InvoicesPage />);
   expect(await screen.findByTestId("negative-count")).toHaveTextContent("81");
   expect(
-    screen.getByText(/有效 200 \+ 已红冲 19 \+ 负数及其他 = 共 300/),
+    screen.getByText(/有效 200 张 · 红冲 19 张 · 共 300 张/),
   ).toBeInTheDocument();
 });
 it("每页条数可选 20/50/100，切换后回到第一页并按新条数请求；销方筛选与流水链接是两个独立控件", async () => {

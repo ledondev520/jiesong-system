@@ -4,6 +4,7 @@ import BankFlowPage from "./page";
 const transactions = vi.fn();
 const stats = vi.fn();
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
   useSearchParams: () => ({ get: () => null }),
   usePathname: () => "/dashboard/finance/bank-flow",
 }));
