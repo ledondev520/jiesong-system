@@ -14,6 +14,7 @@ const { withIdValidation, withPaginationValidation, body, handleValidation } = r
 const { tabularUpload } = require('../utils/tabularImport');
 const { withAuditLog } = require('../middleware/auditLog');
 const { createError } = require('../middleware/errorHandler');
+const { paymentsExportGuard } = require('../middleware/paymentsExportGuard');
 
 const router = Router();
 
@@ -154,12 +155,6 @@ router.post('/import', roleAuth('ADMIN'), tabularUpload.single('file'), withAudi
 // GET /api/v1/system/import/records - 获取导入记录（仅管理员）
 router.get('/import/records', roleAuth('ADMIN'), withPaginationValidation, systemController.getImportRecords);
 
-// 付款流水属账务读取：WAREHOUSE 无任何账务读权限（与 routes/finance.js 一致）
-const paymentsExportGuard = (req, res, next) => (
-  req.params.type === 'payments' && req.user?.role === 'WAREHOUSE'
-    ? next(createError('无权导出付款记录', 403))
-    : next()
-);
 
 // GET /api/v1/system/export/:type - 导出数据（需要管理员或业务主管权限，操作记入审计日志）
 router.get('/export/:type', roleAuth('ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'), paymentsExportGuard, withAuditLog(

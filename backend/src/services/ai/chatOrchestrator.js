@@ -3,6 +3,7 @@ const { getDbContext } = require('./contextService');
 const { buildChatMessages, hasImageInHistory } = require('./messageBuilder');
 
 const buildChatSession = async ({
+  role,
   userId,
   sessionId,
   message,
@@ -18,7 +19,7 @@ const buildChatSession = async ({
       orderBy: { createdAt: 'asc' },
       take: 10,
     }),
-    getDbContext(message),
+    getDbContext(message, { role }),
   ]);
 
   const messages = buildChatMessages({ message, imageUrl, history, dbContext });

@@ -8,6 +8,8 @@
 
 import { RemarkText } from "@/components/ui/remark-text";
 import { format } from "date-fns";
+import { useAuthStore } from "@/store/auth.store";
+import { HIDDEN_MONEY } from "@/lib/purchase-amount";
 import { Loader2, Package, ShoppingCart } from "lucide-react";
 import { AmountText } from "@/components/ui/amount-text";
 import {
@@ -40,6 +42,10 @@ export function PurchaseDetailDialog({
   detail,
   onClose,
 }: PurchaseDetailDialogProps) {
+  // OD-2/OD-3：WAREHOUSE 响应不含金额，显示「无权查看」而不是崩溃或 ¥0
+  const moneyHidden = useAuthStore((state) => state.user?.role === "WAREHOUSE");
+  const money = (value: number | undefined) =>
+    moneyHidden ? HIDDEN_MONEY : `¥${(value ?? 0).toLocaleString()}`;
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -73,13 +79,13 @@ export function PurchaseDetailDialog({
                 <div>
                   <p className="text-sm text-muted-foreground">合同金额</p>
                   <p className="text-xl font-bold">
-                    ¥{detail.totalAmount.toLocaleString()}
+                    {money(detail.totalAmount)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">已付款</p>
                   <AmountText tone="success" size="lg">
-                    ¥{detail.paidAmount.toLocaleString()}
+                    {money(detail.paidAmount)}
                   </AmountText>
                 </div>
                 <div>
@@ -122,10 +128,10 @@ export function PurchaseDetailDialog({
                             {item.quantity} {item.unit || item.product?.unit}
                           </TableCell>
                           <TableCell className="text-right">
-                            ¥{item.unitPrice.toLocaleString()}
+                            {money(item.unitPrice)}
                           </TableCell>
                           <TableCell className="text-right font-medium">
-                            ¥{item.totalPrice.toLocaleString()}
+                            {money(item.totalPrice)}
                           </TableCell>
                         </TableRow>
                       ))}

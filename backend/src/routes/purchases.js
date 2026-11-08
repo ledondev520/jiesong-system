@@ -22,7 +22,7 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/v1/purchases/export - 导出采购合同 Excel
-router.get('/export', purchaseImportExportController.exportExcel);
+router.get('/export', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS'), purchaseImportExportController.exportExcel);
 
 // POST /api/v1/purchases/import - 批量导入采购合同 Excel
 router.post('/import', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseExcelUpload.single('file'), purchaseImportExportController.importExcel);

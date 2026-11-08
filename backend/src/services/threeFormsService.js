@@ -42,6 +42,9 @@ const retryOnNumberConflict = async (run) => {
   }
 };
 
+// 传入外层事务 outer 时复用之（三表同事务）；否则自开事务并重试号码冲突。
+const runInTx = (outer, fn) => (outer ? fn(outer) : retryOnNumberConflict(() => prisma.$transaction(fn)));
+
 const extractHsOverrides = (items = []) => (Array.isArray(items) ? items : [])
   .filter((item) => (
     item?.packingItemId
@@ -89,6 +92,7 @@ const generateCustomsDeclaration = async ({
   items,
   extraData = {},
   itemsPrepared = false,
+  tx: outer,
 }) => {
   let resolvedItems = Array.isArray(items) ? items : [];
   if (!itemsPrepared) {
@@ -97,7 +101,7 @@ const generateCustomsDeclaration = async ({
     resolvedItems = buildPreparedItems(readiness);
   }
 
-  const tx = await retryOnNumberConflict(() => prisma.$transaction(async (tx) => {
+  const created = await runInTx(outer, async (tx) => {
     // 获取出口合同详情
     const contract = await tx.salesContract.findUnique({
       where: { id: salesContractId },
@@ -159,9 +163,9 @@ const generateCustomsDeclaration = async ({
     }
 
     return customsDeclaration;
-  }));
+  });
 
-  return tx;
+  return created;
 };
 
 /**
@@ -176,8 +180,9 @@ const generateForexVerification = async ({
   customsDeclarationId,
   extraData = {},
   receivedAmount,
+  tx: outer,
 }) => {
-  const tx = await retryOnNumberConflict(() => prisma.$transaction(async (tx) => {
+  const created = await runInTx(outer, async (tx) => {
     // 获取出口合同详情
     const contract = await tx.salesContract.findUnique({
       where: { id: salesContractId },
@@ -218,9 +223,9 @@ const generateForexVerification = async ({
     });
 
     return forexVerification;
-  }));
+  });
 
-  return tx;
+  return created;
 };
 
 /**
@@ -237,6 +242,7 @@ const generateTaxRefund = async ({
   forexVerificationId,
   items,
   itemsPrepared = false,
+  tx: outer,
 }) => {
   let resolvedItems = Array.isArray(items) ? items : [];
   if (!itemsPrepared) {
@@ -245,7 +251,7 @@ const generateTaxRefund = async ({
     resolvedItems = buildPreparedItems(readiness);
   }
 
-  const tx = await retryOnNumberConflict(() => prisma.$transaction(async (tx) => {
+  const created = await runInTx(outer, async (tx) => {
     // 获取出口合同详情
     const contract = await tx.salesContract.findUnique({
       where: { id: salesContractId },
@@ -292,9 +298,9 @@ const generateTaxRefund = async ({
     });
 
     return taxRefund;
-  }));
+  });
 
-  return tx;
+  return created;
 };
 
 /**
@@ -338,44 +344,54 @@ const generateThreeForms = async ({
     warnings: readiness.issues.filter((issue) => issue.severity === 'warning'),
   };
 
-  let customsDeclarationId = null;
-  let forexVerificationId = null;
+  // 三表同一事务：任一步失败整体回滚，重试不会留下 -2 重复单据。
+  // 号码冲突(P2002)时 results 在重试中重新赋值，故在回调内重置。
+  await retryOnNumberConflict(() => prisma.$transaction(async (tx) => {
+    results.customsDeclarationId = null;
+    results.forexId = null;
+    results.taxRefundId = null;
+    let customsDeclarationId = null;
+    let forexVerificationId = null;
 
-  // 1. 生成报关单
-  if (generateCustoms) {
-    const customsDeclaration = await generateCustomsDeclaration({
-      salesContractId,
-      items: preparedItems,
-      extraData: extraData.customs || {},
-      itemsPrepared: true,
-    });
-    customsDeclarationId = customsDeclaration.id;
-    results.customsDeclarationId = customsDeclarationId;
-  }
+    // 1. 生成报关单
+    if (generateCustoms) {
+      const customsDeclaration = await generateCustomsDeclaration({
+        salesContractId,
+        items: preparedItems,
+        extraData: extraData.customs || {},
+        itemsPrepared: true,
+        tx,
+      });
+      customsDeclarationId = customsDeclaration.id;
+      results.customsDeclarationId = customsDeclarationId;
+    }
 
-  // 2. 生成外汇核销单（依赖报关单）
-  if (generateForex && customsDeclarationId) {
-    const forexVerification = await generateForexVerification({
-      salesContractId,
-      customsDeclarationId,
-      extraData: extraData.forex || {},
-      receivedAmount: readiness.summary.totalExportAmountUsd,
-    });
-    forexVerificationId = forexVerification.id;
-    results.forexId = forexVerificationId;
-  }
+    // 2. 生成外汇核销单（依赖报关单）
+    if (generateForex && customsDeclarationId) {
+      const forexVerification = await generateForexVerification({
+        salesContractId,
+        customsDeclarationId,
+        extraData: extraData.forex || {},
+        receivedAmount: readiness.summary.totalExportAmountUsd,
+        tx,
+      });
+      forexVerificationId = forexVerification.id;
+      results.forexId = forexVerificationId;
+    }
 
-  // 3. 生成出口退税单（依赖报关单和外汇核销单）
-  if (needTaxRefund && customsDeclarationId && forexVerificationId) {
-    const taxRefund = await generateTaxRefund({
-      salesContractId,
-      customsDeclarationId,
-      forexVerificationId,
-      items: preparedItems,
-      itemsPrepared: true,
-    });
-    results.taxRefundId = taxRefund.id;
-  }
+    // 3. 生成出口退税单（依赖报关单和外汇核销单）
+    if (needTaxRefund && customsDeclarationId && forexVerificationId) {
+      const taxRefund = await generateTaxRefund({
+        salesContractId,
+        customsDeclarationId,
+        forexVerificationId,
+        items: preparedItems,
+        itemsPrepared: true,
+        tx,
+      });
+      results.taxRefundId = taxRefund.id;
+    }
+  }));
 
   return results;
 };

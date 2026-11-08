@@ -15,6 +15,8 @@ const {
 const { redactNestedSuppliers, redactSupplierForRole } = require('../agent/commands/supplier/bankFields');
 const { createMcpServer } = require('../agent/mcp/server');
 const prisma = require('../utils/prisma');
+const { redactWarehouseMoney } = require('../utils/warehouseRedaction');
+const { keepStoredPrices } = require('../utils/warehousePurchasePrices');
 const { logOperation } = require('../utils/auditLog');
 
 const router = Router();
@@ -57,9 +59,13 @@ const createLocalClient = (req) => {
   };
   const actorRole = req.authActor?.actorType === 'AGENT' ? null : req.user?.role;
   return {
-    searchEntities,
-    createPurchase: audited('PurchaseContract', 'CREATE', async (input) => redactNestedSuppliers(actorRole, await createPurchaseWithItems({ input }))),
-    updatePurchase: audited('PurchaseContract', 'UPDATE', async (id, input) => redactNestedSuppliers(actorRole, await updatePurchase({ id, input })), (id) => prisma.purchaseContract.findUnique({ where: { id } })),
+    // OD-3：WAREHOUSE 的搜索副标题不带合同金额；采购读写结果同样剥离金额与发票号（与 REST 一致）
+    searchEntities: (args) => searchEntities({ ...args, includeAmounts: actorRole !== 'WAREHOUSE' }),
+    // 审计记录完整结果；返回给调用方的副本再按角色剔除银行字段与（WAREHOUSE）金额/发票号
+    createPurchase: async (input) => redactWarehouseMoney(actorRole, redactNestedSuppliers(actorRole,
+      await audited('PurchaseContract', 'CREATE', (i) => createPurchaseWithItems({ input: i }))(input))),
+    updatePurchase: async (id, input) => redactWarehouseMoney(actorRole, redactNestedSuppliers(actorRole,
+      await audited('PurchaseContract', 'UPDATE', async (pid, i) => updatePurchase({ id: pid, input: await keepStoredPrices(actorRole, pid, i) }), (pid) => prisma.purchaseContract.findUnique({ where: { id: pid } }))(id, input))),
     createSupplier: async (input) => redactSupplierForRole(actorRole, await audited('Supplier', 'CREATE', (i) => createSupplier({ input: sanitizeSupplierInput(actorRole, i) }))(input)),
     updateSupplier: async (id, input) => redactSupplierForRole(actorRole, await audited('Supplier', 'UPDATE', (sid, i) => {
       assertActiveChangeAllowed(actorRole, i?.isActive);

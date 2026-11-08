@@ -251,7 +251,7 @@ const chat = async (req, res, next) => {
     const currentSessionId = sessionId || `session_${Date.now()}`;
     
     // 调用AI服务
-    const result = await aiService.chat(userId, currentSessionId, message, imageUrl);
+    const result = await aiService.chat(userId, currentSessionId, message, imageUrl, req.user.role);
     
     success(res, {
       sessionId: currentSessionId,
@@ -301,7 +301,8 @@ const chatStream = async (req, res) => {
       // onThinking - 思考过程回调
       (thinking) => {
         sendSseMessage(res, { type: 'thinking', content: thinking });
-      }
+      },
+      req.user.role,
     );
     
     // 发送完成消息

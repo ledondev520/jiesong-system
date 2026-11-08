@@ -61,9 +61,9 @@ router.post('/execute', roleAuth('ADMIN'), withAuditLog(
 ));
 
 // GET /api/v1/import/history - 获取导入历史
-router.get('/history', dataImportController.getHistory);
+router.get('/history', roleAuth('ADMIN'), dataImportController.getHistory);
 
 // GET /api/v1/import/stats - 获取数据库统计
-router.get('/stats', dataImportController.getStats);
+router.get('/stats', roleAuth('ADMIN'), dataImportController.getStats);
 
 module.exports = router;

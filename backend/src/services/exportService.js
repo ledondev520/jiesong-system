@@ -14,6 +14,7 @@ const { calculateTaxSummary } = require('./taxCalculationEngine');
 const { outstandingOf } = require('./payablesService');
 const { getExportReadiness } = require('./exportReadinessService');
 const { roundMoney } = require('../utils/money');
+const { getOwnedReceivableUsd, getEffectiveSalesReceived, getOutstandingReceivableUsd } = require('./salesContractAmount');
 
 /**
  * 职责：导出数据
@@ -22,7 +23,7 @@ const { roundMoney } = require('../utils/money');
  * @param {Object} query - 查询参数
  * @returns {Object} { data, filename, contentType }
  */
-const exportData = async (type, query = {}, { includeBank = false } = {}) => {
+const exportData = async (type, query = {}, { includeBank = false, includeMoney = true } = {}) => {
   switch (type) {
     case 'suppliers':
       return exportSuppliers(query, includeBank);
@@ -31,9 +32,9 @@ const exportData = async (type, query = {}, { includeBank = false } = {}) => {
     case 'products':
       return exportProducts(query);
     case 'purchases':
-      return exportPurchases(query);
+      return exportPurchases(query, includeMoney);
     case 'sales':
-      return exportSales(query);
+      return exportSales(query, includeMoney);
     case 'containers':
       return exportContainers(query);
     case 'inventory':
@@ -145,7 +146,7 @@ const exportProducts = async (query) => {
 /**
  * 职责：导出采购合同数据
  */
-const exportPurchases = async (query) => {
+const exportPurchases = async (query, includeMoney = true) => {
   const contracts = await prisma.purchaseContract.findMany({
     include: {
       supplier: true,
@@ -154,17 +155,16 @@ const exportPurchases = async (query) => {
     orderBy: { createdAt: 'desc' },
   });
   
-  const headers = ['合同号', '供应商', '总金额', '已付金额', '未付金额', '状态', '签订日期', '预计交货', '发票号'];
+  // OD-2/OD-3：WAREHOUSE 无金额与发票号列（includeMoney=false），状态等保留
+  const headers = ['合同号', '供应商', ...(includeMoney ? ['总金额', '已付金额', '未付金额'] : []), '状态', '签订日期', '预计交货', ...(includeMoney ? ['发票号'] : [])];
   const rows = contracts.map(c => [
     c.contractNo,
     c.supplier?.name || '',
-    c.totalAmount,
-    c.paidAmount,
-    outstandingOf(c), // 与付款列表同口径：草稿/已取消为 0
+    ...(includeMoney ? [c.totalAmount, c.paidAmount, outstandingOf(c)] : []), // 与付款列表同口径：草稿/已取消为 0
     c.status,
     c.signedAt ? formatDate(c.signedAt) : '',
     c.expectedDate ? formatDate(c.expectedDate) : '',
-    c.invoiceNo || '',
+    ...(includeMoney ? [c.invoiceNo || ''] : []),
   ]);
   
   return {
@@ -177,7 +177,8 @@ const exportPurchases = async (query) => {
 /**
  * 职责：导出出口合同数据
  */
-const exportSales = async (query) => {
+// OD-3：WAREHOUSE 只看状态，不含合同总额/收款金额（includeMoney=false）。
+const exportSales = async (query, includeMoney = true) => {
   const contracts = await prisma.salesContract.findMany({
     include: {
       items: { include: { product: true, store: true } },
@@ -185,12 +186,10 @@ const exportSales = async (query) => {
     orderBy: { createdAt: 'desc' },
   });
   
-  const headers = ['合同号', '总金额(USD)', '已收金额', '未收金额', '汇率', '状态', '签订日期'];
+  const headers = ['合同号', ...(includeMoney ? ['总金额(USD)', '已收金额', '未收金额'] : []), '汇率', '状态', '签订日期'];
   const rows = contracts.map(c => [
     c.contractNo,
-    c.totalAmount,
-    c.receivedAmount,
-    c.totalAmount - c.receivedAmount,
+    ...(includeMoney ? [c.totalAmount, c.receivedAmount, c.totalAmount - c.receivedAmount] : []),
     c.exchangeRate,
     c.status,
     c.signedAt ? formatDate(c.signedAt) : '',
@@ -397,9 +396,9 @@ const exportSalesContractExcel = async (contractId) => {
     ['签订日期', contract.signedAt ? formatDate(contract.signedAt) : '-'],
     ['合同状态', statusLabels[contract.status] || contract.status],
     ['目的港口', contract.port?.name || '-'],
-    ['总金额 (USD)', `$${contract.totalAmount.toFixed(2)}`],
-    ['已收金额 (USD)', `$${contract.receivedAmount.toFixed(2)}`],
-    ['未收金额 (USD)', `$${(contract.totalAmount - contract.receivedAmount).toFixed(2)}`],
+    ['总金额 (USD)', `$${getOwnedReceivableUsd(contract).toFixed(2)}`],
+    ['已收金额 (USD)', `$${getEffectiveSalesReceived(contract).toFixed(2)}`],
+    ['未收金额 (USD)', `$${getOutstandingReceivableUsd(contract).toFixed(2)}`],
     ['汇率 (USD/CNY)', contract.exchangeRate],
     ['总箱数', contract.totalBoxes || 0],
     ['毛重 (kg)', contract.grossWeight || 0],

@@ -281,6 +281,25 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("BOSS（只读）只有「查看合同」下载入口，没有生成/盖章（OD-4）", async () => {
+    useAuthStore.setState({ user: { id: "synthetic", role: "BOSS" } as never });
+    mockReadOnly = true;
+    mockGetById.mockResolvedValue({ data: draftContract });
+    const user = userEvent.setup();
+    renderPage("p-1");
+
+    await user.click(await screen.findByRole("button", { name: /单证/ }));
+    expect(
+      await screen.findByRole("menuitem", { name: /查看合同/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /生成购销合同/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: /在线盖章/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("在线盖章与生成购销合同收进同一个「单证」菜单，不再是页头独立按钮", async () => {
     mockGetById.mockResolvedValue({ data: draftContract });
     const user = userEvent.setup();
@@ -896,4 +915,47 @@ describe("PurchaseDetailPage 交互逻辑", () => {
       expect(options?.includes("SUPPLIER_INVOICE")).toBe(allowed);
     },
   );
+
+  it("WAREHOUSE：金额与发票号已被服务端剥离，页面显示状态与「无权查看」，没有 ¥ 数字", async () => {
+    useAuthStore.setState({
+      user: { id: "synthetic", role: "WAREHOUSE" } as never,
+    });
+    mockGetById.mockResolvedValue({
+      data: {
+        id: "p-1",
+        contractNo: "PO2500009",
+        status: "SIGNED",
+        taxRate: 13,
+        invoiceCount: 2,
+        hasPaidAmount: true,
+        subStatus: {
+          payment: "PARTIAL",
+          arrival: { state: "NONE", ordered: 3, arrived: 0, registered: false },
+          docsComplete: true,
+        },
+        supplier: { name: "供应商A" },
+        payments: [{ id: "pay-1" }],
+        items: [
+          {
+            id: "i-1",
+            productId: "pr-1",
+            quantity: 3,
+            unit: "件",
+            product: { id: "pr-1", customsName: "餐盘" },
+          },
+        ],
+      },
+    });
+    const { container } = renderPage();
+    await screen.findByRole("heading", { name: "PO2500009" });
+    expect(container.textContent).toContain("无权查看");
+    expect(container.textContent).not.toMatch(/¥/);
+    await openTab("明细");
+    expect(screen.getByText("餐盘")).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/¥\s*[\d,]|NaN/);
+    await openTab("付款与发票");
+    expect(container.textContent).toContain("部分付款");
+    expect(container.textContent).toContain("已登记 2 个发票号");
+    expect(container.textContent).not.toMatch(/¥|NaN|已付清/);
+  });
 });

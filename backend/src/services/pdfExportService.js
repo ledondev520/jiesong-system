@@ -15,6 +15,7 @@ const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
 const { getExportReadiness } = require('./exportReadinessService');
 const { outstandingOf } = require('./payablesService');
+const { getOwnedReceivableUsd, getEffectiveSalesReceived, getOutstandingReceivableUsd } = require('./salesContractAmount');
 
 const DEFAULT_LOGO_PATH = path.join(__dirname, '../../assets/pdf-logo.png');
 const DEFAULT_STAMP_PATH = path.join(__dirname, '../../assets/pdf-stamp.png');
@@ -275,9 +276,9 @@ const exportSalesContractPdf = async (contractId) => {
     ['Port', contract.port?.name || '-'],
     ['Signed At', contract.signedAt ? formatDate(contract.signedAt) : '-'],
     ['Exchange Rate', formatMoney(contract.exchangeRate)],
-    ['Total Amount (USD)', formatMoney(contract.totalAmount)],
-    ['Received Amount (USD)', formatMoney(contract.receivedAmount)],
-    ['Outstanding (USD)', formatMoney((contract.totalAmount || 0) - (contract.receivedAmount || 0))],
+    ['Total Amount (USD)', formatMoney(getOwnedReceivableUsd(contract))],
+    ['Received Amount (USD)', formatMoney(getEffectiveSalesReceived(contract))],
+    ['Outstanding (USD)', formatMoney(getOutstandingReceivableUsd(contract))],
     ['Total Boxes', contract.totalBoxes || 0],
     ['Gross Weight (kg)', formatMoney(contract.grossWeight || 0)],
     ['Net Weight (kg)', formatMoney(contract.netWeight || 0)],
@@ -335,7 +336,7 @@ const exportSalesContractPdf = async (contractId) => {
   };
 };
 
-const exportSystemDataRows = async (type, query = {}, { includeBank = false } = {}) => {
+const exportSystemDataRows = async (type, query = {}, { includeBank = false, includeMoney = true } = {}) => {
   switch (type) {
     case 'suppliers': {
       const suppliers = await prisma.supplier.findMany({
@@ -409,17 +410,15 @@ const exportSystemDataRows = async (type, query = {}, { includeBank = false } = 
       });
       return {
         title: 'Purchases',
-        headers: ['Contract No.', 'Supplier', 'Total', 'Received', 'Outstanding', 'Status', 'Signed At', 'Expected', 'Invoice'],
+        headers: ['Contract No.', 'Supplier', ...(includeMoney ? ['Total', 'Received', 'Outstanding'] : []), 'Status', 'Signed At', 'Expected', ...(includeMoney ? ['Invoice'] : [])],
         rows: contracts.map((item) => [
           item.contractNo,
           item.supplier?.name || '',
-          formatMoney(item.totalAmount),
-          formatMoney(item.paidAmount),
-          formatMoney(outstandingOf(item)),
+          ...(includeMoney ? [formatMoney(item.totalAmount), formatMoney(item.paidAmount), formatMoney(outstandingOf(item))] : []),
           item.status || '',
           item.signedAt ? formatDate(item.signedAt) : '',
           item.expectedDate ? formatDate(item.expectedDate) : '',
-          item.invoiceNo || '',
+          ...(includeMoney ? [item.invoiceNo || ''] : []),
         ]),
         filename: `purchases_${toFilenameDate()}.pdf`,
       };
@@ -433,12 +432,14 @@ const exportSystemDataRows = async (type, query = {}, { includeBank = false } = 
       });
       return {
         title: 'Sales Contracts',
-        headers: ['Contract No.', 'Total', 'Received', 'Outstanding', 'Exchange Rate', 'Status', 'Signed At'],
+        headers: ['Contract No.', ...(includeMoney ? ['Total', 'Received', 'Outstanding'] : []), 'Exchange Rate', 'Status', 'Signed At'],
         rows: contracts.map((item) => [
           item.contractNo,
-          formatMoney(item.totalAmount),
-          formatMoney(item.receivedAmount),
-          formatMoney((item.totalAmount || 0) - (item.receivedAmount || 0)),
+          ...(includeMoney ? [
+            formatMoney(item.totalAmount),
+            formatMoney(item.receivedAmount),
+            formatMoney((item.totalAmount || 0) - (item.receivedAmount || 0)),
+          ] : []),
           formatMoney(item.exchangeRate),
           item.status || '',
           item.signedAt ? formatDate(item.signedAt) : '',
@@ -549,5 +550,6 @@ const exportSystemDataPdf = async (type, query = {}, options = {}) => {
 
 module.exports = {
   exportSalesContractPdf,
+  exportSystemDataRows, // 供测试断言列头（OD-3）
   exportSystemDataPdf,
 };

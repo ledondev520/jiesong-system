@@ -71,7 +71,7 @@ router.post('/generate', roleAuth(...SETTLEMENT_DOC_ROLES), wrapAsync(async (req
  * POST /api/three-forms/customs-declaration
  * 单独生成报关单
  */
-router.post('/customs-declaration', roleAuth(...COMMERCIAL_ROLES), wrapAsync(async (req, res) => {
+router.post('/customs-declaration', roleAuth(...SETTLEMENT_DOC_ROLES), wrapAsync(async (req, res) => {
   const { salesContractId, items, extraData } = req.body;
 
   if (!salesContractId) {

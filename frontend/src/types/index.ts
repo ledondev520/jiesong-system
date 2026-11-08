@@ -357,6 +357,9 @@ export interface PurchaseContract {
   expectedDate?: string;
   productionCompletedAt?: string;
   invoiceNo?: string;
+  /** WAREHOUSE 响应不含 invoiceNo/paidAmount（OD-2/OD-3），以计数与布尔状态代替 */
+  invoiceCount?: number;
+  hasPaidAmount?: boolean;
   storeName?: string; // 发货店铺名称
   note?: string;
   salesContractId?: string; // 生成该采购单的出口订单（接口原本就返回，详情页「关联订单」用）

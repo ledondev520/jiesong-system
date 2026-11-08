@@ -16,8 +16,10 @@ const { withAuditLog } = require('../middleware/auditLog');
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 合同文档含供应商银行信息（Restricted）：与 B60 读模型一致，SALES/WAREHOUSE 403；BOSS 为只读且生成文件默认拒绝。
+// 合同文档含供应商银行信息（Restricted）：与 B60 读模型一致，SALES/WAREHOUSE 403；生成仅 DOC_ROLES，BOSS 只读。
 const DOC_ROLES = ['ADMIN', 'PURCHASE', 'FINANCE'];
+// OD-4：BOSS 可下载 PDF（GET /pdf 只在内存渲染，不写库不落盘）；生成 POST /generate 仍不含 BOSS。
+const PDF_DOWNLOAD_ROLES = [...DOC_ROLES, 'BOSS'];
 
 router.use(authenticate);
 
@@ -83,7 +85,7 @@ router.post(
 // GET /api/v1/contract-doc/pdf/:id - 获取采购合同PDF（用于预览）
 router.get(
   '/pdf/:id',
-  roleAuth(...DOC_ROLES),
+  roleAuth(...PDF_DOWNLOAD_ROLES),
   withIdValidation,
   contractDocController.getContractPdf
 );

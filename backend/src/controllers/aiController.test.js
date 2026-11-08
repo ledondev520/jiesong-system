@@ -780,3 +780,26 @@ test('getSessions: AgentReplaySummary 优先于回放快照与 AGENT_RUN 作为 
     }
   }
 });
+
+// PR #210 re-review P2-A: 聊天的角色必须从控制器逐跳传到 getDbContext；丢角色会让 WAREHOUSE 重新看到金额（默认 null 即显示）。
+test('chat / chatStream: 控制器把 req.user.role 传给 aiService（hop 1，WAREHOUSE 红线）', async () => {
+  const aiService = require('../services/aiService');
+  const originals = { chat: aiService.chat, chatStream: aiService.chatStream };
+  const calls = {};
+  aiService.chat = async (...args) => { calls.chat = args; return { message: 'ok', tokenUsage: {}, model: 'm' }; };
+  aiService.chatStream = async (...args) => { calls.chatStream = args; return { tokenUsage: {}, model: 'm' }; };
+  try {
+    const { chat, chatStream } = require('./aiController');
+    for (const role of ['WAREHOUSE', 'SALES']) {
+      const req = { body: { message: '应付', sessionId: 's1' }, user: { id: 'u1', role } };
+      await chat(req, createMockRes(), (error) => { throw error; });
+      assert.equal(calls.chat[4], role, `chat ${role}`);
+      const sse = { setHeader() {}, flushHeaders() {}, write() {}, end() {} };
+      await chatStream(req, sse);
+      assert.equal(calls.chatStream[6], role, `chatStream ${role}`);
+    }
+  } finally {
+    aiService.chat = originals.chat;
+    aiService.chatStream = originals.chatStream;
+  }
+});

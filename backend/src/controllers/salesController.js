@@ -15,6 +15,7 @@ const fileService = require('../services/fileService');
 const taxRefundPreparationService = require('../services/taxRefundPreparationService');
 const salesFinanceService = require('../services/salesFinanceService');
 const exportPacketService = require('../services/exportPacketService');
+const { redactPackingSecrets } = require('../utils/warehouseRedaction');
 
 const list = async (req, res, next) => {
   try {
@@ -23,7 +24,11 @@ const list = async (req, res, next) => {
     const lite = req.query.lite === 'true' || req.query.lite === true;
 
     const result = await salesService.getSalesContracts({ page, pageSize, status, storeId, customerId, keyword, shipped, shippedFrom, shippedTo, lite });
-    paginated(res, result.contracts, result.total, page, pageSize);
+    // OD-3：WAREHOUSE 只看状态，列表不含合同总额/已收金额。
+    const contracts = req.user?.role === 'WAREHOUSE'
+      ? result.contracts.map(({ totalAmount, receivedAmount, ...rest }) => rest)
+      : result.contracts;
+    paginated(res, contracts, result.total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -32,6 +37,11 @@ const list = async (req, res, next) => {
 const getById = async (req, res, next) => {
   try {
     const contract = await salesService.getSalesContractById(req.params.id);
+    // OD-3/OD-6：WAREHOUSE 详情同样只看状态，不含合同总额、已收金额与收款记录。
+    if (req.user?.role === 'WAREHOUSE') {
+      const { totalAmount, receivedAmount, payments, ...rest } = contract;
+      return success(res, redactPackingSecrets('WAREHOUSE', rest));
+    }
     success(res, contract);
   } catch (error) {
     next(error);
@@ -191,7 +201,7 @@ const calculatePrice = async (req, res, next) => {
 const addPackingItem = async (req, res, next) => {
   try {
     const item = await salesService.addPackingItem(req.params.id, req.body || {});
-    created(res, item, '装箱明细添加成功');
+    created(res, redactPackingSecrets(req.user?.role, item), '装箱明细添加成功');
   } catch (error) {
     next(error);
   }
@@ -226,7 +236,7 @@ const importPurchasePackingItems = async (req, res, next) => {
       req,
       note: '从已完工采购资料导入装箱明细',
     });
-    created(res, result, `已导入 ${result.importedCount} 条装箱明细`);
+    created(res, redactPackingSecrets(req.user?.role, result), `已导入 ${result.importedCount} 条装箱明细`);
   } catch (error) {
     next(error);
   }
@@ -236,7 +246,7 @@ const updatePackingItem = async (req, res, next) => {
   try {
     const { id, itemId } = req.params;
     const item = await salesService.updatePackingItem(id, itemId, req.body || {});
-    success(res, item, '装箱明细更新成功');
+    success(res, redactPackingSecrets(req.user?.role, item), '装箱明细更新成功');
   } catch (error) {
     next(error);
   }
