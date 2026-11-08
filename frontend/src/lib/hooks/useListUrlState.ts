@@ -72,6 +72,8 @@ export const listUrlFields = {
   inventory: {
     keyword: { default: "", key: "inventoryKeyword", resetPage: true },
     store: { default: "", key: "inventoryStore", resetPage: true },
+    lotNo: { default: "", key: "inventoryLot", resetPage: true },
+    binLocation: { default: "", key: "inventoryBin", resetPage: true },
     page: { default: 1, key: "inventoryPage" },
     pageSize: {
       default: 20,
