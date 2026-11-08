@@ -197,3 +197,11 @@ test('/export/:type 与 /system/export/:type 同守卫：WAREHOUSE 导出 paymen
   const purchasesExport = require('../routes/purchases').stack.find((l) => l.route?.path === '/export').route;
   assert.ok(purchasesExport.stack.some((l) => l.handle.isRoleAuth), '/purchases/export 有角色校验');
 });
+
+test('OD-6：库存快照的 totalCost 与 averageCost 对 WAREHOUSE 保持可见，合同金额仍剥离', () => {
+  const body = { byProduct: [{ productId: 'p1', totalCost: 4321, averageCost: 12.5 }], contract: { totalAmount: 99, totalCost: 7 } };
+  const out = redactWarehouseMoney('WAREHOUSE', body);
+  assert.deepEqual(out.byProduct[0], { productId: 'p1', totalCost: 4321, averageCost: 12.5 });
+  assert.equal('totalAmount' in out.contract, false);
+  assert.equal('totalCost' in out.contract, false);
+});

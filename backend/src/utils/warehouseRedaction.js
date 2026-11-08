@@ -19,8 +19,10 @@ const walk = (node) => {
   if (Array.isArray(node)) return node.map(walk);
   if (!isPlain(node)) return node;
   const copy = {};
+  // OD-6：库存快照行（totalCost 与 averageCost 成对出现）的成本对 WAREHOUSE 保持可见；其他 totalCost 仍剥离
+  const inventoryCost = 'totalCost' in node && 'averageCost' in node;
   Object.keys(node).forEach((key) => {
-    if (MONEY_KEYS.has(key)) return;
+    if (MONEY_KEYS.has(key) && !(inventoryCost && key === 'totalCost')) return;
     if (key === 'invoiceNo') { copy.invoiceCount = countInvoices(node[key]); return; }
     if (key === 'invoiceNumbers') { copy.invoiceNumberCount = countInvoices(node[key]); return; }
     // 付款记录只保留条数/编号，金额不外泄；"已付过款"用布尔状态代替 paidAmount
