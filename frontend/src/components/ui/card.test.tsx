@@ -23,7 +23,7 @@ describe("card", () => {
       "flex",
       "flex-col",
       "gap-6",
-      "rounded-lg",
+      "rounded-xl",
       "border",
       "bg-card",
     );

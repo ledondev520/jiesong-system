@@ -54,6 +54,8 @@ import {
   type FinanceDataBatch,
 } from "@/services/bankFlow.service";
 import { ErrorState } from "@/components/ui/data-state";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { formatDate } from "@/lib/date-format";
 import { clearApiGetCache } from "@/lib/axios";
 import { runAwait } from "@/lib/run-await";
 import { canLinkInvoices, txnKind } from "@/lib/finance-ledger";
@@ -217,6 +219,10 @@ export default function BankFlowPage() {
 
   return (
     <div className="space-y-4">
+      <PageHeader
+        title="银行流水"
+        description="查询与核对公司银行账户收支明细"
+      />
       {loadError && (
         <ErrorState
           title="银行流水读取失败"
@@ -259,7 +265,7 @@ export default function BankFlowPage() {
             }}
           />
           <span className="text-xs text-muted-foreground">
-            金额与汇总币种：{currency}；表头为本页排序
+            金额与汇总币种：{currency}
           </span>
         </div>
         {/* KPI */}
@@ -314,12 +320,12 @@ export default function BankFlowPage() {
                 {/* 来源文件名属 Confidential 财务资料，仅 ADMIN/FINANCE 可见 */}
                 <Badge
                   variant="outline"
-                  className="max-w-full whitespace-normal break-all text-[10px]"
+                  className="max-w-full whitespace-normal break-all text-xs"
                 >
                   {canSeeSourceFile ? b.fileName : `第${index + 1}批`}
                 </Badge>
                 {b.dataStartDate}~{b.dataEndDate}
-                ・导入于 {new Date(b.importedAt).toLocaleDateString("zh-CN")}
+                ・导入于 {formatDate(b.importedAt)}
               </span>
             ))}
           </div>
@@ -446,7 +452,7 @@ export default function BankFlowPage() {
         {/* 桌面端表格 */}
         <Card className="hidden md:block">
           <div className="overflow-x-auto">
-            <Table>
+            <Table framed={false}>
               <TableHeader>
                 <TableRow>
                   <SortableTableHead
@@ -533,14 +539,14 @@ export default function BankFlowPage() {
                         {item.direction === "IN" ? (
                           <Badge
                             variant="outline"
-                            className="text-status-green border-status-green/40 text-[10px]"
+                            className="text-status-green border-status-green/40 text-xs"
                           >
                             <ArrowDownLeft className="h-3 w-3 mr-0.5" />收
                           </Badge>
                         ) : (
                           <Badge
                             variant="outline"
-                            className="text-status-red border-status-red/40 text-[10px]"
+                            className="text-status-red border-status-red/40 text-xs"
                           >
                             <ArrowUpRight className="h-3 w-3 mr-0.5" />付
                           </Badge>
@@ -586,7 +592,7 @@ export default function BankFlowPage() {
                         <span className="inline-flex flex-wrap items-center gap-1">
                           {item.txnType || "-"}
                           {txnKind(item) ? (
-                            <Badge variant="secondary" className="text-[10px]">
+                            <Badge variant="secondary" className="text-xs">
                               {txnKind(item)}
                             </Badge>
                           ) : null}

@@ -19,7 +19,7 @@ import { SystemConfigTab } from "./tabs/SystemConfigTab";
 export default function SettingsPageContent() {
   return (
     <div className="space-y-6">
-      <PageHeader title="系统配置" description="全局运营参数与 AI 集成配置" />
+      <PageHeader title="报价规则" description="全局运营参数与 AI 集成配置" />
       <PricingConfigCard />
       <Suspense>
         <SystemConfigTab />

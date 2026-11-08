@@ -234,7 +234,7 @@ export default function PortsPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="港口管理"
+        title="港口"
         description="维护装卸港口基础数据"
         actions={
           <div className="hidden flex-wrap items-center gap-2 md:flex">

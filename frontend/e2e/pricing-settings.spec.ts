@@ -35,7 +35,7 @@ for (const width of [390, 1440]) {
       page.on("pageerror", (error) => errors.push(error.message));
       await signInAsAdmin(page, "/dashboard/settings");
       await expect(
-        page.getByRole("heading", { name: "系统配置" }),
+        page.getByRole("heading", { name: "报价规则" }),
       ).toBeVisible();
       await expect(
         page.getByLabel("默认加价 (%)", { exact: true }),
@@ -83,7 +83,7 @@ for (const width of [390, 1440]) {
           page.getByRole("alert").filter({ hasText: "报价配置" }),
         ).toHaveText("报价配置加载失败，请刷新页面重试");
         await expect(
-          page.getByRole("heading", { name: "系统配置" }),
+          page.getByRole("heading", { name: "报价规则" }),
         ).toBeVisible();
         await expect(
           width < 768

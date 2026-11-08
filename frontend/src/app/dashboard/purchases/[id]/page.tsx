@@ -90,6 +90,7 @@ import Link from "next/link";
 import { RecordHeader } from "@/components/layout/RecordHeader";
 import { KpiStat } from "@/components/ui/kpi-stat";
 import { UrlTabs } from "@/components/ui/url-tabs";
+import { formatMoney, formatUnitPrice } from "@/lib/format";
 import { replaceBrowserQuery } from "@/lib/hooks/useBrowserQuery";
 import ContractFiles from "@/components/contract/ContractFiles";
 import { isPayable, nonPayableNotice } from "../components/purchaseListHelpers";
@@ -627,7 +628,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   // OD-2/OD-3：WAREHOUSE 服务端已剥离金额与发票号，页面显示「无权查看」，绝不把缺失值显示成 ¥0
   const moneyHidden = userRole === "WAREHOUSE";
   const yuan = (value: number) =>
-    moneyHidden ? HIDDEN_MONEY : `¥${value.toLocaleString()}`;
+    moneyHidden ? HIDDEN_MONEY : formatMoney(value, "CNY");
+  const yuanUnit = (value: number) =>
+    moneyHidden ? HIDDEN_MONEY : formatUnitPrice(value, "CNY");
   const hasPaid = contract.hasPaidAmount ?? Number(contract.paidAmount) > 0;
   const hasInvoice =
     (contract.invoiceCount ?? (contract.invoiceNo ? 1 : 0)) > 0;
@@ -721,7 +724,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           ? [
               {
                 key: "generate",
-                label: "生成购销合同",
+                label: "生成盖章购销合同 (Word)",
                 onSelect: () => setDocConfirm("generate"),
               },
               {
@@ -873,10 +876,6 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           </div>
         </div>
       )}
-
-      <p className="text-xs text-muted-foreground">
-        术语说明：采购合同是本系统里向供应商采购的单据（本页）；购销合同是据此生成、用于对外签约盖章的法律文件，在「单证」菜单里生成。
-      </p>
 
       {/* 两列信息卡片 */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -1077,7 +1076,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
+                <Table framed={false}>
                   <TableHeader>
                     <TableRow className="border-b border-border/60 bg-muted/40 hover:bg-muted/40">
                       <TableHead className="w-10 text-center text-xs">
@@ -1146,13 +1145,13 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                           <TableCell className="text-sm text-muted-foreground">
                             {item.specification ||
                               item.product?.specification ||
-                              "-"}
+                              "—"}
                           </TableCell>
                           <TableCell className="text-right text-sm tabular-nums">
                             {item.quantity} {item.unit || item.product?.unit}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm tabular-nums">
-                            {yuan(Number(item.unitPrice) || 0)}
+                            {yuanUnit(Number(item.unitPrice) || 0)}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
                             {yuan(

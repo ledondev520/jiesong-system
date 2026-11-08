@@ -7,6 +7,7 @@
 "use client";
 
 import { LoadingValue } from "@/components/ui/loading-value";
+import { TableRowsSkeleton } from "@/components/ui/data-state";
 import {
   useEffect,
   useCallback,
@@ -484,9 +485,9 @@ export default function SystemLogsPage() {
                 const summaryLine =
                   hints[0] ||
                   (log.oldValue
-                    ? "含旧值快照"
+                    ? "已记录修改前内容"
                     : log.newValue
-                      ? "含新值快照"
+                      ? "已记录修改后内容"
                       : "-");
                 const summaryShort =
                   summaryLine.length > 56
@@ -502,7 +503,7 @@ export default function SystemLogsPage() {
                       <div className="flex flex-wrap gap-1.5">
                         <Badge
                           variant="outline"
-                          className={`w-fit text-[10px] ${level.className}`}
+                          className={`w-fit text-xs ${level.className}`}
                         >
                           {level.label}
                         </Badge>
@@ -521,7 +522,7 @@ export default function SystemLogsPage() {
             )}
           </div>
           <div className="hidden md:block surface-panel overflow-hidden">
-            <Table>
+            <Table framed={false}>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <SortableTableHead
@@ -560,14 +561,7 @@ export default function SystemLogsPage() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="py-12 text-center text-muted-foreground"
-                    >
-                      加载中...
-                    </TableCell>
-                  </TableRow>
+                  <TableRowsSkeleton columns={7} rows={6} />
                 ) : logs.length === 0 ? (
                   <TableRow>
                     <TableCell
@@ -595,7 +589,7 @@ export default function SystemLogsPage() {
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={`text-[10px] ${level.className}`}
+                            className={`text-xs ${level.className}`}
                           >
                             {level.label}
                           </Badge>

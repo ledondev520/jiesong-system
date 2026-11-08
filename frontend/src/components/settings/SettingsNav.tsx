@@ -141,7 +141,7 @@ export function SettingsNav({ mobile = false }: { mobile?: boolean }) {
       <div className="flex-1 space-y-5 overflow-auto px-3 pb-4">
         {filteredGroups.map((group) => (
           <div key={group.label}>
-            <p className="mb-1.5 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+            <p className="mb-1.5 px-2 text-xs font-semibold text-muted-foreground/70">
               {group.label}
             </p>
             <nav className="space-y-0.5">

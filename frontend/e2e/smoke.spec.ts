@@ -91,7 +91,7 @@ test.describe("侧边栏导航全覆盖", () => {
         label: "设置",
         path: "/dashboard/settings",
         url: /\/dashboard\/settings$/,
-        heading: "系统配置",
+        heading: "报价规则",
       },
     ] as const;
 
@@ -135,7 +135,7 @@ test.describe("关键按钮交互", () => {
     await page.goto("/dashboard");
     await page.waitForLoadState("domcontentloaded");
     await safeClick(page.getByRole("button", { name: "新建", exact: true }));
-    await safeClick(page.getByRole("menuitem", { name: /^新建出口合同/ }));
+    await safeClick(page.getByRole("menuitem", { name: /^新建出口订单/ }));
     await expect(page).toHaveURL(/\/dashboard\/sales\/create$/);
     await expect(
       page.getByRole("heading", { name: "创建出口合同" }),
@@ -153,11 +153,11 @@ test.describe("关键按钮交互", () => {
     ).toBeVisible();
   });
 
-  test("出口订单页：新建订单按钮可用", async ({ page }) => {
+  test("出口订单页：新建出口订单按钮可用", async ({ page }) => {
     await signInAsAdmin(page, "/dashboard/orders");
     await expect(page.getByRole("heading", { name: "出口订单" })).toBeVisible();
 
-    await safeClick(page.getByRole("button", { name: "新建订单" }));
+    await safeClick(page.getByRole("button", { name: "新建出口订单" }));
     await expect(page).toHaveURL(/\/dashboard\/orders\/new$/, {
       timeout: 10000,
     });
@@ -210,7 +210,7 @@ test.describe("关键按钮交互", () => {
 
   test("设置页：系统管理 Tab 导航可用", async ({ page }) => {
     await signInAsAdmin(page, "/dashboard/settings");
-    await expect(page.getByRole("heading", { name: "系统配置" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "报价规则" })).toBeVisible();
 
     const accountTab = page.getByRole("link", { name: /^账号管理$/ });
     const settingsUserLink = page.getByRole("link", { name: /^用户管理$/ });

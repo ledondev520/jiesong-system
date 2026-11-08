@@ -97,7 +97,7 @@ export function GovernanceToolbar({
     <>
       <div
         data-testid="governance-presets"
-        className="sticky top-0 z-10 -mx-1 flex flex-wrap gap-2 rounded-xl border border-border/60 bg-background/95 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+        className="sticky top-16 z-20 -mx-1 flex flex-wrap gap-2 rounded-xl border border-border/60 bg-background/95 px-1 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80"
       >
         <Button
           variant={
@@ -227,39 +227,49 @@ export function GovernanceToolbar({
           </Select>
         </div>
       </div>
-      {sortMode === "risk" ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="outline">当前：超时优先风险排序</Badge>
-          <span>顺序为超时失败、超时待确认、普通失败、普通待确认。</span>
-        </div>
-      ) : null}
-      {governanceSourceNote ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          {governanceViewStateNote ? (
-            <Badge variant="outline">{governanceViewStateNote}</Badge>
+      {sortMode === "risk" || governanceSourceNote || governanceReplayNote ? (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          {sortMode === "risk" ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline">当前：超时优先风险排序</Badge>
+              <span>顺序为超时失败、超时待确认、普通失败、普通待确认。</span>
+            </div>
           ) : null}
-          <Badge variant="secondary">{governanceSourceNote.label}</Badge>
-          {governanceSourceNote.stateLabel ? (
-            <Badge variant="outline">{governanceSourceNote.stateLabel}</Badge>
+          {governanceSourceNote ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {governanceViewStateNote ? (
+                <Badge variant="outline">{governanceViewStateNote}</Badge>
+              ) : null}
+              <Badge variant="secondary">{governanceSourceNote.label}</Badge>
+              {governanceSourceNote.stateLabel ? (
+                <Badge variant="outline">
+                  {governanceSourceNote.stateLabel}
+                </Badge>
+              ) : null}
+              <span>{governanceSourceNote.description}</span>
+            </div>
           ) : null}
-          <span>{governanceSourceNote.description}</span>
-        </div>
-      ) : null}
-      {governanceReplayNote ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="secondary">{governanceReplayNote.label}</Badge>
-          {governanceReplayNote.sourceLabel ? (
-            <Badge variant="outline">{governanceReplayNote.sourceLabel}</Badge>
+          {governanceReplayNote ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary">{governanceReplayNote.label}</Badge>
+              {governanceReplayNote.sourceLabel ? (
+                <Badge variant="outline">
+                  {governanceReplayNote.sourceLabel}
+                </Badge>
+              ) : null}
+              {governanceReplayNote.levelLabel ? (
+                <Badge variant="outline">
+                  {governanceReplayNote.levelLabel}
+                </Badge>
+              ) : null}
+              {governanceReplayNote.badges?.map((badge) => (
+                <Badge key={badge} variant="outline">
+                  {badge}
+                </Badge>
+              ))}
+              <span>{governanceReplayNote.description}</span>
+            </div>
           ) : null}
-          {governanceReplayNote.levelLabel ? (
-            <Badge variant="outline">{governanceReplayNote.levelLabel}</Badge>
-          ) : null}
-          {governanceReplayNote.badges?.map((badge) => (
-            <Badge key={badge} variant="outline">
-              {badge}
-            </Badge>
-          ))}
-          <span>{governanceReplayNote.description}</span>
         </div>
       ) : null}
     </>

@@ -535,7 +535,7 @@ function BusinessReportsContent() {
           <KpiStat
             label="在途货柜"
             value={String(inventory.inTransitContainers)}
-            subLabel="状态为「已发运」的销售合同数，与工作台待办数不是同一口径"
+            subLabel="当前处于「已发运」状态的出口订单数"
             icon={<Ship className="h-4 w-4" />}
             footer={
               <Link

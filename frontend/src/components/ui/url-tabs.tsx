@@ -31,6 +31,8 @@ interface UrlTabsProps {
   defaultTab?: string;
   /** URL 参数名，默认 tab */
   param?: string;
+  /** 页签样式变体：默认 line（底线单行滚动），可选 pill（胶囊） */
+  variant?: "line" | "pill";
   className?: string;
 }
 
@@ -59,6 +61,7 @@ export function UrlTabs({
   tabs,
   defaultTab,
   param = "tab",
+  variant = "line",
   className,
 }: UrlTabsProps) {
   const serverQuery = useSearchParams().toString();
@@ -76,9 +79,16 @@ export function UrlTabs({
       }
       className={className}
     >
-      <TabsList className="h-auto max-w-full flex-wrap justify-start">
+      <TabsList
+        variant={variant}
+        className={
+          variant === "pill"
+            ? "h-auto max-w-full flex-wrap justify-start"
+            : undefined
+        }
+      >
         {tabs.map((tab) => (
-          <TabsTrigger key={tab.key} value={tab.key}>
+          <TabsTrigger key={tab.key} value={tab.key} variant={variant}>
             {tab.label}
             {tab.badge !== undefined && (
               <TabBadge badge={tab.badge} label={tab.label} />

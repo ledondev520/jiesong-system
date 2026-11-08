@@ -5,6 +5,7 @@ import { LucideIcon, Loader2, ServerCrash } from "lucide-react";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { describeFailure } from "@/lib/error-reason";
 import { cn } from "@/lib/utils";
 
@@ -96,6 +97,37 @@ export function ErrorState({
       ) : null}
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
+  );
+}
+
+export function TableRowsSkeleton({
+  columns,
+  rows = 5,
+}: {
+  columns: number;
+  rows?: number;
+}) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <TableRow key={rowIndex} aria-hidden="true">
+          {Array.from({ length: columns }).map((__, colIndex) => (
+            <TableCell key={colIndex}>
+              <Skeleton
+                className={cn(
+                  "h-4",
+                  colIndex === 0
+                    ? "w-28"
+                    : colIndex === columns - 1
+                      ? "ml-auto w-16"
+                      : "w-20",
+                )}
+              />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
   );
 }
 

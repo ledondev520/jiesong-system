@@ -26,6 +26,7 @@ const emptyRecon = {
   },
 };
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
   usePathname: () => "/dashboard/finance/reconciliation",
 }));
 vi.mock("@/services/bankFlow.service", () => ({
@@ -242,10 +243,10 @@ it("美元流水与销售合同按 USD 显示，销售未收按本方应得额�
   );
   await goMatch();
   fireEvent.click(await screen.findByText("SYN CUSTOMER"));
-  expect(screen.getByText(/\+USD \$500\.00/)).toBeInTheDocument();
+  expect(screen.getByText(/\+\$500\.00/)).toBeInTheDocument();
   await screen.findAllByText("EXP-SYN-1");
-  expect(screen.getByText(/总额 USD \$600\.00/)).toBeInTheDocument();
-  expect(screen.getByText(/未收\/付 USD \$500\.00/)).toBeInTheDocument();
+  expect(screen.getByText(/总额 \$600\.00/)).toBeInTheDocument();
+  expect(screen.getByText(/未收\/付 \$500\.00/)).toBeInTheDocument();
 });
 
 it("切换合同类型清空已选合同，慢响应不会覆盖新类型列表", async () => {
@@ -274,8 +275,8 @@ it("切换合同类型清空已选合同，慢响应不会覆盖新类型列表"
     expect(screen.queryByText("EXP-SYN-1")).not.toBeInTheDocument(),
   );
   expect(screen.getByText("PUR-SYN-1")).toBeInTheDocument();
-  // 切到销售：已选采购合同被清空，不能带着旧 id 关联
-  fireEvent.click(screen.getByRole("button", { name: "销售" }));
+  // 切到出口：已选采购合同被清空，不能带着旧 id 关联
+  fireEvent.click(screen.getByRole("button", { name: "出口" }));
   expect(screen.getByRole("button", { name: /确认关联/ })).toBeDisabled();
   expect(manualMatch).not.toHaveBeenCalled();
 });

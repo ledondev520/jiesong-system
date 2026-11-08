@@ -385,7 +385,7 @@ function HsCodesPageContent() {
     <div className="flex flex-col h-full">
       <PageHeader
         title="HS 编码查询"
-        description="默认展示全量列表。可输入商品名称（中文或常见英文名，支持模糊）或 4–12 位纯数字 HS 编码检索；编码按前缀匹配，首尾空格会自动忽略。"
+        description="按商品中英文名称模糊检索，或输入 4–12 位纯数字 HS 编码前缀查询。"
         actions={
           <BusinessWrite>
             <Button

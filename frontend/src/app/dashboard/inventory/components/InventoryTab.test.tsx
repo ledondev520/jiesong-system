@@ -217,7 +217,7 @@ const stockRow = (id: string, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-it("显示入库日期；没有入库时间的行显示「—」，并解释可用库存口径与系统不记录仓库/批次", async () => {
+it("显示入库日期；没有入库时间的行显示「—」，并说明可用库存与入库日期口径", async () => {
   getAll.mockResolvedValueOnce({
     data: {
       items: [
@@ -233,9 +233,8 @@ it("显示入库日期；没有入库时间的行显示「—」，并解释可�
   ).toBeInTheDocument();
   expect(screen.getAllByText("2026-10-05").length).toBeGreaterThan(0);
   expect(screen.getAllByText("—").length).toBeGreaterThan(0);
-  expect(screen.getByText(/只统计状态为「已入库」的数量/)).toBeInTheDocument();
   expect(
-    screen.getByText(/系统目前不记录仓库\/库位和批次号/),
+    screen.getByText(/仅「已入库」状态计入可用库存；入库日期为验收入库当日/),
   ).toBeInTheDocument();
 });
 

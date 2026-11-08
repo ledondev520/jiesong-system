@@ -99,7 +99,7 @@ export default function FinanceOverviewCharts({
               }
               description={
                 effectiveRate
-                  ? `近 ${trendDays} 天内没有合同收付款登记（不含银行流水），所以没有柱子可画；银行流水汇总见下方，也可切换区间。`
+                  ? `近 ${trendDays} 天暂无合同收付款记录（不含银行流水）；可切换上方时间区间，或在下方查看银行流水汇总。`
                   : "应收需按结算汇率折算为 CNY，汇率暂不可用，收支对比无法绘制。"
               }
               className="py-10"

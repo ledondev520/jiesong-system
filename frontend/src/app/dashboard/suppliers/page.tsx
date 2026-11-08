@@ -48,6 +48,8 @@ import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth.store";
 import { useMobile } from "@/lib/hooks/useMobile";
 import { Badge } from "@/components/ui/badge";
+import { SemanticBadge } from "@/components/ui/status-badge";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
@@ -152,21 +154,15 @@ function supplierInitial(name: string) {
 
 function SupplierStatusBadge({ hasIssue }: { hasIssue: boolean }) {
   return hasIssue ? (
-    <Badge
-      variant="destructive"
-      className="gap-1 rounded-full px-2 py-0.5 text-[11px]"
-    >
+    <SemanticBadge tone="danger" className="gap-1">
       <AlertTriangle className="h-3 w-3" />
       质量问题
-    </Badge>
+    </SemanticBadge>
   ) : (
-    <Badge
-      variant="outline"
-      className="gap-1 rounded-full border-primary/20 bg-primary/5 px-2 py-0.5 text-[11px] text-primary"
-    >
+    <SemanticBadge tone="success" className="gap-1">
       <CheckCircle2 className="h-3 w-3" />
       正常
-    </Badge>
+    </SemanticBadge>
   );
 }
 
@@ -288,6 +284,7 @@ export default function SuppliersPage() {
   const [hardDeletePreview, setHardDeletePreview] =
     useState<SupplierHardDeletePreview | null>(null);
   const [hardDeleting, setHardDeleting] = useState(false);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const hasActiveFilters = keyword.trim() || statusFilter !== "all";
 
   const resetFilters = () => {
@@ -449,12 +446,7 @@ export default function SuppliersPage() {
     const supplier = activeSupplier;
     const session = editorSession.current;
     if (!supplier || pendingSave.current === session) return;
-    if (
-      !confirm(
-        `确定要归档供应商「${supplier.name}」吗？历史单据保持不变，可由管理员恢复。`,
-      )
-    )
-      return;
+    setArchiveConfirmOpen(false);
     pendingSave.current = session;
     setSaving(true);
     const isCurrent = () =>
@@ -683,7 +675,7 @@ export default function SuppliersPage() {
                     onClick={handleRestoreActive}
                   >
                     <RotateCcw className="mr-1.5 h-4 w-4" />
-                    恢复当前
+                    恢复供应商
                   </Button>
                 </BusinessWrite>
               )}
@@ -1088,8 +1080,8 @@ export default function SuppliersPage() {
                 危险操作
               </h3>
               <p className="text-xs text-muted-foreground">
-                以下操作针对「{activeSupplier.name}
-                」，与保存无关。归档可由管理员恢复；永久删除须先预览关联记录并输入供应商名称确认。
+                针对「{activeSupplier.name}
+                」：归档后默认列表隐藏，历史单据保留，管理员可随时恢复；永久删除须先预览关联记录并输入供应商名称确认。
               </p>
               <div className="flex flex-wrap gap-2">
                 {canArchive && (
@@ -1103,11 +1095,20 @@ export default function SuppliersPage() {
                         activeSupplier.isActive === false ||
                         saving
                       }
-                      onClick={handleDeleteActive}
+                      onClick={() => setArchiveConfirmOpen(true)}
                     >
                       <Trash2 className="mr-1.5 h-4 w-4" />
-                      归档当前
+                      归档供应商
                     </Button>
+                    <ConfirmActionDialog
+                      open={archiveConfirmOpen}
+                      onOpenChange={setArchiveConfirmOpen}
+                      title={`确定要归档供应商「${activeSupplier.name}」吗？`}
+                      description="归档后默认列表隐藏，历史单据保留，管理员可随时恢复。"
+                      confirmLabel="归档供应商"
+                      destructive
+                      onConfirm={() => void handleDeleteActive()}
+                    />
                   </BusinessWrite>
                 )}
                 {isAdmin && (

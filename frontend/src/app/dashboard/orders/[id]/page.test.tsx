@@ -802,6 +802,11 @@ describe("OrderDetailPage 交互逻辑", () => {
 
     // 编辑装箱行 → onChanged → 重新取合同；第二次计划请求仍在途
     await user.click(screen.getAllByRole("button", { name: /^删除 / })[0]);
+    await user.click(
+      within(await screen.findByRole("alertdialog")).getByRole("button", {
+        name: "删除",
+      }),
+    );
     await waitFor(() => expect(mockGetLoadingPlan).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "登记发运" })).toBeDisabled(),

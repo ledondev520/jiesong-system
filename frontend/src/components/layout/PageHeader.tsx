@@ -77,13 +77,13 @@ export function PageHeader({
         {/* 标题区域：移动端字号缩小以节省空间 */}
         <div className="min-w-0">
           {eyebrow && (
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="mb-1 text-xs font-medium text-muted-foreground">
               {eyebrow}
             </p>
           )}
           <h2
             className={cn(
-              "break-words text-xl font-semibold tracking-tight md:text-2xl",
+              "break-words text-xl font-semibold leading-7 md:text-2xl",
               titleClassName,
             )}
           >
