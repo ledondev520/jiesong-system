@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AmountText } from "@/components/ui/amount-text";
+import { KpiStat } from "@/components/ui/kpi-stat";
 import type {
   BossFigures,
   DashboardTodos,
@@ -87,10 +87,10 @@ const SCOPE: Record<TodoKey, string> = {
   ordersToPurchase: "已确认订单中，仍有订单行未采购且库存未覆盖",
   paymentsDue: "已生效采购合同，应付金额大于 0",
   receiptsToInspect: "采购合同已发货，尚未收货",
-  toLoad: "出口合同已确认，尚未装柜",
-  toShip: "出口合同装柜中，尚未发运",
+  toLoad: "出口订单已确认，尚未装柜",
+  toShip: "出口订单装柜中，尚未发运",
   missingInvoice: "货已出，未登记发票号也无已关联发票的采购合同",
-  overdueReceivables: "发运超过 30 天仍有未收余额的出口合同",
+  overdueReceivables: "发运超过 30 天仍有未收余额的出口订单",
   refundable: "本申报月退税工作台中材料核验通过的出口",
 };
 
@@ -113,7 +113,7 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
     <div className="space-y-5">
       {keys.length > 0 && (
         <p className="text-sm text-muted-foreground" data-testid="todo-total">
-          共 {total} 项待办 · 为下方各卡片数量之和
+          共 {total} 项待办
         </p>
       )}
       {todos.figures && (
@@ -122,20 +122,13 @@ export function TodoBoard({ todos }: { todos: DashboardTodos }) {
           aria-label="关键数字"
         >
           {FIGURES.map(([key, label, currency]) => (
-            <Card key={key} className="border-border/70 py-0 md:py-6">
-              <CardContent
-                className="p-3 md:p-4"
-                title={todos.figures?.definitions[key]}
-              >
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <AmountText size="xl">
-                  {money(todos.figures![key], currency)}
-                </AmountText>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {todos.figures?.definitions[key]}
-                </p>
-              </CardContent>
-            </Card>
+            <div key={key} title={todos.figures?.definitions[key]}>
+              <KpiStat
+                label={label}
+                value={money(todos.figures![key], currency)}
+                subLabel={todos.figures?.definitions[key]}
+              />
+            </div>
           ))}
         </section>
       )}
