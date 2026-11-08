@@ -146,7 +146,7 @@ const parseAmount = (value) => {
  * @param {Object} query - 查询参数 { status, supplierId, dateFrom, dateTo }
  * @returns {Promise<{buffer: Buffer, filename: string}>}
  */
-const exportPurchasesExcel = async (query = {}, { includeMoney = true } = {}) => {
+const exportPurchasesExcel = async (query = {}, { includeMoney = false } = {}) => {
   const { status, supplierId, dateFrom, dateTo } = query;
 
   const where = {};

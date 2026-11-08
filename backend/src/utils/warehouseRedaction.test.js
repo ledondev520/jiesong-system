@@ -168,12 +168,12 @@ test('导出：purchases CSV/PDF/xlsx 对 WAREHOUSE 无金额与发票号列，�
     const csvW = (await exportService.exportData('purchases', {}, { includeMoney: false })).data;
     assert.deepEqual(leaks(csvW), []);
     assert.ok(csvW.includes('PO-SYNTH') && csvW.includes('SIGNED'));
-    const csvP = (await exportService.exportData('purchases', {})).data;
+    const csvP = (await exportService.exportData('purchases', {}, { includeMoney: true })).data;
     assert.ok(csvP.includes(INV) && csvP.includes('987654.32'));
     const xW = await exportPurchasesExcel({}, { includeMoney: false });
     const sheet = xlsx.read(xW.buffer, { type: 'buffer' });
     assert.deepEqual(leaks(xlsx.utils.sheet_to_csv(sheet.Sheets[sheet.SheetNames[0]])), []);
-    assert.ok(JSON.stringify(xlsx.utils.sheet_to_json(xlsx.read((await exportPurchasesExcel({})).buffer, { type: 'buffer' }).Sheets['采购合同'])).includes('987654.32'));
+    assert.ok(JSON.stringify(xlsx.utils.sheet_to_json(xlsx.read((await exportPurchasesExcel({}, { includeMoney: true })).buffer, { type: 'buffer' }).Sheets['采购合同'])).includes('987654.32'));
     assert.ok((await exportSystemDataPdf('purchases', {}, { includeMoney: false })).buffer.length > 0);
   });
 });

@@ -14,7 +14,7 @@ const { calculateTaxSummary } = require('./taxCalculationEngine');
 const { outstandingOf } = require('./payablesService');
 const { getExportReadiness } = require('./exportReadinessService');
 const { roundMoney } = require('../utils/money');
-const { getOwnedReceivableUsd, getEffectiveSalesReceived, getOutstandingReceivableUsd } = require('./salesContractAmount');
+const { getOwnedReceivableUsd, getEffectiveSalesReceived, getOutstandingReceivableUsd, SALES_OWNED_AMOUNT_SELECT } = require('./salesContractAmount');
 
 /**
  * 职责：导出数据
@@ -23,7 +23,7 @@ const { getOwnedReceivableUsd, getEffectiveSalesReceived, getOutstandingReceivab
  * @param {Object} query - 查询参数
  * @returns {Object} { data, filename, contentType }
  */
-const exportData = async (type, query = {}, { includeBank = false, includeMoney = true } = {}) => {
+const exportData = async (type, query = {}, { includeBank = false, includeMoney = false } = {}) => {
   switch (type) {
     case 'suppliers':
       return exportSuppliers(query, includeBank);
@@ -146,7 +146,7 @@ const exportProducts = async (query) => {
 /**
  * 职责：导出采购合同数据
  */
-const exportPurchases = async (query, includeMoney = true) => {
+const exportPurchases = async (query, includeMoney = false) => {
   const contracts = await prisma.purchaseContract.findMany({
     include: {
       supplier: true,
@@ -178,10 +178,11 @@ const exportPurchases = async (query, includeMoney = true) => {
  * 职责：导出出口合同数据
  */
 // OD-3：WAREHOUSE 只看状态，不含合同总额/收款金额（includeMoney=false）。
-const exportSales = async (query, includeMoney = true) => {
+const exportSales = async (query, includeMoney = false) => {
   const contracts = await prisma.salesContract.findMany({
     include: {
       items: { include: { product: true, store: true } },
+      packingItems: SALES_OWNED_AMOUNT_SELECT.packingItems, // B87 口径需要装箱归属
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -189,7 +190,7 @@ const exportSales = async (query, includeMoney = true) => {
   const headers = ['合同号', ...(includeMoney ? ['总金额(USD)', '已收金额', '未收金额'] : []), '汇率', '状态', '签订日期'];
   const rows = contracts.map(c => [
     c.contractNo,
-    ...(includeMoney ? [c.totalAmount, c.receivedAmount, c.totalAmount - c.receivedAmount] : []),
+    ...(includeMoney ? [getOwnedReceivableUsd(c), getEffectiveSalesReceived(c), getOutstandingReceivableUsd(c)] : []),
     c.exchangeRate,
     c.status,
     c.signedAt ? formatDate(c.signedAt) : '',
