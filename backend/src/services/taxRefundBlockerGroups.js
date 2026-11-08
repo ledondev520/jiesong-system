@@ -1,7 +1,7 @@
 /**
  * Input: 退税材料准备的阻塞文案数组
  * Output: 阻塞原因类型标签（去重，顺序同前端 BlockerGroups）
- * Pos: 退税工作台服务端「原因」筛选使用；规则必须与 frontend/src/components/tax-refund/BlockerGroups.tsx 的 GROUP_RULES 保持一致（taxRefundBlockerGroups.test.js 钉住）
+ * Pos: 退税工作台服务端「原因」筛选使用；规则必须与 frontend/src/components/tax-refund/BlockerGroups.tsx 的 GROUP_RULES 保持一致（taxRefundWorkbench.filters.test.js 钉住）
  */
 
 // 顺序即优先级：先报关，再供应商资料，再退税计算，再发票，再出货/装箱，最后商品要素。
