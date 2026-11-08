@@ -97,7 +97,10 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
     // 发货后补录生产资料和发票号码是现有专用接口的合法行为，不应一并禁止。
     await call('PUT', `${url}/production-details`, { items: production.map(item => ({ ...item, specification: `合成补录-${label}` })) }, 200, role);
     const invoice = await call('PUT', `${url}/invoice-numbers`, { invoiceNumbers: ['SYNTHETIC-INVOICE-1', 'SYNTHETIC-INVOICE-2'] }, 200, role);
-    assert.deepEqual(invoice.invoiceNumbers, ['SYNTHETIC-INVOICE-1', 'SYNTHETIC-INVOICE-2']);
+    if (role === 'WAREHOUSE') { // OD-2：WAREHOUSE 只得到号码个数，不得到号码本身
+      assert.equal(invoice.invoiceNumbers, undefined);
+      assert.equal(invoice.invoiceNumberCount, 2);
+    } else assert.deepEqual(invoice.invoiceNumbers, ['SYNTHETIC-INVOICE-1', 'SYNTHETIC-INVOICE-2']);
     const after = await snapshot();
     assert.equal(after.purchaseItems[0].specification, `合成补录-${label}`);
     assert.deepEqual(protectedFacts(after), protectedFacts(before), '合法补录必须保持采购行身份、收验货证据、库存来源和应付款');
