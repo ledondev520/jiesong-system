@@ -6,6 +6,7 @@
 "use client";
 
 import { formatAmount } from "@/lib/format";
+import { formatDate } from "@/lib/date-format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, RefreshCw, Split } from "lucide-react";
 import { toast } from "sonner";
@@ -209,13 +210,13 @@ export function UnallocatedReceiptsPanel({
                       <span className="font-semibold text-sm">
                         {p.customerName || "未标注客户"}
                       </span>
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-xs">
                         剩余待分配 {p.currency}{" "}
                         {formatAmount(p.remainingAmount ?? p.amount)}
                       </Badge>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(p.paymentDate).toLocaleDateString("zh-CN")}
+                      {formatDate(p.paymentDate)}
                       {p.note && ` · ${p.note}`}
                     </span>
                   </div>

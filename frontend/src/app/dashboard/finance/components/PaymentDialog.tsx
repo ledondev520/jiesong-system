@@ -1,6 +1,6 @@
 "use client";
 
-import { formatAmount } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import { roundMoney } from "@/lib/money";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -80,8 +80,6 @@ export function PaymentDialog({
   const [pending, setPending] = useState<PaymentFormValues | null>(null);
   const resolvedCurrency =
     currency || (type === PaymentType.PAYABLE ? "CNY" : "USD");
-  const currencySymbol =
-    resolvedCurrency === "USD" ? "$" : resolvedCurrency === "CNY" ? "¥" : "";
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     mode: "onChange",
@@ -159,8 +157,7 @@ export function PaymentDialog({
           <br />
           待结金额:{" "}
           <span className="font-medium text-foreground">
-            {resolvedCurrency} {currencySymbol}
-            {formatAmount(remainingAmount)}
+            {formatMoney(remainingAmount, resolvedCurrency)}
           </span>
         </div>
         {pending ? (
@@ -176,15 +173,14 @@ export function PaymentDialog({
             <div className="space-y-1 rounded-md border bg-muted/40 p-3 text-sm">
               <p>
                 本次登记 <strong>1 笔</strong>：合同 {contractNo}，{label}{" "}
-                {resolvedCurrency} {currencySymbol}
-                {formatAmount(pending.amount)}
+                {formatMoney(pending.amount, resolvedCurrency)}
               </p>
               <p className="text-muted-foreground">
                 {afterOpen < -0.005
-                  ? `超出待结金额 ${resolvedCurrency} ${currencySymbol}${formatAmount(Math.abs(afterOpen))}，该合同将多${type === PaymentType.PAYABLE ? "付" : "收"}。`
+                  ? `超出待结金额 ${formatMoney(Math.abs(afterOpen), resolvedCurrency)}，该合同将多${type === PaymentType.PAYABLE ? "付" : "收"}。`
                   : afterOpen <= 0.005
                     ? "登记后该合同待结金额为 0，将视为结清。"
-                    : `登记后该合同待结 ${resolvedCurrency} ${currencySymbol}${formatAmount(afterOpen)}${isResidual(afterOpen) ? "（尾差，不会自动核销）" : ""}。`}
+                    : `登记后该合同待结 ${formatMoney(afterOpen, resolvedCurrency)}${isResidual(afterOpen) ? "（尾差，不会自动核销）" : ""}。`}
               </p>
               <p className="text-muted-foreground">
                 保存后立即计入{type === PaymentType.PAYABLE ? "应付" : "应收"}
@@ -334,7 +330,7 @@ export function PaymentDialog({
                   ? "提交中..."
                   : confirmStep
                     ? "下一步：确认"
-                    : "确认记录"}
+                    : "确认登记"}
               </Button>
             </DialogFooter>
           </form>

@@ -91,7 +91,7 @@ export function ReceivableReconciliationCard({
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border p-3">
-            <p className="text-xs text-muted-foreground">正式EXP销售</p>
+            <p className="text-xs text-muted-foreground">已生效出口订单总额</p>
             <p className="mt-1 font-semibold tabular-nums">
               {formatUsd(data.formalSalesUsd)}
             </p>

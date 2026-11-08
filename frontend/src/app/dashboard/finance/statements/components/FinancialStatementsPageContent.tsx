@@ -387,9 +387,9 @@ export function FinancialStatementsPageContent() {
             value={activeView}
             onValueChange={(value) => setView({ view: value })}
           >
-            <TabsList className="h-auto flex-wrap justify-start">
+            <TabsList variant="line" className="h-auto flex-wrap justify-start">
               {tabs.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
+                <TabsTrigger key={tab.value} variant="line" value={tab.value}>
                   {tab.label}
                 </TabsTrigger>
               ))}

@@ -90,7 +90,7 @@ export function ReceiptDialog({
       currency: "USD",
       paymentDate: new Date(),
       paymentMethod: "",
-      customerName: "Sp food trading LLC",
+      customerName: "",
       contractRef: "",
       note: "",
     },
@@ -200,7 +200,7 @@ export function ReceiptDialog({
                 <FormItem>
                   <FormLabel>客户名称</FormLabel>
                   <FormControl>
-                    <Input placeholder="例如: Sp food trading LLC" {...field} />
+                    <Input placeholder="输入客户公司名称" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -211,7 +211,7 @@ export function ReceiptDialog({
               name="contractRef"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>合同号（选填）</FormLabel>
+                  <FormLabel>出口订单号（选填）</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="例如: EXP250024"
@@ -222,7 +222,7 @@ export function ReceiptDialog({
                     />
                   </FormControl>
                   <p className="text-xs text-muted-foreground">
-                    填写后系统会按统一备注规范写入，供收款池自动匹配使用。
+                    填写出口订单号后，收款池可自动匹配对应订单。
                   </p>
                   <FormMessage />
                 </FormItem>

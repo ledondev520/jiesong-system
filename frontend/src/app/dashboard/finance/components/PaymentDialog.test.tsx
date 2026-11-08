@@ -77,7 +77,7 @@ function Harness({
   );
 }
 
-const fillDraft = async (button = "确认记录") => {
+const fillDraft = async (button = "确认登记") => {
   fireEvent.click(screen.getByText("其他"));
   fireEvent.change(screen.getByRole("spinbutton"), {
     target: { value: "22.6" },
@@ -93,12 +93,12 @@ it("submits numeric partial amounts; empty amounts cannot submit", async () => {
   render(<Harness submit={submit} />);
   await fillDraft();
   fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "" } });
-  await waitFor(() => expect(screen.getByText("确认记录")).toBeDisabled());
+  await waitFor(() => expect(screen.getByText("确认登记")).toBeDisabled());
   fireEvent.change(screen.getByRole("spinbutton"), {
     target: { value: "12.34" },
   });
-  await waitFor(() => expect(screen.getByText("确认记录")).toBeEnabled());
-  fireEvent.click(screen.getByText("确认记录"));
+  await waitFor(() => expect(screen.getByText("确认登记")).toBeEnabled());
+  fireEvent.click(screen.getByText("确认登记"));
   await waitFor(() =>
     expect(submit).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 12.34 }),
@@ -117,7 +117,7 @@ it("preserves Chinese note, method, amount and exact date after failure, then re
   const view = render(<Harness submit={submit} />);
   await fillDraft();
   const date = screen.getByTestId("payment-date").textContent;
-  fireEvent.click(screen.getByText("确认记录"));
+  fireEvent.click(screen.getByText("确认登记"));
   expect(await screen.findByRole("alert")).toHaveTextContent("网络连接失败");
   expect(screen.getByRole("spinbutton")).toHaveValue(22.6);
   expect(screen.getByLabelText("备注")).toHaveValue("内部付款测试，仅合成数据");
@@ -125,7 +125,7 @@ it("preserves Chinese note, method, amount and exact date after failure, then re
   expect(screen.getByTestId("payment-date")).toHaveTextContent(date!);
   view.rerender(<Harness submit={submit} remaining={90} />);
   expect(screen.getByRole("spinbutton")).toHaveValue(22.6);
-  fireEvent.click(screen.getByText("确认记录"));
+  fireEvent.click(screen.getByText("确认登记"));
   await waitFor(() => expect(submit).toHaveBeenCalledTimes(2));
   expect(submit.mock.calls[1][0]).toEqual(submit.mock.calls[0][0]);
   await waitFor(() =>
@@ -143,7 +143,7 @@ it("guards rapid double submits and dismissal while pending", async () => {
   );
   render(<Harness submit={submit} />);
   await fillDraft();
-  const form = screen.getByText("确认记录").closest("form")!;
+  const form = screen.getByText("确认登记").closest("form")!;
   fireEvent.submit(form);
   fireEvent.submit(form);
   await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
@@ -180,7 +180,7 @@ it("confirmStep: shows scope and reconciliation effect first; nothing is saved u
   const confirm = await screen.findByTestId("payment-confirm");
   expect(confirm).toHaveTextContent("合同 测试");
   expect(confirm).toHaveTextContent("22.6");
-  expect(confirm).toHaveTextContent("登记后该合同待结 CNY ¥77.40");
+  expect(confirm).toHaveTextContent("登记后该合同待结 ¥77.40");
   expect(confirm).toHaveTextContent(
     "计入应付合计。对账页按银行流水与发票计算，不受本次登记影响",
   );
@@ -208,12 +208,12 @@ it("confirmStep: flags a leftover of 1 or less as 尾差 (no write-off)", async 
 it("prefills the remaining amount without float residue and explains a disabled confirm", async () => {
   render(<Harness submit={vi.fn()} remaining={0.1 + 0.2} />);
   expect(screen.getByRole("spinbutton")).toHaveValue(0.3);
-  await waitFor(() => expect(screen.getByText("确认记录")).toBeDisabled());
+  await waitFor(() => expect(screen.getByText("确认登记")).toBeDisabled());
   expect(screen.getByTestId("confirm-disabled-reason")).toHaveTextContent(
     "请先选择支付方式",
   );
   fireEvent.click(screen.getByText("其他"));
-  await waitFor(() => expect(screen.getByText("确认记录")).toBeEnabled());
+  await waitFor(() => expect(screen.getByText("确认登记")).toBeEnabled());
   expect(
     screen.queryByTestId("confirm-disabled-reason"),
   ).not.toBeInTheDocument();

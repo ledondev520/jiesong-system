@@ -43,7 +43,7 @@ const SETTLEMENT_TOLERANCE = 0.01;
 const KIND = {
   payable: {
     title: "应付",
-    description: "已生效采购合同的未付余额（草稿和已取消的合同不是应付）",
+    description: "已生效采购合同的未付余额（不含草稿与已取消合同）",
     currency: "CNY" as const,
     detailHref: (id: string) => `/dashboard/purchase/${id}`,
     party: (row: BalanceRow) => row.supplier?.name ?? "—",
@@ -226,7 +226,7 @@ export function ContractBalanceList({
       cell: (row) => (
         <StatusBadge
           status={row.status}
-          domain={kind === "payable" ? "purchaseContract" : undefined}
+          domain={kind === "payable" ? "purchaseContract" : "salesOrder"}
         />
       ),
     },
@@ -274,7 +274,7 @@ export function ContractBalanceList({
       <Card>
         <CardContent className="flex items-baseline justify-between p-4">
           <span className="text-sm text-muted-foreground">
-            {config.openLabel}合计（全部合同，与财务概览同一口径）
+            {config.openLabel}合计（全部已生效合同）
           </span>
           <span
             className="text-2xl font-semibold tabular-nums"
