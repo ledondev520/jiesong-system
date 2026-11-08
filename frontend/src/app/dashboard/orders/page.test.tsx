@@ -163,6 +163,7 @@ it("B55: 发运阶段 chips 带真实计数，点击切换 status 预设；列�
                     shippedAt: "2026-10-20T04:00:00.000Z",
                     estimatedArrival: "2026-11-15T04:00:00.000Z",
                     port: { id: "p", name: "洛杉矶" },
+                    blNo: "MAEU123456789",
                   },
                 ],
           pagination: {
@@ -177,6 +178,10 @@ it("B55: 发运阶段 chips 带真实计数，点击切换 status 预设；列�
   render(<OrdersPage />);
   const group = await screen.findByRole("group", { name: "发运阶段" });
   await screen.findAllByText("EXP-S");
+  expect(
+    screen.getByRole("columnheader", { name: "提单号" }),
+  ).toBeInTheDocument();
+  expect(screen.getAllByText("MAEU123456789").length).toBeGreaterThan(0);
   expect(screen.getByRole("button", { name: "待装柜3" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "装柜中2" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "已发运4" })).toBeInTheDocument();

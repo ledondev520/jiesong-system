@@ -435,6 +435,8 @@ export interface SalesContract {
   contractNo: string; // EXP 编号
   /** 物理货柜编号（如 "02-振宗"），与 EXP 合同号区分；由发运导入填写，可能为空 */
   containerLabel?: string | null;
+  /** 提单号（运营标识，非金额字段，所有角色可读）；可能为空 */
+  blNo?: string | null;
   // 销售信息
   totalAmount: number;
   amountSource?: "DERIVED" | "FORMAL_DOCUMENT";

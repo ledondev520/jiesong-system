@@ -525,6 +525,7 @@ model SalesContract {
   isFumigated      Boolean?
   hasTaxRefund     Boolean?
   containerLabel   String? // 物理货柜编号（如 "02-振宗"），与 EXP 合同号区分
+  blNo             String? // 提单号（运营标识，非金额字段；A81）
   // 订单级条款（迁移 A）
   customerId       String?
   currency         String    @default("USD") // v1 仅 USD
