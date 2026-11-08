@@ -95,6 +95,7 @@ import ContractFiles from "@/components/contract/ContractFiles";
 import { isPayable, nonPayableNotice } from "../components/purchaseListHelpers";
 import { PurchaseReceiptPanel } from "./components/PurchaseReceiptPanel";
 import { PurchaseFlowPanel } from "./components/PurchaseFlowPanel";
+import { HIDDEN_MONEY } from "@/lib/purchase-amount";
 import { PurchaseProductionPanel } from "./components/PurchaseProductionPanel";
 import { configService } from "@/services/config.service";
 import { PurchaseStatusChips } from "./components/PurchaseStatusChips";
@@ -623,6 +624,14 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     totalAmount: contract.totalAmount,
     paidAmount: contract.paidAmount,
   });
+  // OD-2/OD-3：WAREHOUSE 服务端已剥离金额与发票号，页面显示「无权查看」，绝不把缺失值显示成 ¥0
+  const moneyHidden = userRole === "WAREHOUSE";
+  const yuan = (value: number) =>
+    moneyHidden ? HIDDEN_MONEY : `¥${value.toLocaleString()}`;
+  const hasPaid = contract.hasPaidAmount ?? Number(contract.paidAmount) > 0;
+  const hasInvoice =
+    (contract.invoiceCount ?? (contract.invoiceNo ? 1 : 0)) > 0;
+  const amountIssues = moneyHidden ? [] : amountSummary.issues;
   // 只有已生效状态计入应付（规格 §4.7 白名单，见 isPayable）；草稿、已取消不属于应付（与列表页同一口径）：不显示待付金额与付款进度。
   const payable = isPayable(contract);
   const paidPercent =
@@ -651,18 +660,18 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     (file) => file.category !== "PRODUCTION_PHOTO",
   );
 
-  const grossText = `¥${amountSummary.grossAmount.toLocaleString()}`;
+  const grossText = yuan(amountSummary.grossAmount);
   const canCorrectDraft =
     contract.status === PurchaseStatus.DRAFT &&
-    contract.paidAmount === 0 &&
+    !hasPaid &&
     !contract.payments?.length &&
-    !contract.invoiceNo &&
+    !hasInvoice &&
     contractFiles.length === 0;
   const canCancel =
     [PurchaseStatus.DRAFT, PurchaseStatus.SIGNED].includes(contract.status) &&
-    contract.paidAmount === 0 &&
+    !hasPaid &&
     !contract.payments?.length &&
-    !contract.invoiceNo;
+    !hasInvoice;
 
   const facts = [
     { label: "供应商", value: contract.supplier?.name },
@@ -687,7 +696,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     {
       label: "已付/应付",
       value: payable
-        ? `¥${contract.paidAmount.toLocaleString()} / ${grossText}`
+        ? `${yuan(contract.paidAmount)} / ${grossText}`
         : null,
     },
   ];
@@ -816,9 +825,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         <div className="space-y-2">
           <KpiStat
             label="已付金额"
-            value={`¥${contract.paidAmount.toLocaleString()}`}
+            value={yuan(contract.paidAmount)}
           />
-          {payable && (
+          {payable && !moneyHidden && (
             <Progress
               value={paidPercent}
               aria-label="付款进度"
@@ -829,7 +838,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         {payable ? (
           <KpiStat
             label="待付金额"
-            value={`¥${amountSummary.remainingAmount.toLocaleString()}`}
+            value={yuan(amountSummary.remainingAmount)}
           />
         ) : (
           <KpiStat
@@ -841,7 +850,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      {amountSummary.issues.length > 0 && (
+      {amountIssues.length > 0 && (
         <div
           role="alert"
           className="rounded-lg border border-status-amber/30 bg-status-amber-soft p-3 text-sm text-status-amber"
@@ -851,7 +860,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
             <div>
               <p className="font-medium">金额数据需要复核</p>
               <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
-                {amountSummary.issues.map((issue) => (
+                {amountIssues.map((issue) => (
                   <li key={issue.code}>{issue.message}</li>
                 ))}
               </ul>
@@ -1025,12 +1034,15 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                       },
                       {
                         label: "不含税单价",
-                        value: `¥${(Number(item.unitPrice) || 0).toLocaleString()}`,
+                        value: yuan(Number(item.unitPrice) || 0),
                       },
                     ]}
                     amount={{
                       label: "含税小计",
-                      value: `¥${calculatePurchaseLineAmounts(item, amountSummary.taxRate).grossAmount.toLocaleString()}`,
+                      value: yuan(
+                        calculatePurchaseLineAmounts(item, amountSummary.taxRate)
+                          .grossAmount,
+                      ),
                       emphasis: "success",
                     }}
                   />
@@ -1039,19 +1051,19 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                   <div className="flex flex-wrap justify-between gap-2">
                     <dt>不含税合计</dt>
                     <dd className="font-mono">
-                      ¥{amountSummary.netAmount.toLocaleString()}
+                      {yuan(amountSummary.netAmount)}
                     </dd>
                   </div>
                   <div className="flex flex-wrap justify-between gap-2">
                     <dt>其中税额 ({amountSummary.taxRate}%)</dt>
                     <dd className="font-mono">
-                      ¥{amountSummary.taxAmount.toLocaleString()}
+                      {yuan(amountSummary.taxAmount)}
                     </dd>
                   </div>
                   <div className="flex flex-wrap justify-between gap-2 font-semibold">
                     <dt>含税合计</dt>
                     <dd className="font-mono">
-                      ¥{amountSummary.lineGrossAmount.toLocaleString()}
+                      {yuan(amountSummary.lineGrossAmount)}
                     </dd>
                   </div>
                 </dl>
@@ -1133,14 +1145,15 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                             {item.quantity} {item.unit || item.product?.unit}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm tabular-nums">
-                            ¥{(Number(item.unitPrice) || 0).toLocaleString()}
+                            {yuan(Number(item.unitPrice) || 0)}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
-                            ¥
-                            {calculatePurchaseLineAmounts(
-                              item,
-                              amountSummary.taxRate,
-                            ).grossAmount.toLocaleString()}
+                            {yuan(
+                              calculatePurchaseLineAmounts(
+                                item,
+                                amountSummary.taxRate,
+                              ).grossAmount,
+                            )}
                           </TableCell>
                         </TableRow>
                       ),
@@ -1154,7 +1167,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                         不含税合计
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm tabular-nums text-status-green">
-                        ¥{amountSummary.netAmount.toLocaleString()}
+                        {yuan(amountSummary.netAmount)}
                       </TableCell>
                     </TableRow>
                     <TableRow className="border-b-0 bg-muted/30">
@@ -1165,7 +1178,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                         其中税额 ({amountSummary.taxRate}%)
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm tabular-nums text-muted-foreground">
-                        ¥{amountSummary.taxAmount.toLocaleString()}
+                        {yuan(amountSummary.taxAmount)}
                       </TableCell>
                     </TableRow>
                     <TableRow className="border-b-0 bg-muted/40">
@@ -1176,7 +1189,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                         含税合计
                       </TableCell>
                       <TableCell className="text-right font-mono text-base font-bold tabular-nums text-status-green">
-                        ¥{amountSummary.lineGrossAmount.toLocaleString()}
+                        {yuan(amountSummary.lineGrossAmount)}
                       </TableCell>
                     </TableRow>
                   </TableBody>
@@ -1235,7 +1248,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     {
       key: "payment",
       label: "付款与发票",
-      badge: amountSummary.issues.length > 0 ? ("dot" as const) : undefined,
+      badge: amountIssues.length > 0 ? ("dot" as const) : undefined,
       content: (
         <PurchaseFlowPanel
           contract={contract}

@@ -126,7 +126,9 @@ export interface PurchaseInvoicePreparation {
   purchaseContractId: string;
   complete: boolean;
   fileRequired: false;
-  invoiceNumbers: string[];
+  /** WAREHOUSE 不返回号码（OD-2），只返回 invoiceNumberCount */
+  invoiceNumbers?: string[];
+  invoiceNumberCount?: number;
   invoiceFiles: ContractFile[];
   issues: Array<{ code: string; severity: 'error' | 'warning'; message: string }>;
   amounts: {

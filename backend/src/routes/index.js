@@ -47,6 +47,8 @@ const bankFlowRoutes = require('./bankFlow');
 const notificationRoutes = require('./notifications');
 const fileRoutes = require('./files');
 
+const { warehouseMoneyRedaction } = require('../utils/warehouseRedaction');
+
 const router = Router();
 
 // ==================== 路由注册 ====================
@@ -56,6 +58,9 @@ router.use('/auth', authRoutes);
 router.use('/agents', agentRoutes);
 
 // 业务路由（需要Token）
+// OD-2/OD-3：这些前缀的 JSON 响应对 WAREHOUSE 统一剥离发票号与采购金额（销售/AI 面由 A55 复用同一 helper）
+['/suppliers', '/products', '/purchases', '/inventory', '/dashboard', '/search', '/procurement-template', '/contract-templates']
+  .forEach((prefix) => router.use(prefix, warehouseMoneyRedaction));
 router.use('/suppliers', supplierRoutes);
 router.use('/stores', storeRoutes);
 router.use('/quotes', quoteRoutes);

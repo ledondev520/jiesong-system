@@ -215,8 +215,10 @@ const registerInvoiceNumbers = async (req, res, next) => {
     const preparation = await purchaseInvoiceService.registerPurchaseInvoiceNumbers(
       req.params.id,
       { invoiceNumbers: req.body?.invoiceNumbers },
+      undefined,
+      { appendOnly: req.user?.role === 'WAREHOUSE' }, // OD-2：WAREHOUSE 看不到已存号码，只能追加，不能整表覆盖
     );
-    success(res, preparation, '供应商发票号码已登记');
+    success(res, { ...preparation, invoiceFiles: fileService.filterVisibleFiles(preparation.invoiceFiles, req.user) }, '供应商发票号码已登记');
   } catch (error) {
     next(error);
   }
@@ -254,7 +256,7 @@ const create = async (req, res, next) => {
       prismaClient: prisma,
     });
 
-    const warnings = await checkPriceWarnings(input.items || [], prisma);
+    const warnings = req.user?.role === 'WAREHOUSE' ? [] : await checkPriceWarnings(input.items || [], prisma); // 警告文案含价格，WAREHOUSE 不返回
 
     if (warnings.length > 0) {
       const warningMessages = warnings.map((w) => w.message).join('；');
@@ -268,13 +270,31 @@ const create = async (req, res, next) => {
 };
 
 /**
+ * OD-2：WAREHOUSE 的表单没有价格（服务端已剥离），其草稿更正不能把已存单价清零或改写。
+ * 已有明细（按 id，否则按 productId 顺序配对）一律沿用库内单价；全新行保持提交值。
+ */
+const keepStoredPricesForWarehouse = async (req, input) => {
+  if (req.user?.role !== 'WAREHOUSE' || !Array.isArray(input?.items)) return input;
+  const stored = await prisma.purchaseItem.findMany({ where: { purchaseContractId: req.params.id }, select: { id: true, productId: true, unitPrice: true } });
+  const pool = [...stored];
+  const take = (match) => { const i = pool.findIndex(match); return i < 0 ? null : pool.splice(i, 1)[0]; };
+  return {
+    ...input,
+    items: input.items.map((item) => {
+      const hit = (item?.id && take((s) => s.id === item.id)) || take((s) => s.productId === item?.productId);
+      return hit ? { ...item, unitPrice: hit.unitPrice } : item;
+    }),
+  };
+};
+
+/**
  * 职责：更新采购合同
  */
 const update = async (req, res, next) => {
   try {
     const contract = await updatePurchase({
       id: req.params.id,
-      input: req.body,
+      input: await keepStoredPricesForWarehouse(req, req.body),
       prismaClient: prisma,
     });
     
@@ -603,6 +623,10 @@ const getProductPriceHistory = async (req, res, next) => {
   try {
     const { productId } = req.params;
 
+    if (req.user?.role === 'WAREHOUSE') { // OD-3：历史采购价属金额类，WAREHOUSE 只得到空统计
+      return success(res, { averagePrice: null, minPrice: null, maxPrice: null, count: 0, history: [], bySupplier: [] });
+    }
+
     const historyItems = await prisma.purchaseItem.findMany({
       where: { productId, quantity: { gt: 0 }, purchaseContract: { status: { notIn: ['DRAFT', 'CANCELLED'] } } },
       include: {
@@ -744,6 +768,7 @@ const getSuppliersByProducts = async (req, res, next) => {
 };
 
 module.exports = {
+  keepStoredPricesForWarehouse,
   list,
   getById,
   getInvoicePreparation,
