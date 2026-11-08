@@ -504,25 +504,19 @@ function ProductsPageContent() {
                     {/* 规格信息 */}
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div className="rounded-lg bg-muted/40 p-2">
-                        <p className="text-xs text-muted-foreground">
-                          毛重
-                        </p>
+                        <p className="text-xs text-muted-foreground">毛重</p>
                         <p className="text-sm font-bold tabular-nums">
                           {formatMeasure(product.grossWeight, "kg")}
                         </p>
                       </div>
                       <div className="rounded-lg bg-muted/40 p-2">
-                        <p className="text-xs text-muted-foreground">
-                          净重
-                        </p>
+                        <p className="text-xs text-muted-foreground">净重</p>
                         <p className="text-sm font-bold tabular-nums">
                           {formatMeasure(product.netWeight, "kg")}
                         </p>
                       </div>
                       <div className="rounded-lg bg-muted/40 p-2">
-                        <p className="text-xs text-muted-foreground">
-                          体积
-                        </p>
+                        <p className="text-xs text-muted-foreground">体积</p>
                         <p className="text-sm font-bold tabular-nums">
                           {formatMeasure(product.volume, "CBM")}
                         </p>

@@ -1130,7 +1130,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                             {item.quantity} {item.unit || item.product?.unit}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm tabular-nums">
-                            {formatUnitPrice(Number(item.unitPrice) || 0, "CNY")}
+                            {formatUnitPrice(
+                              Number(item.unitPrice) || 0,
+                              "CNY",
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
                             {formatMoney(

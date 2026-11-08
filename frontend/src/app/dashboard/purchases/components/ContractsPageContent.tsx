@@ -855,9 +855,7 @@ export default function ContractsPageContent() {
 
                     <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/40 p-3">
                       <div className="space-y-1">
-                        <p className="text-xs text-muted-foreground">
-                          供应商
-                        </p>
+                        <p className="text-xs text-muted-foreground">供应商</p>
                         <p className="text-sm font-medium">
                           {contract.supplier?.name || "—"}
                         </p>
@@ -882,9 +880,7 @@ export default function ContractsPageContent() {
                     </div>
 
                     <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background px-3 py-2.5">
-                      <p className="text-xs text-muted-foreground">
-                        已付金额
-                      </p>
+                      <p className="text-xs text-muted-foreground">已付金额</p>
                       <AmountText
                         tone={
                           isPayable(contract) &&

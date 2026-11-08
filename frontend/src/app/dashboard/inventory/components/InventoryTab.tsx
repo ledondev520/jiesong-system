@@ -704,25 +704,19 @@ export function InventoryTab() {
 
                   <div className="grid grid-cols-2 gap-3 rounded-lg bg-muted/55 p-3">
                     <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        数量
-                      </p>
+                      <p className="text-xs text-muted-foreground">数量</p>
                       <p className="text-sm font-medium">
                         {formatQuantity(item.quantity, item.product?.unit)}
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        入库日期
-                      </p>
+                      <p className="text-xs text-muted-foreground">入库日期</p>
                       <p className="text-sm font-medium">
                         {formatDate(item.inboundAt, MISSING_VALUE)}
                       </p>
                     </div>
                     <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        当前状态
-                      </p>
+                      <p className="text-xs text-muted-foreground">当前状态</p>
                       <p className="text-sm font-medium">
                         {STATUS_LABEL_MAP[item.status]}
                       </p>

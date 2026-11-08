@@ -67,7 +67,7 @@ const isDraftDeclaration = (declaration: CustomsDeclaration) =>
   splitDraftSuffix(declaration.declarationNo).isDraft;
 
 const formatAmount = (amount: number, currency: string) =>
-  formatMoney(amount, currency);
+  formatMoney(amount, currency === "CNY" ? "CNY" : "USD");
 
 export function CustomsDeclarationListPageContent({
   embedded = false,

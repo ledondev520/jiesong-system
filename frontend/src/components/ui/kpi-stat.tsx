@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 interface KpiStatProps {
   label: string;
   /** 缺失（null/undefined）显示「—」，不是 0；加载中请传 loading。 */
-  value: string | null | undefined;
+  value: string | number | null | undefined;
   /** 加载中：显示骨架，不显示 0 或「—」（避免把没加载完误读成空系统）。 */
   loading?: boolean;
   subLabel?: string;
@@ -52,9 +52,7 @@ export function KpiStat({
     <CardContent className="p-4" aria-busy={loading || undefined}>
       <div className="flex items-start justify-between">
         <div className="flex-1 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">
-            {label}
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
           <div className="space-y-1">
             {loading ? (
               <>

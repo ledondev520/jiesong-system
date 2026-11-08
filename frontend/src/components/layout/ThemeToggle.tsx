@@ -6,12 +6,12 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useSyncExternalStore } from 'react';
-import { Sun, Moon } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { Button } from '@/components/ui/button';
+import { useSyncExternalStore } from "react";
+import { Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Button } from "@/components/ui/button";
 
 /**
  * 职责：切换明暗主题
@@ -43,16 +43,16 @@ export function ThemeToggle() {
     );
   }
 
-  const isDark = resolvedTheme === 'dark';
+  const isDark = resolvedTheme === "dark";
 
   return (
     <Button
       variant="ghost"
       size="icon"
       className="h-11 w-11 rounded-md md:h-9 md:w-9"
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      title={isDark ? '切换到白天模式' : '切换到夜间模式'}
-      aria-label={isDark ? '切换到白天模式' : '切换到夜间模式'}
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      title={isDark ? "切换到白天模式" : "切换到夜间模式"}
+      aria-label={isDark ? "切换到白天模式" : "切换到夜间模式"}
     >
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </Button>

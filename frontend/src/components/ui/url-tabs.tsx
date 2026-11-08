@@ -82,7 +82,9 @@ export function UrlTabs({
       <TabsList
         variant={variant}
         className={
-          variant === "pill" ? "h-auto max-w-full flex-wrap justify-start" : undefined
+          variant === "pill"
+            ? "h-auto max-w-full flex-wrap justify-start"
+            : undefined
         }
       >
         {tabs.map((tab) => (

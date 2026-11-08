@@ -8,7 +8,7 @@
 
 import { MISSING_VALUE } from "./missing-value";
 
-const BEIJING = 'Asia/Shanghai';
+const BEIJING = "Asia/Shanghai";
 
 const toDate = (value: unknown): Date | null => {
   if (!value) {
@@ -34,11 +34,11 @@ export const formatDate = (value: unknown, fallback = MISSING_VALUE) => {
     return fallback;
   }
 
-  return new Intl.DateTimeFormat('en-CA', {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: BEIJING,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(date);
 };
 
@@ -54,14 +54,14 @@ export const formatDateTime = (value: unknown, fallback = MISSING_VALUE) => {
   }
 
   // sv-SE 产出与 ISO 接近的 yyyy-MM-dd HH:mm:ss，配合 timeZone 得到北京时间
-  return new Intl.DateTimeFormat('sv-SE', {
+  return new Intl.DateTimeFormat("sv-SE", {
     timeZone: BEIJING,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   }).format(date);
 };
@@ -75,11 +75,11 @@ export const formatTime = (value: unknown, fallback = MISSING_VALUE) => {
     return fallback;
   }
 
-  return new Intl.DateTimeFormat('sv-SE', {
+  return new Intl.DateTimeFormat("sv-SE", {
     timeZone: BEIJING,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hour12: false,
   }).format(date);
 };

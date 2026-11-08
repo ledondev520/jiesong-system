@@ -209,10 +209,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="发票台账"
-        description="查询与核对进项发票及抵扣状态"
-      />
+      <PageHeader title="发票台账" description="查询与核对进项发票及抵扣状态" />
       {loadError && (
         <ErrorState
           title="发票台账读取失败"

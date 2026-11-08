@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney } from "@/lib/format";
+import { formatMoney, type Currency } from "@/lib/format";
 import { roundMoney } from "@/lib/money";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -78,8 +78,14 @@ export function PaymentDialog({
   const previousSession = useRef({ open: false, contractId });
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [pending, setPending] = useState<PaymentFormValues | null>(null);
-  const resolvedCurrency =
-    currency || (type === PaymentType.PAYABLE ? "CNY" : "USD");
+  const resolvedCurrency: Currency =
+    currency === "USD"
+      ? "USD"
+      : currency === "CNY"
+        ? "CNY"
+        : type === PaymentType.PAYABLE
+          ? "CNY"
+          : "USD";
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     mode: "onChange",

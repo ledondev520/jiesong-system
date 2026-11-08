@@ -216,7 +216,9 @@ function OrdersList() {
     {
       key: "status",
       header: "状态",
-      cell: (order) => <StatusBadge status={order.status} domain="salesOrder" />,
+      cell: (order) => (
+        <StatusBadge status={order.status} domain="salesOrder" />
+      ),
       hideable: false,
     },
     {
