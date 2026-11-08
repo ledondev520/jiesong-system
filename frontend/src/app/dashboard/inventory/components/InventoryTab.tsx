@@ -113,8 +113,10 @@ export function InventoryTab() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [{ keyword, store, page: currentPage, pageSize }, setListState] =
-    useListUrlState(listUrlFields.inventory);
+  const [
+    { keyword, store, lotNo, binLocation, page: currentPage, pageSize },
+    setListState,
+  ] = useListUrlState(listUrlFields.inventory);
   const [storeOptions, setStoreOptions] = useState<
     { id: string; name: string }[]
   >([]);
@@ -161,6 +163,8 @@ export function InventoryTab() {
             pageSize,
             keyword: searchKeyword || undefined,
             storeId: store || undefined,
+            lotNo: lotNo.trim() || undefined,
+            binLocation: binLocation.trim() || undefined,
           }),
         (response) => {
           if (request !== inventoryRequest.current) return;
@@ -183,7 +187,7 @@ export function InventoryTab() {
         },
       );
     },
-    [currentPage, pageSize, store],
+    [currentPage, pageSize, store, lotNo, binLocation],
   );
 
   /** 手动重试：先进入加载态再拉取 */
@@ -200,6 +204,8 @@ export function InventoryTab() {
   const inventoryQueryKey = JSON.stringify([
     debouncedKeyword,
     store,
+    lotNo,
+    binLocation,
     currentPage,
     pageSize,
     refreshVersion,
@@ -438,7 +444,7 @@ export function InventoryTab() {
   const showContractColumn = pagedInventory.some(
     (item) => item.purchaseItem?.purchaseContract?.contractNo,
   );
-  const columnCount = showContractColumn ? 9 : 6;
+  const columnCount = showContractColumn ? 11 : 8;
 
   const hasManualInventory = inventory.some(
     (item) => !item.purchaseItemId && !item.receiptInspectionId,
@@ -486,13 +492,34 @@ export function InventoryTab() {
           />
         </div>
         {renderStoreSelect("h-10 w-44 rounded-xl")}
-        {(keyword || store) && (
+        <Input
+          aria-label="批次号筛选"
+          placeholder="批次号"
+          value={lotNo}
+          onChange={(event) => setListState({ lotNo: event.target.value })}
+          className="h-10 w-32 rounded-xl border-border/70 bg-background/70"
+        />
+        <Input
+          aria-label="库位筛选"
+          placeholder="库位"
+          value={binLocation}
+          onChange={(event) =>
+            setListState({ binLocation: event.target.value })
+          }
+          className="h-10 w-32 rounded-xl border-border/70 bg-background/70"
+        />
+        {(keyword || store || lotNo || binLocation) && (
           <Button
             variant="ghost"
             size="sm"
             className="h-10 rounded-xl"
             onClick={() => {
-              setListState({ keyword: "", store: "" });
+              setListState({
+                keyword: "",
+                store: "",
+                lotNo: "",
+                binLocation: "",
+              });
               setDebouncedKeyword("");
             }}
           >
@@ -555,12 +582,17 @@ export function InventoryTab() {
                 />
               </div>
               {renderStoreSelect("h-11 w-full rounded-lg")}
-              {(keyword || store) && (
+              {(keyword || store || lotNo || binLocation) && (
                 <Button
                   variant="outline"
                   className="h-11 w-full rounded-lg"
                   onClick={() => {
-                    setListState({ keyword: "", store: "" });
+                    setListState({
+                      keyword: "",
+                      store: "",
+                      lotNo: "",
+                      binLocation: "",
+                    });
                     setDebouncedKeyword("");
                   }}
                 >
@@ -809,6 +841,8 @@ export function InventoryTab() {
               >
                 数量
               </SortableTableHead>
+              <TableHead>批次号</TableHead>
+              <TableHead>库位</TableHead>
               <TableHead>入库日期</TableHead>
               <TableHead>当前状态</TableHead>
               <TableHead className="w-[100px]">操作</TableHead>
@@ -880,6 +914,12 @@ export function InventoryTab() {
                   ) : null}
                   <TableCell>
                     {formatQuantity(item.quantity, item.product?.unit)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.lotNo || "-"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.binLocation || "-"}
                   </TableCell>
                   <TableCell>
                     {formatDate(item.inboundAt, MISSING_VALUE)}

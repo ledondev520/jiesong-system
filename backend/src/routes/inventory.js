@@ -59,4 +59,10 @@ router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES
   inventoryController.updateStatus
 ));
 
+// POST /api/v1/inventory/:id/location - 登记/修改批次号与库位（A83；仅仓储相关角色）
+router.post('/:id/location', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'WAREHOUSE'), withAuditLog(
+  { entity: 'Inventory', action: 'UPDATE_LOCATION', model: 'inventory' },
+  inventoryController.updateLocation
+));
+
 module.exports = router;
