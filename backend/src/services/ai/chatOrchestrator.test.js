@@ -173,3 +173,22 @@ test('buildChatSession: thinking 模式无图片时优先 thinking 模型并支�
     clearModuleCache();
   }
 });
+
+// PR #210 re-review P2-A (hop 4): buildChatSession 必须把 role 交给 getDbContext，否则默认 null 会显示金额。
+test('buildChatSession: role 原样传给 getDbContext 的第二个参数', async () => {
+  const originals = { findMany: prisma.chatHistory.findMany, getDbContext: contextService.getDbContext };
+  const seen = [];
+  prisma.chatHistory.findMany = async () => [];
+  contextService.getDbContext = async (message, options) => { seen.push(options); return ''; };
+  try {
+    const buildChatSession = loadBuildChatSession();
+    for (const role of ['WAREHOUSE', 'SALES']) {
+      await buildChatSession({ role, userId: 'u-1', sessionId: 's-1', message: '应付', defaultModel: 'm', visionModel: 'v' });
+    }
+    assert.deepEqual(seen, [{ role: 'WAREHOUSE' }, { role: 'SALES' }]);
+  } finally {
+    prisma.chatHistory.findMany = originals.findMany;
+    contextService.getDbContext = originals.getDbContext;
+    clearModuleCache();
+  }
+});
