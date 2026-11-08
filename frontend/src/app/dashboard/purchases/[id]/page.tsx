@@ -629,7 +629,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const moneyHidden = userRole === "WAREHOUSE";
   const yuan = (value: number) =>
     moneyHidden ? HIDDEN_MONEY : `¥${value.toLocaleString()}`;
-  // 明细表（#211 润色）沿用 formatMoney/formatUnitPrice，WAREHOUSE 同样显示「无权查看」
+  // 明细表（UX 润色批）沿用 formatMoney/formatUnitPrice，WAREHOUSE 同样显示「无权查看」
   const yuanFmt = (value: number) =>
     moneyHidden ? HIDDEN_MONEY : formatMoney(value, "CNY");
   const yuanUnit = (value: number) =>
