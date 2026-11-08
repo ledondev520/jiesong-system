@@ -10,6 +10,7 @@ const prisma = require('../utils/prisma');
 const { roundMoney } = require('./purchaseAmountService');
 const { normalizeInvoiceNumbers } = require('./purchaseInvoiceService');
 const { verifyShipmentInvoices } = require('./invoiceVerificationService');
+const { blockerReasons } = require('./taxRefundBlockerGroups');
 
 const READY_TO_EXPORT_STATUS = new Set(['SHIPPED', 'ARRIVED', 'COMPLETED']);
 const DEFAULT_PAGE_SIZE = 20;
@@ -138,6 +139,49 @@ const filterItems = (items, { keyword, stage }) => items.filter((item) => {
   return haystack.includes(String(keyword).trim().toLowerCase());
 });
 
+// 申报月份 M 的本期 = M-1 月出货；更早（或无月份）的是历史待办。月份取 Asia/Shanghai，与 listShipmentPreparations 一致。
+const previousMonth = (filingMonth) => {
+  const [year, month] = filingMonth.split('-').map(Number);
+  return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
+};
+const isHistorical = (item, filingMonth) => {
+  const month = require('./taxRefundShipmentService').monthOf(item.declaration?.exportDate || item.shippedAt);
+  return !month || month < previousMonth(filingMonth);
+};
+
+const parseIncludeHistory = (value) => {
+  if (value === undefined || value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  const error = new Error('includeHistory 必须为 true 或 false');
+  error.statusCode = 400;
+  throw error;
+};
+const parseReason = (value) => {
+  if (value === undefined || value === '' || value === 'ALL') return null;
+  if (typeof value !== 'string' || value.length > 20) {
+    const error = new Error('reason 必须为阻塞原因类型文本');
+    error.statusCode = 400;
+    throw error;
+  }
+  return value;
+};
+
+// 月份范围与原因筛选先于分页执行；facets 基于阶段/关键词/月份范围筛选后的全集（不受原因影响），供前端原因标签显示全量计数。
+const applyScopeFilters = (items, { keyword, stage, filingMonth, includeHistory, reason }) => {
+  const matched = filterItems(items, { keyword, stage });
+  const historyCount = filingMonth ? matched.filter((item) => isHistorical(item, filingMonth)).length : 0;
+  const inScope = filingMonth && !includeHistory ? matched.filter((item) => !isHistorical(item, filingMonth)) : matched;
+  const reasonCounts = new Map();
+  for (const item of inScope) {
+    for (const label of blockerReasons(item.issues)) reasonCounts.set(label, (reasonCounts.get(label) ?? 0) + 1);
+  }
+  const filtered = reason ? inScope.filter((item) => blockerReasons(item.issues).includes(reason)) : inScope;
+  return {
+    filtered,
+    facets: { scopeTotal: inScope.length, historyCount, reasons: [...reasonCounts].map(([label, count]) => ({ label, count })) },
+  };
+};
+
 const buildSummary = (items, latestInvoiceBatch) => ({
   contracts: items.length,
   readyToExport: items.filter((item) => item.stage === 'READY_TO_EXPORT').length,
@@ -161,7 +205,11 @@ const getTaxRefundWorkbench = async ({
   keyword,
   stage,
   filingMonth,
+  includeHistory: includeHistoryParam,
+  reason: reasonParam,
 } = {}, prismaClient = prisma) => {
+  const includeHistory = parseIncludeHistory(includeHistoryParam);
+  const reason = parseReason(reasonParam);
   const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
   const safePageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number.parseInt(pageSize, 10) || DEFAULT_PAGE_SIZE));
   if (filingMonth) {
@@ -185,10 +233,11 @@ const getTaxRefundWorkbench = async ({
       confirmedFile: preparation.confirmedFile,
       issues: preparation.materialBlockers,
     }));
-    const filtered = filterItems(items, { keyword, stage });
+    items.forEach((item) => { item.historical = isHistorical(item, filingMonth); });
+    const { filtered, facets } = applyScopeFilters(items, { keyword, stage, filingMonth, includeHistory, reason });
     const start = (safePage - 1) * safePageSize;
     return { items: filtered.slice(start, start + safePageSize), total: filtered.length, page: safePage, pageSize: safePageSize,
-      filingMonth, summary: { ...buildSummary(items, null), materialReadyCount: items.filter((item) => item.materialReady).length,
+      filingMonth, facets, summary: { ...buildSummary(items, null), materialReadyCount: items.filter((item) => item.materialReady).length,
         confirmedCount: items.filter((item) => item.confirmationStatus === 'CONFIRMED').length },
       disclaimer: '自动汇总本期及历史待申报出货；资料确认与归档不代表税务机关受理。' };
   }
@@ -243,13 +292,14 @@ const getTaxRefundWorkbench = async ({
     });
     return buildContractItem({ contract, purchasesByContractNo, invoiceVerification });
   });
-  const filtered = filterItems(items, { keyword, stage });
+  const { filtered, facets } = applyScopeFilters(items, { keyword, stage, filingMonth: null, includeHistory: true, reason });
   const start = (safePage - 1) * safePageSize;
   return {
     items: filtered.slice(start, start + safePageSize),
     total: filtered.length,
     page: safePage,
     pageSize: safePageSize,
+    facets,
     summary: buildSummary(items, latestInvoiceBatch),
     disclaimer: '本工作台用于内部准备、核验和生成申报明细，不代表税务机关已受理或完成退税。',
   };
