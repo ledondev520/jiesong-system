@@ -74,13 +74,30 @@ describe("status-badge", () => {
   });
 });
 
-describe("SemanticBadge danger", () => {
+describe("SemanticBadge danger & info/progress separation", () => {
   it("danger 用红色状态 token 的文字色，不是近白的 destructive-foreground（对比度）", () => {
     render(<SemanticBadge tone="danger">失败</SemanticBadge>);
     const cls = screen.getByText("失败").className;
     expect(cls).toContain("text-status-red");
     expect(cls).toContain("bg-status-red-soft");
     expect(cls).not.toContain("text-destructive-foreground");
+  });
+
+  it("info 与 progress 使用蓝色状态 token，不与酒红 primary 混淆 (DS-1)", () => {
+    render(
+      <>
+        <SemanticBadge tone="info">已确认</SemanticBadge>
+        <SemanticBadge tone="progress">运输中</SemanticBadge>
+      </>,
+    );
+    const infoCls = screen.getByText("已确认").className;
+    const progressCls = screen.getByText("运输中").className;
+    expect(infoCls).toContain("text-status-blue");
+    expect(infoCls).toContain("bg-status-blue-soft");
+    expect(infoCls).not.toContain("text-primary");
+    expect(progressCls).toContain("text-status-blue");
+    expect(progressCls).toContain("bg-status-blue-soft");
+    expect(progressCls).not.toContain("text-primary");
   });
 });
 

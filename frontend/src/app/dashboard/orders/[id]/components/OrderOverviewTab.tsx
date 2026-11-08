@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { SalesStatus, type SalesContract } from "@/types";
 import { formatDate } from "@/lib/date-format";
+import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -62,7 +63,7 @@ const PRINT_CSS = `@media print {
   #order-shipping-print-root { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
 }`;
 
-const usd = (value: number) => `$${(value || 0).toLocaleString()}`;
+const usd = (value: number) => formatMoney(value || 0, "USD");
 
 /** 职责：物流时间线（与原详情页同口径：箱数/体积取装箱明细合计） */
 const buildTimeline = (contract: SalesContract, readiness: OrderReadiness) => {
@@ -153,7 +154,7 @@ function ShippingInfoCard({
     {
       label: "提单号",
       value: "未记录",
-      hint: "系统暂无提单号字段，提单原件请在「单证」页签的源文件附件中归档",
+      hint: "提单原件请在「单证」页签归档附件",
     },
   ];
   return (
@@ -186,15 +187,16 @@ function ShippingInfoCard({
                 {fact.value}
               </dd>
               {fact.hint && (
-                <p className="text-xs text-muted-foreground">{fact.hint}</p>
+                <p className="text-xs text-muted-foreground print:hidden">
+                  {fact.hint}
+                </p>
               )}
             </div>
           ))}
         </dl>
         {shipped && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            订单状态与外销合同文件相互独立：发运不要求先生成合同，已发运订单也可以在页头「单证
-            ▾」→「生成出口单证」补生成外销合同（需订单资料完整），所以已发运订单可能暂无合同文件。
+          <p className="mt-3 text-xs text-muted-foreground print:hidden">
+            订单状态与外销合同文件相互独立；尚未生成外销合同文件时，可在右上角「单证」→「生成出口单证」中补生成。
           </p>
         )}
       </CardContent>
@@ -280,7 +282,7 @@ export function OrderOverviewTab({
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table framed={false}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>门店</TableHead>

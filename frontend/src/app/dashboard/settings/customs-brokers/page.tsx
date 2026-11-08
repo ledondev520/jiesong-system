@@ -235,7 +235,7 @@ export default function CustomsBrokersPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="报关公司"
+        title="报关行"
         description="管理报关公司档案"
         actions={
           <div className="hidden flex-wrap items-center gap-2 md:flex">

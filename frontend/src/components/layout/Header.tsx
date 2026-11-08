@@ -104,6 +104,7 @@ export function Header() {
           <Button
             variant={aiOpen ? "secondary" : "ghost"}
             size="icon"
+            className="h-11 w-11 rounded-md md:h-9 md:w-9"
             onClick={toggleAiPanel}
             aria-label="AI 助手"
             aria-pressed={aiOpen}

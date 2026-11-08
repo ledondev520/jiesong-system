@@ -431,7 +431,7 @@ describe("AiSessionsPage", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "AI 会话列表" }),
+        screen.getByRole("heading", { name: "AI 用量" }),
       ).toBeInTheDocument();
       expect(screen.getAllByText("session_1").length).toBeGreaterThan(0);
       expect(screen.getByText("当前数据：已审计回放")).toBeInTheDocument();
@@ -1789,7 +1789,7 @@ describe("AiSessionsPage", () => {
     await waitFor(() => {
       const bar = screen.getByTestId("governance-presets");
       expect(bar.className).toContain("sticky");
-      expect(bar.className).toContain("top-0");
+      expect(bar.className).toContain("top-16");
       expect(
         screen
           .getByRole("button", { name: /失败动作 1/ })

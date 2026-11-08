@@ -51,6 +51,7 @@ import { CustomsDeclarationStatusBadge } from "./CustomsDeclarationStatusBadge";
 
 import { resolveCustomsReturnTo } from "./customs-return-context";
 import { splitDraftSuffix } from "./declarationNo";
+import { formatAmount as formatNumberAmount, formatMoney } from "@/lib/format";
 
 // 报关单只会写入这四个状态（CustomsDeclarationForm），后端按精确值过滤；其余枚举值没有写入路径，不单列 chip。
 const statusChips = [
@@ -66,7 +67,9 @@ const isDraftDeclaration = (declaration: CustomsDeclaration) =>
   splitDraftSuffix(declaration.declarationNo).isDraft;
 
 const formatAmount = (amount: number, currency: string) =>
-  `${currency} ${amount.toLocaleString()}`;
+  currency === "CNY" || currency === "USD"
+    ? formatMoney(amount, currency)
+    : `${currency} ${formatNumberAmount(amount)}`;
 
 export function CustomsDeclarationListPageContent({
   embedded = false,
@@ -302,9 +305,9 @@ export function CustomsDeclarationListPageContent({
           value={String(draftCount)}
         />
         <KpiStat
-          label="本页货值"
+          label="本页货值 (USD)"
           loading={loading}
-          value={`USD ${totalAmount.toLocaleString()}`}
+          value={formatMoney(totalAmount, "USD")}
         />
       </div>
 
@@ -367,7 +370,7 @@ export function CustomsDeclarationListPageContent({
           </CardTitle>
         </CardHeader>
         <CardContent className="px-0">
-          <Table>
+          <Table framed={false}>
             <TableHeader>
               <TableRow>
                 <SortableTableHead

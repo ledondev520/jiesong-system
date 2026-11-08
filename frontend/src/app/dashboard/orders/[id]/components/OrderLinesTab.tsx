@@ -7,6 +7,8 @@
 
 import { useMemo } from "react";
 import type { SalesContract, Store } from "@/types";
+import { formatMoney, formatUnitPrice } from "@/lib/format";
+import { MISSING_VALUE } from "@/lib/missing-value";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -86,18 +88,18 @@ export function OrderLinesTab({
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table framed={false}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>商品</TableHead>
-                    <TableHead className="text-right">单价 ($)</TableHead>
+                    <TableHead className="text-right">单价 (USD)</TableHead>
                     {grid.stores.map(([storeId, name]) => (
                       <TableHead key={storeId} className="text-right">
                         {name}
                       </TableHead>
                     ))}
                     <TableHead className="text-right">合计</TableHead>
-                    <TableHead className="text-right">金额 ($)</TableHead>
+                    <TableHead className="text-right">金额 (USD)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -112,21 +114,24 @@ export function OrderLinesTab({
                         )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.price ? row.price.toLocaleString() : "-"}
+                        {row.price
+                          ? formatUnitPrice(row.price, "USD")
+                          : MISSING_VALUE}
                       </TableCell>
                       {grid.stores.map(([storeId]) => (
                         <TableCell
                           key={storeId}
                           className="text-right tabular-nums"
                         >
-                          {row.quantities.get(storeId)?.toLocaleString() ?? "-"}
+                          {row.quantities.get(storeId)?.toLocaleString() ??
+                            MISSING_VALUE}
                         </TableCell>
                       ))}
                       <TableCell className="text-right font-medium tabular-nums">
                         {row.total.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {row.amount.toLocaleString()}
+                        {formatMoney(row.amount, "USD")}
                       </TableCell>
                     </TableRow>
                   ))}

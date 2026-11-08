@@ -200,7 +200,7 @@ describe("DashboardPage 待办首页", () => {
     expect(mockPush).toHaveBeenCalledWith("/dashboard/purchases/new");
     await user.click(screen.getByRole("button", { name: "新建" }));
     await user.click(
-      await screen.findByRole("menuitem", { name: /新建出口合同/ }),
+      await screen.findByRole("menuitem", { name: /新建出口订单/ }),
     );
     expect(mockPush).toHaveBeenCalledWith("/dashboard/sales/create");
   });

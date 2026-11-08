@@ -373,6 +373,45 @@ describe("嵌入退税工作台的报关列表 URL 同步", () => {
     const formalRow = screen.getByTestId("declaration-row-CD-2");
     expect(within(formalRow).queryByText("草稿 · 非正式单")).toBeNull();
   });
+
+  it("非 CNY/USD 报关币种（如 EUR/HKD）保留真实币种前缀，不强制渲染为 $ (B2)", async () => {
+    mocks.getAll.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "eur-1",
+            declarationNo: "CD-EUR-1",
+            status: "DECLARED",
+            currency: "EUR",
+            totalAmount: 1200,
+          },
+          {
+            id: "usd-1",
+            declarationNo: "CD-USD-1",
+            status: "RELEASED",
+            currency: "USD",
+            totalAmount: 500,
+          },
+          {
+            id: "cny-1",
+            declarationNo: "CD-CNY-1",
+            status: "RELEASED",
+            currency: "CNY",
+            totalAmount: 300,
+          },
+        ],
+        pagination: { total: 3 },
+      },
+    });
+    render(<CustomsDeclarationListPageContent embedded />);
+    const eurRow = await screen.findByTestId("declaration-row-CD-EUR-1");
+    expect(within(eurRow).getByText("EUR 1,200.00")).toBeInTheDocument();
+    expect(within(eurRow).queryByText("$1,200.00")).toBeNull();
+    const usdRow = screen.getByTestId("declaration-row-CD-USD-1");
+    expect(within(usdRow).getByText("$500.00")).toBeInTheDocument();
+    const cnyRow = screen.getByTestId("declaration-row-CD-CNY-1");
+    expect(within(cnyRow).getByText("¥300.00")).toBeInTheDocument();
+  });
 });
 
 it("报关详情返回与刷新恢复URL页签、筛选及分页", async () => {

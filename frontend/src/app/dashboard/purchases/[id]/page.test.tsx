@@ -247,7 +247,7 @@ describe("PurchaseDetailPage 交互逻辑", () => {
 
     await user.click(await screen.findByRole("button", { name: /单证/ }));
     await user.click(
-      await screen.findByRole("menuitem", { name: /生成购销合同/ }),
+      await screen.findByRole("menuitem", { name: /生成盖章购销合同/ }),
     );
     const confirm = await screen.findByRole("alertdialog");
     expect(confirm).toHaveTextContent("PO2500001");
@@ -319,7 +319,7 @@ describe("PurchaseDetailPage 交互逻辑", () => {
 
     await user.click(screen.getByRole("button", { name: /单证/ }));
     await user.click(
-      await screen.findByRole("menuitem", { name: /生成购销合同/ }),
+      await screen.findByRole("menuitem", { name: /生成盖章购销合同/ }),
     );
     await user.click(
       within(await screen.findByRole("alertdialog")).getByRole("button", {
@@ -848,12 +848,20 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     ).toHaveAttribute("aria-selected", "true");
   });
 
-  it("术语说明区分采购合同与购销合同", async () => {
+  it("单证菜单项明确标识生成盖章购销合同 (Word)，不再展示常驻术语说明段落", async () => {
     mockGetById.mockResolvedValue({ data: signedContract });
+    const user = userEvent.setup();
     renderPage();
+    await screen.findByRole("heading", { name: "CG2600009" });
     expect(
-      await screen.findByText(/采购合同是本系统里向供应商采购的单据/),
-    ).toHaveTextContent("购销合同是据此生成");
+      screen.queryByText(/采购合同是本系统里向供应商采购的单据/),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "单证" }));
+    expect(
+      await screen.findByRole("menuitem", {
+        name: "生成盖章购销合同 (Word)",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("单证菜单项失败（服务端拒绝）时有错误提示，不静默", async () => {

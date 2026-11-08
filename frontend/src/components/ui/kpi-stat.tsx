@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 interface KpiStatProps {
   label: string;
   /** 缺失（null/undefined）显示「—」，不是 0；加载中请传 loading。 */
-  value: string | null | undefined;
+  value: string | number | null | undefined;
   /** 加载中：显示骨架，不显示 0 或「—」（避免把没加载完误读成空系统）。 */
   loading?: boolean;
   subLabel?: string;
@@ -49,12 +49,10 @@ export function KpiStat({
   const isDown = trend === "down";
 
   const body = (
-    <CardContent className="p-5" aria-busy={loading || undefined}>
+    <CardContent className="p-4" aria-busy={loading || undefined}>
       <div className="flex items-start justify-between">
-        <div className="flex-1 space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            {label}
-          </p>
+        <div className="flex-1 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
           <div className="space-y-1">
             {loading ? (
               <>
@@ -83,7 +81,7 @@ export function KpiStat({
           {!loading && trendValue && (
             <span
               className={cn(
-                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold",
+                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold",
                 isUp && "bg-status-green-soft text-status-green",
                 isDown && "bg-status-red-soft text-status-red",
                 !isUp && !isDown && "bg-muted text-muted-foreground",
@@ -105,10 +103,10 @@ export function KpiStat({
     </CardContent>
   );
 
-  if (!onClick) return <Card className={className}>{body}</Card>;
+  if (!onClick) return <Card className={cn("py-0", className)}>{body}</Card>;
 
   return (
-    // 内边距挪到按钮上，整张卡都可点，且与不可点的卡等高
+    // 内边距由 CardContent 统一管理，整张卡都可点，且与不可点的卡等高
     <Card
       className={cn(
         "py-0 focus-within:ring-2 focus-within:ring-ring",
@@ -120,7 +118,7 @@ export function KpiStat({
         type="button"
         onClick={onClick}
         aria-pressed={active}
-        className="w-full rounded-lg py-6 text-left outline-none"
+        className="w-full rounded-xl text-left outline-none"
       >
         {body}
       </button>

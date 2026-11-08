@@ -87,7 +87,7 @@ for (const width of [390, 1440]) {
     await expect(dialog.getByLabel("备注")).toHaveValue("");
     await fill();
     const originalDate = await dialog.locator("#payment-date").innerText();
-    await dialog.getByRole("button", { name: "确认记录", exact: true }).click();
+    await dialog.getByRole("button", { name: "确认登记", exact: true }).click();
     await expect.poll(() => attempts.length).toBe(1);
     await dialog.locator("form").dispatchEvent("submit");
     await expect(
@@ -108,7 +108,7 @@ for (const width of [390, 1440]) {
     await expect(dialog.locator("#payment-date")).toHaveText(originalDate);
     expect(attempts).toHaveLength(1);
     const beforeRefresh = contractReads;
-    await dialog.getByRole("button", { name: "确认记录", exact: true }).click();
+    await dialog.getByRole("button", { name: "确认登记", exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await expect.poll(() => contractReads).toBeGreaterThan(beforeRefresh);
     expect(attempts).toHaveLength(2);

@@ -195,9 +195,6 @@ describe("FinancePage 交互逻辑", () => {
         expect(
           screen.getByRole("heading", { name: "财务概览" }),
         ).toBeInTheDocument();
-        expect(
-          screen.getByText("先看收付压力，再下钻经营分析"),
-        ).toBeInTheDocument();
         expect(screen.getByText("应付账款总额")).toBeInTheDocument();
         expect(screen.getByText("待收账款")).toBeInTheDocument();
         expect(screen.getByText(/当前客户剩余欠款/)).toBeInTheDocument();

@@ -191,13 +191,13 @@ export default function DashboardLayout({
     <>
       <NetworkStatus />
       <div className="grid min-h-screen w-full bg-muted/40 md:grid-cols-[232px_1fr]">
-        {/* 桌面端侧边栏：移动端隐藏 */}
-        <div className="hidden border-r bg-sidebar md:block">
+        {/* 桌面端侧边栏：移动端隐藏，桌面端吸顶定高 */}
+        <div className="hidden border-r bg-sidebar md:sticky md:top-0 md:block md:h-dvh md:shrink-0">
           <Sidebar />
         </div>
         {/* 内容列 + 右侧停靠的 AI 面板：面板打开时内容列变窄，不覆盖内容 */}
         <div className="flex min-w-0">
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="@container/main flex min-w-0 flex-1 flex-col">
             <Header />
             {/* 移动端底部 TabBar 高度补偿：56px + safe-area-inset-bottom */}
             <main

@@ -92,7 +92,7 @@ function DashboardContent() {
                     onSelect={() => router.push("/dashboard/sales/create")}
                   >
                     <Ship className="mr-2 h-4 w-4" />
-                    新建出口合同
+                    新建出口订单
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

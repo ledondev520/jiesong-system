@@ -59,7 +59,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { comparePeriods, NO_PRIOR_PERIOD } from "@/lib/period-comparison";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
-import { KpiCard } from "@/components/finance/KpiCard";
+import { KpiStat } from "@/components/ui/kpi-stat";
 import {
   buildCnyCashFlowForecast,
   convertPaymentTrendsToCny,
@@ -308,188 +308,66 @@ export default function FinancePage() {
         title="财务概览"
         description="公司财务进度、收支健康、成本结构与利润趋势。"
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => loadData(true)}
-            disabled={refreshing}
-          >
-            <RefreshCw
-              className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
-            />
-            刷新
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard/finance/receivable">
+                <Wallet className="mr-1.5 h-4 w-4" />
+                应收账款
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard/finance/payable">应付账款</Link>
+            </Button>
+            {canReadLedger && (
+              <Button asChild variant="outline" size="sm">
+                <Link href="/dashboard/finance/statements">查看报表分析</Link>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadData(true)}
+              disabled={refreshing}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${refreshing ? "animate-spin" : ""}`}
+              />
+              刷新
+            </Button>
+          </div>
         }
       />
 
-      <section className="space-y-4">
-        <Card className="border-primary/20 bg-primary/[0.03]">
-          <CardContent className="space-y-4 pt-6">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">
-                公司财务进度
-              </p>
-              <h3 className="text-lg font-semibold tracking-tight">
-                先看收付压力，再下钻经营分析
-              </h3>
-              <p className="text-sm leading-6 text-muted-foreground">
-                财务概览先给出应付完成率、应收完成率和待付待收风险；三表导入、账期选择和收入利润、成本结构、资产负债下钻集中放在报表分析页面。
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Button asChild className="h-11 rounded-xl">
-                <Link href="/dashboard/finance/receivable">
-                  <Wallet className="mr-2 h-4 w-4" />
-                  进入应收（收款池）
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="h-11 rounded-xl">
-                <Link href="/dashboard/finance/payable">查看待付风险</Link>
-              </Button>
-              {canReadLedger && (
-                <Button asChild variant="outline" className="h-11 rounded-xl">
-                  <Link href="/dashboard/finance/statements">查看报表分析</Link>
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* 汇率与健康度横幅 */}
-      {hasData && (
-        <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
-          {/* 汇率卡 */}
-          <Card className="border-primary/20 bg-primary/[0.03]">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">
-                    当前结算汇率
-                  </p>
-                  <p className="text-2xl font-bold tabular-nums">
-                    {exchangeRate?.effectiveRate != null
-                      ? exchangeRate.effectiveRate.toFixed(2)
-                      : "—"}
-                    <span className="text-sm font-normal text-muted-foreground ml-1">
-                      ¥/$
-                    </span>
-                  </p>
-                  {exchangeRate && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      市场汇率 {exchangeRate.rate?.toFixed(2) ?? "—"} · 风险缓冲{" "}
-                      {exchangeRate.buffer?.toFixed(2) ?? "—"}
-                    </p>
-                  )}
-                  {exchangeRate && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      结算汇率 = 市场汇率 − 风险缓冲，用于美元应收折算人民币
-                    </p>
-                  )}
-                </div>
-                <TrendingUp className="h-8 w-8 text-primary opacity-60" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 应付完成率 */}
-          <Card
-            className={
-              payableUrgent
-                ? "border-destructive/40 bg-destructive/5"
-                : "border-status-green/30 bg-status-green-soft/30"
-            }
-          >
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-muted-foreground">
-                  应付账款完成率
-                </p>
-                {payableUrgent ? (
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4 text-status-green" />
-                )}
-              </div>
-              <p className="text-2xl font-bold tabular-nums mb-2">
-                {payableRate}%
-              </p>
-              <Progress
-                value={payableRate}
-                className={`h-2 ${payableUrgent ? "[&>div]:bg-destructive" : "[&>div]:bg-status-green"}`}
-              />
-              <p className="text-xs text-muted-foreground mt-1.5">
-                已付 ¥{formatAmount(stats?.payable.paid ?? 0)} / 总额 ¥
-                {formatAmount(stats?.payable.total ?? 0)}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* 应收完成率 */}
-          <Card
-            className={
-              receivableUrgent
-                ? "border-status-amber/40 bg-status-amber-soft/30"
-                : "border-status-green/30 bg-status-green-soft/30"
-            }
-          >
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-muted-foreground">
-                  应收账款完成率
-                </p>
-                {receivableUrgent ? (
-                  <AlertTriangle className="h-4 w-4 text-status-amber" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4 text-status-green" />
-                )}
-              </div>
-              <p className="text-2xl font-bold tabular-nums mb-2">
-                {receivableRate}%
-              </p>
-              <Progress
-                value={receivableRate}
-                className={`h-2 ${receivableUrgent ? "[&>div]:bg-status-amber" : "[&>div]:bg-status-green"}`}
-              />
-              <p className="text-xs text-muted-foreground mt-1.5">
-                已收 USD {formatAmount(stats?.receivable.received ?? 0)} / 总额
-                USD {formatAmount(stats?.receivable.total ?? 0)}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* 四象KPI区域 - 使用专业卡片 */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 lg:grid-cols-4">
-        <KpiCard
+      {/* 核心收付 KPI 与结算汇率 */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4 xl:grid-cols-5">
+        <KpiStat
           label="应付账款总额"
           value={`¥${formatAmount(stats?.payable.total ?? 0)}`}
-          subLabel={`已付 ¥${formatAmount(stats?.payable.paid ?? 0)}`}
+          subLabel={`已付 ¥${formatAmount(stats?.payable.paid ?? 0)} · 完成率 ${payableRate}%`}
           trend={payableTrendDir}
           trendValue={payableTrend}
           icon={<ArrowUpRight className="h-4 w-4" />}
         />
-        <KpiCard
+        <KpiStat
           label="待付账款"
           value={`¥${formatAmount(stats?.payable.unpaid ?? 0)}`}
           subLabel={
             payableUrgent ? "超过总额50%，建议优先处理" : "尚未支付给供应商"
           }
-          trend="down"
+          trend={payableUrgent ? "down" : "neutral"}
           trendValue={payableUrgent ? "高风险" : "正常"}
           icon={<Wallet className="h-4 w-4" />}
           valueClassName={payableUrgent ? "text-destructive" : undefined}
         />
-        <KpiCard
+        <KpiStat
           label="应收账款总额"
           value={`USD ${formatAmount(stats?.receivable.total ?? 0)}`}
-          subLabel={`已收 USD ${formatAmount(stats?.receivable.received ?? 0)}`}
+          subLabel={`已收 USD ${formatAmount(stats?.receivable.received ?? 0)} · 完成率 ${receivableRate}%`}
           trend={receivableTrendDir}
           trendValue={receivableTrend}
           icon={<ArrowDownLeft className="h-4 w-4" />}
         />
-        <KpiCard
+        <KpiStat
           label="待收账款"
           value={`USD ${formatAmount(stats?.receivable.unreceived ?? 0)}`}
           subLabel={
@@ -497,11 +375,42 @@ export default function FinancePage() {
               ? "当前客户剩余欠款偏高，建议优先跟进"
               : "当前客户剩余欠款"
           }
-          trend="neutral"
+          trend={receivableUrgent ? "down" : "neutral"}
           trendValue={receivableUrgent ? "需跟进" : "正常"}
           icon={<DollarSign className="h-4 w-4" />}
           valueClassName={receivableUrgent ? "text-status-amber" : undefined}
         />
+        <Card className="py-0">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">
+                  当前结算汇率
+                </p>
+                <p className="text-2xl font-bold tracking-tight tabular-nums">
+                  {exchangeRate?.effectiveRate != null
+                    ? exchangeRate.effectiveRate.toFixed(2)
+                    : "—"}
+                  <span className="ml-1 text-sm font-normal text-muted-foreground">
+                    ¥/$
+                  </span>
+                </p>
+              </div>
+              <div className="rounded-lg bg-muted p-2 text-muted-foreground shrink-0">
+                <TrendingUp className="h-4 w-4" />
+              </div>
+            </div>
+            {exchangeRate && (
+              <div className="mt-3 space-y-0.5 text-xs text-muted-foreground">
+                <p>
+                  市场汇率 {exchangeRate.rate?.toFixed(2) ?? "—"} · 风险缓冲{" "}
+                  {exchangeRate.buffer?.toFixed(2) ?? "—"}
+                </p>
+                <p>结算汇率 = 市场汇率 − 风险缓冲，用于美元应收折算人民币</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Suspense fallback={financeChartsFallback}>
@@ -707,7 +616,7 @@ export default function FinancePage() {
                 <div>
                   <p className="text-sm font-medium">应付账款明细</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    查看各供应商欠款详情
+                    查看各供应商欠款详情与付款登记
                   </p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -721,25 +630,9 @@ export default function FinancePage() {
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">应收账款明细</p>
+                  <p className="text-sm font-medium">应收账款与收款池</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    查看各门店待回款详情
-                  </p>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/dashboard/finance/receivable" className="group">
-          <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">收款池与分配</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    记录到账、自动匹配与分配
+                    查看门店待回款、记录到账与自动匹配分配
                   </p>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -768,7 +661,7 @@ export default function FinancePage() {
           </Link>
         )}
 
-        {canReadLedger && (
+        {canReadLedger && !bankStats && (
           <Link href="/dashboard/finance/bank-flow" className="group">
             <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
               <CardContent className="pt-4 pb-4">
@@ -786,7 +679,7 @@ export default function FinancePage() {
           </Link>
         )}
 
-        {canReadLedger && (
+        {canReadLedger && !invStats && (
           <Link href="/dashboard/finance/invoices" className="group">
             <Card className="cursor-pointer transition-all hover:border-primary/40 hover:shadow-sm">
               <CardContent className="pt-4 pb-4">

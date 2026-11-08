@@ -448,7 +448,7 @@ describe("supplier catalog identity and deletion sessions", () => {
       render(<SuppliersPage />);
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" });
       expect(
-        screen.queryByRole("button", { name: "归档当前" }),
+        screen.queryByRole("button", { name: "归档供应商" }),
       ).not.toBeInTheDocument();
     },
   );
@@ -561,14 +561,17 @@ describe("supplier catalog identity and deletion sessions", () => {
   it("late deletion cannot clear a newer selected supplier draft", async () => {
     const pending = deferred<{ data: null }>();
     mockDelete.mockReturnValue(pending.promise);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
     render(<SuppliersPage />);
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
     await user.click(screen.getByRole("button", { name: "编辑" }));
-    await user.click(screen.getByRole("button", { name: "归档当前" }));
+    await user.click(screen.getByRole("button", { name: "归档供应商" }));
+    const confirmDialog = await screen.findByRole("alertdialog");
+    await user.click(
+      within(confirmDialog).getByRole("button", { name: "归档供应商" }),
+    );
     await waitFor(() => expect(mockDelete).toHaveBeenCalledTimes(1));
     await user.click(
       screen.getByRole("button", { name: "选择供应商 合成供应商乙" }),
@@ -582,7 +585,6 @@ describe("supplier catalog identity and deletion sessions", () => {
     );
     expect(mockToastSuccess).not.toHaveBeenCalled();
     expect(mockDelete).toHaveBeenCalledExactlyOnceWith("synthetic-a");
-    confirm.mockRestore();
   });
 });
 
@@ -621,7 +623,7 @@ describe("supplier click lands on a read-only summary (B17)", () => {
     await screen.findByRole("button", { name: "选择供应商 合成供应商甲" });
     expect(screen.getByTestId("supplier-empty-state")).toBeInTheDocument();
     expect(screen.queryByLabelText("公司名称 *")).not.toBeInTheDocument();
-    for (const name of ["创建供应商", "保存修改", "归档当前", "永久删除"]) {
+    for (const name of ["创建供应商", "保存修改", "归档供应商", "永久删除"]) {
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     }
     expect(screen.queryByRole("region", { name: "危险操作" })).toBeNull();
@@ -637,7 +639,7 @@ describe("supplier click lands on a read-only summary (B17)", () => {
     const zone = screen.getByRole("region", { name: "危险操作" });
     expect(zone).toHaveTextContent("合成供应商甲");
     expect(
-      within(zone).getByRole("button", { name: "归档当前" }),
+      within(zone).getByRole("button", { name: "归档供应商" }),
     ).toBeInTheDocument();
     expect(
       within(zone).getByRole("button", { name: "永久删除" }),
@@ -711,21 +713,21 @@ describe("supplier click lands on a read-only summary (B17)", () => {
 
   it("archive from the read-only summary asks for confirmation and then shows the empty state", async () => {
     mockDelete.mockResolvedValue({});
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
     render(<SuppliersPage />);
     await user.click(
       await screen.findByRole("button", { name: "选择供应商 合成供应商甲" }),
     );
-    await user.click(screen.getByRole("button", { name: "归档当前" }));
-    expect(confirmSpy).toHaveBeenCalledWith(
-      expect.stringContaining("合成供应商甲"),
+    await user.click(screen.getByRole("button", { name: "归档供应商" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("合成供应商甲");
+    await user.click(
+      within(dialog).getByRole("button", { name: "归档供应商" }),
     );
     await waitFor(() => expect(mockDelete).toHaveBeenCalledWith("synthetic-a"));
     await waitFor(() =>
       expect(screen.getByTestId("supplier-empty-state")).toBeInTheDocument(),
     );
-    confirmSpy.mockRestore();
   });
 
   it("keeps archive and permanent delete in a separate danger zone that names the record", async () => {

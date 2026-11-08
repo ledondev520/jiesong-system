@@ -16,6 +16,7 @@ const batch = {
 };
 
 vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
   useSearchParams: () => ({ get: () => null }),
   usePathname: () => "/dashboard/finance/bank-flow",
 }));

@@ -387,13 +387,15 @@ export function FinancialStatementsPageContent() {
             value={activeView}
             onValueChange={(value) => setView({ view: value })}
           >
-            <TabsList className="h-auto flex-wrap justify-start">
-              {tabs.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
-                  {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <div className="overflow-x-auto pb-1">
+              <TabsList variant="line">
+                {tabs.map((tab) => (
+                  <TabsTrigger key={tab.value} variant="line" value={tab.value}>
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
           </Tabs>
 
           {activeView !== "library" && (

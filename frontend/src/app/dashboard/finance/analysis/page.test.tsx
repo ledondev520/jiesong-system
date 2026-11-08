@@ -107,7 +107,7 @@ describe("经营报表范围与追溯", () => {
       },
     });
     render(<BusinessReportsPage />);
-    await screen.findByText(/与工作台待办数不是同一口径/);
+    await screen.findByText(/当前处于「已发运」状态的出口订单数/);
     expect(
       screen.queryByTestId("all-receivables-overdue"),
     ).not.toBeInTheDocument();
@@ -121,7 +121,7 @@ describe("经营报表范围与追溯", () => {
     });
     render(<BusinessReportsPage />);
     expect(
-      await screen.findByText(/与工作台待办数不是同一口径/),
+      await screen.findByText(/当前处于「已发运」状态的出口订单数/),
     ).toBeInTheDocument();
     expect(
       screen.queryByTestId("all-receivables-overdue"),

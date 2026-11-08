@@ -57,6 +57,7 @@ import { getAuthToken } from "@/lib/auth-token";
 import { clearApiGetCache } from "@/lib/axios";
 import { clearAllCache } from "@/lib/api-cache";
 import { useBusinessReadOnly } from "@/lib/hooks/useBusinessReadOnly";
+import { toast } from "sonner";
 
 interface PendingActionState extends AgentPendingAction {
   status: "pending" | "executing" | "executed" | "cancelled" | "failed";
@@ -394,7 +395,7 @@ export function AIAssistant({
   const handleImageFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
     if (file.size > 5 * 1024 * 1024) {
-      alert("图片大小不能超过5MB");
+      toast.error("图片大小不能超过 5MB");
       return;
     }
     const reader = new FileReader();
@@ -1017,12 +1018,12 @@ export function AIAssistant({
                                       <span className="font-medium">
                                         {recommendation.title}
                                       </span>
-                                      <span className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                      <span className="rounded border border-border/60 px-1.5 py-0.5 text-xs text-muted-foreground">
                                         {formatRecommendationPriority(
                                           recommendation.priority,
                                         )}
                                       </span>
-                                      <span className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                      <span className="rounded border border-border/60 px-1.5 py-0.5 text-xs text-muted-foreground">
                                         {formatRecommendationMode(
                                           recommendation.executionMode,
                                         )}
@@ -1124,14 +1125,14 @@ export function AIAssistant({
                         msg.id !== INITIAL_MESSAGE.id &&
                         msg.content &&
                         !isStreamingThis && (
-                          <p className="mt-1.5 text-[10px] text-muted-foreground">
+                          <p className="mt-1.5 text-xs text-muted-foreground">
                             {`AI 回答 · ${msg.createdAt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false })} 生成 · 金额与状态请以对应页面为准`}
                           </p>
                         )}
                       {/* 显示模型标签 */}
                       {msg.role === "assistant" && msg.model && (
                         <div className="mt-1.5 flex items-center gap-1">
-                          <span className="inline-flex items-center rounded border border-border/50 bg-muted/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground/70">
+                          <span className="inline-flex items-center rounded border border-border/50 bg-muted/60 px-1.5 py-0.5 text-xs font-mono text-muted-foreground/70">
                             {msg.model}
                           </span>
                         </div>
@@ -1208,7 +1209,7 @@ export function AIAssistant({
                 <Send className="h-4 w-4" />
               </Button>
             </form>
-            <p className="text-[10px] text-muted-foreground text-center">
+            <p className="text-xs text-muted-foreground text-center">
               内部草稿按请求直接生成；付款、实物状态和异常操作需一次确认
               {isAdmin && (
                 <>
