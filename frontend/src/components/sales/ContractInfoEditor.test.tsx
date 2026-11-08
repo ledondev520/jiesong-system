@@ -93,6 +93,37 @@ describe("ContractInfoEditor", () => {
     expect(screen.getByRole("button", { name: "编辑" })).toBeInTheDocument();
   });
 
+  it("提单号可编辑：保存提交修剪后的值，清空提交空串", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(
+      <ContractInfoEditor
+        contract={{ ...baseContract, blNo: "OLD-1" }}
+        stores={stores}
+        onSave={onSave}
+      />,
+    );
+    expect(screen.getByText("OLD-1")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "编辑" }));
+    const input = screen.getByLabelText("提单号");
+    await user.clear(input);
+    await user.type(input, "  MAEU123  ");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenLastCalledWith(
+        expect.objectContaining({ blNo: "MAEU123" }),
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "编辑" }));
+    await user.clear(screen.getByLabelText("提单号"));
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenLastCalledWith(
+        expect.objectContaining({ blNo: "" }),
+      ),
+    );
+  });
+
   it("编辑后保存会调用 onSave 并带上更新字段", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
@@ -140,9 +171,9 @@ describe("ContractInfoEditor", () => {
     await user.clear(screen.getByDisplayValue("7.2"));
     await user.type(screen.getByRole("spinbutton"), "7.9");
     await user.clear(screen.getByDisplayValue("2026-02-01"));
-    await user.type(screen.getByDisplayValue(""), "2026-02-05");
+    await user.type(screen.getByLabelText("签订日期"), "2026-02-05");
     await user.clear(screen.getByDisplayValue("2026-03-01"));
-    await user.type(screen.getByDisplayValue(""), "2026-03-05");
+    await user.type(screen.getByLabelText("预计到达"), "2026-03-05");
     await user.click(screen.getByRole("combobox"));
     await user.click(screen.getByRole("option", { name: "Long Beach" }));
     await user.click(screen.getByRole("button", { name: "取消" }));

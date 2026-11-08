@@ -9,6 +9,7 @@ const {
   generateNextContractNo,
   normalizeFilterStatus,
   parseNullableNumber,
+  normalizeBlNo,
 } = require('./shared/contractUtils');
 const {
   SALES_STATUS,
@@ -253,6 +254,7 @@ const updateSalesContract = async (id, data = {}) => {
       estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : undefined,
       portId: data.portId || undefined,
       note: data.note,
+      blNo: data.blNo === undefined ? undefined : normalizeBlNo(data.blNo),
     },
   });
   if (data.customerId === undefined) return update(prisma);

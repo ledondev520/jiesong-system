@@ -8,6 +8,7 @@ const { SALES_STATUS, normalizeSalesStatus } = require('./salesStateMachine');
 const { getContainerSpec } = require('./containerSpecs');
 const {
   generateNextContractNo,
+  normalizeBlNo,
   normalizeFilterStatus,
   parseNullableNumber,
 } = require('./shared/contractUtils');
@@ -306,6 +307,7 @@ const create = async (data = {}) => {
       estimatedArrival: data.estimatedArrival ? new Date(data.estimatedArrival) : null,
       portId: data.portId,
       customsBroker: data.customsBroker || null,
+      blNo: normalizeBlNo(data.blNo),
       isFumigated: data.isFumigated || false,
       hasTaxRefund: data.hasTaxRefund || false,
       status,
@@ -331,6 +333,7 @@ const update = async (id, data = {}) => {
   }
   if (data.shippedAt !== undefined) updateData.shippedAt = data.shippedAt ? new Date(data.shippedAt) : null;
   if (data.customsBroker !== undefined) updateData.customsBroker = data.customsBroker;
+  if (data.blNo !== undefined) updateData.blNo = normalizeBlNo(data.blNo);
   if (data.isFumigated !== undefined) updateData.isFumigated = data.isFumigated;
   if (data.hasTaxRefund !== undefined) updateData.hasTaxRefund = data.hasTaxRefund;
   if (data.totalBoxes !== undefined) updateData.totalBoxes = data.totalBoxes;

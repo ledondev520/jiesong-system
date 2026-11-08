@@ -205,6 +205,11 @@ function OrdersList() {
     },
     { key: "port", header: "目的港", cell: (order) => order.port?.name ?? "—" },
     {
+      key: "blNo",
+      header: "提单号",
+      cell: (order) => order.blNo?.trim() || "—",
+    },
+    {
       key: "shippedAt",
       header: "发运日期",
       cell: (order) => formatDate(order.shippedAt, "—"),
