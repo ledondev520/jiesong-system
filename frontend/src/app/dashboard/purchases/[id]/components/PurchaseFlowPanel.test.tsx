@@ -301,8 +301,11 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
     render(<PurchaseFlowPanel contract={contract} onUpdated={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "催开发票" }));
     await screen.findByText("发票.pdf");
-    expect(!!screen.queryByRole("button", { name: "上传发票原件" })).toBe(visible);
-    if (!visible) expect(screen.getByLabelText("上传供应商发票原件")).toBeDisabled();
+    expect(!!screen.queryByRole("button", { name: "上传发票原件" })).toBe(
+      visible,
+    );
+    if (!visible)
+      expect(screen.getByLabelText("上传供应商发票原件")).toBeDisabled();
   });
 
   describe("WAREHOUSE：服务端已剥离发票号与金额（OD-2/OD-3）", () => {
@@ -314,7 +317,13 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
       invoiceCount: 2,
       hasPaidAmount: true,
       subStatus: { payment: "PARTIAL" },
-      items: [{ ...(contract.items as unknown[])[0] as object, unitPrice: undefined, totalPrice: undefined }],
+      items: [
+        {
+          ...((contract.items as unknown[])[0] as object),
+          unitPrice: undefined,
+          totalPrice: undefined,
+        },
+      ],
       payments: [{ id: "pay-1" }],
     } as unknown as PurchaseContract;
     const warehousePreparation = {
@@ -323,7 +332,18 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
       invoiceNumberCount: 2,
       invoiceFiles: [],
       amounts: undefined,
-      request: { ...preparation.request, lines: [{ ...preparation.request.lines[0], netUnitPrice: undefined, netAmount: undefined, taxAmount: undefined, grossAmount: undefined }] },
+      request: {
+        ...preparation.request,
+        lines: [
+          {
+            ...preparation.request.lines[0],
+            netUnitPrice: undefined,
+            netAmount: undefined,
+            taxAmount: undefined,
+            grossAmount: undefined,
+          },
+        ],
+      },
     };
 
     beforeEach(() => {
@@ -332,7 +352,9 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
     });
 
     it("卡片头只显示状态：不出现 ¥0.00 / 已付清，号码数来自 invoiceCount", () => {
-      const { container } = render(<PurchaseFlowPanel contract={warehouseContract} onUpdated={vi.fn()} />);
+      const { container } = render(
+        <PurchaseFlowPanel contract={warehouseContract} onUpdated={vi.fn()} />,
+      );
       expect(container.textContent).toContain("部分付款");
       expect(container.textContent).toContain("无权查看");
       expect(container.textContent).toContain("已登记 2 个发票号");
@@ -343,17 +365,28 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
 
     it("催开发票弹窗保留，开票信息无单价/金额，号码框不预填且保存只提交新号码", async () => {
       const user = userEvent.setup();
-      render(<PurchaseFlowPanel contract={warehouseContract} onUpdated={vi.fn()} />);
+      render(
+        <PurchaseFlowPanel contract={warehouseContract} onUpdated={vi.fn()} />,
+      );
       await user.click(screen.getByRole("button", { name: "催开发票" }));
-      const field = await screen.findByLabelText("发票号码登记（每行或逗号分隔）");
+      const field =
+        await screen.findByLabelText("发票号码登记（每行或逗号分隔）");
       expect(field).toHaveValue("");
-      const infoText = (screen.getAllByRole("textbox")[0] as HTMLTextAreaElement).value;
+      const infoText = (
+        screen.getAllByRole("textbox")[0] as HTMLTextAreaElement
+      ).value;
       expect(infoText).toContain("餐盘");
       expect(infoText).not.toMatch(/¥|单价|金额|税额|合计/);
       await user.type(field, "NEW-9");
-      mockRegisterNumbers.mockResolvedValue({ data: { ...warehousePreparation, invoiceNumberCount: 3 } });
+      mockRegisterNumbers.mockResolvedValue({
+        data: { ...warehousePreparation, invoiceNumberCount: 3 },
+      });
       await user.click(screen.getByRole("button", { name: "保存" }));
-      await waitFor(() => expect(mockRegisterNumbers).toHaveBeenCalledWith("purchase-1", ["NEW-9"]));
+      await waitFor(() =>
+        expect(mockRegisterNumbers).toHaveBeenCalledWith("purchase-1", [
+          "NEW-9",
+        ]),
+      );
       expect(field).toHaveValue("");
     });
   });

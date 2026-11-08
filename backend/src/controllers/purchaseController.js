@@ -34,6 +34,7 @@ const {
 const purchaseInvoiceService = require('../services/purchaseInvoiceService');
 const { roundMoney } = require('../utils/money');
 const { redactNestedSuppliers } = require('../agent/commands/supplier/bankFields');
+const { keepStoredPrices } = require('../utils/warehousePurchasePrices');
 
 /**
  * 职责：检查商品价格是否高于历史均价并生成警告
@@ -273,19 +274,7 @@ const create = async (req, res, next) => {
  * OD-2：WAREHOUSE 的表单没有价格（服务端已剥离），其草稿更正不能把已存单价清零或改写。
  * 已有明细（按 id，否则按 productId 顺序配对）一律沿用库内单价；全新行保持提交值。
  */
-const keepStoredPricesForWarehouse = async (req, input) => {
-  if (req.user?.role !== 'WAREHOUSE' || !Array.isArray(input?.items)) return input;
-  const stored = await prisma.purchaseItem.findMany({ where: { purchaseContractId: req.params.id }, select: { id: true, productId: true, unitPrice: true } });
-  const pool = [...stored];
-  const take = (match) => { const i = pool.findIndex(match); return i < 0 ? null : pool.splice(i, 1)[0]; };
-  return {
-    ...input,
-    items: input.items.map((item) => {
-      const hit = (item?.id && take((s) => s.id === item.id)) || take((s) => s.productId === item?.productId);
-      return hit ? { ...item, unitPrice: hit.unitPrice } : item;
-    }),
-  };
-};
+const keepStoredPricesForWarehouse = (req, input) => keepStoredPrices(req.user?.role, req.params.id, input);
 
 /**
  * 职责：更新采购合同

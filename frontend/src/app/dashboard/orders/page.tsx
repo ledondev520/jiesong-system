@@ -256,7 +256,8 @@ function OrdersList() {
   const visibleColumns = showAmounts
     ? columns
     : columns.filter(
-        (column) => column.key !== "totalAmount" && column.key !== "receivedAmount",
+        (column) =>
+          column.key !== "totalAmount" && column.key !== "receivedAmount",
       );
 
   return (

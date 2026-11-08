@@ -98,7 +98,13 @@ describe("OrderOverviewTab 金额（OD-3）", () => {
     const { useAuthStore } = await import("@/store/auth.store");
     useAuthStore.setState({ user: { id: "w", role: "WAREHOUSE" } as never });
     const { unmount } = render(
-      <OrderOverviewTab contract={contract({ totalAmount: undefined, receivedAmount: undefined } as never)} readiness={readiness} />,
+      <OrderOverviewTab
+        contract={contract({
+          totalAmount: undefined,
+          receivedAmount: undefined,
+        } as never)}
+        readiness={readiness}
+      />,
     );
     expect(screen.queryByText("合同金额")).toBeNull();
     expect(screen.queryByText("已收款")).toBeNull();

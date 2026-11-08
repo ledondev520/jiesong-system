@@ -26,7 +26,7 @@ const addQuery = (tasks, name, query) => {
   tasks.push({ name, query });
 };
 
-const buildContextQueries = (message) => {
+const buildContextQueries = (message, { role } = {}) => {
   const lowerMsg = message.toLowerCase();
   const keywords = extractKeywords(message);
   const purchaseKeyword = message.match(/CG\d+/i)?.[0];
@@ -158,7 +158,7 @@ const buildContextQueries = (message) => {
     addQuery(tasks, 'exchange', () => safe(Promise.resolve().then(() => currentRates())));
   }
 
-  if (shouldSearchFinance) {
+  if (shouldSearchFinance && role !== 'WAREHOUSE') {
     addQuery(tasks, 'finance', () =>
       safe(Promise.all([
         getPayablesSummary(prisma),
@@ -192,7 +192,8 @@ const collectContextData = async (tasks) => {
   }, {});
 };
 
-const appendContextLines = (context, byName, salesKeyword) => {
+// WAREHOUSE（OD-3）：上下文不含采购/销售/财务金额，只保留状态与数量。
+const appendContextLines = (context, byName, salesKeyword, showMoney = true) => {
   if (Object.entries(byName).some(([name, value]) => value === null && name !== 'exchange')) {
     context.push('【数据查询提示】部分资料暂时无法读取，请勿将查询失败解释为没有业务数据。');
   }
@@ -228,9 +229,9 @@ const appendContextLines = (context, byName, salesKeyword) => {
   if (exactSales && Array.isArray(exactSales[1]) && exactSales[1].length > 0) {
     exactSales[1].forEach((contract) => {
       const itemDetails = contract.items?.map((item) =>
-        `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, 售价$${item.sellingPrice}, 门店:${item.store?.name || '未知'})`
+        `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''}, ${showMoney ? `售价$${item.sellingPrice}, ` : ''}门店:${item.store?.name || '未知'})`
       ).join(', ') || '无商品明细';
-      context.push(`【销售合同${contract.contractNo}】状态:${contract.status}, 金额:$${contract.totalAmount}, 已收:$${contract.receivedAmount}\\n  商品明细: ${itemDetails}\\n  链接: /dashboard/orders`);
+      context.push(`【销售合同${contract.contractNo}】状态:${contract.status}${showMoney ? `, 金额:$${contract.totalAmount}, 已收:$${contract.receivedAmount}` : ''}\\n  商品明细: ${itemDetails}\\n  链接: /dashboard/orders`);
     });
   } else if (salesKeyword && exactSales && Array.isArray(exactSales[1])) {
     const fuzzyResult = Object.entries(byName).find(([name]) => name.startsWith('sales:fuzzy:'));
@@ -240,7 +241,7 @@ const appendContextLines = (context, byName, salesKeyword) => {
         const itemDetails = contract.items?.map((item) =>
           `${item.product?.customsName || '未知商品'}(${item.quantity}${item.product?.unit || ''})`
         ).join(', ') || '无商品明细';
-        context.push(`  - ${contract.contractNo}: $${contract.totalAmount}, 商品: ${itemDetails}`);
+        context.push(`  - ${contract.contractNo}: ${showMoney ? `$${contract.totalAmount}, ` : ''}商品: ${itemDetails}`);
       });
     }
   }
@@ -252,12 +253,12 @@ const appendContextLines = (context, byName, salesKeyword) => {
 
     if (name.startsWith('purchase:exact:')) {
       context.push(`【采购合同\"${name.replace('purchase:exact:', '')}\"】` + value.map((purchase) =>
-        `${purchase.contractNo}(供应商:${purchase.supplier?.name || '未知'}, 金额:¥${purchase.totalAmount})`
+        `${purchase.contractNo}(供应商:${purchase.supplier?.name || '未知'}${showMoney ? `, 金额:¥${purchase.totalAmount}` : ''})`
       ).join('; '));
     }
 
     if (name === 'sales:recent') {
-      context.push('【最近销售合同】' + value.map((s) => `${s.contractNo}(港口:${s.port?.name || '未指定'}, $${s.totalAmount})`).join(', '));
+      context.push('【最近销售合同】' + value.map((s) => `${s.contractNo}(港口:${s.port?.name || '未指定'}${showMoney ? `, $${s.totalAmount}` : ''})`).join(', '));
     }
 
     if (name.startsWith('container:exact:')) {
@@ -283,7 +284,7 @@ const appendContextLines = (context, byName, salesKeyword) => {
     context.push(`【汇率配置】现汇${rates.spotRate}, 调整${rates.adjustment}, 报价汇率${rates.effectiveRate}, 默认加价${rates.defaultMarkup}, 单价向上取整到整美元（老商品默认取上次确认价）`);
   }
 
-  if (Array.isArray(byName.finance) && byName.finance.length === 2) {
+  if (showMoney && Array.isArray(byName.finance) && byName.finance.length === 2) {
     const [payableStats, receivableStats] = byName.finance;
     const payableTotal = payableStats?.total || 0;
     const paidTotal = payableStats?.paid || 0;
@@ -294,13 +295,13 @@ const appendContextLines = (context, byName, salesKeyword) => {
   }
 };
 
-const getDbContext = async (message) => {
+const getDbContext = async (message, { role } = {}) => {
   const context = [];
-  const { tasks, salesKeyword } = buildContextQueries(message);
+  const { tasks, salesKeyword } = buildContextQueries(message, { role });
   const byName = await collectContextData(tasks);
 
   try {
-    appendContextLines(context, byName, salesKeyword);
+    appendContextLines(context, byName, salesKeyword, role !== 'WAREHOUSE');
     if (context.length === 0) {
       return '';
     }

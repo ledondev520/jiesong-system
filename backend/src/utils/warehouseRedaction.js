@@ -44,4 +44,15 @@ const warehouseMoneyRedaction = (req, res, next) => {
   next();
 };
 
-module.exports = { MONEY_KEYS, redactWarehouseMoney, warehouseMoneyRedaction };
+// P2-B：装箱明细的供应商发票号与采购成本（CNY）属同一数据类；销售面不挂 key 中间件，以免剥掉 OD-6 保留的 USD 行价。
+const PACKING_SECRET_KEYS = ['invoiceNo', 'purchaseCost'];
+const stripPacking = (node) => {
+  if (Array.isArray(node)) return node.map(stripPacking);
+  if (!isPlain(node)) return node;
+  const copy = {};
+  Object.keys(node).forEach((key) => { if (!PACKING_SECRET_KEYS.includes(key)) copy[key] = stripPacking(node[key]); });
+  return copy;
+};
+const redactPackingSecrets = (role, data) => (role === 'WAREHOUSE' ? stripPacking(data) : data);
+
+module.exports = { MONEY_KEYS, redactWarehouseMoney, redactPackingSecrets, warehouseMoneyRedaction };

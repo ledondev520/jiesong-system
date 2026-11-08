@@ -909,7 +909,9 @@ describe("PurchaseDetailPage 交互逻辑", () => {
   );
 
   it("WAREHOUSE：金额与发票号已被服务端剥离，页面显示状态与「无权查看」，没有 ¥ 数字", async () => {
-    useAuthStore.setState({ user: { id: "synthetic", role: "WAREHOUSE" } as never });
+    useAuthStore.setState({
+      user: { id: "synthetic", role: "WAREHOUSE" } as never,
+    });
     mockGetById.mockResolvedValue({
       data: {
         id: "p-1",
@@ -918,10 +920,22 @@ describe("PurchaseDetailPage 交互逻辑", () => {
         taxRate: 13,
         invoiceCount: 2,
         hasPaidAmount: true,
-        subStatus: { payment: "PARTIAL", arrival: { state: "NONE", ordered: 3, arrived: 0, registered: false }, docsComplete: true },
+        subStatus: {
+          payment: "PARTIAL",
+          arrival: { state: "NONE", ordered: 3, arrived: 0, registered: false },
+          docsComplete: true,
+        },
         supplier: { name: "供应商A" },
         payments: [{ id: "pay-1" }],
-        items: [{ id: "i-1", productId: "pr-1", quantity: 3, unit: "件", product: { id: "pr-1", customsName: "餐盘" } }],
+        items: [
+          {
+            id: "i-1",
+            productId: "pr-1",
+            quantity: 3,
+            unit: "件",
+            product: { id: "pr-1", customsName: "餐盘" },
+          },
+        ],
       },
     });
     const { container } = renderPage();

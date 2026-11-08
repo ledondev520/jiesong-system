@@ -367,12 +367,19 @@ test("BOSS reads purchase and sales UI, hides write controls and cannot mutate r
   await expect(page.getByRole("button", { name: "登记分批到货" })).toHaveCount(
     0,
   );
-  // 头部：老板只读，主操作和「单证」「更多」菜单都不出现
-  for (const name of ["单证", "更多", "登记完工资料", "确认供应商已发货"]) {
+  // 头部：老板只读，主操作和「更多」菜单不出现；OD-4：「单证」菜单只有「查看合同」下载入口
+  for (const name of ["更多", "登记完工资料", "确认供应商已发货"]) {
     await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
       0,
     );
   }
+  await page.getByRole("button", { name: "单证", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: /查看合同/ })).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: /生成购销合同/ }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: /在线盖章/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "登记验货", exact: true }),
   ).toHaveCount(0);

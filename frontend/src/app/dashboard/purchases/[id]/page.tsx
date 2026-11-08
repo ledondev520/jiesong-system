@@ -695,9 +695,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     { label: "含税合计", value: grossText },
     {
       label: "已付/应付",
-      value: payable
-        ? `${yuan(contract.paidAmount)} / ${grossText}`
-        : null,
+      value: payable ? `${yuan(contract.paidAmount)} / ${grossText}` : null,
     },
   ];
 
@@ -833,10 +831,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
       <div className="grid gap-3 sm:grid-cols-3">
         <KpiStat label="合同含税金额" value={grossText} />
         <div className="space-y-2">
-          <KpiStat
-            label="已付金额"
-            value={yuan(contract.paidAmount)}
-          />
+          <KpiStat label="已付金额" value={yuan(contract.paidAmount)} />
           {payable && !moneyHidden && (
             <Progress
               value={paidPercent}
@@ -1050,8 +1045,10 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                     amount={{
                       label: "含税小计",
                       value: yuan(
-                        calculatePurchaseLineAmounts(item, amountSummary.taxRate)
-                          .grossAmount,
+                        calculatePurchaseLineAmounts(
+                          item,
+                          amountSummary.taxRate,
+                        ).grossAmount,
                       ),
                       emphasis: "success",
                     }}

@@ -220,7 +220,11 @@ it("B55: 计数请求失败时 chip 显示「—」而不是 0，列表仍可用
 describe("WAREHOUSE 只看状态（OD-3）", () => {
   it("不显示金额列和卡片金额", async () => {
     useAuthStore.setState({ user: { id: "w", role: "WAREHOUSE" } as never });
-    const { totalAmount: _t, receivedAmount: _r, ...row } = reply("SC-W").data.items[0];
+    const {
+      totalAmount: _t,
+      receivedAmount: _r,
+      ...row
+    } = reply("SC-W").data.items[0];
     mocks.getAll.mockResolvedValue({
       data: { ...reply("SC-W").data, items: [row] },
     });

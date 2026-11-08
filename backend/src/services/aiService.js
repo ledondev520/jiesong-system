@@ -384,8 +384,9 @@ const buildChatApiResult = ({ response, model, tokenUsage, sessionId }) => ({
   model,
 });
 
-const resolveChatResult = async ({ userId, sessionId, message, imageUrl, useThinking, onChunk, onThinking }) => {
+const resolveChatResult = async ({ userId, sessionId, message, imageUrl, useThinking, onChunk, onThinking, role }) => {
   const result = await runChatSession({
+    role,
     userId,
     sessionId,
     message,
@@ -445,6 +446,7 @@ const getConfiguredModels = async () => {
 };
 
 const runChatSession = async ({
+  role,
   userId,
   sessionId,
   message,
@@ -457,6 +459,7 @@ const runChatSession = async ({
   const { defaultModel, thinkingModel } = await getConfiguredModels();
 
   const { messages, model } = await buildChatSession({
+    role,
     userId,
     sessionId,
     message,
@@ -516,8 +519,9 @@ const runChatSession = async ({
  * @param {string} imageUrl - 图片URL（可选）
  * @returns {Object} AI响应
  */
-const chat = async (userId, sessionId, message, imageUrl = null) => {
+const chat = async (userId, sessionId, message, imageUrl = null, role = null) => {
   const result = await resolveChatResult({
+    role,
     userId,
     sessionId,
     message,
@@ -544,8 +548,9 @@ const chat = async (userId, sessionId, message, imageUrl = null) => {
  * @param {function} onThinking - 思考过程的回调函数（可选）
  * @returns {Object} 最终结果
  */
-const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk, onThinking = null) => {
+const chatStream = async (userId, sessionId, message, imageUrl = null, onChunk, onThinking = null, role = null) => {
   return resolveChatResult({
+    role,
     userId,
     sessionId,
     message,

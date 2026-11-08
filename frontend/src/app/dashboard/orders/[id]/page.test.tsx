@@ -203,7 +203,9 @@ const PACKING_CONTRACT = {
 describe("OrderDetailPage 交互逻辑", () => {
   beforeEach(() => {
     // 单证菜单在角色未知时不渲染动作；真实应用里已登录用户总有角色
-    useAuthStore.setState({ user: { id: "synthetic", role: "ADMIN" } as never });
+    useAuthStore.setState({
+      user: { id: "synthetic", role: "ADMIN" } as never,
+    });
     mockIsMobile.mockReturnValue(false);
     mockSearch = new URLSearchParams("tab=container");
     mockGetById.mockReset();

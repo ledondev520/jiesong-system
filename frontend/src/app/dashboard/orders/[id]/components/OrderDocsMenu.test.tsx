@@ -26,11 +26,17 @@ const visibleFor = async (role?: string) => {
 
 describe("OrderDocsMenu ROLE_ACTIONS", () => {
   it("PURCHASE 没有报关单草稿（OD-1）", async () => {
-    expect(await visibleFor("PURCHASE")).toEqual(["packingCheck", "exportWorkbook"]);
+    expect(await visibleFor("PURCHASE")).toEqual([
+      "packingCheck",
+      "exportWorkbook",
+    ]);
   });
 
   it("WAREHOUSE 只有报关单草稿与装箱核对", async () => {
-    expect(await visibleFor("WAREHOUSE")).toEqual(["customsDraft", "packingCheck"]);
+    expect(await visibleFor("WAREHOUSE")).toEqual([
+      "customsDraft",
+      "packingCheck",
+    ]);
   });
 
   it.each(["ADMIN", "SALES", "FINANCE"])("%s 看到全部动作", async (role) => {

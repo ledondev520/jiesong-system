@@ -50,7 +50,8 @@ describe("OrderDocsTab 未匹配 HS", () => {
 });
 
 describe("OrderDocsTab 处理未匹配 HS 按钮（R3 P1-3）", () => {
-  const button = () => screen.getByRole("button", { name: "处理未匹配 HS 编码" });
+  const button = () =>
+    screen.getByRole("button", { name: "处理未匹配 HS 编码" });
 
   it.each(["WAREHOUSE", "PURCHASE"])("%s 不可用", (role) => {
     renderTab(["水杯"], role);
