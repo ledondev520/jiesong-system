@@ -76,3 +76,29 @@ test('auditLog: 供应商银行路由字段只记变更不记明文', async () =
     prisma.operationLog.create = originalCreate;
   }
 });
+
+test('auditLog: 出口合同提单号 blNo 的变更进入审计（A86）', async () => {
+  const mod = require('./auditLog');
+  const originalCreate = prisma.operationLog.create;
+  let captured = null;
+  prisma.operationLog.create = async ({ data }) => {
+    captured = data;
+    return data;
+  };
+  try {
+    await mod.logOperation({
+      userId: 'user-1',
+      action: 'UPDATE',
+      entity: 'SalesContract',
+      entityId: 'sc-1',
+      oldValue: { blNo: 'BL-OLD-1', note: '不变' },
+      newValue: { blNo: 'BL-NEW-2', note: '不变' },
+    });
+    assert.match(captured.oldValue || '', /BL-OLD-1/);
+    assert.match(captured.newValue || '', /BL-NEW-2/);
+    // 命中审计字段清单时只记变更字段（blNo 不在清单里时会整条记录落库，含未变的 note）。
+    assert.doesNotMatch(captured.newValue || '', /不变/);
+  } finally {
+    prisma.operationLog.create = originalCreate;
+  }
+});
