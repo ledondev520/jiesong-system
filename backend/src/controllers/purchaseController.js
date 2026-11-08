@@ -35,6 +35,19 @@ const purchaseInvoiceService = require('../services/purchaseInvoiceService');
 const { roundMoney } = require('../utils/money');
 const { redactNestedSuppliers } = require('../agent/commands/supplier/bankFields');
 const { keepStoredPrices } = require('../utils/warehousePurchasePrices');
+const { parseListSort } = require('../utils/listSort');
+
+// A85：列表可排序列白名单。金额列不对 WAREHOUSE 开放（OD-3：按看不到的金额排序等于泄露大小）。
+const PURCHASE_SORT_COLUMNS = {
+  contractNo: (dir) => ({ contractNo: dir }),
+  supplier: (dir) => ({ supplier: { name: dir } }),
+  signedAt: (dir) => ({ signedAt: dir }),
+  status: (dir) => ({ status: dir }),
+};
+const PURCHASE_MONEY_SORT_COLUMNS = {
+  totalAmount: (dir) => ({ totalAmount: dir }),
+  paidAmount: (dir) => ({ paidAmount: dir }),
+};
 
 /**
  * 职责：检查商品价格是否高于历史均价并生成警告
@@ -117,6 +130,12 @@ const list = async (req, res, next) => {
       ];
     }
     
+    const orderBy = parseListSort(
+      req.query,
+      req.user?.role === 'WAREHOUSE' ? PURCHASE_SORT_COLUMNS : { ...PURCHASE_SORT_COLUMNS, ...PURCHASE_MONEY_SORT_COLUMNS },
+      [{ contractNo: 'desc' }],
+    );
+
     const [contracts, total, statusCounts, stores] = await Promise.all([
       prisma.purchaseContract.findMany({
         where,
@@ -154,7 +173,7 @@ const list = async (req, res, next) => {
                 },
               },
             },
-        orderBy: { contractNo: 'desc' }, // 按合同编号倒序
+        orderBy, // 默认按合同编号倒序；sortBy/sortDir 在分页前排序（A85）
       }),
       prisma.purchaseContract.count({ where }),
       prisma.purchaseContract.groupBy({ by: ['status'], _count: { _all: true } }),

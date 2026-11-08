@@ -9,6 +9,8 @@ export const inventoryService = {
     storeId?: string;
     lotNo?: string;
     binLocation?: string;
+    sortBy?: string;
+    sortDir?: "asc" | "desc";
     lite?: boolean;
   }) => {
     // 库存由验货与发运实时改变，不复用默认三分钟 GET 缓存。
