@@ -172,3 +172,38 @@ test('A63：销售列表 CSV/PDF 对 DERIVED 合同扣除第三方装箱货值�
   const pdf = (await exportSystemDataRows('sales', {}, { includeMoney: true })).rows[0];
   assert.deepEqual(pdf.slice(1, 4), ['700.00', '300.00', '400.00']);
 });
+
+test('A69/A63-F1：采购 Excel 导出 includeMoney 缺省即无总金额列（fail closed）', async (t) => {
+  stubPrisma(t, prisma.purchaseContract, 'findMany', async () => [{
+    contractNo: 'CG-1', supplier: { name: '合成供应商' }, signedAt: new Date('2026-01-01T00:00:00Z'),
+    totalAmount: 98765, status: 'DRAFT', note: '',
+  }]);
+  const xlsx = require('xlsx');
+  const { exportPurchasesExcel } = require('./purchaseImportExportService');
+  const read = async (opts) => {
+    const wb = xlsx.read((await exportPurchasesExcel({}, opts)).buffer, { type: 'buffer' });
+    return xlsx.utils.sheet_to_json(wb.Sheets['采购合同'])[0];
+  };
+  const def = await read(undefined);
+  assert.equal('总金额' in def, false);
+  assert.ok(!JSON.stringify(def).includes('98765'));
+  assert.equal((await read({ includeMoney: false }))['总金额'], undefined);
+  assert.equal((await read({ includeMoney: true }))['总金额'], 98765);
+});
+
+test('A69/A63-F3：销售列表导出已收封顶到自有额（owned 600 / received 900），CSV 与 PDF 一致', async (t) => {
+  const capped = {
+    ...CONTRACTS[0], totalAmount: 1000, receivedAmount: 900, amountSource: 'DERIVED',
+    packingItems: [
+      { totalPrice: 600, isOwnedByJiesong: true, note: null },
+      { totalPrice: 400, isOwnedByJiesong: false, note: null },
+    ],
+  };
+  stubPrisma(t, prisma.salesContract, 'findMany', async () => [capped]);
+  const { exportData } = require('./exportService');
+  const { exportSystemDataRows } = require('./pdfExportService');
+  const csv = (await exportData('sales', {}, { includeMoney: true })).data.split('\n')[1].replace(/"/g, '').split(',');
+  assert.deepEqual(csv.slice(1, 4).map(Number), [600, 600, 0]);
+  const pdf = (await exportSystemDataRows('sales', {}, { includeMoney: true })).rows[0];
+  assert.deepEqual(pdf.slice(1, 4), ['600.00', '600.00', '0.00']);
+});
