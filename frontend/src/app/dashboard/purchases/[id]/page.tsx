@@ -628,6 +628,9 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   // OD-2/OD-3：WAREHOUSE 服务端已剥离金额与发票号，页面显示「无权查看」，绝不把缺失值显示成 ¥0
   const moneyHidden = userRole === "WAREHOUSE";
   const yuan = (value: number) =>
+    moneyHidden ? HIDDEN_MONEY : `¥${value.toLocaleString()}`;
+  // 明细表（#211 润色）沿用 formatMoney/formatUnitPrice，WAREHOUSE 同样显示「无权查看」
+  const yuanFmt = (value: number) =>
     moneyHidden ? HIDDEN_MONEY : formatMoney(value, "CNY");
   const yuanUnit = (value: number) =>
     moneyHidden ? HIDDEN_MONEY : formatUnitPrice(value, "CNY");
@@ -1154,7 +1157,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
                             {yuanUnit(Number(item.unitPrice) || 0)}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm font-medium tabular-nums">
-                            {yuan(
+                            {yuanFmt(
                               calculatePurchaseLineAmounts(
                                 item,
                                 amountSummary.taxRate,
