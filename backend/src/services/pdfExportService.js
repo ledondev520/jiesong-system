@@ -15,7 +15,7 @@ const { createError } = require('../middleware/errorHandler');
 const { calculateTaxSummary } = require('./taxCalculationEngine');
 const { getExportReadiness } = require('./exportReadinessService');
 const { outstandingOf } = require('./payablesService');
-const { getOwnedReceivableUsd, getEffectiveSalesReceived, getOutstandingReceivableUsd } = require('./salesContractAmount');
+const { getOwnedReceivableUsd, getEffectiveSalesReceived, getOutstandingReceivableUsd, SALES_OWNED_AMOUNT_SELECT } = require('./salesContractAmount');
 
 const DEFAULT_LOGO_PATH = path.join(__dirname, '../../assets/pdf-logo.png');
 const DEFAULT_STAMP_PATH = path.join(__dirname, '../../assets/pdf-stamp.png');
@@ -336,7 +336,7 @@ const exportSalesContractPdf = async (contractId) => {
   };
 };
 
-const exportSystemDataRows = async (type, query = {}, { includeBank = false, includeMoney = true } = {}) => {
+const exportSystemDataRows = async (type, query = {}, { includeBank = false, includeMoney = false } = {}) => {
   switch (type) {
     case 'suppliers': {
       const suppliers = await prisma.supplier.findMany({
@@ -427,6 +427,7 @@ const exportSystemDataRows = async (type, query = {}, { includeBank = false, inc
       const contracts = await prisma.salesContract.findMany({
         include: {
           items: { include: { product: true, store: true } },
+          packingItems: SALES_OWNED_AMOUNT_SELECT.packingItems, // B87 口径需要装箱归属
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -436,9 +437,9 @@ const exportSystemDataRows = async (type, query = {}, { includeBank = false, inc
         rows: contracts.map((item) => [
           item.contractNo,
           ...(includeMoney ? [
-            formatMoney(item.totalAmount),
-            formatMoney(item.receivedAmount),
-            formatMoney((item.totalAmount || 0) - (item.receivedAmount || 0)),
+            formatMoney(getOwnedReceivableUsd(item)),
+            formatMoney(getEffectiveSalesReceived(item)),
+            formatMoney(getOutstandingReceivableUsd(item)),
           ] : []),
           formatMoney(item.exchangeRate),
           item.status || '',
