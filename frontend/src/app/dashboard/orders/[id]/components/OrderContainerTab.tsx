@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import type { Inventory, PackingItem, Product, SalesContract } from "@/types";
 import { salesService } from "@/services/sales.service";
 import { Button } from "@/components/ui/button";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
   Card,
   CardContent,
@@ -76,6 +77,7 @@ export function OrderContainerTab({
   onChanged: () => void;
 }) {
   const [editingItem, setEditingItem] = useState<PackingItem | null>(null);
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const packingRows = contract.packingItems ?? [];
   const { readiness, summary, plan, totals, hasShipped, isBlocking } = result;
   const spec = plan?.container;
@@ -101,8 +103,14 @@ export function OrderContainerTab({
     onItemDialogOpenChange(true);
   };
 
-  const handleDelete = async (itemId: string) => {
-    if (!confirm("确定要删除这个商品吗？")) return;
+  const handleDelete = (itemId: string) => {
+    setDeletingItemId(itemId);
+  };
+
+  const confirmDelete = async () => {
+    const itemId = deletingItemId;
+    setDeletingItemId(null);
+    if (!itemId) return;
     try {
       await salesService.removePackingItem(contract.id, itemId);
       toast.success("商品已删除");
@@ -274,6 +282,17 @@ export function OrderContainerTab({
           )}
         </CardContent>
       </Card>
+
+      <ConfirmActionDialog
+        open={deletingItemId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletingItemId(null);
+        }}
+        title="确认删除装箱商品？"
+        description="删除后该商品将从当前装柜明细中移除，确认后立即生效。"
+        confirmLabel="删除"
+        onConfirm={() => void confirmDelete()}
+      />
 
       {itemDialogOpen && (
         <PackingItemDialog

@@ -8,6 +8,7 @@
 
 import { LoadingValue } from "@/components/ui/loading-value";
 import { orMissing } from "@/lib/missing-value";
+import { formatDate } from "@/lib/date-format";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import {
   useCallback,
@@ -405,7 +406,7 @@ export function TaxRefundWorkbench() {
               setKeyword(event.target.value);
               setPage(1);
             }}
-            placeholder="搜索 EXP、报关单号、退税单号或问题"
+            placeholder="搜索出口订单号、报关单号、退税单号..."
           />
           {keyword && (
             <Button
@@ -546,9 +547,7 @@ export function TaxRefundWorkbench() {
                 { label: "缺失发票", value: item.invoiceSummary.missing },
                 {
                   label: "出货日期",
-                  value: item.shippedAt
-                    ? new Date(item.shippedAt).toLocaleDateString("zh-CN")
-                    : "未登记",
+                  value: formatDate(item.shippedAt),
                 },
               ]}
               amount={{
@@ -620,10 +619,10 @@ export function TaxRefundWorkbench() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table>
+            <Table framed={false}>
               <TableHeader>
                 <TableRow>
-                  <TableHead>出口合同</TableHead>
+                  <TableHead>出口订单</TableHead>
                   <TableHead>当前阶段</TableHead>
                   <TableHead>报关单</TableHead>
                   <TableHead>发票核验</TableHead>
@@ -675,11 +674,9 @@ export function TaxRefundWorkbench() {
                         >
                           {item.contractNo}
                         </button>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs tabular-nums text-muted-foreground">
                           {item.shippedAt
-                            ? new Date(item.shippedAt).toLocaleDateString(
-                                "zh-CN",
-                              )
+                            ? formatDate(item.shippedAt)
                             : "未登记出货日期"}
                           {isHistorical(item, filingMonth) && (
                             <Badge variant="outline" className="ml-1.5">

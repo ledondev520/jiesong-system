@@ -35,12 +35,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TableRowsSkeleton } from "@/components/ui/data-state";
 import { MobileListCard } from "@/components/mobile";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { QuoteStatusBadge } from "./QuoteStatusBadge";
 
 const dateOnly = (value: string | null | undefined) =>
-  value?.slice(0, 10) || "-";
+  value?.slice(0, 10) || "—";
 
 export function QuoteListPageContent() {
   const router = useRouter();
@@ -176,7 +177,7 @@ export function QuoteListPageContent() {
                 />
               }
               fields={[
-                { label: "门店数", value: String(quote._count?.items ?? 0) },
+                { label: "商品行数", value: String(quote._count?.items ?? 0) },
                 { label: "有效期", value: dateOnly(quote.validUntil) },
               ]}
               amount={{ label: "金额", value: formatUsd(quote.totalAmount) }}
@@ -188,12 +189,12 @@ export function QuoteListPageContent() {
 
       <Card className="surface-panel hidden overflow-hidden md:block">
         <CardContent className="px-0">
-          <Table>
+          <Table framed={false}>
             <TableHeader>
               <TableRow>
                 <TableHead>编号</TableHead>
                 <TableHead>客户</TableHead>
-                <TableHead className="text-right">行数</TableHead>
+                <TableHead className="text-right">商品行数</TableHead>
                 <TableHead className="text-right">金额</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>有效期</TableHead>
@@ -202,14 +203,7 @@ export function QuoteListPageContent() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="py-14 text-center text-muted-foreground"
-                  >
-                    加载中...
-                  </TableCell>
-                </TableRow>
+                <TableRowsSkeleton columns={7} />
               ) : quotes.length === 0 ? (
                 <TableRow>
                   <TableCell
@@ -230,7 +224,7 @@ export function QuoteListPageContent() {
                     <TableCell className="font-medium">
                       {quote.quoteNo}
                     </TableCell>
-                    <TableCell>{quote.customer?.name ?? "-"}</TableCell>
+                    <TableCell>{quote.customer?.name ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       {quote._count?.items ?? 0}
                     </TableCell>

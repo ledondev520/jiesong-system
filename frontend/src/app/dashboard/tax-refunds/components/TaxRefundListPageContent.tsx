@@ -320,10 +320,16 @@ export function TaxRefundListPageContent() {
         onValueChange={handleViewChange}
         className="space-y-6"
       >
-        <TabsList className="grid w-full max-w-xl grid-cols-3 border bg-background">
-          <TabsTrigger value="customs">报关单</TabsTrigger>
-          <TabsTrigger value="workbench">退税工作台</TabsTrigger>
-          <TabsTrigger value="refunds">退税记录</TabsTrigger>
+        <TabsList variant="line">
+          <TabsTrigger value="customs" variant="line">
+            报关单
+          </TabsTrigger>
+          <TabsTrigger value="workbench" variant="line">
+            退税工作台
+          </TabsTrigger>
+          <TabsTrigger value="refunds" variant="line">
+            退税记录
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="workbench" className="mt-0">
@@ -453,7 +459,7 @@ export function TaxRefundListPageContent() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-0">
-              <Table>
+              <Table framed={false}>
                 <TableHeader>
                   <TableRow>
                     <SortableTableHead

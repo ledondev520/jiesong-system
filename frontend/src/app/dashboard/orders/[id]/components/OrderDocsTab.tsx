@@ -9,6 +9,7 @@ import { useMemo } from "react";
 import { AlertTriangle, FileSpreadsheet } from "lucide-react";
 import type { SalesContract } from "@/types";
 import type { ContractFile } from "@/services/contractFile.service";
+import { formatMoney } from "@/lib/format";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import ContractFiles from "@/components/contract/ContractFiles";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -135,27 +136,27 @@ export function OrderDocsTab({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table framed={false}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>HS 编码</TableHead>
                     <TableHead>商品名称</TableHead>
                     <TableHead className="text-right">数量</TableHead>
-                    <TableHead className="text-right">总价 ($)</TableHead>
+                    <TableHead className="text-right">总价 (USD)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {hsCodeList.map((item) => (
                     <TableRow key={`${item.hsCode}-${item.productName}`}>
-                      <TableCell className="font-mono text-sm font-medium">
+                      <TableCell className="font-mono text-xs font-medium">
                         {item.hsCode}
                       </TableCell>
                       <TableCell>{item.productName}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right tabular-nums">
                         {item.quantity.toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right font-medium">
-                        ${item.totalPrice.toLocaleString()}
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {formatMoney(item.totalPrice, "USD")}
                       </TableCell>
                     </TableRow>
                   ))}

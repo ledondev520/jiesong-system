@@ -216,7 +216,7 @@ function OrdersList() {
     {
       key: "status",
       header: "状态",
-      cell: (order) => <StatusBadge status={order.status} />,
+      cell: (order) => <StatusBadge status={order.status} domain="salesOrder" />,
       hideable: false,
     },
     {
@@ -255,14 +255,14 @@ function OrdersList() {
     <div className="space-y-5">
       <PageHeader
         title="出口订单"
-        description="一张订单 = 客户 + 多个门店；点击订单号进入详情"
+        description="管理客户出口订单、装柜发运进度与单证归档"
         actions={
           <BusinessWrite>
             <Button
               className="h-10 rounded-xl"
               onClick={() => router.push("/dashboard/orders/new")}
             >
-              <Plus className="mr-2 h-4 w-4" /> 新建订单
+              <Plus className="mr-2 h-4 w-4" /> 新建出口订单
             </Button>
           </BusinessWrite>
         }
@@ -296,7 +296,7 @@ function OrdersList() {
               <CardContent className="space-y-1 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-semibold">{order.contractNo}</p>
-                  <StatusBadge status={order.status} />
+                  <StatusBadge status={order.status} domain="salesOrder" />
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {order.stores?.length ? order.stores.join("、") : "—"} ·{" "}

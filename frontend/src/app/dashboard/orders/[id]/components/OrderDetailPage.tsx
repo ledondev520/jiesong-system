@@ -39,7 +39,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import { formatDate } from "@/lib/date-format";
 import type { LoadingPlan } from "@/lib/containerLoading";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { RecordHeader } from "@/components/layout/RecordHeader";
 import { Button } from "@/components/ui/button";
 import {
   StatusBadge,
@@ -330,13 +330,18 @@ export function OrderDetailPage({ id }: { id: string }) {
 
   return (
     <div className="min-w-0 space-y-6 pb-10">
-      <PageHeader
-        title={contract.contractNo}
-        description={`目的港: ${contract.port?.name || "未指定"} | 签订: ${formatDate(contract.signedAt)} | 预计到达: ${formatDate(contract.estimatedArrival)}`}
+      <RecordHeader
+        number={contract.contractNo}
         backHref="/dashboard/orders"
-        actions={
+        status={<StatusBadge status={contract.status} domain="salesOrder" />}
+        facts={[
+          { label: "客户", value: contract.customer?.name },
+          { label: "目的港", value: contract.port?.name },
+          { label: "签订", value: formatDate(contract.signedAt) },
+          { label: "预计到港", value: formatDate(contract.estimatedArrival) },
+        ]}
+        primaryAction={
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={contract.status} domain="salesOrder" />
             <BusinessWrite>
               <OrderDocsMenu onSelect={runDocAction} role={role} />
             </BusinessWrite>
@@ -375,11 +380,11 @@ export function OrderDetailPage({ id }: { id: string }) {
 
       <Tabs value={activeTab} onValueChange={changeTab} className="min-w-0">
         <div className="overflow-x-auto pb-1">
-          <TabsList>
+          <TabsList variant="line">
             {ORDER_TABS.filter(
               (tab) => canViewFinance || !FINANCE_TABS.includes(tab.value),
             ).map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value}>
+              <TabsTrigger key={tab.value} value={tab.value} variant="line">
                 {tab.label}
               </TabsTrigger>
             ))}

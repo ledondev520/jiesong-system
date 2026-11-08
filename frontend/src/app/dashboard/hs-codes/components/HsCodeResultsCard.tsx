@@ -125,7 +125,7 @@ export function HsCodeResultsCard({
                           (keyword.trim() || hsCodeInput.trim()) &&
                           record.similarity !== undefined && (
                             <p className="text-xs text-muted-foreground">
-                              置信分：{Math.round(record.similarity * 100)} 分
+                              匹配度：{Math.round(record.similarity * 100)}%
                             </p>
                           )}
                         <Button
@@ -141,8 +141,8 @@ export function HsCodeResultsCard({
                 ))}
               </div>
 
-              <div className="hidden overflow-hidden rounded-md border md:block">
-                <Table>
+              <div className="hidden overflow-hidden rounded-xl border md:block">
+                <Table framed={false}>
                   <TableHeader>
                     <TableRow>
                       <SortableTableHead
@@ -152,7 +152,7 @@ export function HsCodeResultsCard({
                         onSort={sort.onSort}
                         className="w-[120px]"
                       >
-                        HSCode
+                        HS 编码
                       </SortableTableHead>
                       <SortableTableHead
                         sortKey="productName"
@@ -164,7 +164,7 @@ export function HsCodeResultsCard({
                         商品名称
                       </SortableTableHead>
                       {isFuzzy && (keyword.trim() || hsCodeInput.trim()) && (
-                        <TableHead className="w-[76px]">置信分</TableHead>
+                        <TableHead className="w-[76px]">匹配度</TableHead>
                       )}
                       <TableHead className="w-[60px]">单位</TableHead>
                       <SortableTableHead
@@ -215,15 +215,15 @@ export function HsCodeResultsCard({
                                 }
                                 className="text-xs tabular-nums"
                               >
-                                {Math.round(record.similarity * 100)} 分
+                                {Math.round(record.similarity * 100)}%
                               </Badge>
                             ) : (
-                              "-"
+                              "—"
                             )}
                           </TableCell>
                         )}
                         <TableCell className="text-xs">
-                          {record.unit || "-"}
+                          {record.unit || "—"}
                         </TableCell>
                         <TableCell className="text-xs">
                           {formatPercent(record.refundRate)}
