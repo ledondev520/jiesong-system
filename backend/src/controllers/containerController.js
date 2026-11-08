@@ -9,6 +9,7 @@
 const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const containerService = require('../services/containerService');
+const { redactSalesContract } = require('../utils/warehouseRedaction');
 
 const list = async (req, res, next) => {
   try {
@@ -43,7 +44,7 @@ const getById = async (req, res, next) => {
 const create = async (req, res, next) => {
   try {
     const contract = await containerService.create(req.body || {});
-    created(res, contract, '货柜创建成功');
+    created(res, redactSalesContract(req.user?.role, contract), '货柜创建成功');
   } catch (error) {
     next(error);
   }
@@ -53,7 +54,7 @@ const update = async (req, res, next) => {
   try {
     const { id } = req.params;
     const contract = await containerService.update(id, req.body || {});
-    success(res, contract, '货柜更新成功');
+    success(res, redactSalesContract(req.user?.role, contract), '货柜更新成功');
   } catch (error) {
     next(error);
   }
@@ -100,7 +101,7 @@ const updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     const contract = await containerService.updateStatus(id, req.body?.status);
-    success(res, contract, '状态更新成功');
+    success(res, redactSalesContract(req.user?.role, contract), '状态更新成功');
   } catch (error) {
     next(error);
   }

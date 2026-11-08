@@ -55,4 +55,11 @@ const stripPacking = (node) => {
 };
 const redactPackingSecrets = (role, data) => (role === 'WAREHOUSE' ? stripPacking(data) : data);
 
-module.exports = { MONEY_KEYS, redactWarehouseMoney, redactPackingSecrets, warehouseMoneyRedaction };
+// OD-3/OD-7：销售合同行（读与写响应共用）对 WAREHOUSE 只留状态，去掉合同总额、已收金额与收款记录。
+const redactSalesContract = (role, contract) => {
+  if (role !== 'WAREHOUSE' || !contract || typeof contract !== 'object') return contract;
+  const { totalAmount, receivedAmount, payments, ...rest } = contract;
+  return stripPacking(rest);
+};
+
+module.exports = { MONEY_KEYS, redactWarehouseMoney, redactPackingSecrets, redactSalesContract, warehouseMoneyRedaction };
