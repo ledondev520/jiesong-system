@@ -90,16 +90,16 @@ export function HeaderNotifications() {
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
-          className="relative h-11 w-11 rounded-md"
+          className="relative h-11 w-11 rounded-md md:h-9 md:w-9"
         >
-          <Bell className="h-5 w-5" />
+          <Bell className="h-4 w-4" />
           <span className="sr-only">通知</span>
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -right-1 -top-1 h-5 min-w-[20px] px-1.5 text-[11px]"
+              className="absolute -right-1 -top-1 h-5 min-w-[20px] px-1.5 text-xs"
             >
               {unreadCount > 99 ? "99+" : unreadCount}
             </Badge>

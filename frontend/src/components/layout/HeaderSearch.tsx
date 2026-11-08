@@ -54,7 +54,7 @@ const getTypeLabel = (type: DashboardSearchResultType) => {
     case "purchase":
       return "采购";
     case "sales":
-      return "出口合同";
+      return "出口订单";
   }
 };
 
@@ -142,14 +142,14 @@ export function HeaderSearch() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="搜索商品、供应商、合同"
-        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-input bg-background hover:bg-accent md:h-auto md:w-56 md:justify-start md:border-0 lg:w-64 xl:w-80"
+        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-input bg-background hover:bg-accent md:h-9 md:w-56 md:justify-start md:border-0 lg:w-64 xl:w-80 @3xl/main:w-64 @5xl/main:w-72"
       >
         <Search className="h-5 w-5 text-muted-foreground md:absolute md:left-3 md:top-1/2 md:h-4 md:w-4 md:-translate-y-1/2" />
-        <div className="hidden h-10 w-full min-w-0 items-center rounded-lg border border-input/80 bg-muted/50 pl-9 pr-3 text-sm text-muted-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-muted md:flex">
+        <div className="hidden h-9 w-full min-w-0 items-center rounded-md border border-border bg-muted/40 pl-9 pr-2.5 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-muted md:flex">
           <span className="min-w-0 flex-1 truncate text-left">
-            搜索商品、供应商、合同...
+            搜索商品、供应商、订单...
           </span>
-          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 sm:inline-flex">
+          <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-xs font-medium opacity-100 sm:inline-flex">
             <span className="text-xs">⌘</span>K
           </kbd>
         </div>
@@ -200,7 +200,7 @@ export function HeaderSearch() {
                           </div>
                         )}
                       </div>
-                      <span className="shrink-0 rounded border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                      <span className="shrink-0 rounded border px-1.5 py-0.5 text-xs text-muted-foreground">
                         {getTypeLabel(result.type)}
                       </span>
                     </CommandItem>

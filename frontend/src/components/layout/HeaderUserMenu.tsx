@@ -93,7 +93,8 @@ export function HeaderUserMenu({
   onSaveProfile,
   onLogout,
 }: HeaderUserMenuProps) {
-  const resolvedDisplayName = displayName || "管理员";
+  const resolvedDisplayName =
+    displayName?.trim() || username?.trim() || "当前用户";
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogKey, setDialogKey] = useState(0);
   const [preferences, setPreferences] =
@@ -121,7 +122,7 @@ export function HeaderUserMenu({
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
-            className="h-11 gap-2 rounded-md px-2"
+            className="h-11 gap-2 rounded-md px-2 md:h-9"
             aria-label="用户菜单"
           >
             <Avatar className="h-7 w-7 border">
@@ -149,7 +150,7 @@ export function HeaderUserMenu({
                 {username}
               </span>
               {lastLoginAt && (
-                <span className="text-[11px] font-normal text-muted-foreground/70 mt-0.5">
+                <span className="mt-0.5 text-xs font-normal text-muted-foreground/70">
                   最后登录:{" "}
                   {new Date(lastLoginAt).toLocaleString("zh-CN", {
                     month: "2-digit",
