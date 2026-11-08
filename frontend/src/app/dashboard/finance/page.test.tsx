@@ -198,6 +198,11 @@ describe("FinancePage 交互逻辑", () => {
         expect(screen.getByText("应付账款总额")).toBeInTheDocument();
         expect(screen.getByText("待收账款")).toBeInTheDocument();
         expect(screen.getByText(/当前客户剩余欠款/)).toBeInTheDocument();
+        // OD-5：两个应收口径并存，概览页的数字按合同表头口径，必须写明
+        expect(screen.getByText(/合同表头口径 · 完成率/)).toBeInTheDocument();
+        expect(
+          screen.getByText(/合同表头口径 · 当前客户剩余欠款/),
+        ).toBeInTheDocument();
         expect(screen.getByText("财务报表分析")).toBeInTheDocument();
         expect(
           screen.getByRole("link", { name: /查看报表分析/ }),
@@ -216,6 +221,23 @@ describe("FinancePage 交互逻辑", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("收支对比")).toBeInTheDocument();
     expect(screen.getByText("现金流预测")).toBeInTheDocument();
+  });
+
+  it("待收账款未超过50%时走正常分支：不显示「需跟进」与催办文案 (A62-F1)", async () => {
+    mockGetStats.mockResolvedValue({
+      payable: { total: 1200, paid: 400, unpaid: 800 },
+      receivable: { total: 3200, received: 2000, unreceived: 1200 },
+    });
+
+    render(<FinancePage />);
+
+    expect(
+      await screen.findByText("合同表头口径 · 当前客户剩余欠款", undefined, {
+        timeout: 5000,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/建议优先跟进/)).not.toBeInTheDocument();
+    expect(screen.queryByText("需跟进")).not.toBeInTheDocument();
   });
 
   it("SALES 不请求银行/发票统计，也看不到会得到 403 的报表/流水/发票入口", async () => {

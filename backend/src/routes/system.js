@@ -13,7 +13,6 @@ const { authenticate, roleAuth } = require('../middleware/auth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { tabularUpload } = require('../utils/tabularImport');
 const { withAuditLog } = require('../middleware/auditLog');
-const { createError } = require('../middleware/errorHandler');
 const { paymentsExportGuard } = require('../middleware/paymentsExportGuard');
 
 const router = Router();

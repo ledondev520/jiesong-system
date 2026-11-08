@@ -15,7 +15,7 @@ const fileService = require('../services/fileService');
 const taxRefundPreparationService = require('../services/taxRefundPreparationService');
 const salesFinanceService = require('../services/salesFinanceService');
 const exportPacketService = require('../services/exportPacketService');
-const { redactPackingSecrets } = require('../utils/warehouseRedaction');
+const { redactPackingSecrets, redactSalesContract } = require('../utils/warehouseRedaction');
 
 const list = async (req, res, next) => {
   try {
@@ -38,11 +38,7 @@ const getById = async (req, res, next) => {
   try {
     const contract = await salesService.getSalesContractById(req.params.id);
     // OD-3/OD-6：WAREHOUSE 详情同样只看状态，不含合同总额、已收金额与收款记录。
-    if (req.user?.role === 'WAREHOUSE') {
-      const { totalAmount, receivedAmount, payments, ...rest } = contract;
-      return success(res, redactPackingSecrets('WAREHOUSE', rest));
-    }
-    success(res, contract);
+    success(res, redactSalesContract(req.user?.role, contract));
   } catch (error) {
     next(error);
   }
@@ -93,7 +89,7 @@ const create = async (req, res, next) => {
       actor: req.authActor,
     });
 
-    created(res, contract, '出口合同创建成功');
+    created(res, redactSalesContract(req.user?.role, contract), '出口合同创建成功');
   } catch (error) {
     next(error);
   }
@@ -102,7 +98,7 @@ const create = async (req, res, next) => {
 const update = async (req, res, next) => {
   try {
     const contract = await salesService.updateSalesContract(req.params.id, req.body || {});
-    success(res, contract, '出口合同更新成功');
+    success(res, redactSalesContract(req.user?.role, contract), '出口合同更新成功');
   } catch (error) {
     next(error);
   }
@@ -165,7 +161,7 @@ const updateStatus = async (req, res, next) => {
     delete contract._revertInfo;
     delete contract._applyInfo;
 
-    success(res, contract, '状态更新成功');
+    success(res, redactSalesContract(req.user?.role, contract), '状态更新成功');
   } catch (error) {
     next(error);
   }

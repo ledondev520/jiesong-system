@@ -9,6 +9,7 @@
 const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const containerService = require('../services/containerService');
+const { redactSalesContract, redactPackingSecrets } = require('../utils/warehouseRedaction');
 
 const list = async (req, res, next) => {
   try {
@@ -25,7 +26,7 @@ const list = async (req, res, next) => {
       lite,
     });
 
-    paginated(res, items, total, page, pageSize);
+    paginated(res, items.map((c) => redactSalesContract(req.user?.role, c)), total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -34,7 +35,7 @@ const list = async (req, res, next) => {
 const getById = async (req, res, next) => {
   try {
     const contract = await containerService.getById(req.params.id);
-    success(res, contract);
+    success(res, redactSalesContract(req.user?.role, contract));
   } catch (error) {
     next(error);
   }
@@ -43,7 +44,7 @@ const getById = async (req, res, next) => {
 const create = async (req, res, next) => {
   try {
     const contract = await containerService.create(req.body || {});
-    created(res, contract, '货柜创建成功');
+    created(res, redactSalesContract(req.user?.role, contract), '货柜创建成功');
   } catch (error) {
     next(error);
   }
@@ -53,7 +54,7 @@ const update = async (req, res, next) => {
   try {
     const { id } = req.params;
     const contract = await containerService.update(id, req.body || {});
-    success(res, contract, '货柜更新成功');
+    success(res, redactSalesContract(req.user?.role, contract), '货柜更新成功');
   } catch (error) {
     next(error);
   }
@@ -71,7 +72,7 @@ const remove = async (req, res, next) => {
 const addItem = async (req, res, next) => {
   try {
     const item = await containerService.addItem(req.params.id, req.body || {});
-    created(res, item, '装箱明细添加成功');
+    created(res, redactPackingSecrets(req.user?.role, item), '装箱明细添加成功');
   } catch (error) {
     next(error);
   }
@@ -81,7 +82,7 @@ const updateItem = async (req, res, next) => {
   try {
     const { id, itemId } = req.params;
     const item = await containerService.updateItem(id, itemId, req.body || {});
-    success(res, item, '装箱明细更新成功');
+    success(res, redactPackingSecrets(req.user?.role, item), '装箱明细更新成功');
   } catch (error) {
     next(error);
   }
@@ -100,7 +101,7 @@ const updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     const contract = await containerService.updateStatus(id, req.body?.status);
-    success(res, contract, '状态更新成功');
+    success(res, redactSalesContract(req.user?.role, contract), '状态更新成功');
   } catch (error) {
     next(error);
   }
@@ -118,7 +119,7 @@ const getNextContainerNo = async (req, res, next) => {
 const getProducts = async (req, res, next) => {
   try {
     const items = await containerService.getProducts(req.params.id);
-    success(res, items);
+    success(res, redactPackingSecrets(req.user?.role, items));
   } catch (error) {
     next(error);
   }
@@ -127,7 +128,7 @@ const getProducts = async (req, res, next) => {
 const getVisualization = async (req, res, next) => {
   try {
     const visualization = await containerService.getVisualization(req.params.id);
-    success(res, visualization);
+    success(res, redactPackingSecrets(req.user?.role, visualization));
   } catch (error) {
     next(error);
   }
@@ -141,7 +142,7 @@ const getVisualization = async (req, res, next) => {
 const listItems = async (req, res, next) => {
   try {
     const items = await containerService.listItems(req.params.id);
-    success(res, items);
+    success(res, redactPackingSecrets(req.user?.role, items));
   } catch (error) {
     next(error);
   }
@@ -155,7 +156,7 @@ const listItems = async (req, res, next) => {
 const getItemsSummary = async (req, res, next) => {
   try {
     const summary = await containerService.getItemsSummary(req.params.id);
-    success(res, summary);
+    success(res, redactSalesContract(req.user?.role, summary));
   } catch (error) {
     next(error);
   }

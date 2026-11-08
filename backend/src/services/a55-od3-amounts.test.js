@@ -22,7 +22,7 @@ const CONTRACTS = [{
 test('OD-3：CSV 导出 WAREHOUSE 无金额列，其余角色保留', async (t) => {
   stubPrisma(t, prisma.salesContract, 'findMany', async () => CONTRACTS);
   const { exportData } = require('./exportService');
-  const full = (await exportData('sales', {})).data;
+  const full = (await exportData('sales', {}, { includeMoney: true })).data;
   assert.match(full, /总金额\(USD\)/);
   assert.match(full, /1234/);
   const wh = (await exportData('sales', {}, { includeMoney: false })).data;
@@ -35,7 +35,7 @@ test('OD-3：CSV 导出 WAREHOUSE 无金额列，其余角色保留', async (t) 
 test('OD-3：PDF 导出行 WAREHOUSE 无 Total/Received/Outstanding', async (t) => {
   stubPrisma(t, prisma.salesContract, 'findMany', async () => CONTRACTS);
   const { exportSystemDataRows } = require('./pdfExportService');
-  const full = await exportSystemDataRows('sales', {});
+  const full = await exportSystemDataRows('sales', {}, { includeMoney: true });
   assert.deepEqual(full.headers.slice(0, 4), ['Contract No.', 'Total', 'Received', 'Outstanding']);
   const wh = await exportSystemDataRows('sales', {}, { includeMoney: false });
   assert.deepEqual(wh.headers, ['Contract No.', 'Exchange Rate', 'Status', 'Signed At']);
@@ -144,4 +144,66 @@ test('OD-3/OD-6：GET /sales/:id 对 WAREHOUSE 去掉合同总额、已收金额
   assert.doesNotMatch(wh, /totalAmount|receivedAmount|payments/);
   assert.match(wh, /CONFIRMED/);
   assert.match(await run('SALES'), /totalAmount/);
+});
+
+test('A63：导出 includeMoney 缺省即无金额（fail closed）', async (t) => {
+  stubPrisma(t, prisma.salesContract, 'findMany', async () => CONTRACTS);
+  stubPrisma(t, prisma.purchaseContract, 'findMany', async () => []);
+  const { exportData } = require('./exportService');
+  const { exportSystemDataRows } = require('./pdfExportService');
+  assert.doesNotMatch((await exportData('sales', {})).data, /总金额|1234/);
+  assert.doesNotMatch((await exportData('purchases', {})).data, /总金额|已付金额/);
+  assert.deepEqual((await exportSystemDataRows('sales', {})).headers, ['Contract No.', 'Exchange Rate', 'Status', 'Signed At']);
+});
+
+test('A63：销售列表 CSV/PDF 对 DERIVED 合同扣除第三方装箱货值（B87 口径）', async (t) => {
+  const derived = {
+    ...CONTRACTS[0], totalAmount: 1000, receivedAmount: 300, amountSource: 'DERIVED',
+    packingItems: [
+      { totalPrice: 700, isOwnedByJiesong: true, note: null },
+      { totalPrice: 300, isOwnedByJiesong: false, note: null },
+    ],
+  };
+  stubPrisma(t, prisma.salesContract, 'findMany', async () => [derived]);
+  const { exportData } = require('./exportService');
+  const { exportSystemDataRows } = require('./pdfExportService');
+  const csv = (await exportData('sales', {}, { includeMoney: true })).data.split('\n')[1].replace(/"/g, '').split(',');
+  assert.deepEqual(csv.slice(1, 4).map(Number), [700, 300, 400]);
+  const pdf = (await exportSystemDataRows('sales', {}, { includeMoney: true })).rows[0];
+  assert.deepEqual(pdf.slice(1, 4), ['700.00', '300.00', '400.00']);
+});
+
+test('A69/A63-F1：采购 Excel 导出 includeMoney 缺省即无总金额列（fail closed）', async (t) => {
+  stubPrisma(t, prisma.purchaseContract, 'findMany', async () => [{
+    contractNo: 'CG-1', supplier: { name: '合成供应商' }, signedAt: new Date('2026-01-01T00:00:00Z'),
+    totalAmount: 98765, status: 'DRAFT', note: '',
+  }]);
+  const xlsx = require('xlsx');
+  const { exportPurchasesExcel } = require('./purchaseImportExportService');
+  const read = async (opts) => {
+    const wb = xlsx.read((await exportPurchasesExcel({}, opts)).buffer, { type: 'buffer' });
+    return xlsx.utils.sheet_to_json(wb.Sheets['采购合同'])[0];
+  };
+  const def = await read(undefined);
+  assert.equal('总金额' in def, false);
+  assert.ok(!JSON.stringify(def).includes('98765'));
+  assert.equal((await read({ includeMoney: false }))['总金额'], undefined);
+  assert.equal((await read({ includeMoney: true }))['总金额'], 98765);
+});
+
+test('A69/A63-F3：销售列表导出已收封顶到自有额（owned 600 / received 900），CSV 与 PDF 一致', async (t) => {
+  const capped = {
+    ...CONTRACTS[0], totalAmount: 1000, receivedAmount: 900, amountSource: 'DERIVED',
+    packingItems: [
+      { totalPrice: 600, isOwnedByJiesong: true, note: null },
+      { totalPrice: 400, isOwnedByJiesong: false, note: null },
+    ],
+  };
+  stubPrisma(t, prisma.salesContract, 'findMany', async () => [capped]);
+  const { exportData } = require('./exportService');
+  const { exportSystemDataRows } = require('./pdfExportService');
+  const csv = (await exportData('sales', {}, { includeMoney: true })).data.split('\n')[1].replace(/"/g, '').split(',');
+  assert.deepEqual(csv.slice(1, 4).map(Number), [600, 600, 0]);
+  const pdf = (await exportSystemDataRows('sales', {}, { includeMoney: true })).rows[0];
+  assert.deepEqual(pdf.slice(1, 4), ['600.00', '600.00', '0.00']);
 });
