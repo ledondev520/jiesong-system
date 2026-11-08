@@ -68,6 +68,13 @@ test('HTTP/SQLite: sortBy/sortDir sort before pagination, compose with filters a
   // Inventory.
   assert.deepEqual(await pages('/inventory?sortBy=quantity&sortDir=desc', 'quantity'), [50, 40, 30, 20, 10]);
   assert.deepEqual(await pages('/inventory?sortBy=quantity&sortDir=asc', 'quantity'), [10, 20, 30, 40, 50]);
+  // A83 columns (lot / bin) are sortable too.
+  const stock = await db.inventory.findMany({ orderBy: { quantity: 'asc' } });
+  for (const [index, row] of stock.entries()) {
+    await db.inventory.update({ where: { id: row.id }, data: { lotNo: `LOT-${5 - index}`, binLocation: `BIN-${index}` } });
+  }
+  assert.deepEqual(await pages('/inventory?sortBy=lotNo&sortDir=asc', 'lotNo'), ['LOT-1', 'LOT-2', 'LOT-3', 'LOT-4', 'LOT-5']);
+  assert.deepEqual(await pages('/inventory?sortBy=binLocation&sortDir=desc', 'binLocation'), ['BIN-4', 'BIN-3', 'BIN-2', 'BIN-1', 'BIN-0']);
   // Unknown column / direction -> 400 (never reaches Prisma); money columns closed to WAREHOUSE.
   assert.equal((await get('/purchases?sortBy=password')).status, 400);
   assert.equal((await get('/purchases?sortBy=totalAmount&sortDir=sideways')).status, 400);
