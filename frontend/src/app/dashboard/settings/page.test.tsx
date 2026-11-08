@@ -80,7 +80,7 @@ describe('SettingsPage 交互逻辑', () => {
     render(<SettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '系统配置' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '报价规则' })).toBeInTheDocument();
     });
   });
 

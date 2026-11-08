@@ -22,7 +22,7 @@ describe("AboutAgentPage", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "关于 Agent 使用" }),
+        screen.getByRole("heading", { name: "AI 接入" }),
       ).toBeInTheDocument();
       expect(
         screen.queryByRole("link", { name: "打开项目驾驶舱" }),

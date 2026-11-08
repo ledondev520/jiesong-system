@@ -143,8 +143,8 @@ export default function AboutAgentPage() {
   return (
     <div className="min-w-0 space-y-6 break-words">
       <PageHeader
-        title="关于 Agent 使用"
-        description="让内部同事的 Agent 用几句话或几条命令，就能接上这套系统。"
+        title="AI 接入"
+        description="配置远程 HTTP MCP 与本机 CLI，供内部 Agent 访问系统数据与工具。"
         actions={
           <Button asChild variant="outline">
             <Link href="/dashboard/settings/users">
@@ -168,8 +168,7 @@ export default function AboutAgentPage() {
               一套系统，两种接法：远程 Agent 与本机 Agent。
             </CardTitle>
             <CardDescription>
-              内部同事不需要理解数据库或后端实现，只需要知道系统地址和自己的账号密码，就可以让
-              Agent 去查询、录入、修改。
+              输入系统地址与账号密码即可接入 Agent，支持查询、录入与修改。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -197,7 +196,10 @@ export default function AboutAgentPage() {
               </div>
             </div>
             <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-              内部普通使用默认走“自己的账号密码 + 系统权限”。`Agent token`
+              内部普通使用默认走“自己的账号密码 + 系统权限”。
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                Agent token
+              </code>{" "}
               现在保留为高级模式，更适合长期无人值守的内部自动化。
             </div>
           </CardContent>
@@ -207,14 +209,26 @@ export default function AboutAgentPage() {
           <CardHeader>
             <CardTitle className="text-lg">接入前准备</CardTitle>
             <CardDescription>
-              管理员只要做这三步，内部 Agent 基本就能开始用了。
+              完成以下三步即可启用内部 Agent 接入。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="rounded-lg border p-3">
               <p className="font-medium text-foreground">1. 创建 Agent 账号</p>
               <p>
-                当前实现会自动赋予固定能力集：`search.read`、`purchase.create/update`、`supplier.create/update`。暂不支持在页面里逐项勾选权限。
+                当前实现会自动赋予固定能力集：
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                  search.read
+                </code>
+                、
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                  purchase.create/update
+                </code>
+                、
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                  supplier.create/update
+                </code>
+                。暂不支持在页面里逐项勾选权限。
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -292,7 +306,7 @@ export default function AboutAgentPage() {
           <CardHeader>
             <CardTitle className="text-lg">一句话提示词示例</CardTitle>
             <CardDescription>
-              给内部同事看的不是 API 文档，而是“怎么跟 Agent 说”。
+              支持通过自然语言向 Agent 下达查询、录入与修改指令。
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -311,8 +325,11 @@ export default function AboutAgentPage() {
             <div className="rounded-lg border p-3">
               <p className="font-medium">修改</p>
               <p className="text-muted-foreground">
-                把供应商 `supplier-1` 的联系人电话改成
-                13800000000，并保留其他字段不变。
+                把供应商{" "}
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                  supplier-1
+                </code>{" "}
+                的联系人电话改成 13800000000，并保留其他字段不变。
               </p>
             </div>
           </CardContent>
@@ -324,9 +341,7 @@ export default function AboutAgentPage() {
               <ShieldCheck className="h-5 w-5 text-primary" />
               使用提醒
             </CardTitle>
-            <CardDescription>
-              这部分建议直接发给内部同事，减少误用。
-            </CardDescription>
+            <CardDescription>接入配置与权限边界说明。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <div className="rounded-lg border p-3">
@@ -334,9 +349,15 @@ export default function AboutAgentPage() {
                 远程用 MCP，本机调 CLI。
               </p>
               <p>
-                如果 Agent 在别的机器、飞书桥接或 VPS 上运行，优先接 `{origin}
-                /mcp`。如果在本机做调试或脚本，优先用 `npm run agent:cli --
-                ...`。
+                如果 Agent 在远程服务器、飞书桥接或 VPS 上运行，优先接入{" "}
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                  {origin}/mcp
+                </code>
+                。如果在本机调试或运行脚本，优先使用{" "}
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                  npm run agent:cli -- ...
+                </code>
+                。
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -344,9 +365,11 @@ export default function AboutAgentPage() {
                 最快接入方式：一条命令安装本地桥。
               </p>
               <p>
-                直接复制上面的“一键安装命令”，填自己的用户名和密码后执行，会在本机安装
-                `jiesong-agent-mcp`，并自动换取 JWT，再通过 stdio 连接你 VPS
-                上的 HTTP MCP。
+                复制上方“一键安装命令”，填入用户名和密码后执行，即可在本机安装{" "}
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                  jiesong-agent-mcp
+                </code>{" "}
+                并自动换取 JWT，通过 stdio 连接远程 HTTP MCP。
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -372,8 +395,15 @@ export default function AboutAgentPage() {
                 先探活，再执行写操作。
               </p>
               <p>
-                推荐先跑 `tools/list` 或 `search`
-                确认配置无误，再做创建或修改，避免一上来就报 401/403。
+                推荐先调用{" "}
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                  tools/list
+                </code>{" "}
+                或{" "}
+                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                  search
+                </code>{" "}
+                确认配置无误，再执行创建或修改，避免直接触发 401/403。
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -393,7 +423,7 @@ export default function AboutAgentPage() {
             内部推广建议
           </CardTitle>
           <CardDescription>
-            如果你要让内部同事真的用起来，最先给他们的不是说明书，而是下面这三样。
+            向内部成员同步以下三项信息即可快速启用：
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3 text-sm text-muted-foreground">

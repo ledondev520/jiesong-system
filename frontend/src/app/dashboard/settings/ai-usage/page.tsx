@@ -404,7 +404,7 @@ export default function AiSessionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="AI 会话列表"
+        title="AI 用量"
         description="用量趋势见上图；下方用标签切换「聊天会话」与「其他 AI 调用」（含 HS 编码推荐）"
         actions={
           <Button
@@ -453,10 +453,14 @@ export default function AiSessionsPage() {
         />
         <div className="surface-panel overflow-hidden">
           <Tabs defaultValue="chat" className="gap-0">
-            <div className="border-b border-border/60 px-4 py-3">
-              <TabsList className="grid h-9 w-full max-w-md grid-cols-2">
-                <TabsTrigger value="chat">聊天会话</TabsTrigger>
-                <TabsTrigger value="standalone">其他 AI 调用</TabsTrigger>
+            <div className="border-b border-border/60 px-4 pt-2">
+              <TabsList variant="line">
+                <TabsTrigger variant="line" value="chat">
+                  聊天会话
+                </TabsTrigger>
+                <TabsTrigger variant="line" value="standalone">
+                  其他 AI 调用
+                </TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="chat" className="mt-0 outline-none">
