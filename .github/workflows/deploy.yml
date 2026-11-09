@@ -42,7 +42,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Verify deployment check behavior
-        run: node --test scripts/verify-vps-runtime.test.cjs scripts/deploy-ssh.test.cjs scripts/deploy-sh.test.cjs
+        run: node --test scripts/verify-vps-runtime.test.cjs scripts/deploy-ssh.test.cjs scripts/deploy-sh.test.cjs scripts/prune-deploy-snapshots.test.cjs
 
       - name: Install frontend dependencies
         working-directory: ./frontend
@@ -239,6 +239,10 @@ jobs:
               sudo nginx -t || exit 1
               sudo systemctl reload nginx
               node /opt/jiesong-system/scripts/verify-vps-runtime.cjs "$PRODUCTION_URL"
+              # Prune only after a verified deploy, so a failed one keeps every rollback point. Never fails the deploy.
+              if [ -n "$SNAP" ]; then
+                bash ../scripts/prune-deploy-snapshots.sh "${SNAP_DIR%/*}" || echo "snapshot prune failed; deploy unaffected" >&2
+              fi
             } </dev/null
           REMOTE
 

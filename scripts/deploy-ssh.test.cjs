@@ -12,7 +12,7 @@ const step = workflow.match(/^      - name: Deploy to Production via SSH\n[\s\S]
 assert.ok(step, 'cannot extract the production SSH run block');
 const runBlock = step[1].replace(/^          /gm, '');
 
-function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxTestStatus = 0, verifierStatus = 0, migrateStatus = 'ok', migrateDeployStatus = 0, databaseUrl = null, integrity = 'ok', gitStatus = 0 } = {}) {
+function runDeployment(t, { priorSnapshots = [], missingRuntime = false, missingGuard = false, nginxTestStatus = 0, verifierStatus = 0, migrateStatus = 'ok', migrateDeployStatus = 0, databaseUrl = null, integrity = 'ok', gitStatus = 0 } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'deploy-ssh-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const checkout = path.join(root, 'checkout');
@@ -32,6 +32,8 @@ function runDeployment(t, { missingRuntime = false, missingGuard = false, nginxT
   mkdirSync(path.join(root, 'scripts'), { mode: 0o700 });
   copyFileSync(path.join(repo, 'scripts/require-node-runtime.sh'), path.join(root, 'scripts/require-node-runtime.sh'));
   if (!missingGuard) copyFileSync(path.join(repo, 'scripts/require-node-runtime.sh'), path.join(checkout, 'scripts/require-node-runtime.sh'));
+  copyFileSync(path.join(repo, 'scripts/prune-deploy-snapshots.sh'), path.join(checkout, 'scripts/prune-deploy-snapshots.sh'));
+  for (const name of priorSnapshots) mkdirSync(path.join(root, 'backups', name), { recursive: true, mode: 0o700 });
   const executable = (filename, body) => writeFileSync(filename, `#!/bin/bash\nset -eu\n${body}\n`, { mode: 0o700 });
 
   // Map only the production checkout path; execute the extracted source unchanged.
@@ -254,6 +256,31 @@ test('pending migration takes a private, integrity-checked snapshot after the st
   assert.equal(statSync(path.join(backups, dir)).mode & 0o777, 0o700);
   assert.equal(statSync(path.join(backups, dir, 'premigrate.db')).mode & 0o777, 0o600);
   assert.match(result.stdout, /pre-migrate snapshot: .*auto-premigrate-test-sh-/);
+});
+
+const retentionFixture = () => [
+  ...Array.from({ length: 13 }, (_, i) => `auto-premigrate-abc1234-202601${String(i + 1).padStart(2, '0')}T000000Z`),
+  'pre-manual-backup',
+];
+
+test('a verified deploy with a new snapshot prunes old auto snapshots after verification', t => {
+  const result = runDeployment(t, { migrateStatus: 'pending', priorSnapshots: retentionFixture() });
+  assert.equal(result.status, 0, result.stderr);
+  const left = readdirSync(path.join(result.root, 'backups'));
+  assert.equal(left.filter(name => name.startsWith('auto-premigrate-')).length, 12);
+  assert.ok(left.includes('pre-manual-backup'));
+  assert.ok(left.some(name => name.startsWith('auto-premigrate-test-sh-')), 'new snapshot is kept');
+  assert.ok(!left.includes('auto-premigrate-abc1234-20260101T000000Z'), 'oldest is pruned');
+  assert.ok(!left.includes('auto-premigrate-abc1234-20260102T000000Z'), 'second oldest is pruned');
+});
+
+test('a failed verification or a deploy without a new snapshot prunes nothing', t => {
+  const failed = runDeployment(t, { migrateStatus: 'pending', verifierStatus: 7, priorSnapshots: retentionFixture() });
+  assert.notEqual(failed.status, 0);
+  assert.equal(readdirSync(path.join(failed.root, 'backups')).length, 15);
+  const noMigration = runDeployment(t, { priorSnapshots: retentionFixture() });
+  assert.equal(noMigration.status, 0, noMigration.stderr);
+  assert.equal(readdirSync(path.join(noMigration.root, 'backups')).length, 14);
 });
 
 test('a failing migrate deploy restarts the backend, reports the snapshot and fails the step', t => {
