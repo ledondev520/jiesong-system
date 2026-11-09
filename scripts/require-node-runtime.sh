@@ -1,6 +1,6 @@
 # Source before any deployment npm/npx/node command; provision the runtime separately.
 # An absolute, single PATH entry keeps the selection valid across deployment cd steps.
-NODE_RUNTIME=${NODE_RUNTIME:-/opt/jiesong_system/runtime/node-v22.23.4-linux-x64}
+NODE_RUNTIME=${NODE_RUNTIME:-/opt/jiesong-system/runtime/node-v22.23.4-linux-x64}
 case "$NODE_RUNTIME" in
   /*) ;;
   *) echo 'Deploy runtime error: NODE_RUNTIME must be an absolute directory' >&2; exit 1 ;;

@@ -30,7 +30,7 @@ SQLite事务先更新迁移初始化的单例写锁，然后读取与预留配�
 
 发布仍须明确批准。针对本次已审阅的纯增量迁移，维护者先通过 SQLite 在线 backup API 保存事务一致的受保护快照（目录0700/文件0600），验证快照可读，再应用迁移、生成 Prisma Client 并重启所有后端 worker。在线快照不要求提前停止全部 writer，也不声称服务已停写；若后续迁移含破坏性变更，应另行评估维护窗口。保持现有JWT签名密钥和私有DirectMail环境配置；不要打印配置值。邮件配置缺失应拒绝找回。
 
-具体备份前置：先核对当前部署 SHA、实际绝对 DATABASE_URL 候选及后端打开的同一数据库文件（路径与设备号/inode 一致）、磁盘容量和增量迁移。在线 SQLite backup API 包含已提交 WAL 数据，并处理并发写入；设置有界超时，超时或任何校验失败不得合并。独占创建新快照目录，权限0700/0600；关闭连接后验证快照 `PRAGMA quick_check` 为ok、大小、起止时间、SHA-256及持久化回执，绝不输出业务行或上传数据库。2026-10-04只读预检观察到数据库路径 `/opt/jiesong_system/current/backend/prisma/dev.db`，执行时仍须再次核对实际文件身份，不仅照抄路径。
+具体备份前置：先核对当前部署 SHA、实际绝对 DATABASE_URL 候选及后端打开的同一数据库文件（路径与设备号/inode 一致）、磁盘容量和增量迁移。在线 SQLite backup API 包含已提交 WAL 数据，并处理并发写入；设置有界超时，超时或任何校验失败不得合并。独占创建新快照目录，权限0700/0600；关闭连接后验证快照 `PRAGMA quick_check` 为ok、大小、起止时间、SHA-256及持久化回执，绝不输出业务行或上传数据库。2026-10-04只读预检观察到数据库路径 `/opt/jiesong-system/data/prod/dev.db`，执行时仍须再次核对实际文件身份，不仅照抄路径。
 
 仓库自动Deploy直接执行migrate deploy，没有备份步骤，main合并会更新当前celerada.link；必须**先验收一致备份，再合并触发部署**。migrate deploy应只剩本次已审阅迁移pending。`backend/scripts/db-backup.js`只复制固定构建目录prisma/dev.db，不保证实际生产路径/WAL一致性；`scripts/backup.sh`直接cp且校验函数定义顺序有问题，均不作为本次生产保障。不要执行有db push回退和pm2 delete all的旧deploy.sh。
 

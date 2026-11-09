@@ -2,11 +2,11 @@
 
 ## 变量与运行时：先完成，再执行任何回滚操作
 
-在同一个 Bash 会话按顺序执行，分支步骤只选适用的一支。先填写本次部署前备份目录 `B`（形如 `/opt/jiesong_system/deploy-backups/pre-<短sha>-<时间>`），`OLD` 只从该目录的 `code-HEAD.txt` 读取，不手填提交号。下列命令是供生产操作者审阅后执行的流程，不是一键脚本。
+在同一个 Bash 会话按顺序执行，分支步骤只选适用的一支。先填写本次部署前备份目录 `B`（形如 `/opt/jiesong-system/deploy-backups/pre-<短sha>-<时间>`），`OLD` 只从该目录的 `code-HEAD.txt` 读取，不手填提交号。下列命令是供生产操作者审阅后执行的流程，不是一键脚本。
 
 ```bash
 set -euo pipefail
-NODE_RUNTIME=/opt/jiesong_system/runtime/node-v22.23.4-linux-x64
+NODE_RUNTIME=/opt/jiesong-system/runtime/node-v22.23.4-linux-x64
 export PATH="$NODE_RUNTIME/bin:$PATH"
 NODE_BIN=$(command -v node)
 test "$NODE_BIN" = "$NODE_RUNTIME/bin/node"
@@ -22,7 +22,7 @@ OLD=$(cat "$B/code-HEAD.txt")
 [[ "$OLD" =~ ^[[:xdigit:]]{40}$ ]]
 BACKUP_HEAD=$(cat "$B/code-HEAD.txt")
 test "$BACKUP_HEAD" = "$OLD"
-DB=/opt/jiesong_system/current/backend/prisma/dev.db
+DB=/opt/jiesong-system/data/prod/dev.db
 : "${PRODUCTION_URL:?请设置生产 HTTPS 入口}"
 : "${UPLOAD_DIR:?请填写实际附件目录的绝对路径}"
 : "${RECEIPT_DIR:?请填写本次部署后财务留存回执所在的私有目录}"
@@ -32,7 +32,7 @@ ENV_FILE="$CODE/backend/.env"
 RESTORE_DB=no
 BACKEND_NAME=jiesong-backend
 FRONTEND_NAME=jiesong-frontend
-NODE20_ECOSYSTEM=/opt/jiesong_system/runtime/ecosystem.node20-rollback.config.js
+NODE20_ECOSYSTEM=/opt/jiesong-system/runtime/ecosystem.node20-rollback.config.js
 : "${NODE22_ECOSYSTEM:?请设置 runtime 目录内实际的 Node 22 ecosystem 路径}"
 SCHEMA="$CODE/backend/prisma/schema.prisma"
 VERIFY="$CODE/scripts/verify-vps-runtime.cjs"
