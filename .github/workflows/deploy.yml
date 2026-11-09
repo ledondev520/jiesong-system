@@ -120,7 +120,7 @@ jobs:
 
       - name: Deploy to Production via SSH
         env:
-          NODE_RUNTIME: ${{ vars.NODE_RUNTIME || '/opt/jiesong_system/runtime/node-v22.23.4-linux-x64' }}
+          NODE_RUNTIME: ${{ vars.NODE_RUNTIME || '/opt/jiesong-system/runtime/node-v22.23.4-linux-x64' }}
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
@@ -214,7 +214,7 @@ jobs:
                   echo "cannot resolve prod SQLite file from backend/.env DATABASE_URL (or sqlite3 missing); aborting before stopping the backend" >&2
                   exit 1
                 fi
-                SNAP_DIR="${DEPLOY_BACKUP_ROOT:-/opt/jiesong_system/deploy-backups}/auto-premigrate-$(printf '%.7s' "$DEPLOY_SHA")-$(date -u +%Y%m%dT%H%M%SZ)"
+                SNAP_DIR="${DEPLOY_BACKUP_ROOT:-/opt/jiesong-system/deploy-backups}/auto-premigrate-$(printf '%.7s' "$DEPLOY_SHA")-$(date -u +%Y%m%dT%H%M%SZ)"
                 SNAP="$SNAP_DIR/premigrate.db"
                 (umask 077 && mkdir -p "$SNAP_DIR")
                 BACKEND_STOPPED=1
