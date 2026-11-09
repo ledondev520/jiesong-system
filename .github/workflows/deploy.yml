@@ -227,8 +227,6 @@ jobs:
                   exit 1
                 fi
                 echo "pre-migrate snapshot: $SNAP"
-                # Keep the newest 12 auto-premigrate-* snapshot dirs; manual pre-<sha> backups are never touched.
-                ls -1dt "${SNAP_DIR%/*}"/auto-premigrate-* 2>/dev/null | tail -n +13 | while IFS= read -r OLD_SNAP; do rm -rf -- "$OLD_SNAP"; done || true
                 MIGRATE_RUNNING=1
                 (cd ../backend && npx prisma migrate deploy)
                 MIGRATE_RUNNING=0
