@@ -1,5 +1,5 @@
 /**
- * Input: 桩化的 service / 命令 / prisma，WAREHOUSE 与其他角色调用控制器、MCP 路由、AI 上下文
+ * Input: 桩化的 service / 命令 / prisma，WAREHOUSE 与其他角色调用控制器、AI 上下文
  * Output: 回归：WAREHOUSE 红线（OD-2/OD-3/P2-B）在各接线点真正生效（只测接线，函数本体见 warehouseRedaction.test.js 等）
  * Pos: PR #210 review P1-C/P2-A/P2-B；每个断言在对应接线被还原时必须失败
  */
@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const express = require('express');
 const prisma = require('../utils/prisma');
 
-// 必须在加载控制器 / mcp 路由之前桩化：它们在模块加载时解构这些函数。
+// 必须在加载控制器之前桩化：它们在模块加载时解构这些函数。
 const auth = require('../middleware/auth');
 auth.authenticate = (req, _res, next) => { req.user = { id: 'u1', role: req.headers['x-role'] }; next(); };
 const auditLog = require('../utils/auditLog');
@@ -80,47 +80,6 @@ test('PUT /purchases/:id：WAREHOUSE 的草稿更正沿用库内单价，其他�
   assert.equal(updateInput.items[0].unitPrice, 7.5);
   await ctrl.update({ params: { id: 'pc-1' }, body: body(), user: { role: 'PURCHASE' } }, createRes(), next);
   assert.equal(updateInput.items[0].unitPrice, undefined);
-});
-
-const callMcp = async (role, name, args) => {
-  const app = express();
-  app.use(express.json());
-  app.use('/mcp', require('./mcp'));
-  const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
-  try {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/mcp`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-role': role },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
-    });
-    return { status: response.status, text: await response.text() };
-  } finally {
-    await new Promise((resolve) => server.close(resolve));
-  }
-};
-
-test('MCP update_purchase / create_purchase_with_items：WAREHOUSE 响应无金额与发票号，且更新沿用库内单价', async (t) => {
-  const o1 = prisma.purchaseContract.findUnique; const o2 = prisma.purchaseItem.findMany;
-  prisma.purchaseContract.findUnique = async () => SECRET_PURCHASE;
-  prisma.purchaseItem.findMany = async () => [{ id: 'i1', productId: 'p1', unitPrice: 7.5 }];
-  t.after(() => { prisma.purchaseContract.findUnique = o1; prisma.purchaseItem.findMany = o2; });
-  const items = [{ id: 'i1', productId: 'p1', quantity: 2 }];
-  const update = await callMcp('WAREHOUSE', 'update_purchase', { id: 'pc-1', items });
-  assert.equal(update.status, 200);
-  assert.doesNotMatch(update.text, /9876|INV-SECRET-1|7\.5/);
-  assert.match(update.text, /PO-1/);
-  assert.equal(updateInput.items[0].unitPrice, 7.5);
-  const create = await callMcp('WAREHOUSE', 'create_purchase_with_items', { supplierId: 's1', items: [] });
-  assert.doesNotMatch(create.text, /9876|INV-SECRET-1/);
-  const purchase = await callMcp('PURCHASE', 'update_purchase', { id: 'pc-1', items });
-  assert.match(purchase.text, /9876/);
-});
-
-test('MCP search_entities：WAREHOUSE 传 includeAmounts:false', async () => {
-  await callMcp('WAREHOUSE', 'search_entities', { query: 'x' });
-  assert.equal(searchArgs.includeAmounts, false);
-  await callMcp('SALES', 'search_entities', { query: 'x' });
-  assert.equal(searchArgs.includeAmounts, true);
 });
 
 test('AI 对话上下文：WAREHOUSE 不含采购/销售/财务金额', async (t) => {

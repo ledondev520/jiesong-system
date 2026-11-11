@@ -204,9 +204,6 @@ const coreCases = [
 
   { id: 'users_list', method: 'GET', path: '/api/v1/users?page=1&pageSize=20', save: saveFirstId('userId') },
   { id: 'user_detail', method: 'GET', path: optionalPath('userId', (id) => `/api/v1/users/${id}`) },
-  { id: 'agents_list', method: 'GET', path: '/api/v1/agents?page=1&pageSize=20', save: saveFirstId('agentId') },
-  { id: 'agent_detail', method: 'GET', path: optionalPath('agentId', (id) => `/api/v1/agents/${id}`) },
-  { id: 'agent_detail_missing', method: 'GET', path: '/api/v1/agents/perf-missing-agent', expectedStatuses: [404] },
   { id: 'notifications_list', method: 'GET', path: '/api/v1/notifications?page=1&pageSize=20' },
   { id: 'notifications_unread_count', method: 'GET', path: '/api/v1/notifications/unread-count' },
 

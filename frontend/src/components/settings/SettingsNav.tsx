@@ -19,7 +19,6 @@ import {
   Landmark,
   Download,
   History,
-  Bot,
   BarChart3,
   Search,
   ChevronRight,
@@ -80,7 +79,6 @@ const navGroups: NavGroup[] = [
   {
     label: "AI",
     items: [
-      { href: "/dashboard/settings/ai-access", label: "AI 接入", icon: Bot },
       {
         href: "/dashboard/settings/ai-usage",
         label: "AI 用量",

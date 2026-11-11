@@ -33,9 +33,6 @@ vi.mock("@/services/user.service", () => ({
   },
 }));
 
-vi.mock("@/services/agent.service", () => ({
-  agentService: { getAll: vi.fn().mockResolvedValue({ data: { items: [] } }) },
-}));
 
 vi.mock("sonner", () => ({
   toast: {

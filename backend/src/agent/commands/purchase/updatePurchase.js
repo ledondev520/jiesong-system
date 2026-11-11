@@ -1,7 +1,7 @@
 /**
  * Input: 采购更正信息及事务客户端
  * Output: 原子重算后的草稿或既有合同头信息
- * Pos: HTTP / CLI / MCP 共用的采购更正命令
+ * Pos: HTTP 与 AI 助手共用的采购更正命令
  */
 const prisma = require('../../../utils/prisma');
 const { createError } = require('../../../middleware/errorHandler');

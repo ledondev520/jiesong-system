@@ -21,46 +21,6 @@ export interface User {
   updatedAt: string;
 }
 
-interface AgentGrant {
-  id?: string;
-  agentAccountId?: string;
-  agentCredentialId?: string | null;
-  resource: string;
-  action: string;
-  scopeJson?: string | null;
-  createdAt?: string;
-}
-
-interface AgentCredential {
-  id: string;
-  credentialKey: string;
-  label?: string | null;
-  status: string;
-  secretPreview?: string | null;
-  expiresAt?: string | null;
-  lastUsedAt?: string | null;
-  createdAt: string;
-  revokedAt?: string | null;
-}
-
-export interface AgentAccount {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  status: string;
-  defaultMode: string;
-  createdAt: string;
-  updatedAt: string;
-  grants?: AgentGrant[];
-  credentials?: AgentCredential[];
-}
-
-export interface AgentCredentialIssueResult {
-  credential: AgentCredential;
-  token: string;
-}
-
 interface Port {
   id: string;
   name: string;

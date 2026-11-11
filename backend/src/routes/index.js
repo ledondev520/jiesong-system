@@ -12,7 +12,6 @@ const { Router } = require('express');
 
 // 导入各业务路由
 const authRoutes = require('./auth');
-const agentRoutes = require('./agents');
 const supplierRoutes = require('./suppliers');
 const storeRoutes = require('./stores');
 const quoteRoutes = require('./quotes');
@@ -55,7 +54,6 @@ const router = Router();
 
 // 认证路由（无需Token）
 router.use('/auth', authRoutes);
-router.use('/agents', agentRoutes);
 
 // 业务路由（需要Token）
 // OD-2/OD-3：这些前缀的 JSON 响应对 WAREHOUSE 统一剥离发票号与采购金额（销售/AI 面由 A55 复用同一 helper）

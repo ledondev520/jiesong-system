@@ -10,7 +10,6 @@ describe("中文业务面包屑", () => {
     ["/dashboard/notifications", "通知中心"],
     ["/dashboard/settings/logs", "系统日志"],
     ["/dashboard/settings/ai-usage", "AI 用量"],
-    ["/dashboard/settings/ai-access", "AI 接入"],
     ["/dashboard/settings/customs-brokers", "报关行"],
     ["/dashboard/orders/x", "出口订单"],
     ["/dashboard/quotes", "报价"],

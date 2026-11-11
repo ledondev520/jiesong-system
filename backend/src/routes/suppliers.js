@@ -9,7 +9,6 @@
 const { Router } = require('express');
 const supplierController = require('../controllers/supplierController');
 const { authenticate, roleAuth } = require('../middleware/auth');
-const { accessAuth } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -27,13 +26,13 @@ router.get('/:id', withIdValidation, supplierController.getById);
 // POST /api/v1/suppliers - 创建供应商
 router.post('/', [
   body('name').notEmpty().withMessage('供应商名称不能为空'),
-], accessAuth({ roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'], capabilities: ['supplier.create'] }), handleValidation, withAuditLog(
+], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
   { entity: 'Supplier', action: 'CREATE', model: 'supplier' },
   supplierController.create
 ));
 
 // PUT /api/v1/suppliers/:id - 更新供应商
-router.put('/:id', withIdValidation, accessAuth({ roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'], capabilities: ['supplier.update'] }), withAuditLog(
+router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
   { entity: 'Supplier', action: 'UPDATE', model: 'supplier' },
   supplierController.update
 ));

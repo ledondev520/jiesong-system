@@ -1,5 +1,5 @@
 /**
- * Input: 真实挂载的路由模块、真实 authenticate/roleAuth/bossReadOnly 中间件（仅 prisma 用户/Agent 凭证读取被桩替换）
+ * Input: 真实挂载的路由模块、真实 authenticate/roleAuth/bossReadOnly 中间件（仅 prisma 用户读取被桩替换）
  * Output: Restricted/Confidential 前缀的读/写最大角色集合的实际 HTTP 结果矩阵（ANTI-PLAN P2-5）
  * Pos: 后端路由权限测试；补足 rbac-write-routes.test.js 只检查 "roleAuth(" 子串的缺口
  *
@@ -16,7 +16,6 @@ const jwt = require('jsonwebtoken');
 const config = require('../config');
 const prisma = require('../utils/prisma');
 const { errorHandler } = require('../middleware/errorHandler');
-const { hashAgentSecret } = require('../utils/agentCredentials');
 
 const ROLES = ['ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE', 'BOSS'];
 const ALL = ROLES;
@@ -32,7 +31,6 @@ const MODULES = {
   '/forex-verifications': './forexVerifications',
   '/suppliers': './suppliers',
   '/users': './users',
-  '/agents': './agents',
   '/system': './system',
   '/reports': './reports',
   '/sales': './sales',
@@ -59,7 +57,6 @@ const POLICY = [
   { re: /^\/suppliers\/[^/]+\/hard-delete(-preview)?$/, read: ADMIN, write: ADMIN },
   { re: /^\/suppliers(\/|$)/, read: ALL, write: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'] },
   { re: /^\/users(\/|$)/, read: ADMIN, write: ADMIN },
-  { re: /^\/agents(\/|$)/, read: ADMIN, write: ADMIN },
   { re: /^\/system\/(configs|notifications|seller-identity|exchange-rate|ports|categories|customs-brokers)$/, read: ALL, write: ADMIN },
   { re: /^\/system\/notifications\/[^/]+\/read$/, read: ALL, write: ['ADMIN', 'BOSS', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'] },
   { re: /^\/system\/export\//, read: ['ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'], write: ADMIN },
@@ -111,8 +108,8 @@ const startApp = async (t) => {
 };
 
 const humanToken = (role) => jwt.sign({ userId: `u-${role}`, sessionVersion: 0 }, config.jwt.secret, { expiresIn: '5m' });
-const AGENT_SECRET = 'synthetic-secret-for-matrix-test';
-const AGENT_TOKEN = `jsa_synthetickey.${AGENT_SECRET}`;
+// A96: the Agent credential path is removed; a former jsa_ token is just an invalid bearer.
+const AGENT_TOKEN = 'jsa_synthetickey.synthetic-secret-for-matrix-test';
 
 // Prisma delegates are not mock.method-able; follow the repo convention of assigning and restoring.
 const stub = (t, delegate, name, impl) => {
@@ -126,19 +123,6 @@ const stubAuth = (t) => {
     const role = String(where.id).replace(/^u-/, '');
     return { id: where.id, username: role, name: role, role, isActive: true, sessionVersion: 0 };
   });
-  // capabilities: [] —— 有效、启用的 Agent 凭证，但没有任何授权
-  stub(t, prisma.agentCredential, 'findUnique', async () => ({
-    id: 'cred-1',
-    credentialKey: 'synthetickey',
-    status: 'ACTIVE',
-    revokedAt: null,
-    expiresAt: null,
-    label: 'matrix',
-    secretHash: hashAgentSecret(AGENT_SECRET),
-    agentAccount: { id: 'agent-1', name: 'matrix', slug: 'matrix', status: 'ACTIVE', defaultMode: null },
-    grants: [],
-  }));
-  stub(t, prisma.agentCredential, 'update', async () => ({}));
 };
 
 const call = async (base, { method, path }, token) => {
@@ -196,13 +180,13 @@ test('BOSS：除自身写入例外外，所有写路由 403（不论路由角色
   assert.deepEqual(failures, [], `\n${failures.join('\n')}`);
 });
 
-test('capabilities 为空的 Agent 令牌在每条路由上得到 403', async (t) => {
+test('旧 Agent (jsa_) 令牌在每条路由上得到 401', async (t) => {
   stubAuth(t);
   const base = await startApp(t);
   const failures = [];
   for (const route of enumerateRoutes()) {
     const status = await call(base, route, AGENT_TOKEN);
-    if (status !== 403) failures.push(`AGENT ${route.method} ${route.declared} -> ${status}`);
+    if (status !== 401) failures.push(`AGENT ${route.method} ${route.declared} -> ${status}`);
   }
   assert.deepEqual(failures, [], `\n${failures.join('\n')}`);
 });

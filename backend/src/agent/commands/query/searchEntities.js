@@ -1,7 +1,7 @@
 /**
  * Input: 查询关键字、类型过滤、结果上限
  * Output: 统一查询结果数组
- * Pos: Agent 命令层查询能力，供 CLI / MCP / HTTP 复用
+ * Pos: Agent 命令层查询能力，供 HTTP 与 AI 助手复用
  */
 
 const prisma = require('../../../utils/prisma');
