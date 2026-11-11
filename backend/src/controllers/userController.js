@@ -123,13 +123,15 @@ const create = async (req, res, next) => {
 const update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, role, isActive, password } = req.body;
+    const { name, role, isActive, password, email, phone } = req.body;
     if (role !== undefined && !Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
 
     const updateData = {};
     if (name !== undefined) updateData.name = name;
     if (role !== undefined) updateData.role = role;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
     if (password !== undefined && password !== '') {
       assertPassword(password);
       updateData.password = await bcrypt.hash(password, 12);
@@ -140,7 +142,8 @@ const update = async (req, res, next) => {
       const existing = await tx.user.findUnique({ where: { id }, select: { role: true, isActive: true } });
       if (!existing) throw createError('用户不存在', 404);
       await assertAdminKept(tx, id, existing, { role, isActive }, req.user?.id);
-      const revoke = shouldRevokeSessions(existing, { role, isActive });
+      // Email is the password-recovery identity (SECURITY.md 找回): any email write ends existing sessions, as the removed PUT /auth/users/:id did.
+      const revoke = shouldRevokeSessions(existing, { role, isActive }) || email !== undefined;
       if (revoke) updateData.sessionVersion = { increment: 1 };
       const updated = await tx.user.update({
         where: { id },

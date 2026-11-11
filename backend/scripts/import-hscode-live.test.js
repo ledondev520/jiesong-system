@@ -52,7 +52,7 @@ test('flattenDeclarationElements: 保留顺序并拼接申报要素文本', () =
   );
 });
 
-test('normalizeLiveRecord: 提取关键查询字段并保留完整原始 payload', () => {
+test('normalizeLiveRecord: 提取关键查询字段，不再保存原始 payload（A101）', () => {
   const normalized = normalizeLiveRecord(sampleRecord);
 
   assert.equal(normalized.hsCode, '6904100000');

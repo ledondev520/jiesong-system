@@ -65,9 +65,7 @@ A:
 ## 联系方式
 
 部署遇到问题？检查以下日志：
-- Render: Dashboard → Logs
-- Fly.io: `flyctl logs`
-- Vercel: Dashboard → Functions → Logs
+- VPS: `pm2 logs jiesong-backend` / `pm2 logs jiesong-frontend`（只看日志，不要打印 `pm2 env`）
 
 ## 邮箱注册
 

@@ -51,6 +51,24 @@ test('update: 仅改姓名或角色未变时不撤销会话', async (t) => {
   assert.deepEqual(calls.revoked, []);
 });
 
+test('update: 管理员绑定或修改邮箱写入 email/phone，递增 sessionVersion 并撤销浏览器会话', async (t) => {
+  const calls = mockTx(t, { role: 'SALES', isActive: true });
+  const { error } = await run(controller.update, { params: { id: 'u1' }, body: { email: 'synthetic-user@example.test', phone: '+86 000-0000' }, user: { id: 'admin' } });
+  assert.equal(error, undefined);
+  assert.equal(calls.updates[0].email, 'synthetic-user@example.test');
+  assert.equal(calls.updates[0].phone, '+86 000-0000');
+  assert.deepEqual(calls.updates[0].sessionVersion, { increment: 1 });
+  assert.deepEqual(calls.revoked, [{ userId: 'u1' }]);
+});
+
+test('update: 只改电话不撤销会话', async (t) => {
+  const calls = mockTx(t, { role: 'SALES', isActive: true });
+  await run(controller.update, { params: { id: 'u1' }, body: { phone: '+86 000-0001' }, user: { id: 'admin' } });
+  assert.equal(calls.updates[0].phone, '+86 000-0001');
+  assert.equal(calls.updates[0].sessionVersion, undefined);
+  assert.deepEqual(calls.revoked, []);
+});
+
 test('remove: DELETE 改为软停用并撤销会话，不物理删除', async (t) => {
   const calls = mockTx(t, { role: 'SALES', isActive: true });
   const originalDelete = prisma.user.delete;
