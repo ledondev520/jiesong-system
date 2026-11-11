@@ -2,8 +2,6 @@
  * Input: 认证服务
  * Output: 认证相关的HTTP响应
  * Pos: 认证控制器，处理固定期限浏览器会话、登录、邮箱验证注册、用户管理、找回密码请求
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const authService = require('../services/authService');

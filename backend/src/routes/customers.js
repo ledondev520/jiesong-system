@@ -3,7 +3,6 @@
  * Output: 客户路由（读：所有已登录角色，BOSS 经白名单只读；写：ADMIN、SALES）
  * Pos: 客户 API。没有 DELETE：客户归档用 PUT isActive:false，永不物理删除。
  *      客户下门店的写入沿用 /stores（需 customerId，见 storeController）；读取用 GET /:id/stores。
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const { Router } = require('express');
 const customerController = require('../controllers/customerController');

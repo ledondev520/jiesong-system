@@ -2,8 +2,6 @@
  * Input: 采购表单、供应商选择状态
  * Output: 步骤 2：合同详情（供应商/合同号/签订日期/税率）与提交按钮
  * Pos: 采购合同创建入口（CreatePurchasePageContent 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

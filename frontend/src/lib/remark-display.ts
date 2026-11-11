@@ -2,8 +2,6 @@
  * Input: 后端存储的备注原文（可能含导入脚本追加的内部来源痕迹）
  * Output: { text: 用户应看到的备注, source: 可折叠展示的导入来源行 }
  * Pos: 展示层拆分（不改存储）；采购/报关/退税等备注显示处共用，组件见 components/ui/remark-text.tsx
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 // 导入脚本写入的标记形如 [WPS_PURCHASE_EVIDENCE]、[CUSTOMS_XML]：全大写、至少含一个下划线。

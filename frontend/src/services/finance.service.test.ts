@@ -2,8 +2,6 @@
  * Input: 财务服务与API实例
  * Output: 财务服务接口与 Unicode 请求幂等、失败重试测试
  * Pos: 前端业务服务测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";

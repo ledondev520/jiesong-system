@@ -2,8 +2,6 @@
  * Input: KPI 标签、数值、加载状态、趋势、可选图标，可选点击（作为筛选）
  * Output: 唯一的 KPI 指标卡：静态边框，无悬浮上浮；加载显示骨架，缺失显示「—」而不是 0；可选 footer（如「查看明细」链接）
  * Pos: 通用 UI 组件，取代 .kpi-card CSS、finance/KpiCard 和页面里零散的 Card+图标块（PHASE3 §1）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";

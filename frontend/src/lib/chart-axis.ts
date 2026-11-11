@@ -2,8 +2,6 @@
  * Input: 图表坐标轴原始值（CNY 金额、YYYY-MM 月份、数据点数量）
  * Output: 横纵轴刻度文本与旋转参数，保证应用常见宽度下刻度可读
  * Pos: recharts 图表共用的轴格式化（财务概览收支对比、经营分析月度销售趋势）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const trim = (n: number) => String(Number(n.toFixed(1)));

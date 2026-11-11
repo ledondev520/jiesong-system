@@ -2,8 +2,6 @@
  * Input: HTTP 请求（路由参数、三类上传工作簿、预览凭证）
  * Output: 财务数据包预览、确认写入、查询与分析 JSON 响应
  * Pos: 财务报表 HTTP Adapter；三类上传来源不能绕过预览直接写库
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const financialStatementsService = require('../services/financialStatementsService');

@@ -2,8 +2,6 @@
  * Input: useFormHandler hook
  * Output: 提交流程成功/失败行为测试
  * Pos: 前端 hooks 测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { act, renderHook } from '@testing-library/react';

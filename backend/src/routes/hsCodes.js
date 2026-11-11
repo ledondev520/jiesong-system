@@ -2,8 +2,6 @@
  * Input: hsCodeService, aiService, aiCache, hsciqService, prisma（systemConfig 开关）
  * Output: HSCode 查询/人工证据更新路由（含 AI 推荐、HSCIQ 权威归类实例、申报要素填写、推荐缓存与使用统计）
  * Pos: 提供本地 HSCode 搜索、详情、证据化更新与 AI 推荐的 Interface
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

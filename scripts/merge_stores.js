@@ -2,8 +2,6 @@
  * Input: Store数据
  * Output: 合并重复门店，统一名称
  * Pos: 数据清洗脚本，合并重复的门店名称
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const path = require('path');

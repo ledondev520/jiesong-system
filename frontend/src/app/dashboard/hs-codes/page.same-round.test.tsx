@@ -2,8 +2,6 @@
  * Input: HS 编码页面、同一轮完成的合成列表刷新与税则保存请求
  * Output: 列表刷新与保存的成功/失败回调顺序与原 async try/await 一致的回归测试（旧列表不覆盖新保存结果、提示顺序不变）
  * Pos: HS 编码页面请求回调时序回归测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it, vi } from "vitest";

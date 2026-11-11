@@ -5,7 +5,6 @@ Input: backend/prisma/dev.db
 Output: tmp/wps_11_export_list_raw/parsed/wps_pending_formalization_blockers.{json,csv,md}
 Pos: PENDING 合同正式化阻断原因分类；区分销售、装箱和报关链路，只读不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

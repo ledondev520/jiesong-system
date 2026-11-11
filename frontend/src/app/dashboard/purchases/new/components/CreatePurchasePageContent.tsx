@@ -2,8 +2,6 @@
  * Input: purchaseService, supplierService, productService
  * Output: 支持独立内联供应商编辑会话的采购表单；迟到保存不覆盖当前选择或草稿
  * Pos: 采购合同创建入口
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

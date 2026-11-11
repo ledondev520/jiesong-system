@@ -5,7 +5,6 @@ Input: parsed/wps_cloud_only_probe.json
 Output: parsed/wps_cloud_only_broad_local_search.{json,csv,md}
 Pos: WPS cloud-only 目标原件广域本机只读搜索；按文件名和目标大小查找并校验 SHA1；不写库不复制
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

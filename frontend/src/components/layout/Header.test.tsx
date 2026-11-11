@@ -2,8 +2,6 @@
  * Input: Header组件、统一搜索服务、router
  * Output: Header搜索与壳层交互测试
  * Pos: 前端布局组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

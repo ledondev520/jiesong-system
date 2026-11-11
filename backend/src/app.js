@@ -2,8 +2,6 @@
  * Input: 所有路由模块、中间件
  * Output: Express应用实例、管理员初始化门禁、标准100/min全局限流（显式代理白名单默认关闭）
  * Pos: 应用入口，初始化 Express 服务器
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const express = require('express');

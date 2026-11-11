@@ -3,8 +3,6 @@
  * Input: 海关解密 XML 目录、目标 EXP 合同范围、可选报关单号到合同号的人工确认映射
  * Output: 受限 dry-run 计划；显式 --apply 后幂等写入报关单及明细
  * Pos: 出口退税报关 XML 关联 CLI Adapter；只关联正式 XML 能逐项命中的装箱明细
- *
- * Note: 我被更新时，必须同步更新本头注释 + scripts/README.md。
  */
 
 const crypto = require('crypto');

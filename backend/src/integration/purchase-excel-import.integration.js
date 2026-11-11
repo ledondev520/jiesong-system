@@ -2,7 +2,6 @@
  * Input: active multipart purchase import, generated workbooks and committed migrations
  * Output: six HTTP/SQLite workbook validation, value-preservation and replay cases
  * Pos: private synthetic Excel-import regression; no browser, providers or real records
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

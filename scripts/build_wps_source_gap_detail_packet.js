@@ -2,8 +2,6 @@
  * Input: WPS import plans + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/wps_source_gap_details.{json,csv,md}
  * Pos: WPS 剩余来源缺口逐条明细包；把每条 DB 缺口、匹配失败阶段和后续动作汇总到一个只读交付物，不写库
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

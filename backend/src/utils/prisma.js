@@ -2,8 +2,6 @@
  * Input: Prisma Client库
  * Output: 单例Prisma客户端实例（禁止输出带密码/验证码参数的查询和异常）
  * Pos: 数据库连接工具，提供统一的Prisma实例
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { PrismaClient } = require('@prisma/client');

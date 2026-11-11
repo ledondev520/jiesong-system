@@ -2,8 +2,6 @@
  * Input: auth-session 统一入口
  * Output: 会话过期清理、提示与跳转收敛测试
  * Pos: 前端认证基础设施测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

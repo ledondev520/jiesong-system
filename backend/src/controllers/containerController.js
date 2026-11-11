@@ -2,8 +2,6 @@
  * Input: containerService（货柜服务层）
  * Output: 货柜及装箱明细 HTTP 控制器（list/getById/create/update/remove/addItem/updateItem/removeItem/listItems/getItemsSummary）
  * Pos: 货柜控制器层，委托 service 完成业务，仅负责请求解析与响应组装
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { success, created, paginated } = require('../utils/response');

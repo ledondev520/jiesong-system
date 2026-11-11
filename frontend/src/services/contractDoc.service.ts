@@ -2,8 +2,6 @@
  * Input: 合同文档API
  * Output: 合同文档服务方法
  * Pos: 前端服务层，封装合同文档生成相关API调用
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import api from '@/lib/axios';

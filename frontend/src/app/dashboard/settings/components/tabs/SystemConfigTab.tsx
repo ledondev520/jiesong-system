@@ -2,8 +2,6 @@
  * Input: 后端 /system/configs API（通过 configService）、/hs-codes/hsciq-usage API
  * Output: 手机单列配置表单、系统/业务参数、当前 AI 供应商的模型与只写密钥配置、HSCIQ 开关与数据字典
  * Pos: 设置页 > 系统配置 Tab，管理员调整全局运营参数与外部 API 集成
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

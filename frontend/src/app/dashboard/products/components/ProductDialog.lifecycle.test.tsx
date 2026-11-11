@@ -2,8 +2,6 @@
  * Input: 商品编辑会话、关闭/重开/切换操作、可延迟的 HSCode 查询
  * Output: 取消恢复资料，假时钟/按名称延迟响应验证匹配顺序及会话隔离
  * Pos: 商品档案组件生命周期测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { useState } from "react";

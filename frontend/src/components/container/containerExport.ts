@@ -2,8 +2,6 @@
  * Input: 已渲染的打印页 DOM 元素（每柜一页）
  * Output: PNG 下载、PDF 下载（页面截图 → 图片；按页宽缩放，长表格在行边界分页且逐页截取；PDF 页统一 A4 竖版、以 JPEG 嵌入控制体积；不引入新依赖，jsPDF 默认字体不含中文故不直接写文字）
  * Pos: 装柜图导出工具，供 ContainerLoadingPanel 调用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const download = (href: string, filename: string) => {

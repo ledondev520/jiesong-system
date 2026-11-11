@@ -2,8 +2,6 @@
  * Input: 发票查询 API
  * Output: 发票台账查询页面（手机卡片与可排序桌面表格）
  * Pos: 财务模块-发票台账子页面
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

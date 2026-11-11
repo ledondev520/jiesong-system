@@ -2,8 +2,6 @@
  * Input: purchase_evidence_extracts.csv + purchase_evidence_items.csv + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/purchase_mismatch_source_note_backfill_plan.json; optional note-only Prisma writes when --apply is passed
  * Pos: WPS 采购合同号口径冲突来源 note 回填脚本；只在文件名合同号与正文合同号不同但供应商/日期/金额可对齐时补 mismatch 来源标记，不改业务字段
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

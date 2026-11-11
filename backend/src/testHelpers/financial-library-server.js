@@ -2,8 +2,6 @@
  * Input: Explicit private test directory, generated sources and committed migrations
  * Output: Existing CLI-ingested library served by real Express/auth on IPv4 loopback
  * Pos: Test-only financial library backend; no test HTTP endpoints or production configuration
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const fs = require('node:fs');
 const os = require('node:os');

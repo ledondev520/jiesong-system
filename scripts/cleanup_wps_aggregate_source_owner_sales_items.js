@@ -2,8 +2,6 @@
  * Input: tmp/wps_11_export_list_raw/parsed/wps_candidate_source_ownership_review.json + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/wps_aggregate_source_owner_sales_cleanup_plan.json; optional delete when --apply is passed
  * Pos: 清理候选来源占用复核中“无引用聚合门店来源行已覆盖的无来源拆分销售行”；默认 dry-run，写库前必须先备份 DB
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

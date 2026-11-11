@@ -2,8 +2,6 @@
  * Input: Production frontend, real auth/CLI-ingested library and private committed-migration SQLite
  * Output: Six ADMIN/FINANCE source/row/page/reload and interrupted-read acceptance definitions
  * Pos: Hosted library UI acceptance; distinct from monthly statement upload, no response mocks
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, test, type Page } from "@playwright/test";
 import {

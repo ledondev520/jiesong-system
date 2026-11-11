@@ -5,7 +5,6 @@ Input: parsed/wps_import_completion_audit.json + WPS cache.db + local source/dow
 Output: parsed/wps_cloud_only_probe.{json,md}
 Pos: WPS 仅云端原件缺口窄探测脚本；只反查当前 cloud-only 目标的本机候选、WPS metadata 和下载失败记录；只读，不写库不复制
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

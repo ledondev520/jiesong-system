@@ -2,8 +2,6 @@
  * Input: 门店服务与API实例
  * Output: 门店CRUD及实时可用港口接口单元测试
  * Pos: 前端业务服务测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

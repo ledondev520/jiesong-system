@@ -2,8 +2,6 @@
  * Input: tmp/wps_11_export_list_raw/parsed/*.csv + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/import_plan.json + invoice_summary_audit.json; optional Prisma writes when --apply is passed
  * Pos: WPS 出货源文件幂等导入脚本；默认 dry-run，只生成变更计划；报关/退税写入前先审计发票汇总污染；多门店混合名称仅在源文件给出现有真实港口时自动建组合门店，`混合港口` 不建；若组合门店已存在且无精确装箱行，则把源装箱行作为独立来源行保留；装箱来源 note 已挂到不同门店且无报关引用时，可移除错挂来源并按源门店新增/匹配装箱行；销售行不从多门店装箱商品的文件路径猜单一门店；装箱行按同源同商品同数量同规格唯一命中、数量唯一命中或同源同商品残余唯一配对时可回填销售门店；销售总数量等于同商品同规格多门店装箱数量之和时，可按装箱数量拆分销售行并沿用源单价；同一销售行已有不同装箱门店标记时不再自动改门店；同质多门店销售行只补现有门店行价格
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

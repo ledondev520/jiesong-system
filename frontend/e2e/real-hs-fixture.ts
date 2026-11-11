@@ -2,8 +2,6 @@
  * Input: Test-only HS backend, real login/HTTP and private committed-migration SQLite
  * Output: Isolated HS catalogue browser fixture and independent persisted snapshots
  * Pos: Hosted HS checks; no business mocks, provider calls or production data
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, statSync } from "node:fs";

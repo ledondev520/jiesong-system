@@ -2,8 +2,6 @@
  * Input: 商品名或 HSCode 查询参数、Prisma 客户端、aiService（懒加载）
  * Output: 本地名称/编码组合交集查询、税率与带来源证据的人工更新
  * Pos: HSCode 服务层，负责本地商品编码检索与当前税则快照维护；batchMatchHsCodes 采用两轮策略提升准确率
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

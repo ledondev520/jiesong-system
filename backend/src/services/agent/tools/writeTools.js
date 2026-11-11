@@ -3,7 +3,6 @@
  * Output: Agent 写工具定义（WRITE_TOOL_SPECS）
  * Pos: 后端 Agent Runtime 工具层
  *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  * 角色 allowedRoles 由 openAgentService 注入/复核；密钥类配置键拒绝读写；CreatePaymentRecord 映射 financeService.createPayment。
  */
 

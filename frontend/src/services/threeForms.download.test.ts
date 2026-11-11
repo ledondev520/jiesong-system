@@ -2,8 +2,6 @@
  * Input: Real Axios interceptors, synthetic Blob adapter and browser download helpers
  * Output: Download filename/byte, uncached repeat and rejected-response regression checks
  * Pos: Three-form export transport test; no network, browser launch or real documents
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { Blob as NodeBlob } from "node:buffer";
 import {

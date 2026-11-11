@@ -2,8 +2,6 @@
  * Input: contractTemplateService
  * Output: 合同模板 HTTP 响应
  * Pos: 合同模板控制器
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { success, created } = require('../utils/response');

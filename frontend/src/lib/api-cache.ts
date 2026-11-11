@@ -2,8 +2,6 @@
  * Input: API 请求 key + 数据获取函数
  * Output: 按认证代次隔离的内存缓存请求结果
  * Pos: 轻量级前端请求缓存层，用于减少 Tab 切换时重复发起相同请求
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { getAuthGeneration } from "@/lib/browser-session";

@@ -2,8 +2,6 @@
  * Input: /api/v1/procurement-template/* 三个端点
  * Output: 通用采购模板、门店列表、指定门店历史采购清单的类型定义和请求方法
  * Pos: 前端服务层，对接后端CSV分析接口
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import api from '@/lib/axios';

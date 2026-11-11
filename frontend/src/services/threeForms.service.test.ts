@@ -2,8 +2,6 @@
  * Input: 三表生成/预览参数及共享 Axios 直接返回的响应正文
  * Output: 三表服务请求契约和 Blob 下载调用测试
  * Pos: 出口三表服务层单元测试；完整拦截器下载另由 download.test 覆盖
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { threeFormsService } from "./threeForms.service";

@@ -2,8 +2,6 @@
  * Input: Production frontend, real SALES auth/Express and private committed-migration SQLite
  * Output: Four header cancel/save/failure-retry/reload browser acceptance cases
  * Pos: Hosted sales header supplement checks; no business response mocks or production access
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {

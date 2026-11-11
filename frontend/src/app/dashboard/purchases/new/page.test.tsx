@@ -2,8 +2,6 @@
  * Input: 采购创建页、purchase/supplier/product 服务、toast、router
  * Output: 采购创建页基础交互测试结果
  * Pos: 前端创建页交互测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

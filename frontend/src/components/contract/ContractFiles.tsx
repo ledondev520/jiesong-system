@@ -2,8 +2,6 @@
  * Input: contractId、contractType、附件列表与共享认证二进制读取
  * Output: 合同附件管理、可取消认证下载/预览、文件与浏览器错误反馈
  * Pos: 合同详情页通用附件组件，支持采购/出口合同复用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

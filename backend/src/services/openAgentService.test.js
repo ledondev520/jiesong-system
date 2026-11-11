@@ -2,7 +2,6 @@
  * Input: Agent 服务、已发布 SDK 与合成业务/HTTP 数据
  * Output: Agent 路由、权限、幂等性和上游协议及失败语义回归结果
  * Pos: 后端 Agent Runtime 单测，验证干净安装与单次失败不重试
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

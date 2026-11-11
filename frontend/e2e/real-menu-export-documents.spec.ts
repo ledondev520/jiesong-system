@@ -2,8 +2,6 @@
  * Input: Real role fixture, SALES menu UI, isolated Express/SQLite and XLSX downloads
  * Output: Six prerequisite, generation, cancellation, retry and workbook-content cases
  * Pos: Hosted browser acceptance for internal customs/refund and commercial documents
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { execFileSync } from "node:child_process";
 import path from "node:path";

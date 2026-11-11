@@ -2,8 +2,6 @@
  * Input: Explicit test scenario, private temporary root and synthetic role/business data
  * Output: Isolated real Express/auth backend and scenario metadata for browser/HTTP tests
  * Pos: Test-only role fixture including internal records, documents, header drafts and dashboard sources
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const fs = require('node:fs');
 const os = require('node:os');

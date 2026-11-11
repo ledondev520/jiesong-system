@@ -6,8 +6,6 @@
  * Pos: quote create page and DRAFT detail. Shares lib/order-lines.ts, ProductPicker and PasteRowsDialog with components/orders.
  * Owner decisions 2026-10-31: conversion sets the order FX to spot − 0.2 (server side); a manual unit price is any value >= 0
  *   (no comparison with the rule price). Cost may be empty in a draft (缺成本 → price 0 until filled or overridden).
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 "use client";
 

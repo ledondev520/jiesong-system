@@ -2,8 +2,6 @@
  * Input: 采购合同详情页、purchaseService、contractDocService、router、toast
  * Output: 采购合同详情页交互逻辑测试结果
  * Pos: 前端详情页交互测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

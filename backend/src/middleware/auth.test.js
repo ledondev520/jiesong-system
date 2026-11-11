@@ -2,8 +2,6 @@
  * Input: node:test、node:assert/strict、授权中间件
  * Output: 认证授权中间件的单元测试结果
  * Pos: 后端授权校验测试文件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

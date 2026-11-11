@@ -2,8 +2,6 @@
  * Input: 后端 GET /sales/:id/loading-plan 返回的装柜计划（毫米坐标，原点=后墙左侧地面，x 朝柜门）
  * Output: LoadingPlan 等类型、summarizeLoadingPlan（页面横幅摘要）、mmToM
  * Pos: 前端只渲染装柜计划，不再排柜；类型镜像 backend/src/services/containerPacking.js 与 shipmentReadinessService.js
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 export type ContainerTypeCode = "20GP" | "40GP" | "40HQ";

@@ -2,8 +2,6 @@
  * Input: PageHeader组件、默认 Next Router 与显式返回动作
  * Output: 页面头部交互测试
  * Pos: 前端布局组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";

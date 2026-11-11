@@ -2,8 +2,6 @@
  * Input: HeaderUserMenu, actual Zustand profile persistence and synthetic identity
  * Output: Partial local profile-save failure, preserved draft and explicit retry regression
  * Pos: Runnable personal settings integration at the existing local save seam; no HTTP
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";

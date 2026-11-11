@@ -2,7 +2,6 @@
  * Input: 390/1440px 浏览器、商品编辑 UI、完全合成的 API 和延迟响应
  * Output: 取消/重开、迟到 HS 详情、保存失败重试和旧保存隔离的浏览器验收
  * Pos: 商品档案编辑生命周期验收，不访问真实业务或付费匹配服务
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { test, expect } from "@playwright/test";
 import { mockApiRoutes, signInAsAdmin } from "./helpers";

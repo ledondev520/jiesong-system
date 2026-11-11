@@ -2,8 +2,6 @@
  * Input: 财务工作簿/PDF buffer、来源文件名/相对路径、Prisma Adapter 与查询筛选
  * Output: 脱敏结构化文档、普通幂等导入、仅新增报表快照、资料库摘要与行级下钻
  * Pos: 财务证据库；快照区分单月与累计区间、不替换业务账期，原始文件不归档
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const crypto = require('crypto');

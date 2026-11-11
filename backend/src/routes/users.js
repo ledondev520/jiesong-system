@@ -2,8 +2,6 @@
  * Input: 用户控制器
  * Output: 用户管理路由
  * Pos: 用户路由，处理用户CRUD
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

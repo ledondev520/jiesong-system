@@ -2,8 +2,6 @@
  * Input: Quote objects returned by /api/v1/quotes
  * Output: status labels/tones, the one primary action per status, and line math for the editor
  * Pos: pure helpers shared by the quote list, detail and editor (docs/redesign/UX-REDESIGN-2026.md §6.3)
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 export const QUOTE_STATUSES = [

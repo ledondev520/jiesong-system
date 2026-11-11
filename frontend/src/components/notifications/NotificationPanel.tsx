@@ -2,8 +2,6 @@
  * Input: 通知列表数据
  * Output: 通知列表面板（下拉/弹窗内容）
  * Pos: 通知展示子组件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

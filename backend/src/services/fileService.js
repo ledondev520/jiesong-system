@@ -3,7 +3,6 @@
  * Output: 统一合同附件服务、受限路径与文件身份校验后的失败上传清理、Buffer 归档与受保护凭证访问/删除约束
  * Pos: 文件管理领域服务，屏蔽采购/出口合同附件的底层表差异
  *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  * 下载/删除前的库内路径统一经 resolveContainedUploadPath（realpath 包含 UPLOAD_DIR）。
  */
 

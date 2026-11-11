@@ -5,7 +5,6 @@ Input: parsed/wps_remaining_closure_register.json
 Output: parsed/wps_remaining_action_matrix.{json,csv,md}
 Pos: WPS 剩余导入行动矩阵；把关闭台账翻译成补材料/裁决/复跑脚本清单；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

@@ -2,8 +2,6 @@
  * Input: ThemeToggle 组件
  * Output: 主题切换交互测试
  * Pos: 前端布局组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';

@@ -2,8 +2,6 @@
  * Input: parsed/contracts.csv + purchase_evidence_import_plan.json + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/contract_source_note_backfill_plan.json; optional note-only Prisma writes when --apply is passed
  * Pos: WPS 合同头来源 note 回填脚本；只补出口/采购合同头的文件来源标记，不改业务字段
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

@@ -5,7 +5,6 @@ Input: parsed/wps_candidate_source_mapping_review.json + SQLite dev DB
 Output: parsed/wps_candidate_source_ownership_review.{json,csv,md}
 Pos: WPS 候选来源占用复核；检查候选来源已挂接 DB 行的引用状态和是否可能是聚合行占用；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

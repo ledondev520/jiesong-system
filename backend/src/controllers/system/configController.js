@@ -2,8 +2,6 @@
  * Input: prisma.systemConfig KV 存储
  * Output: 系统配置读写接口（平铺格式 + 分域格式）；数据库与环境密钥均仅返回脱敏状态
  * Pos: 系统配置控制层，支持向后兼容的平铺 getConfigs 与新增的分域 getConfigsByDomain
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const https = require('https');

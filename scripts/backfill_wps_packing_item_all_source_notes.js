@@ -2,8 +2,6 @@
  * Input: wps_source_gap_disposition.json + packing_items.csv + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/packing_item_all_source_note_backfill_plan.json; optional note-only Prisma writes when --apply is passed
  * Pos: WPS 装箱明细全量源来源 note 回填脚本；只处理 no_candidate_source_required 中被 preferred 源遗漏、但全量装箱源有唯一强匹配的记录
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

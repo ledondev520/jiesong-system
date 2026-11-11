@@ -2,8 +2,6 @@
  * Input: 可见会话列表与排序状态
  * Output: 「聊天会话」标签内容（移动卡片 + 桌面表格）
  * Pos: Dashboard AI 管理模块（settings/ai-usage 页面拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

@@ -2,7 +2,6 @@
  * Input: 真实 Next 路由、390/1440px 视口与本地合成报关/退税 API
  * Output: 历史筛选、带关键词/状态的详情明确返回与退税页签切换浏览器验收
  * Pos: 报关列表导航回归；不访问生产数据、不执行业务写入
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { test, expect } from "@playwright/test";
 import { mockApiRoutes, signInAsAdmin } from "./helpers";

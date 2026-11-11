@@ -2,8 +2,6 @@
  * Input: 当前日期标签
  * Output: Header 上下文提示块
  * Pos: 前端布局子组件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

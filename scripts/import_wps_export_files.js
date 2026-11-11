@@ -2,8 +2,6 @@
  * Input: attachment_inventory.csv + backend/prisma/dev.db
  * Output: optional deterministic file copies under <UPLOAD_DIR>/sales-contracts (same root as backend config.upload.dir) + SalesContractFile records
  * Pos: WPS 出货源文件附件导入脚本；默认 dry-run，显式 --apply 后才复制文件并创建附件记录，不改出口业务字段
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const crypto = require('crypto');

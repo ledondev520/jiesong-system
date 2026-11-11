@@ -2,8 +2,6 @@
  * Input: 销售创建页、products/stores/sales 服务、toast、router
  * Output: 销售创建原子提交、数值输入、重复点击、失败重试和离页中断回归
  * Pos: 前端创建页交互测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

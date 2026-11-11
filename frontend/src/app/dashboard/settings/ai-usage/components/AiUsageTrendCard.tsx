@@ -2,8 +2,6 @@
  * Input: Token 统计数据、区间选择
  * Output: AI 用量趋势折线图与 24h/30d 摘要卡片（图表 Module 按需加载）
  * Pos: Dashboard AI 管理模块（settings/ai-usage 页面拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

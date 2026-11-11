@@ -2,8 +2,6 @@
  * Input: 采购控制器、采购 Excel 专用内存上传中间件
  * Output: 采购合同管理路由；导入先认证/鉴权，再以内存接收 Excel
  * Pos: 采购路由，处理采购合同CRUD操作
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

@@ -2,7 +2,6 @@
  * Input: 合成 multipart 流、临时上传配置与真实 Multer/Busboy
  * Output: 无监听端口的采购内存上传、大小/扩展名及 NUL 解析回归
  * Pos: 采购上传工具单元测试；仅 os.tmpdir()，不访问数据库
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

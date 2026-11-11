@@ -2,8 +2,6 @@
  * Input: Sentry config entrypoints
  * Output: 配置文件可导入性测试
  * Pos: 前端构建期依赖回归测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it } from 'vitest';

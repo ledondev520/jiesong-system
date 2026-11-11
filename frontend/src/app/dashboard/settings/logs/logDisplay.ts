@@ -2,8 +2,6 @@
  * Input: 操作日志原始字段（action / entity / oldValue / newValue）
  * Output: 中文标签与可读摘要，降低运维查看成本
  * Pos: 系统日志页展示辅助
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 /** 职责：审计动作代码 → 简短中文（未知则回退原文） */

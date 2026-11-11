@@ -4,7 +4,6 @@ Input: tmp/wps_11_export_list_raw/11-报关记录 + parsed/contracts.csv
 Output: parsed/attachment_inventory.csv/json + attachment_inventory_summary.md
 Pos: WPS 历史出货附件盘点脚本；只分类和归属附件，不解析 PDF 正文、不写数据库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

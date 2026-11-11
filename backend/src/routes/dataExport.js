@@ -5,8 +5,6 @@
  *
  * 安全说明：该路由与 system.js 中的 /system/export/:type 指向同一控制器，
  * 已对齐相同的 roleAuth 权限配置，防止绕过 RBAC 直接访问。
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

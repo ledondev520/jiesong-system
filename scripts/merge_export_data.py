@@ -5,7 +5,6 @@ Input: update0117.csv (报关记录), 出口合同明细.csv (外销合同)
 Output: docs/出口合同汇总.csv (合并后的数据)
 Pos: 数据合并脚本
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 import pandas as pd

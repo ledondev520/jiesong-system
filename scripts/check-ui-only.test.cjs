@@ -2,7 +2,6 @@
  * Input: 临时合成 Git 仓库与 scripts/check-ui-only.cjs
  * Output: §14.1 允许/拒绝清单、重命名、浅历史和 backend-gate fail-safe 回归
  * Pos: CI 工具测试；不读写业务数据，不更改全局 Git 配置
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

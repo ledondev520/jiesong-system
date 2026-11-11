@@ -2,8 +2,6 @@
  * Input: 受限归档的最新 `出货汇总.xlsx` + backend/prisma SQLite
  * Output: 只新增源表中缺失的 EXP 合同、PENDING 异常占位与装箱明细；不覆盖现有合同/明细
  * Pos: 出货汇总增量导入 Adapter；默认 dry-run，显式 --apply 后才以单事务写库
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README。
  */
 
 const crypto = require('crypto');

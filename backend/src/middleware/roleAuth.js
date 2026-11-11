@@ -2,8 +2,6 @@
  * Input: 当前登录用户、目标路由允许角色
  * Output: 角色授权结果
  * Pos: 角色鉴权中间件，统一处理 RBAC
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { createError } = require('./errorHandler');

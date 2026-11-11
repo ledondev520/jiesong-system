@@ -2,8 +2,6 @@
  * Input: ThemeProvider 组件
  * Output: 主题提供器参数透传测试
  * Pos: 前端布局组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import type { ReactNode } from 'react';

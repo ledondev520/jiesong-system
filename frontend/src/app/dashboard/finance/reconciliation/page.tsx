@@ -2,8 +2,6 @@
  * Input: financeMatchService API
  * Output: 智能关联对账分析页面（三栏：银行流水 / 合同 / 发票）
  * Pos: 财务模块-智能关联对账分析子页面
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

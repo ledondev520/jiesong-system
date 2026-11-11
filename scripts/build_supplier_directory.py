@@ -5,7 +5,6 @@ Input: 当前 SQLite 供应商/采购合同、WPS 采购合同凭证抽取 CSV�
 Output: 受限 JSON，供供应商名录工作簿生成；stdout 只输出聚合计数
 Pos: 供应商主体目录汇总 Adapter；只读来源和数据库，不自动回填，不按相似名称合并
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

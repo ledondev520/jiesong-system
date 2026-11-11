@@ -2,8 +2,6 @@
  * Input: refreshed purchase_evidence_extracts.csv + purchase_evidence_items.csv + backend/prisma/dev.db + 已上传附件（<UPLOAD_DIR>，与后端 config.upload.dir 同一解析）
  * Output: tmp/wps_11_export_list_raw/parsed/cg2500013_purchase_contract_repair_plan.json; optional Prisma repair when --apply is passed
  * Pos: WPS CG2500013 采购合同错挂修复脚本；只在 PDF 正文、附件 SHA1、无付款/库存引用均通过时，把库中重复屏风合同修正为 PDF 证明的釉面砖合同
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const crypto = require('crypto');

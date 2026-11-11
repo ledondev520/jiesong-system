@@ -2,8 +2,6 @@
  * Input: wps_source_gap_disposition.json + preferred_packing_items.csv + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/sales_item_shipment_summary_source_note_backfill_plan.json; optional note-only Prisma writes when --apply is passed
  * Pos: WPS 销售明细出货汇总来源 note 回填脚本；只在出货汇总同合同/商品/门店/售价强一致且数量一行或同价多行精确覆盖时补来源标记
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

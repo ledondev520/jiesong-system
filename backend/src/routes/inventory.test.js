@@ -2,8 +2,6 @@
  * Input: inventory 路由模块
  * Output: 库存路由静态优先级回归测试结果
  * Pos: 库存路由层测试，保障静态路由不被动态路由覆盖
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

@@ -2,8 +2,6 @@
  * Input: Prisma客户端、JWT、bcrypt
  * Output: 认证相关业务逻辑（版本化登录会话、注册、统一密码管理、邮箱找回密码）
  * Pos: 认证服务，处理用户认证和授权逻辑
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const bcrypt = require('bcrypt');

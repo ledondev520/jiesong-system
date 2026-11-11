@@ -2,8 +2,6 @@
  * Input: Existing ADMIN config HTTP route, committed migrations and private synthetic SQLite
  * Output: Company-name-only companyName save (the old invoiceTitleInfo setting was merged into 公司信息, J35), retry, failure and independent readback
  * Pos: Row 30 ordinary text acceptance; no full-form, provider, accounting or security writes
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

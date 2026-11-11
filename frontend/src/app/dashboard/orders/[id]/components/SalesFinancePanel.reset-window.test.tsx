@@ -2,8 +2,6 @@
  * Input: SalesFinancePanel、真实 React 调度（非 act 环境，被动 effect 晚于 layout effect 一个任务执行）、合成财务汇总请求
  * Output: 切换合同后、被动 effect 发起新请求之前到达的旧响应不得改写渲染期重置的加载/失败状态（与原 effect 内同步重置一致）的回归测试
  * Pos: 出口专项单财务结算 resetPendingRef 窗口回归测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { useLayoutEffect } from "react";

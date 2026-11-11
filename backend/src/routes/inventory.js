@@ -2,8 +2,6 @@
  * Input: 库存控制器
  * Output: 库存管理路由
  * Pos: 库存路由，处理库存查询和状态变更
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

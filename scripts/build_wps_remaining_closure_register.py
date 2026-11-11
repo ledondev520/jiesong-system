@@ -5,7 +5,6 @@ Input: parsed WPS blocker reports + completion audit + decision/cloud reports
 Output: parsed/wps_remaining_closure_register.{json,csv,md}
 Pos: WPS 剩余导入关闭总台账；汇总来源缺口、裁决项和 cloud-only 原件；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

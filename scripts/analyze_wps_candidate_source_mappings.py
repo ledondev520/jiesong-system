@@ -5,7 +5,6 @@ Input: parsed/wps_source_gap_disposition.json + preferred WPS source CSVs + SQLi
 Output: parsed/wps_candidate_source_mapping_review.{json,csv,md}
 Pos: WPS 来源缺口候选映射深度复核；并排比较 DB 行、候选源行、候选源是否已挂到其他 note；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

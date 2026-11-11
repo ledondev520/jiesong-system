@@ -2,8 +2,6 @@
  * Input: actual authenticated multipart finance routes, synthetic XLSX and committed migrations
  * Output: financial preview/confirmation, HTTP readback and independent SQL/literal amount/source acceptance
  * Pos: isolated financial import regression; no production data, providers or archived workbooks
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

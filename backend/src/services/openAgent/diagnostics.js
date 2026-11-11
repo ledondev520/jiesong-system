@@ -2,8 +2,6 @@
  * Input: 合同号与业务服务层
  * Output: 销售/采购/贸易合规诊断（纯读取）及其数组、计数辅助函数
  * Pos: openAgentService 的诊断子模块；由 openAgentService.js 门面原样重新导出
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../../utils/prisma');

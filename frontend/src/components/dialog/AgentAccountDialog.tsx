@@ -2,8 +2,6 @@
  * Input: AgentAccount 数据（编辑模式）或空（新建模式）
  * Output: Agent 账号新建/编辑对话框，仅包含名称、slug、描述、状态
  * Pos: 账号管理页面（users/page.tsx）的共享对话框组件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';

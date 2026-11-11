@@ -2,8 +2,6 @@
  * Input: ISO 字符串、时间戳、Date（多来自后端 UTC/ISO）
  * Output: 以「北京时间 Asia/Shanghai」展示的日期/时间字符串
  * Pos: 全系统默认时间展示（与后端审计、Token 分桶策略一致时优先用本模块）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { MISSING_VALUE } from "./missing-value";

@@ -2,8 +2,6 @@
  * Input: sales 路由模块
  * Output: 销售路由匹配顺序回归测试结果
  * Pos: 销售路由层测试，保障静态路由优先级
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

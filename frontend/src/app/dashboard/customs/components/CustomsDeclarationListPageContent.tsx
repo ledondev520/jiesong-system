@@ -2,8 +2,6 @@
  * Input: 报关单服务、共享列表URL状态、router
  * Output: 报关单列表页（嵌入时只渲染工具栏；状态 chips、KpiStat、草稿单标注；筛选与历史同步，详情携带安全的当前列表返回上下文）
  * Pos: 报关单管理主列表页
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

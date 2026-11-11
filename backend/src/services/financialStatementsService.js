@@ -2,8 +2,6 @@
  * Input: 会计报表/科目余额/明细账 Buffer、账期与 Prisma 数据库
  * Output: 保留数字公式缓存的三文件只读预览、确认后事务写入、财务报表查询、趋势分析和预警
  * Pos: 财务报表业务服务层；三类来源必须跨越“预览 → 明确确认”Interface 后才能写库
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const crypto = require('crypto');

@@ -5,7 +5,6 @@ Input: parsed WPS cloud metadata + local WPS cache.db/filetransfer tables
 Output: parsed/wps_cloud_only_download_handles.{json,md}
 Pos: WPS cloud-only 原件下载手柄只读探测；抽取 fileId/groupId/taskId/transfer 状态，判断本机是否已有可直接下载线索；不联网、不输出 token、不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

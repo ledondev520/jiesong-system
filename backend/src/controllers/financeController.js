@@ -2,8 +2,6 @@
  * Input: finance service 层
  * Output: 财务相关的HTTP响应
  * Pos: 财务控制器，委托 service 完成业务逻辑
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { success, created, paginated } = require('../utils/response');

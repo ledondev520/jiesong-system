@@ -2,8 +2,6 @@
  * Input: next-themes useTheme、按钮组件、图标
  * Output: 主题切换按钮（白天/夜间）
  * Pos: 顶部Header交互组件，负责主题切换入口
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

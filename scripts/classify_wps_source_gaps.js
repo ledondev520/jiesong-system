@@ -2,8 +2,6 @@
  * Input: wps_db_source_coverage.json + import/purchase/evidence plans + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/wps_source_gap_classification.{json,md}
  * Pos: WPS 剩余来源缺口只读分类脚本；把不能自动回填的原因分桶，帮助后续继续推进或人工裁决，不写库
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

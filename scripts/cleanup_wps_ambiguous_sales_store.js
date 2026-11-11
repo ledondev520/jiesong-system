@@ -2,8 +2,6 @@
  * Input: tmp/wps_11_export_list_raw/parsed/import_plan.json + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/ambiguous_sales_store_cleanup_plan.json; optional Prisma updates/deletes when --apply is passed
  * Pos: 清理已被当前证据证明为不可靠的 WPS 路径门店销售行；删除不在候选集合内、与同数量装箱唯一门店冲突且已有正确重复行、同源正确价格已转移到强门店行、或已被同源装箱数量拆分行覆盖的记录
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

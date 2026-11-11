@@ -2,8 +2,6 @@
  * Input: AI 会话 / Token 统计 Interface 数据
  * Output: 会话治理视角、风险排序、用量图表与费用估算的纯函数及类型（含少量图标节点）
  * Pos: Dashboard AI 管理模块（settings/ai-usage 页面拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import type {

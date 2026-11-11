@@ -2,8 +2,6 @@
  * Input: 采购合同详情（含商品明细）、开关与关闭回调
  * Output: 采购列表页的合同详情弹窗（金额汇总、商品明细、备注）
  * Pos: 采购列表页（ContractsPageContent）拆出的只读展示组件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { RemarkText } from "@/components/ui/remark-text";

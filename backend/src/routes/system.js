@@ -2,8 +2,6 @@
  * Input: 系统控制器
  * Output: 系统配置管理路由；CSV/xlsx 导入经内存上传，不在磁盘留下文件
  * Pos: 系统路由，处理系统配置和日志查询
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

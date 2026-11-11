@@ -5,7 +5,6 @@ Input: backend/prisma/dev.db + parsed WPS source/evidence CSV/JSON files
 Output: parsed/wps_formal_customs_gap_review.{json,csv,md}
 Pos: WPS 正式报关来源缺口只读复核；核对占位报关单、装箱源集合和正式凭证候选，证明哪些缺口不能自动写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

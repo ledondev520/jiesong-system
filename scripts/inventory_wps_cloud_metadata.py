@@ -5,7 +5,6 @@ Input: WPS Cloud Files cache.db metadata for 11-报关记录 and root shipment/l
 Output: parsed/wps_cloud_metadata_*.csv/json/md and optional copied cached/direct-local/source-root files
 Pos: WPS 云端文件索引盘点脚本；只读 WPS 本机索引，并回查本机团队文档路径、WPS 根目录与项目源目录，标记云端可见/本机已缓存状态
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

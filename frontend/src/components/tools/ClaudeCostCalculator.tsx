@@ -8,8 +8,6 @@
  * - Output: $20 / 百万 token
  * - Cache Read: $0.5 / 百万 token
  * - Cache Write: $6.25 / 百万 token
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';

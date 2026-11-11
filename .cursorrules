@@ -32,8 +32,6 @@ alwaysApply: true
  * Input: [依赖的模块/数据/文档]
  * Output: [对外提供的功能/数据/接口]
  * Pos: [在系统中的位置/角色]
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 ```
 

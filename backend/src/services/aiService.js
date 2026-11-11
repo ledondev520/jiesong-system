@@ -2,8 +2,6 @@
  * Input: 当前 AI provider（OpenAI / DeepSeek / Kimi）、Prisma客户端
  * Output: AI对话和解析结果
  * Pos: AI服务，处理智能问答和辅助录入（含图像理解）；统一 provider/profile、完整 deadline 与流式 usage
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const config = require('../config');

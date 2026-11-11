@@ -2,8 +2,6 @@
  * Input: 供应商控制器
  * Output: 供应商管理路由
  * Pos: 供应商路由，处理供应商CRUD操作
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

@@ -2,8 +2,6 @@
  * Input: Playwright测试运行参数
  * Output: 自动化验收测试配置
  * Pos: 前端E2E测试入口配置
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { defineConfig, devices } from '@playwright/test';

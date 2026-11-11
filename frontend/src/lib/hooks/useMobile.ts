@@ -2,8 +2,6 @@
  * Input: 浏览器窗口尺寸
  * Output: 当前视口是否为移动端（< 768px）的布尔值
  * Pos: 工具 hook，用于条件渲染移动端/桌面端差异化布局
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';

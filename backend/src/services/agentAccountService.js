@@ -2,8 +2,6 @@
  * Input: Agent 账号与凭证管理请求
  * Output: Agent 账号、grant、credential 生命周期能力
  * Pos: Agent 管理服务层；创建/更新时自动分配全量 capability，无需手动配置
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const crypto = require('node:crypto');

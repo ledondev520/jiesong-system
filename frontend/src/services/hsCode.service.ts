@@ -2,8 +2,6 @@
  * Input: HSCode 查询参数与人工税则证据更新字段
  * Output: HSCode 查询、匹配和证据化更新前端 Module
  * Pos: 商品管理页智能匹配服务层
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import api from '@/lib/axios';

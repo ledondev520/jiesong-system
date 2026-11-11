@@ -2,8 +2,6 @@
  * Input: 搜索关键词、HS 编码前缀、分页大小
  * Output: 商品名称 / HS 编码双搜索栏
  * Pos: 出口模块子页面 - HSCode 检索（page.tsx 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

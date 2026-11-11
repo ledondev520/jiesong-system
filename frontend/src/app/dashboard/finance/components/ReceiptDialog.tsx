@@ -2,8 +2,6 @@
  * Input: 用户录入的到账金额与日期
  * Output: 无合同的收款记录（RECEIVABLE_RECEIPT），进入待分配池
  * Pos: 财务收款流程第一步 - 记录客户到账，不绑定具体合同
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

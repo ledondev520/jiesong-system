@@ -4,8 +4,6 @@
  * Pos: 数据导入脚本，从财务 Excel 导入完整收付款流水
  *
  * 运行: cd backend && node prisma/import-payments.js
- *
- * 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { PrismaClient } = require('@prisma/client');

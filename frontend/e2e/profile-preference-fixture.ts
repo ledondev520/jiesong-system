@@ -2,8 +2,6 @@
  * Input: Real isolated SALES backend, browser preference storage and profile draft UI
  * Output: Safe authenticated user readback and one-shot local persistence failures
  * Pos: Hosted personal settings acceptance helpers; no credential or auth-storage reads
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, type Page } from "@playwright/test";
 import { loginAs, type RoleFixture } from "./real-role-fixture";

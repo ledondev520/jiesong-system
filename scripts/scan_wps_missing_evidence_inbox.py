@@ -5,7 +5,6 @@ Input: parsed/wps_missing_evidence_intake_package.json + local incoming dirs
 Output: parsed/wps_missing_evidence_incoming_scan.{json,csv,md}
 Pos: WPS 缺失材料本机收件扫描器；只读扫描收件目录，按路径与内容识别精确 cloud 原件与正式报关候选；不写库不复制
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

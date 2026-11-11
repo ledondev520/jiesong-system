@@ -2,8 +2,6 @@
  * Input: 采购合同服务、SortableTableHead、useServerSort
  * Output: 手机前置操作与双列紧凑概览的采购合同管理页面（合同号/供应商/商品服务端检索、分页、具名桌面操作）
  * Pos: 核心业务页面，管理供应商采购合同
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

@@ -2,8 +2,6 @@
  * Input: wps_purchase_file_retention_audit.json + backend/prisma/dev.db
  * Output: optional deterministic file copies under <UPLOAD_DIR>/contracts (same root as backend config.upload.dir) + ContractFile records
  * Pos: WPS 采购合同附件导入脚本；默认 dry-run，显式 --apply 后才复制文件并创建附件记录，不改采购业务字段
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const crypto = require('crypto');

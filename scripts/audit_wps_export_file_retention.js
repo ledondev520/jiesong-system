@@ -2,8 +2,6 @@
  * Input: attachment_inventory.csv + WPS cloud metadata + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/wps_export_file_retention_audit.{json,csv,md}
  * Pos: WPS 出货/报关源文件留存只读审计；对比已保留源文件、EXP 归属和当前销售合同，不写库
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

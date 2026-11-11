@@ -2,8 +2,6 @@
  * Input: tmp/wps_11_export_list_raw/parsed/purchase_evidence_*.csv + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/purchase_evidence_import_plan.json; optional Prisma writes when --apply is passed
  * Pos: WPS 采购合同凭证幂等导入脚本；默认 dry-run，只导入字段齐全且库里缺失的真实采购合同；显式开启后可导入只有合同头证据的 DRAFT 合同
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

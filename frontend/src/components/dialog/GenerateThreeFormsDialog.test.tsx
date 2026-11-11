@@ -2,8 +2,6 @@
  * Input: 三表生成对话框、后端准备度、HS 建议与请求拒绝正文
  * Output: 单证门禁、无退税警示及可见错误/保留草稿/显式重试交互测试
  * Pos: 出口单证确认 Module 交互测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

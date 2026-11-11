@@ -2,8 +2,6 @@
  * Input: update0117.csv增量数据
  * Output: 新增数据导入SQLite数据库
  * Pos: 增量数据导入脚本
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

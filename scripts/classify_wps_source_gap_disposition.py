@@ -5,7 +5,6 @@ Input: parsed/wps_source_gap_details.json
 Output: parsed/wps_source_gap_disposition.{json,csv,md}
 Pos: WPS 已入库来源缺口处置分层；把 223 条缺来源记录按正式凭证、采购歧义、零值/非捷淞、候选映射复核、无候选补源分桶；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

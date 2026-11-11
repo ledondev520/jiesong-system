@@ -2,8 +2,6 @@
  * Input: Test-only role scenarios, Express child process and private synthetic SQLite
  * Output: Real login/HTTP forwarding plus independent business, document, header and dashboard readback
  * Pos: Shared hosted role-browser fixture; never mocks business responses
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync } from "node:fs";

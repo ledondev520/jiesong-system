@@ -2,8 +2,6 @@
  * Input: 港口管理页、system.service、toast
  * Output: 加载失败原因与重试、停用确认、状态徽章的回归结果
  * Pos: 前端业务页交互测试；验证共享 DataTable / ErrorState / RowActionsMenu 在真实页面上的接入
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

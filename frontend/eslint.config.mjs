@@ -2,7 +2,6 @@
  * Input: Next.js ESLint 配置与生成目录清单
  * Output: 前端源码及测试 lint，排除构建和验收生成报告；react-hooks 规则升级后检出 81 处既有违规，未清零的规则暂降为 warn
  * Pos: 前端代码质量门禁配置
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";

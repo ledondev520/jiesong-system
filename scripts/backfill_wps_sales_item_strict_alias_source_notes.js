@@ -2,8 +2,6 @@
  * Input: wps_source_gap_disposition.json + preferred_sales_items.csv + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/sales_item_strict_alias_source_note_backfill_plan.json; optional note-only Prisma writes when --apply is passed
  * Pos: WPS 销售明细别名来源 note 回填脚本；只处理 no_candidate_source_required 中同合同/数量/单价强一致且商品别名唯一的销售记录
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

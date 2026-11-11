@@ -2,8 +2,6 @@
  * Input: procurementTemplateService（CSV解析与聚合）
  * Output: 三个需认证的REST端点：门店列表、通用模板、指定门店采购清单
  * Pos: 路由层，将采购模板服务暴露为HTTP API
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

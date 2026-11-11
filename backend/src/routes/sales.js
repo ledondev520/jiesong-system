@@ -7,8 +7,6 @@
  * 2026-02-21 新增：GET /:id/export-excel 生成三 Sheet 标准出口 Excel
  * 2026-06-03 新增：/:id/files 出口源文件附件上传、列表、下载、删除
  * 2026-07-10 升级：船司装箱单 PDF 原件、差异、历史和人工结论持久化
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

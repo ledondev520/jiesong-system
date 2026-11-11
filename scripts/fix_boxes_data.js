@@ -10,8 +10,6 @@
  * 修复逻辑：
  *   对于 EXP25 开头的合同，如果 boxes == quantity 或 boxes == Math.ceil(quantity)，
  *   说明箱数是从数量错误推导的，应该置空。
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const path = require('path');

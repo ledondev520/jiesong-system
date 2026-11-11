@@ -2,8 +2,6 @@
  * Input: express-validator库
  * Output: 通用验证规则（统一新密码策略、邮箱找回、注册及安全整数分页边界）
  * Pos: 参数验证工具，提供常用验证规则
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { body, param, query, validationResult } = require('express-validator');

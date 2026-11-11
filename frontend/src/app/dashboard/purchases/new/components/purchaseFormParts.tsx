@@ -2,8 +2,6 @@
  * Input: zod
  * Output: 采购表单校验 schema、内联供应商初始值、步骤指示器与价格汇总卡片
  * Pos: CreatePurchasePageContent 拆出的无状态部分
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { z } from "zod";

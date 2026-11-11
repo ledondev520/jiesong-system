@@ -2,8 +2,6 @@
  * Input: HTTP 请求（查询参数 / 内存上传文件）
  * Output: Excel 文件下载 或 JSON 导入结果；导入仅传文件名标签与内存字节
  * Pos: 采购合同批量导入导出控制器
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { exportPurchasesExcel, importPurchasesExcel } = require('../services/purchaseImportExportService');

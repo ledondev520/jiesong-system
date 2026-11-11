@@ -2,8 +2,6 @@
  * Input: 搜索结果列表与分页状态
  * Output: 搜索结果卡片（移动卡片、桌面表格、分页）
  * Pos: 出口模块子页面 - HSCode 检索（page.tsx 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

@@ -2,8 +2,6 @@
  * Input: GET /purchases/price-history/:productId 的 bySupplier 扩展字段
  * Output: 供应商比价类型（purchase.service 的 ProductPriceHistory 不含 bySupplier）
  * Pos: 比价弹层、商品/供应商详情页共用类型
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import type { ProductPriceHistory } from "./purchase.service";

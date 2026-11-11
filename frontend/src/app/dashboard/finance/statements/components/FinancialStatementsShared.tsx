@@ -2,8 +2,6 @@
  * Input: 财务报表页共享格式化逻辑、预警、表格与图表提示配置
  * Output: 可复用的财务报表展示子组件
  * Pos: 财务报表页共享展示层
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import type { ComponentType } from "react";

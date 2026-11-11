@@ -4,8 +4,6 @@
  *         时序完全一致的 Promise（各回调执行的微任务位置、返回 Promise 的完成时机、同步异常与回调异常的处理均相同）
  * Pos: 供页面在 effect 中调用的请求函数使用：状态只在回调中写入（满足 react-hooks/set-state-in-effect），
  *      又不像 `.then().catch().finally()` 链那样改变同一轮内多个请求成功/失败处理的相对顺序
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const noop = () => {};

@@ -2,8 +2,6 @@
  * Input: real PDFKit bytes, Express carrier-check routes and private migrated SQLite
  * Output: four bounded multi-page, row-difference, image-only and malformed cases
  * Pos: extends the genuine-PDF happy path already in trade-lifecycle.integration.js
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

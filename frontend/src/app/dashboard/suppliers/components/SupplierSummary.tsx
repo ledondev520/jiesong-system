@@ -2,8 +2,6 @@
  * Input: 当前选中的供应商、onEdit 回调
  * Output: 只读供应商摘要（联系人、税号、别名、质量说明）与显式「编辑」入口；不含收款账户（需进入编辑或详情页），但列出缺失字段名称
  * Pos: 供应商列表点击后的落点，避免点击即进入可保存/归档/删除的编辑表单
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import Link from "next/link";
 import { Pencil } from "lucide-react";

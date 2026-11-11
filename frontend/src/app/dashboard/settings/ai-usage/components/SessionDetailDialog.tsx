@@ -2,8 +2,6 @@
  * Input: 会话消息与选中会话
  * Output: 会话详情弹窗
  * Pos: Dashboard AI 管理模块（settings/ai-usage 页面拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

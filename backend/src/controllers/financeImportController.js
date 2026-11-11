@@ -2,8 +2,6 @@
  * Input: HTTP请求、financeImportService
  * Output: 银行流水/发票导入的API响应
  * Pos: 财务数据导入控制器
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const multer = require('multer');

@@ -2,8 +2,6 @@
  * Input: 用户服务 API、Agent 服务 API
  * Output: 账号管理、未开通/已停用账号核对入口和完整分页目录
  * Pos: 系统设置子页面，管理员管理所有账号
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

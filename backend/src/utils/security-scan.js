@@ -2,8 +2,6 @@
  * Input: 任意请求/响应数据
  * Output: 脱敏后的JSON序列化安全副本
  * Pos: 出站日志与监控数据脱敏
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const DEFAULT_REDACTED_TEXT = '[REDACTED]';

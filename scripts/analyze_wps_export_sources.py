@@ -5,7 +5,6 @@ Input: tmp/wps_11_export_list_raw/11-报关记录 下的 WPS 出货/出口合同
 Output: tmp/wps_11_export_list_raw/parsed/ 下的合同、装箱、发票汇总与现库差异报告
 Pos: WPS 出货源文件解析与导入前核对脚本；只读源文件和数据库，不直接落库；混合门店汇总行会被可加总的拆分行替代
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

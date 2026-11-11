@@ -2,8 +2,6 @@
  * Input: 库存当前状态、目标状态、库存记录上下文
  * Output: 状态流转校验结果（允许/拒绝与原因）
  * Pos: 库存状态机工具，统一约束库存状态流转规则，业务来源库存由验货/发运驱动
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { INVENTORY_STATUS } = require('../config/constants');

@@ -2,8 +2,6 @@
  * Input: Real role fixture, committed migrations, ordinary HTTP routes and synthetic XLSX
  * Output: Six menu-document fixture contract checks (split from role-browser-server.test.js for parallel runs)
  * Pos: Backend HTTP/SQLite acceptance; no browser execution or production/provider access
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

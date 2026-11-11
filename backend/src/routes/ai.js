@@ -2,8 +2,6 @@
  * Input: AI控制器
  * Output: AI助手路由
  * Pos: AI路由，处理智能问答和辅助录入（含图像）
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

@@ -2,8 +2,6 @@
  * Input: Prisma客户端、数据库数据
  * Output: 带 UTF-8 BOM 的 CSV 及 Excel 导出数据（收付款 CSV 类型沿用既有财务应付分组）
  * Pos: 数据导出服务，生成各种格式的导出文件（含销售合同五 Sheet Excel 标准出口模板：合同信息/商品明细/装箱清单/商业发票/税务测算）
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const ExcelJS = require('exceljs');

@@ -2,7 +2,6 @@
  * Input: 合成 XLS/XLSX multipart、畸形文件名及模拟认证/服务
  * Output: 采购内存上传兼容性、鉴权顺序、限制及四类上传路由的 NUL 输入400回归
  * Pos: localhost HTTP 上传边界测试；仅 os.tmpdir()，无真实数据库
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

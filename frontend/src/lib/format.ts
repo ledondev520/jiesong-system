@@ -2,8 +2,6 @@
  * Input: 金额/数量数值、币种、加载与错误状态
  * Output: 统一的金额、单价、统计值展示字符串
  * Pos: 展示层格式化（UX 规范 §8.9）；日期仍用 date-format.ts。不做任何取整，只负责显示
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 export type Currency = "CNY" | "USD";

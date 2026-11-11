@@ -2,8 +2,6 @@
  * Input: ContainerLoadingPanel / ContainerPrintView / ContainerSummary、两柜装柜计划夹具
  * Output: 摘要状态、桌面 3D 与手机 2D 回退切换、打印页计数与「估算」、导出按钮接线的测试结果
  * Pos: 货柜面板组件测试（Container3DView 与导出库以替身代替）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

@@ -11,8 +11,6 @@
  *   3. 数据库中已有该编码 → UPDATE（以 Excel 数据为准，保留现有税率）
  *   4. 数据库中没有该编码 → INSERT（税率默认 0，后续可用 HSCIQ 补充）
  *   5. 清除过期备注（若 Excel 中备注为空，则清空数据库中的 note 字段）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const path = require('path');

@@ -2,8 +2,6 @@
  * Input: 认证状态仓库（zustand persist）、路由导航能力、Sidebar、Header、MobileTabBar
  * Output: 验证会话后呈现 Dashboard，未登录重定向与网络失败重试
  * Pos: 仪表盘路由层，承载导航框架和内容区域；移动端使用底部 TabBar 替代侧边栏
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

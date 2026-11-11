@@ -2,8 +2,6 @@
  * Input: AIAssistant组件、fetch/aiService mock
  * Output: AI统一助手组件交互测试结果（流式+图片+二步确认）
  * Pos: 全局AI助手组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";

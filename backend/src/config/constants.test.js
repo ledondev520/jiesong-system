@@ -2,8 +2,6 @@
  * Input: node:test、node:assert/strict、constants配置
  * Output: 常量定义的单元测试结果
  * Pos: 后端常量配置测试文件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

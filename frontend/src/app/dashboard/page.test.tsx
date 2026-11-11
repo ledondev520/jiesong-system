@@ -2,8 +2,6 @@
  * Input: 首页、router、合成待办响应（按角色）
  * Output: 各角色待办展示、BOSS 数字、失败重试与快捷入口测试结果
  * Pos: 前端首页交互测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

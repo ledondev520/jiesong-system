@@ -2,8 +2,6 @@
  * Input: value（当前每页条数）、onChange（变更回调）、options（可选条数列表）
  * Output: 每页条数选择器组件
  * Pos: 通用UI组件，用于所有有分页的列表页面
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import {

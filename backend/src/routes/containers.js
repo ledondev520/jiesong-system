@@ -2,8 +2,6 @@
  * Input: containerController（货柜控制器）、auth/auditLog 中间件
  * Output: /api/v1/containers 路由，含货柜 CRUD 和装箱明细（PackingItem）增删改查汇总
  * Pos: 货柜路由层，将 HTTP 请求分发到 containerController
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

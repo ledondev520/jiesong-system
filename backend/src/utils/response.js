@@ -2,8 +2,6 @@
  * Input: 响应数据
  * Output: 统一格式的响应对象
  * Pos: 响应工具类，统一API响应格式
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { buildPaginatedPayload } = require('./pagination');
