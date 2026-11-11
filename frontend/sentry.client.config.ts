@@ -2,8 +2,6 @@
  * Input: NEXT_PUBLIC_SENTRY_DSN 环境变量
  * Output: 浏览器端 Sentry 错误上报初始化
  * Pos: Next.js 前端客户端 Sentry 配置（浏览器运行时）
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import * as Sentry from '@sentry/nextjs';

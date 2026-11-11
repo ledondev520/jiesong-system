@@ -2,8 +2,6 @@
  * Input: actual Express read routes and committed migrations with private synthetic SQLite
  * Output: three source-backed shipping margin/cash, current finance and payment-trend read cases
  * Pos: ordinary overview acceptance; no uploads, production data, providers or business writes
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

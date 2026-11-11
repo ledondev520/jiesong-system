@@ -2,8 +2,6 @@
  * Input: wps_purchase_file_retention_audit.json + backend/prisma/dev.db
  * Output: ContractFile records for existing <UPLOAD_DIR>/contracts orphan files (same root as backend config.upload.dir)
  * Pos: WPS 采购合同物理孤儿附件恢复脚本；默认 dry-run，只在文件名可推断现有采购合同且物理文件存在时创建附件记录，不改业务字段
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

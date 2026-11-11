@@ -2,8 +2,6 @@
  * Input: tmp/wps_11_export_list_raw/parsed/import_plan.json + backend/prisma/dev.db
  * Output: dry-run/apply cleanup of provable duplicate WPS packing rows and conflicting source notes
  * Pos: WPS 装箱明细去重脚本；处理导入计划中的同分候选、错挂来源 note，以及被拆分源行覆盖的无门店汇总行；默认 dry-run
- *
- * Note: 我被更新时，必须同步更新 scripts/README.md + PLAN/TASKS 检查点。
  */
 
 const fs = require('fs');

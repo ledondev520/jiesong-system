@@ -2,8 +2,6 @@
  * Input: node:test、假客户端（无网络、无密钥）
  * Output: DeepSeek 自动回退与熔断的单元测试
  * Pos: 后端 AI 回退适配层测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

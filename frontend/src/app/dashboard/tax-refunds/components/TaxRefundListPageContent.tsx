@@ -2,8 +2,6 @@
  * Input: 退税服务、URL 查询参数、router
  * Output: 「单证与退税」唯一页面标题；页签 报关单 · 退税工作台 · 退税记录（默认页签按角色，view 显式写入 URL）；退税记录 KPI（可退/已退/进度，本页口径）与列表
  * Pos: 单证与退税主页面（/dashboard/customs）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

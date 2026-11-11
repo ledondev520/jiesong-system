@@ -2,8 +2,6 @@
  * Input: 商品目录、批量选择状态
  * Output: 批量商品选择器弹窗
  * Pos: 采购合同创建入口（CreatePurchasePageContent 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

@@ -2,8 +2,6 @@
  * Input: 浏览器 sessionStorage
  * Output: 认证 Token 读写工具
  * Pos: 前端认证基础设施，统一管理访问令牌
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const AUTH_TOKEN_KEY = 'jiesong_access_token';

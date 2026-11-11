@@ -2,8 +2,6 @@
  * Input: 通知服务
  * Output: 通知相关的 HTTP 响应
  * Pos: 通知控制器，处理有统一分页边界的通知列表、已读、生成逻辑
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const notificationService = require('../services/notificationService');

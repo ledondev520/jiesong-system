@@ -2,8 +2,6 @@
  * Input: PrismaClient, financeService 共享逾期规则, SystemConfig
  * Output: 当前销售模型巡检 + 未读/24小时通知去重 + 可自动修复的执行器
  * Pos: 自进化Agent核心——业务数据巡检、系统健康检查、异常自动修复
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

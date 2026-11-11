@@ -2,8 +2,6 @@
  * Input: AI SSE API、标签Bearer或HttpOnly会话的内存CSRF证明
  * Output: AI 统一智能助手（悬浮 / 工作区 / 停靠侧栏三种形态，docked 随提问附带页面上下文，流式输出+图片上传+写操作二步确认）
  * Pos: 全局 AI 对话模块，单入口 SSE 流式调用 unified agent
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

@@ -2,8 +2,6 @@
  * Input: SalesContract, Store[], onSave callback
  * Output: 可取消草稿、失败保留并明确重试的合同信息编辑表单
  * Pos: 出口合同详情页子组件，支持编辑合同基本信息
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

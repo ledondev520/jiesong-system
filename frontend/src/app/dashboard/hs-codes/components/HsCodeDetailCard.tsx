@@ -2,8 +2,6 @@
  * Input: 选中的 HS 编码记录、AI 填写申报要素状态
  * Output: HS 编码详情卡片（税率、监管条件、申报要素、AI 辅助填写）
  * Pos: 出口模块子页面 - HSCode 检索（page.tsx 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

@@ -2,7 +2,6 @@
  * Input: 根相对的报关列表地址或详情 returnTo 查询值
  * Output: 安全的规范报关返回地址及明确返回的新文档导航
  * Pos: 报关列表/详情的有限返回上下文与原生导航边界
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const CUSTOMS_LIST_PATH = "/dashboard/customs";

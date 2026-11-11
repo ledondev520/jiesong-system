@@ -2,8 +2,6 @@
  * Input: useTableSort hook 返回的排序状态
  * Output: 可点击排序的表头组件（三态箭头：升序/降序/无）
  * Pos: 通用 UI 组件，配合 useTableSort 使用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';

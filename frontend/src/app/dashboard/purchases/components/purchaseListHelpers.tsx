@@ -2,8 +2,6 @@
  * Input: PurchaseStatus、PurchaseContract 类型
  * Output: 采购列表共用的状态徽章（StatusBadge 映射）、状态色条、金额与分页页码辅助
  * Pos: 采购列表页（ContractsPageContent）拆出的纯展示辅助；草稿/已取消状态明确标注不计应付（应付口径白名单见 isPayable）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { PurchaseContract, PurchaseItem, PurchaseStatus } from "@/types";

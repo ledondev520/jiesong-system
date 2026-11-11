@@ -5,7 +5,6 @@ Input: parsed/wps_import_completion_audit.json + WPS local qing cache databases/
 Output: parsed/wps_cloud_only_deep_state.{json,md}
 Pos: WPS 仅云端原件深度只读探测；跨 cache/sync/transfer/precloud/datacache/cachedata/logs 复核目标是否进入本机下载或隐藏缓存；不写库、不复制、不输出 RPC 正文
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

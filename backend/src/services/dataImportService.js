@@ -2,8 +2,6 @@
  * Input: CSV数据、Prisma客户端
  * Output: 数据对比结果、增量导入结果
  * Pos: 数据导入服务，处理CSV解析、对比、增量导入
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const Papa = require('papaparse');

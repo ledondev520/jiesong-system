@@ -2,8 +2,6 @@
  * Input: open 状态、标题/说明、确认文案与确认回调
  * Output: 状态变更前的确认弹窗（桌面与手机一致，取消不触发任何请求）
  * Pos: UI基础组件层；基于 shadcn AlertDialog，供每个"点一下就改状态"的按钮复用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 "use client";
 

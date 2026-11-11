@@ -2,7 +2,6 @@
  * Input: 完整 Git 历史、PR base/head SHA 与前端锁定的 Prettier
  * Output: PR 改动的 TS/TSX 源码格式结果，历史/文件错误不能当作无改动
  * Pos: PR Review 格式门禁，使用 NUL 路径及参数数组支持特殊文件名
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const fs = require('node:fs');
 const path = require('node:path');

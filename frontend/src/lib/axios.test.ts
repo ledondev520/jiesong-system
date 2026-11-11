@@ -2,8 +2,6 @@
  * Input: axios配置与环境变量
  * Output: axios实例创建与拦截器配置测试
  * Pos: 前端HTTP客户端测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

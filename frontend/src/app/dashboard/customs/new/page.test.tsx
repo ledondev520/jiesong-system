@@ -2,8 +2,6 @@
  * Input: 新建报关单页、customsDeclarationService、router、toast
  * Output: 按真实合同/商品字段提交及失败恢复测试
  * Pos: 报关单管理创建页测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

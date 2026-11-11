@@ -2,8 +2,6 @@
  * Input: Committed Prisma migrations/schema and an exclusive private destination path
  * Output: A 0600 SQLite copy of a once-built migrated (kind "deploy") or schema-DDL (kind "diff") template
  * Pos: Test-only; replaces one Prisma CLI run per fixture with one per migration+schema+builder+Prisma-version hash
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const crypto = require('node:crypto');
 const fs = require('node:fs');

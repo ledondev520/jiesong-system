@@ -2,8 +2,6 @@
  * Input: exportReminderService（退税月度提醒 + 缺发票催票提醒）
  * Output: 每日定时触发的出口流程提醒任务（退税提醒自守卫仅每月5号生效）
  * Pos: 运行时任务编排，与 inventoryAlertJob 同构
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const {

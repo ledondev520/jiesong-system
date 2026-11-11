@@ -2,8 +2,6 @@
  * Input: Sidebar组件
  * Output: Sidebar组件单元测试
  * Pos: 前端布局组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

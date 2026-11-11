@@ -2,8 +2,6 @@
  * Input: 后端 /api/v1/finance/statements/* 接口与三类财务来源文件
  * Output: 账期详情、趋势分析、脱敏资料库、三文件预览与确认写入
  * Pos: 财务报表前端服务层；提供受限资料下钻且不暴露跳过预览的三类数据写入 Interface
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import api from "@/lib/axios";

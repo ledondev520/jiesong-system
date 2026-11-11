@@ -2,8 +2,6 @@
  * Input: docs/出口合同完整明细.csv
  * Output: 更新 SalesContract, SalesItem 和 Product 表
  * Pos: 出口合同数据导入脚本
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

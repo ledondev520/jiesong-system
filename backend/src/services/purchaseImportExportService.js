@@ -2,8 +2,6 @@
  * Input: Prisma 客户端、Excel 内存字节或查询参数
  * Output: Excel Buffer 或逐行导入统计；拒绝路径输入且不读取/留存原始工作簿；拒绝非法值、错误及可识别无缓存公式，留空编号沿用统一序列
  * Pos: 采购合同批量导入导出服务
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const xlsx = require('xlsx');

@@ -2,8 +2,6 @@
  * Input: runAwait 与等价原生 async try/await/catch/finally 实现
  * Output: 成功/失败/同步抛错/非 Promise 返回/thenable/回调抛错各情形下微任务轨迹与结果完全一致的测试
  * Pos: 前端请求回调时序工具单测
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it } from "vitest";

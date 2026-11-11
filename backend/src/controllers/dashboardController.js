@@ -4,8 +4,6 @@
  * Pos: 仪表盘控制器，提供首页统计数据
  * 
  * 2026-01-20 更新：Container已合并到SalesContract
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

@@ -2,8 +2,6 @@
  * Input: 会话列表与治理视角状态
  * Output: 治理预设入口条、待处理 chips 与视角说明
  * Pos: Dashboard AI 管理模块（settings/ai-usage 页面拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

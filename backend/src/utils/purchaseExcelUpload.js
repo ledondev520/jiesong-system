@@ -2,8 +2,6 @@
  * Input: multer、上传大小配置、客户端文件名扩展名
  * Output: 仅接受 .xlsx/.xls 的内存上传中间件；不创建上传目录或磁盘文件
  * Pos: 采购合同 Excel 导入专用上传边界
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const multer = require('multer');
 const path = require('path');

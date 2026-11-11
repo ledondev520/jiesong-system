@@ -2,8 +2,6 @@
  * Input: 商品详情 API、GET /purchases/price-history/:productId
  * Output: 商品详情页：概览与只读「采购价格」页签（各供应商比价）；页底「危险操作」区放删除（确认弹窗命名商品）
  * Pos: 采购模块商品档案详情；删除只在这里，列表卡片不再提供
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

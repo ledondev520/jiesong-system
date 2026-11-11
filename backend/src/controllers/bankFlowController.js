@@ -2,8 +2,6 @@
  * Input: bankFlowService、invoiceRecordService
  * Output: 银行流水与发票查询 HTTP handler
  * Pos: 财务模块-银行流水/发票控制器
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const bankFlowService = require('../services/bankFlowService');

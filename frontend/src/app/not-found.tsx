@@ -8,8 +8,6 @@ export const metadata: Metadata = { title: "页面不存在" };
  * Input: Next.js not-found boundary
  * Output: 面向业务用户的 404 页面（标题为唯一 h1），按登录状态提供返回入口
  * Pos: 全局兜底路由页
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 export default function NotFoundPage() {
   return (

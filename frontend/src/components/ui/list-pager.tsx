@@ -2,8 +2,6 @@
  * Input: lib/hooks/usePagination 的结果（客户端内存分页）
  * Output: 「共 N 条，第 p/T 页」+ 每页条数 + 上一页/下一页；sliceByPager 取当前页数据
  * Pos: 前端已持有完整数组、没有服务端分页的长列表（如对账供应商表）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 "use client";
 

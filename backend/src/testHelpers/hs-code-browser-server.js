@@ -2,8 +2,6 @@
  * Input: Explicit test-only private directory and committed Prisma migrations
  * Output: Real Express/login backend with synthetic local HS records and existing roles
  * Pos: Isolated HS catalogue browser/HTTP fixture; no provider or production access
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const fs = require('node:fs');
 const os = require('node:os');

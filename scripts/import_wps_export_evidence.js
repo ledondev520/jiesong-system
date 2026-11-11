@@ -2,8 +2,6 @@
  * Input: tmp/wps_11_export_list_raw/parsed/evidence_*.csv + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/evidence_import_plan.json; optional Prisma writes when --apply is passed
  * Pos: WPS 真实凭证幂等导入脚本；默认 dry-run，只写真实报关单、报关明细、退税草稿和可安全命中的报关明细申报要素，不消费污染的发票汇总
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

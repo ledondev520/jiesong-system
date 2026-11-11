@@ -2,8 +2,6 @@
  * Input: DashboardLayout、认证状态仓库、路由能力
  * Output: dashboard 布局渲染与重定向逻辑测试
  * Pos: 前端路由布局测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { act, render, screen, waitFor } from "@testing-library/react";

@@ -2,8 +2,6 @@
  * Input: Private test directory, committed migrations and synthetic ordinary users
  * Output: Loopback Express API plus safe-field identities for name-only lifecycle QA
  * Pos: Test-only account-name fixture; no login/password or Agent operations
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const fs = require('node:fs');
 const os = require('node:os');

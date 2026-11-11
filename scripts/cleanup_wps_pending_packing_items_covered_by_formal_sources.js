@@ -2,8 +2,6 @@
  * Input: backend/prisma/dev.db + current WPS source notes
  * Output: tmp/wps_11_export_list_raw/parsed/wps_pending_packing_formal_source_cleanup_plan.json; optional delete/update when --apply is passed
  * Pos: 清理已被唯一正式 EXP 装箱来源覆盖的 PENDING 装箱占位行；默认 dry-run，写库前必须先备份 DB
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

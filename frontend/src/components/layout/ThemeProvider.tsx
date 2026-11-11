@@ -2,8 +2,6 @@
  * Input: next-themes ThemeProvider
  * Output: 全局主题提供器（支持亮色/暗色切换）
  * Pos: 布局基础组件，为全应用提供主题上下文
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';

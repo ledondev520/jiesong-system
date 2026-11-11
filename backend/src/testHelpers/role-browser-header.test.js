@@ -2,8 +2,6 @@
  * Input: Isolated committed-migration role fixture and ordinary sales header HTTP routes
  * Output: Header save/readback and rejected-save/explicit-retry conservation checks
  * Pos: Synthetic SALES fixture acceptance; no browser, production or payment/shipment execution
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

@@ -2,8 +2,6 @@
  * Input: patrolService
  * Output: 定时巡检任务调度器（每小时业务+系统巡检）
  * Pos: 运行时任务编排，负责定时触发巡检并记录结果
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { runFullPatrol } = require('../services/patrolService');

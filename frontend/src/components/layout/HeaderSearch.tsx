@@ -2,8 +2,6 @@
  * Input: 搜索关键字、统一搜索服务、Command 组件
  * Output: 手机端图标 / 桌面端搜索入口与可滚动 Command 弹窗，仅展示当前查询结果
  * Pos: 前端布局子组件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

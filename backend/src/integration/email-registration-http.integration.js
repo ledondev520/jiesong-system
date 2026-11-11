@@ -2,8 +2,6 @@
  * Input: actual registration HTTP routes, committed migrations and fake mail delivery only
  * Output: inactive SALES creation and replay rejection with independent safe-field SQL readback
  * Pos: test-only localhost registration acceptance; no activation, login or external provider
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

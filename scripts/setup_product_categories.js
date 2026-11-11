@@ -2,8 +2,6 @@
  * Input: 商品数据
  * Output: 创建商品分类并批量分类商品
  * Pos: 一次性数据脚本，根据火锅+烧烤店业务场景分类商品
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const path = require('path');

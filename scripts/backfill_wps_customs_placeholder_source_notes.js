@@ -2,8 +2,6 @@
  * Input: preferred_packing_items.csv + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/customs_placeholder_source_note_backfill_plan.json; optional note-only Prisma writes when --apply is passed
  * Pos: WPS 占位报关单来源 note 回填脚本；只在占位报关明细集合与同一 WPS 装箱源集合完全匹配时补来源标记，不改业务字段
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

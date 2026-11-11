@@ -2,8 +2,6 @@
  * Input: purchase_evidence_items.csv + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/purchase_item_source_note_backfill_plan.json; optional note-only Prisma writes when --apply is passed
  * Pos: WPS 采购明细来源 note 回填脚本；只在合同号、商品、数量、单价/总额唯一匹配时补来源标记，不改业务字段
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

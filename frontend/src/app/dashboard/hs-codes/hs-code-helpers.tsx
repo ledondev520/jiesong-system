@@ -2,8 +2,6 @@
  * Input: HSCode 记录、HSCIQ 与 AI 推荐载荷
  * Output: HSCode 页面共用的解析函数、类型与展示片段
  * Pos: 出口模块子页面 - HSCode 检索（page.tsx 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

@@ -2,8 +2,6 @@
  * Input: 用户请求数据
  * Output: 用户管理响应
  * Pos: 用户控制器，处理用户CRUD操作
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

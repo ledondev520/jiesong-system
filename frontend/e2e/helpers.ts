@@ -2,7 +2,6 @@
  * Input: Playwright 页面与业务服务 DTO
  * Output: 合成 API 夹具（含版本化报价配置）、认证会话与页面异常断言
  * Pos: 浏览器验收共用辅助；注册仅申请审核，采购汇总遵循 receipts DTO
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, type Locator, type Page, type Route } from "@playwright/test";
 import { createHash } from "node:crypto";

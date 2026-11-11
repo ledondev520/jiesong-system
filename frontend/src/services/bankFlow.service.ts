@@ -2,8 +2,6 @@
  * Input: axios API client
  * Output: 银行流水与发票数据查询 API 接口
  * Pos: 前端服务层-银行流水/发票数据
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import api from "@/lib/axios";

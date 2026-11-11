@@ -2,7 +2,6 @@
  * Input: 合成 API 夹具与手机、平板、桌面视口（320/390/430 三个手机视口遍历在 mobile-<宽度>.spec.ts）
  * Output: 页面可达、设置菜单精确命名与收起、账簿滚动及核心交互验收
  * Pos: Playwright 移动端回归，保持运行时异常与整页宽度检查
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, test } from "@playwright/test";
 import { mockApiRoutes, signInAsAdmin } from "./helpers";

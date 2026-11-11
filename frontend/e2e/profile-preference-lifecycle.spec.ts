@@ -2,8 +2,6 @@
  * Input: Production frontend, real synthetic SALES login and existing local preference/profile state
  * Output: Cancel, save/reopen/reload and both local save failure/retry browser definitions
  * Pos: Hosted Header personal settings acceptance; no profile HTTP writes or production access
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, test, type Page } from "@playwright/test";
 import {

@@ -2,8 +2,6 @@
  * Input: 泛型数组数据 + 可选默认排序
  * Output: 排序状态管理、排序后数据、排序回调
  * Pos: 通用 hook，任何表格页面可直接使用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { useState, useMemo, useCallback } from 'react';

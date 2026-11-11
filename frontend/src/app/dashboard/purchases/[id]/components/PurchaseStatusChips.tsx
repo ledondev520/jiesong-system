@@ -2,8 +2,6 @@
  * Input: 合同状态 status 与后端派生的 subStatus（付款/到货/生产资料）
  * Output: 四个维度各自带标签的 chips：合同 · 付款 · 到货 · 资料，不再混在一行里不知道说的是哪一维
  * Pos: 采购合同详情页头部下方；复用 getSubStatusBadges 的口径与色调，草稿/已取消没有付款到货义务，只显示合同
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { getSubStatusBadges } from "@/components/purchase/PurchaseSubStatus";

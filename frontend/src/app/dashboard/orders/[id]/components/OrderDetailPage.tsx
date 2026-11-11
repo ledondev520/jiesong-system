@@ -2,8 +2,6 @@
  * Input: 出口订单详情（含关联采购单）、附件、按需加载的商品/门店/库存、当前用户角色
  * Output: 订单详情：页头（状态、唯一下一步按钮、「单证 ▾」）+ 概览/明细/采购/货柜/单证/收款/退税 七个页签
  * Pos: /dashboard/orders/[id] 主组件（UX 规范 §4.2）；状态流转仍走 salesService.updateStatus，规则不变
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

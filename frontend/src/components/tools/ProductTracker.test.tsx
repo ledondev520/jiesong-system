@@ -2,8 +2,6 @@
  * Input: ProductTracker组件、查询API、router、toast
  * Output: 商品追踪组件交互测试结果
  * Pos: 工作台工具组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';

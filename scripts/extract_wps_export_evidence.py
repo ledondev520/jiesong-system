@@ -4,7 +4,6 @@ Input: parsed/attachment_inventory.csv + tmp/wps_11_export_list_raw/11-报关记
 Output: parsed/evidence_extracts.csv/json + evidence_items.csv + evidence_extracts_summary.md
 Pos: WPS 历史出货真实凭证正文抽取脚本；支持 11-报关记录附件、正式报关/退税 PDF 明细申报要素、出货清单/出口申报信息参考表、旧 xls 底稿与 12-报关单独立 PDF；商业发票只标记为 reference_only，不进入报关/退税写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

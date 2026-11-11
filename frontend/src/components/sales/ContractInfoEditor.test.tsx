@@ -2,8 +2,6 @@
  * Input: ContractInfoEditor组件、合同数据、保存回调
  * Output: 合同信息编辑组件交互测试结果
  * Pos: 销售合同详情子组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it, vi } from "vitest";

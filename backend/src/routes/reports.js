@@ -2,8 +2,6 @@
  * Input: dashboardController
  * Output: 经营报表 API 路由
  * Pos: 报表路由定义
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const express = require('express');

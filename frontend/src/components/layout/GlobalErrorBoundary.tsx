@@ -4,8 +4,6 @@
  * Input: React 子组件树
  * Output: 渲染子组件；若子组件 throw，展示友好错误卡片而非白屏
  * Pos: 全局最外层 Error Boundary，在 app/layout.tsx 中包裹整个应用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import React from 'react';

@@ -2,8 +2,6 @@
  * Input: 库存页签、同一轮完成的合成库存列表请求与状态更新请求
  * Output: 旧列表不覆盖新状态、列表/状态更新提示顺序与原 async try/await 一致的回归测试
  * Pos: 库存页签请求回调时序回归测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it, vi } from "vitest";

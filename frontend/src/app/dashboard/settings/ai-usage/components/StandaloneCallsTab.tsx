@@ -2,8 +2,6 @@
  * Input: 无会话 Token 记录与排序状态
  * Output: 「其他 AI 调用」标签内容
  * Pos: Dashboard AI 管理模块（settings/ai-usage 页面拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

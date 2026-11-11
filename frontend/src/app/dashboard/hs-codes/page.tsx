@@ -2,8 +2,6 @@
  * Input: HSCode 搜索/人工更新服务、AI 推荐接口（集成 HSCIQ 归类实例 + 官方税率）
  * Output: HSCode 查询页面（手机检索卡片、双搜索、AI 推荐、证据化人工税则更新、申报要素填写与复制）
  * Pos: 出口模块子页面 - HSCode 检索
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

@@ -5,7 +5,6 @@ Input: parsed/wps_cloud_only_download_handles.json + local WPS cloud logs
 Output: parsed/wps_cloud_only_log_api_clues.{json,md}
 Pos: WPS cloud-only 原件日志接口线索只读探测；脱敏抽取目标相关 URL host/path、接口词、错误码和命中摘要；不输出 token/cookie/日志正文，不联网不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

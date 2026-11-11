@@ -7,8 +7,6 @@
  *   - 箱数(boxes)不再使用数量(quantity)作为默认值
  *   - 如果CSV中没有箱数字段，boxes 置为 null 而非推导值
  *   - 合同的 totalBoxes 也可能为 null（当无有效箱数数据时）
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

@@ -2,8 +2,6 @@
  * Input: inventoryStateMachine 工具
  * Output: 库存状态机规则测试结果
  * Pos: 后端规则单测，保障库存状态流转约束稳定
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

@@ -5,7 +5,6 @@ Input: parsed/wps_remaining_source_gap_execution_plan.json + parsed/wps_source_g
 Output: parsed/wps_no_candidate_source_blockers.{json,csv,md}
 Pos: WPS 剩余 no-candidate 来源缺口阻断原因分类；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

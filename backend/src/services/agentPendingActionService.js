@@ -3,7 +3,6 @@
  * Output: 跨进程共享（SQLite）的待确认操作存取与原子抢占
  * Pos: openAgentService 的持久层；确认只允许 `pending -> executing` 抢占成功的一方执行
  *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  * - 过期在 DB 层判断（expiresAt），清理在创建时惰性执行，不使用进程内定时器，N 个进程都安全。
  * - 进程在 executing 时崩溃：记录保持 executing 直到过期，宁可不执行也不重复执行。
  */

@@ -6,8 +6,6 @@
  *
  * 用法: node scripts/import-finance-csv.js [--bank <path>] [--invoice <path>]
  * 示例: node scripts/import-finance-csv.js --bank ../docs/捷淞-流水.csv --invoice ../docs/捷淞全量发票_去重.csv
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

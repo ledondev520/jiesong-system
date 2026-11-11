@@ -2,8 +2,6 @@
  * Input: 阶段列表（key/label/count）、当前选中 key、选择回调、加载状态
  * Output: 横向阶段筛选 chips，带计数；加载或失败时计数显示「—」而不是 0
  * Pos: 通用 UI 组件，Workbench 与列表页的阶段筛选（PHASE3 §1 archetype C）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { MISSING_VALUE, isMissing } from "@/lib/missing-value";

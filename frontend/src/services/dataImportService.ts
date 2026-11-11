@@ -2,8 +2,6 @@
  * Input: axios实例
  * Output: 数据导入相关API调用
  * Pos: 前端数据导入服务
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import api from '@/lib/axios';

@@ -2,8 +2,6 @@
  * Input: Private migrated HS fixture, real authenticated local routes and SQLite literals
  * Output: Local search/detail, existing-role manual evidence persistence and rejection checks
  * Pos: HS fixture contract tests; no browser, AI, external provider or production records
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

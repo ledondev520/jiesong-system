@@ -2,8 +2,6 @@
  * Input: bankFlowController、auth middleware
  * Output: 银行流水与发票查询路由
  * Pos: 财务模块-银行流水/发票 REST 路由
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

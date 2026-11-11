@@ -2,8 +2,6 @@
  * Input: @radix-ui/react-alert-dialog
  * Output: AlertDialog 相关组件，确认内容在手机可视高度内滚动
  * Pos: UI组件库，提供确认对话框功能
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client"

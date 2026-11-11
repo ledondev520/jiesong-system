@@ -2,8 +2,6 @@
  * Input: 采购合同详情API、购销合同生成服务、系统配置（盖章平台/开票抬头）、RecordHeader、UrlTabs、PurchaseFlowPanel、SortableTableHead、useTableSort
  * Output: 采购合同记录页：头部（单号、5 个事实 chips、唯一主操作、「单证」/「更多」菜单、阻塞条）、四维状态 chips、?tab= 页签（概览/明细/生产/收货验货/付款与发票/附件）
  * Pos: 采购管理子页面，承载「签合同→盖章→付款→生产完工→催票」的单合同主线路；在线盖章与生成购销合同收进「单证」菜单，两者都先确认对外法律文件；取消合同在「更多」里并先确认
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

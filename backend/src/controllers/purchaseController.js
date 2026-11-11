@@ -2,8 +2,6 @@
  * Input: Prisma客户端、统一附件服务与上传路径工具
  * Output: 采购合同相关的HTTP响应，编号预览沿用统一序列规则；附件下载/删除复用财务凭证访问边界
  * Pos: 采购控制器，处理采购合同CRUD请求与受限附件存储、下载
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

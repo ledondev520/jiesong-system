@@ -2,8 +2,6 @@
  * Input: AI 会话页面（React StrictMode 下重复挂载）、同一轮完成的两次合成工具注册表请求
  * Output: 重叠注册表请求的成功/失败回调顺序与原 async try/await 一致、成功结果不被同轮失败清空的回归测试
  * Pos: AI 会话页面请求回调时序回归测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { StrictMode } from "react";

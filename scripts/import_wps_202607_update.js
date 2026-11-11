@@ -8,8 +8,6 @@
  *   - 出口合同按 contractNo upsert；items/packingItems 先删后建（仅限本脚本管理的 EXP260008/009）
  *   - 付款按 idempotencyKey（BANKFLOW-<日期>-<票据号>）唯一去重
  *   - 附件按 salesContractId+fileName 去重
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

@@ -2,8 +2,6 @@
  * Input: 系统导出服务（exportSystemData）
  * Output: 数据导出选择与下载表单
  * Pos: 设置页 > 数据导出 Tab，允许管理员按模块导出 CSV
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';

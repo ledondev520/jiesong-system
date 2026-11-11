@@ -2,8 +2,6 @@
  * Input: backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/wps_db_source_coverage.{json,md}
  * Pos: WPS 历史导入只读来源覆盖审计；统计已入库出口/采购/报关/退税记录是否带 WPS 文件来源标记，不写库
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

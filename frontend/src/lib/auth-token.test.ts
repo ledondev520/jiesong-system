@@ -2,8 +2,6 @@
  * Input: auth-token 工具
  * Output: Token 缓存与 sessionStorage 行为测试
  * Pos: 前端认证基础设施测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';

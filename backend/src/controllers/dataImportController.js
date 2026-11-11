@@ -2,8 +2,6 @@
  * Input: HTTP请求、dataImportService
  * Output: 数据导入相关的API响应
  * Pos: 数据导入控制器，处理CSV/xlsx上传、解析、对比、导入请求
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { parseTabularFile } = require('../utils/tabularImport');

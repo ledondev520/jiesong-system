@@ -2,8 +2,6 @@
  * Input: node:test、node:assert/strict、express-validator规则
  * Output: 参数验证与错误处理的单元测试结果
  * Pos: 后端参数校验工具测试文件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

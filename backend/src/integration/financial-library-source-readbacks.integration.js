@@ -2,8 +2,6 @@
  * Input: Generated XLS/XLSX, existing library CLI, actual auth/Express and committed-migration SQLite
  * Output: Five independent ingest, metadata, ordered row, filter and authorization acceptance cases
  * Pos: Financial library source acceptance; distinct from monthly workbook upload/import
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

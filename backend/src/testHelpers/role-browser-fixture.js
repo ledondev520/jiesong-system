@@ -2,8 +2,6 @@
  * Input: Scenario name, optional private temporary root and the role-browser-server.js child fixture
  * Output: Started synthetic role HTTP fixture (metadata, login, call, independent read-only SQLite helper)
  * Pos: Shared by role-browser-server.test.js and role-browser-documents.test.js so node --test runs them in parallel
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

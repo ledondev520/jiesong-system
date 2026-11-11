@@ -2,8 +2,6 @@
  * Input: contractTemplateController
  * Output: 合同模板管理路由
  * Pos: 合同模板路由，处理模板 CRUD 操作
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

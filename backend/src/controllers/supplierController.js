@@ -2,8 +2,6 @@
  * Input: 供应商服务
  * Output: 供应商相关的HTTP响应
  * Pos: 供应商控制器，处理供应商CRUD请求
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

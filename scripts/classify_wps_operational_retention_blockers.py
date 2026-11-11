@@ -5,7 +5,6 @@ Input: parsed/wps_remaining_source_gap_execution_plan.json + parsed/wps_operatio
 Output: parsed/wps_operational_retention_blockers.{json,csv,md}
 Pos: WPS 操作性历史行保留/清理关闭清单；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

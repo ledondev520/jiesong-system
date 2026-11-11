@@ -2,8 +2,6 @@
  * Input: fileService、响应工具
  * Output: 合同附件接口；通过共享 fileService 边界限制退税确认清单下载/删除为管理员/财务
  * Pos: 合同附件管理控制器，提供上传、列表、下载、删除接口
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const path = require('path');

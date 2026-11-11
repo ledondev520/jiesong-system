@@ -2,8 +2,6 @@
  * Input: 金额文本、语义状态
  * Output: 统一金额文本组件
  * Pos: UI基础组件层，统一金额正负/风险语义色
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { cva, type VariantProps } from "class-variance-authority";

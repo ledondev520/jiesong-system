@@ -2,8 +2,6 @@
  * Input: 认证控制器
  * Output: 认证相关路由
  * Pos: 认证路由，处理邮箱验证码注册、登录/浏览器会话、邮箱验证码找回密码
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

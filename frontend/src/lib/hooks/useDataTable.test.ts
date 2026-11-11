@@ -2,8 +2,6 @@
  * Input: useDataTable hook
  * Output: 过滤/排序/分页联动测试
  * Pos: 前端 hooks 测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { act, renderHook } from '@testing-library/react';

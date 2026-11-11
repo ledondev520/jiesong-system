@@ -2,8 +2,6 @@
  * Input: Test-only loopback Express child and private migrated synthetic SQLite
  * Output: Real user API transport, bounded name-only requests and safe independent readback
  * Pos: Frontend account-name lifecycle fixture; no credential fields are queried
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, statSync } from "node:fs";

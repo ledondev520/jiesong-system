@@ -7,8 +7,6 @@
  * 2026-03-29: 箱规由体积推算的行用橙色边框区分，悬浮提示中注明"尺寸已预估"
  * 2026-10-31: 排柜移到后端（containerPacking.js）；本组件改为接收 plan，一个块用一个 InstancedMesh，
  *             柜体尺寸取自 plan.container（不再硬编码）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

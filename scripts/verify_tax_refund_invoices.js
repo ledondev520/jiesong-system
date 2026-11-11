@@ -3,8 +3,6 @@
  * Input: 出货汇总.xlsx、backend InvoiceRecord；可选税务数字账户导出的进项发票清单
  * Output: 只读出口退税发票核验 JSON/CSV，控制台仅输出数量摘要与受限文件路径
  * Pos: 出口退税发票核验 CLI Adapter；不写数据库、不改源工作簿
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README。
  */
 
 const crypto = require('crypto');

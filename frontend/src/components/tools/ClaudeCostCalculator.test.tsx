@@ -2,8 +2,6 @@
  * Input: ClaudeCostCalculator组件、AI识别接口、toast
  * Output: 费用计算器交互与异常分支测试结果
  * Pos: 工作台工具组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

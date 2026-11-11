@@ -2,8 +2,6 @@
  * Input: JWT Bearer、HttpOnly浏览器会话、用户角色
  * Output: 实时用户状态与会话版本认证/授权结果
  * Pos: 认证授权中间件，保护API路由
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const jwt = require('jsonwebtoken');

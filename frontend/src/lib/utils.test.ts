@@ -2,8 +2,6 @@
  * Input: cn工具函数
  * Output: 类名合并单元测试
  * Pos: 前端工具函数测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, it, expect } from 'vitest';

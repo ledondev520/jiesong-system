@@ -2,8 +2,6 @@
  * Input: useApi hook
  * Output: 通用异步请求状态机测试
  * Pos: 前端 hooks 测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { act, renderHook, waitFor } from '@testing-library/react';

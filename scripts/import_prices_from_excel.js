@@ -2,8 +2,6 @@
  * Input: 捷淞汇总文件夹中的Excel文件（发票工作表）
  * Output: 更新 PackingItem 表的单价和总价数据
  * Pos: 数据导入脚本，从原始Excel获取历史单价
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { execSync } = require('child_process');

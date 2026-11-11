@@ -2,8 +2,6 @@
  * Input: tmp/wps_11_export_list_raw/parsed/wps_operational_source_gap_review.json + backend/prisma/dev.db
  * Output: tmp/wps_11_export_list_raw/parsed/wps_operational_duplicate_coverage.{json,csv,md}
  * Pos: 复核零值/操作性来源缺口是否被带 WPS 来源的现库行严格覆盖；只读，不写库、不删除
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

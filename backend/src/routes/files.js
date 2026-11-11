@@ -2,8 +2,6 @@
  * Input: fileController、认证中间件、上传中间件
  * Output: 统一合同附件路由
  * Pos: 合同附件管理路由，挂载在 /api/v1 下
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

@@ -2,8 +2,6 @@
  * Input: 页签定义（key/label/badge）、URL 参数名（默认 ?tab=）、默认页签
  * Output: 以 URL 为准的页签；页签可带计数或红点（该页签里有阻塞项）
  * Pos: 通用 UI 组件，记录页（Record archetype）的 ?tab= 页签（PHASE3 §1）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

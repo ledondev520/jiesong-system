@@ -2,8 +2,6 @@
  * Input: 工具或诊断产出的建议项
  * Output: 规范化、去重并限量的操作建议
  * Pos: openAgentService 的建议子模块；诊断与门面共用，避免循环依赖
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const ACTION_RECOMMENDATIONS_LIMIT = 20;

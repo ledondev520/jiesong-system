@@ -2,8 +2,6 @@
  * Input: actual Express/auth read paths and committed migrations with private synthetic SQLite
  * Output: four bounded statement/evidence/reconciliation/source-discovery readback cases
  * Pos: financial read acceptance; no uploads, providers, production data or accounting writes
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

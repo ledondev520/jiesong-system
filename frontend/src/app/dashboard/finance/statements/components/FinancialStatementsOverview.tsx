@@ -2,8 +2,6 @@
  * Input: 财务报表概览数据、操作回调与状态
  * Output: 可独立或嵌入展示的响应式页面头部、空态、预警、KPI 与营运资金概览
  * Pos: 财务报表概览分区
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";

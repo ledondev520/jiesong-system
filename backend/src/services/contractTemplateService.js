@@ -2,8 +2,6 @@
  * Input: Prisma 客户端
  * Output: 合同模板业务逻辑
  * Pos: 合同模板服务层
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

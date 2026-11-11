@@ -3,7 +3,6 @@
  * Output: AI 只读查询（含真实拼柜来源）、内部草稿直接执行、业务事实一次确认与可回放执行记录，上游失败不记成功
  * Pos: 后端 Agent Runtime 核心，衔接 LLM 与业务数据
  *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  * 子模块：openAgent/diagnostics.js（只读诊断）、openAgent/recommendations.js（建议项规范化）；导出面不变。
  * 角色边界：读工具 allowedRoles、建议卡生成与确认执行都按调用者实时角色复核；密钥类配置助手不可读写。
  */

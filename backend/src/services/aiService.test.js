@@ -2,8 +2,6 @@
  * Input: node:test、node:assert/strict、aiService
  * Output: AI服务关键路径单元测试
  * Pos: 后端服务测试文件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

@@ -2,8 +2,6 @@
  * Input: Real Express/auth, committed migrations and independently seeded synthetic SQLite
  * Output: Dashboard KPI/funds, historical risk/task, trace and current-role destination evidence
  * Pos: Workbench read acceptance; no reports, browser, production or provider requests
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

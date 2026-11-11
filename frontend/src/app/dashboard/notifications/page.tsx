@@ -2,8 +2,6 @@
  * Input: 系统通知 API
  * Output: 通知中心页面（查看通知、标记已读）
  * Pos: 运维中心
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

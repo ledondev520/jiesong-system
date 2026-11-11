@@ -5,7 +5,6 @@ Input: 捷淞汇总 工作区的 EXP 开头的 Excel 文件（合同+箱单）
 Output: docs/出口合同完整明细.csv
 Pos: 数据提取脚本 - 完整版（含箱单信息）
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 import os

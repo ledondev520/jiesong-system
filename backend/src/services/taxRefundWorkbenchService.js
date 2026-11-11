@@ -2,8 +2,6 @@
  * Input: 出口合同、装箱明细、报关/退税记录、采购主数据与发票台账
  * Output: 出口退税工作台、按申报月份逐次出货的准备状态与确认版本
  * Pos: 出口退税网页工作台聚合 Module；复用既有退税、采购和发票 Module，不直接提交税局
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

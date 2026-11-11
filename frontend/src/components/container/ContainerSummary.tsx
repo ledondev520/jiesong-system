@@ -2,8 +2,6 @@
  * Input: 后端装柜计划 LoadingPlan（含 check）
  * Output: 摘要面板：柜数、每柜体积%/毛重%/箱数、80% 检查状态、阻塞项与警告（已发运订单折叠为中性「模拟结果（历史数据）」）
  * Pos: 货柜页签顶部摘要，文案全部取自后端 check，不在前端重算
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { AlertTriangle, CheckCircle2, CircleDashed } from "lucide-react";

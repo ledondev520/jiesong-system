@@ -2,8 +2,6 @@
  * Input: 门店控制器
  * Output: 门店管理路由
  * Pos: 门店路由，处理门店CRUD操作
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

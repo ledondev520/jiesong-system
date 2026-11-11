@@ -2,8 +2,6 @@
  * Input: 财务资料库受限查询 Interface
  * Output: 分类/账期筛选、文档列表、Sheet 选择与脱敏行级下钻，旧来源请求不能恢复失效明细
  * Pos: 财务报表页资料证据分区，遵循 shadcn/ui 模式
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

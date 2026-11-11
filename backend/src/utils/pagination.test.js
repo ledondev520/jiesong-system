@@ -2,8 +2,6 @@
  * Input: 分页工具函数
  * Output: 分页元数据与统一 payload 组装断言
  * Pos: 后端工具链测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

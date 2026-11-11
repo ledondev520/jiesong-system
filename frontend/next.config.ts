@@ -6,8 +6,6 @@ import { getApiProxyBaseUrl } from "./src/lib/api-base-url";
  * Input: 环境变量 NEXT_PUBLIC_API_BASE_URL（生产环境后端地址）
  * Output: Next.js 构建与代理配置
  * Pos: 前端构建入口配置，控制 API 代理路径与 Sentry/Vercel 集成
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 // 开发环境默认代理到本地后端，生产环境使用环境变量

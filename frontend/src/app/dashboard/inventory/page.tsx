@@ -2,8 +2,6 @@
  * Input: 库存服务、InventoryTab、ReceivingWorkbench、UrlTabs（?tab=receiving|stock）
  * Output: 库存页两个页签：收货验货（待收货合同队列，侧栏登记到货/验货）与库存（唯一库存视图：店铺筛选、确认后的状态流转）
  * Pos: 库存模块主页面；默认仍打开库存，旧链接不变
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

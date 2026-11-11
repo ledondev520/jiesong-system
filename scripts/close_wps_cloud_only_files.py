@@ -5,7 +5,6 @@ Input: parsed/wps_cloud_only_probe.json
 Output: parsed/wps_cloud_only_close_plan.{json,md} + optional copies into tmp/wps_11_export_list_raw/11-报关记录
 Pos: WPS cloud-only 原件关闭工具；仅在本机候选 SHA1 精确等于 WPS metadata 时复制到项目源目录；默认 dry-run，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

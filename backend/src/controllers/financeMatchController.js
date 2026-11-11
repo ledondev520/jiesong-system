@@ -2,8 +2,6 @@
  * Input: financeMatchService
  * Output: 智能关联引擎 HTTP 响应
  * Pos: 财务模块-智能关联控制器
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { success, paginated } = require('../utils/response');

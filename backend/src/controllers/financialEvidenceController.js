@@ -2,8 +2,6 @@
  * Input: 已认证的财务资料库查询参数
  * Output: 脱敏资料摘要、文档列表与 Sheet 行级下钻 JSON
  * Pos: 财务资料库 HTTP Adapter；路由只允许 ADMIN/FINANCE 角色访问
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const financialEvidenceService = require('../services/financialEvidenceService');

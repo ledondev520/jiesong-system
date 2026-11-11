@@ -5,7 +5,6 @@ Input: tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_dossier.json + b
 Output: tmp/wps_11_export_list_raw/parsed/wps_remaining_decision_execution_plan.{json,csv,md}
 Pos: WPS 剩余 2 个裁决项只读执行方案；列出业务裁决后可能执行的候选动作、目标行和必要输入；不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

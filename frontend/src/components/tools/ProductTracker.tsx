@@ -2,8 +2,6 @@
  * Input: 商品名称、门店名称
  * Output: 匹配的出口合同列表
  * Pos: 工作台小工具，快速查询商品位置
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 'use client';

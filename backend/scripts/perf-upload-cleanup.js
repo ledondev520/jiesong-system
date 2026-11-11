@@ -2,8 +2,6 @@
  * Input: 显式测试上传目录 API_PERF_UPLOAD_DIR（必须是一次性压测后端自己的 UPLOAD_DIR）、需保护的真实上传目录
  * Output: 经校验的测试上传目录（真实路径 + dev/ino 身份）；仅限该目录内普通文件的清理
  * Pos: scripts/audit_api_write_success_times.js 的文件清理边界；不回退 backend/.env 或默认 backend/uploads 作为清理目录
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

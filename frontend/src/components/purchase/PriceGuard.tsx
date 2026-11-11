@@ -2,8 +2,6 @@
  * Input: productId, currentPrice, supplierId（可选）
  * Output: 单价红绿灯组件——与历史成交价对比并展示涨跌幅
  * Pos: 采购单品表单内的智能比价组件，依赖 GET /products/:id/price-history
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

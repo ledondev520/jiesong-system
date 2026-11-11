@@ -2,8 +2,6 @@
  * Input: Both human-user pages, real UserDialog and private migrated loopback API
  * Output: Name-only search/save/reopen/reload, cancellation and genuine failure retry evidence
  * Pos: Account management ordinary-name lifecycle regression
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import {
   act,

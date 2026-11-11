@@ -4,8 +4,6 @@
  * Pos: 路由入口，注册所有API路由
  * 
  * 架构说明：货柜功能已合并到 sales（出口合同），每个 EXP 编号即为货柜标识
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

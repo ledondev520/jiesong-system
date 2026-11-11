@@ -2,8 +2,6 @@
  * Input: 合同文档控制器
  * Output: 合同文档生成路由
  * Pos: 路由层，处理合同文档生成相关请求
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');

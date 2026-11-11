@@ -2,8 +2,6 @@
  * Input: PrismaClient（销售/采购合同、退税单、通知、用户）
  * Output: 出口退税月度提醒（每月5号）与已出货缺发票提醒的生成能力
  * Pos: 出口流程提醒服务，供 exportReminderJob 定时任务与手动触发复用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

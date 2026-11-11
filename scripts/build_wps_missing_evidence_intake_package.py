@@ -5,7 +5,6 @@ Input: parsed/wps_remaining_action_matrix.json + cloud/formal blocker reports
 Output: parsed/wps_missing_evidence_intake_package.{json,csv,md}
 Pos: WPS 剩余缺失材料收件包；把行动矩阵转成可验收材料、校验命令和禁止动作；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

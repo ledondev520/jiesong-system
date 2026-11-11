@@ -2,8 +2,6 @@
  * Input: 经营概览 overview（不可用合同及其具体原因、按原因合计、已核实汇总）
  * Output: 「毛利待核验」提示：每笔合同缺哪项输入、按原因的笔数、已核实出货的单独汇总
  * Pos: 经营分析页；替代原来笼统的「缺少汇率或已售成本」，只展示后端给出的原因，不在前端推断
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import Link from "next/link";
 import type { BusinessOverview, ReasonCount } from "@/services/reports.service";

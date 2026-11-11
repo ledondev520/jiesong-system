@@ -2,7 +2,6 @@
  * Input: 合成 Excel 内存字节、非法路径载荷与内存 Prisma 桩
  * Output: 采购导入语义与无文件系统读取/非法输入零写入回归结果
  * Pos: 采购 Excel 服务单元测试；不接触真实业务数据库
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

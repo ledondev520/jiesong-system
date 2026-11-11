@@ -2,8 +2,6 @@
  * Input: 财务概览页面、finance stats、汇率、银行流水和发票统计 Interface
  * Output: 财务概览页交互逻辑测试结果
  * Pos: 前端业务页交互测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

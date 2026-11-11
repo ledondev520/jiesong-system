@@ -2,8 +2,6 @@
  * Input: ContainerLoadingPanel、可控的 getLoadingPlan 延迟响应
  * Output: 柜型模拟的乱序响应、重置、换合同、失败提示不被过期请求覆盖的测试结果
  * Pos: C5-04 回归；Radix Select 以原生 select 代替，3D/导出以替身代替
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

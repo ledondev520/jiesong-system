@@ -2,8 +2,6 @@
  * Input: 报关单详情页、customsDeclarationService、浏览器查询、router、toast
  * Output: 真实报关摘要、出口日期与明细展示测试
  * Pos: 报关单管理详情页测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

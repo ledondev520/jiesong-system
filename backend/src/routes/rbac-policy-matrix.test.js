@@ -3,7 +3,6 @@
  * Output: Restricted/Confidential 前缀的读/写最大角色集合的实际 HTTP 结果矩阵（ANTI-PLAN P2-5）
  * Pos: 后端路由权限测试；补足 rbac-write-routes.test.js 只检查 "roleAuth(" 子串的缺口
  *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  * 语义：表中是该路由「最大允许角色集」，角色不在集合内必须 403；集合内的角色可被路由进一步收紧，不在此断言。
  */
 

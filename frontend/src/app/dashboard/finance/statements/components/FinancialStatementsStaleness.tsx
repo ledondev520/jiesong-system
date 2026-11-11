@@ -2,8 +2,6 @@
  * Input: 已导入账期列表
  * Output: 「数据截至 X」提示；最新账期滞后 2 个月及以上时明确写出已滞后及其含义
  * Pos: 财务报表页各视图顶部；只说明数据新旧，不改任何数字
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { SemanticBadge } from "@/components/ui/status-badge";
 import { getStatementsStaleness } from "./financialStatementsFormatting";

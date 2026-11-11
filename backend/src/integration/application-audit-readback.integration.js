@@ -2,8 +2,6 @@
  * Input: actual application-audit HTTP routes, committed migrations and private synthetic SQLite
  * Output: filtered full-record/CSV readback, date/paging semantics and current role acceptance
  * Pos: ordinary system logs regression; no OS logs, real history, providers or production data
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

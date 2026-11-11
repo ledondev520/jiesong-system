@@ -2,8 +2,6 @@
  * Input: Hosted library fixture, real login/Express and independent private SQLite reads
  * Output: Fixture-contract proof for current ADMIN/FINANCE login and source detail
  * Pos: Browser-independent verification of the exact hosted financial library backend
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

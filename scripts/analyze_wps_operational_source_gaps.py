@@ -5,7 +5,6 @@ Input: parsed/wps_source_gap_disposition.json + SQLite dev DB
 Output: parsed/wps_operational_source_gap_review.{json,csv,md}
 Pos: WPS 零值/操作性历史来源缺口复核；检查库存/报关引用、候选来源数量和占位合同；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

@@ -2,8 +2,6 @@
  * Input: OrderContainerTab（真实 ContainerLoadingPanel）、可控的 getLoadingPlan 延迟响应
  * Output: 货柜页签宿主路径下，柜型模拟的在途响应在默认计划/合同刷新后被丢弃的测试结果
  * Pos: C5-04 在 OrderContainerTab 宿主路径的回归；Radix Select 以原生 select 代替，3D/导出以替身代替
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

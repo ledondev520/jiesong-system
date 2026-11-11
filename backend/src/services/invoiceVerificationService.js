@@ -2,8 +2,6 @@
  * Input: 出货汇总候选行、按发票号码取得的发票记录
  * Output: 发票级销方、金额、品名、状态一致性核验结果与统计
  * Pos: 出口退税发票只读核验 Module；不修改发票、合同或退税记录
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const VALID_INVOICE_NUMBER_LENGTHS = new Set([8, 20]);

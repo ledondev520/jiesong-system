@@ -5,7 +5,6 @@ Input: parsed/wps_source_gap_disposition.json + candidate/operational/formal rev
 Output: parsed/wps_remaining_source_gap_execution_plan.{json,csv,md}
 Pos: WPS 剩余 199 条来源缺口执行队列；逐条列出后续可执行前置条件、禁止动作和下一步证据；只读，不写库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

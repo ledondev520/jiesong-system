@@ -2,8 +2,6 @@
  * Input: purchase_evidence_preferred.csv + backend/prisma/dev.db + <UPLOAD_DIR>/contracts (same root as backend config.upload.dir)
  * Output: tmp/wps_11_export_list_raw/parsed/wps_purchase_file_retention_audit.{json,csv,md}
  * Pos: WPS 采购合同文件留存只读审计；对比 WPS 已保留凭证、系统附件表和物理上传文件，不写库
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

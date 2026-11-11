@@ -5,7 +5,6 @@ Input: tmp/wps_11_export_list_raw/parsed import/evidence/purchase reports + back
 Output: parsed/wps_import_decision_packet.{csv,json,md}
 Pos: WPS 历史导入待业务裁决事项聚合脚本；补充旧装箱候选、销售缺门店源行/候选/现库摘要、路径门店推断复核项、真实凭证缺口同目录证据；不写数据库
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

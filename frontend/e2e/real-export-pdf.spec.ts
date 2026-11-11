@@ -2,8 +2,6 @@
  * Input: Real SALES login, existing private role fixture order and the 导出 PDF button
  * Output: One case asserting the downloaded loading-plan PDF bytes (A4 portrait pages, size, page count) for the single-page fixture and for a forced multi-page layout, plus the real-DOM page-break rule using the product's PDF_BREAK_SELECTOR
  * Pos: Hosted Chromium acceptance for containerExport.ts / ContainerPrintView.tsx (no product code)
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { readFile } from "node:fs/promises";
 import { test, expect } from "@playwright/test";

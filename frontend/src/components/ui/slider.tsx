@@ -2,8 +2,6 @@
  * Input: Radix UI Slider primitive
  * Output: shadcn/ui 风格的 Slider 组件
  * Pos: UI基础组件层，供 SystemConfigTab 温度滑块使用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 'use client';
 

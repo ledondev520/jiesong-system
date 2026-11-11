@@ -2,8 +2,6 @@
  * Input: Prisma客户端、显式初始化密码
  * Output: 初始化数据库种子数据，不重置既有安全密码
  * Pos: 数据库初始化脚本
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { PrismaClient } = require('@prisma/client');

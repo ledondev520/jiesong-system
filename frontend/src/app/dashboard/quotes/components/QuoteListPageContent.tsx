@@ -2,8 +2,6 @@
  * Input: quote service, shared list URL state (keyword/status/page/pageSize)
  * Output: quote list — table on md+, cards below md — with search/reset, status filter, paging and 新建报价
  * Pos: /dashboard/quotes (出口 module). Columns per spec §6.3: 编号, 客户, 门店数, 金额, 状态, 有效期, 创建时间.
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 "use client";
 
