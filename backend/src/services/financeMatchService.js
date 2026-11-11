@@ -807,7 +807,9 @@ async function listContractsForMatch(contractType, search = '', purpose = MATCH_
 
 module.exports = {
   MATCH_PURPOSE,
+  maxStringSimilarity,
   loadPurchaseContracts,
+  loadSalesContracts,
   loadPendingBankTxns,
   loadPendingInvoices,
   runAutoMatch,
