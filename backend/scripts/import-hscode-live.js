@@ -119,7 +119,6 @@ const normalizeLiveRecord = (record) => {
     rcepRatesJson: stringifyJson(record?.rcep_rates || {}),
     basicInfoJson: stringifyJson(basicInfo),
     taxInfoJson: stringifyJson(taxInfo),
-    rawPayloadJson: stringifyJson(record),
     fetchedAt: fetchedAt && !Number.isNaN(fetchedAt.getTime()) ? fetchedAt : null,
     effectiveDate,
   };

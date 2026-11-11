@@ -923,7 +923,6 @@ model HsCode {
   rcepRatesJson         String?
   basicInfoJson         String?
   taxInfoJson           String?
-  rawPayloadJson        String?
   fetchedAt             DateTime?
   effectiveDate         DateTime
 

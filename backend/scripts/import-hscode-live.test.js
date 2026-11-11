@@ -65,7 +65,7 @@ test('normalizeLiveRecord: 提取关键查询字段并保留完整原始 payload
   assert.equal(normalized.supervisionConditions, '无');
   assert.equal(normalized.inspectionQuarantine, 'L:民用商品入境验证');
   assert.equal(normalized.sourceUrl, 'https://www.hsbianma.com/Code/6904100000.html');
-  assert.equal(normalized.rawPayloadJson, JSON.stringify(sampleRecord));
+  assert.equal('rawPayloadJson' in normalized, false);
   assert.ok(normalized.fetchedAt instanceof Date);
   assert.ok(normalized.effectiveDate instanceof Date);
 });
@@ -102,7 +102,7 @@ test('importLiveHsCodes: 从目录读取 JSON 并逐条 upsert', async () => {
     assert.equal(upserts[0].where.hsCode, '6904100000');
     assert.equal(upserts[0].create.productName, '陶瓷制建筑用砖');
     assert.equal(upserts[0].create.declarationElements, '品牌类型 [ ? ] | 出口享惠情况 [ ? ] | 种类(建筑用砖、地面砖等)');
-    assert.equal(upserts[0].create.rawPayloadJson, JSON.stringify(sampleRecord));
+    assert.equal('rawPayloadJson' in upserts[0].create, false);
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
   }

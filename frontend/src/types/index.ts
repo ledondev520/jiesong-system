@@ -219,7 +219,6 @@ export interface HsCodeRecord {
   rcepRatesJson?: string | null;
   basicInfoJson?: string | null;
   taxInfoJson?: string | null;
-  rawPayloadJson?: string | null;
   fetchedAt?: string | null;
   effectiveDate: string;
   /** 模糊检索相似度 0–1（仅部分列表接口返回） */

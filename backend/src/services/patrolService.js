@@ -6,6 +6,7 @@
  * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
+const crypto = require('node:crypto');
 const prisma = require('../utils/prisma');
 const { getOverdueReceivables } = require('./financeService');
 const { pricingConfigStatus } = require('./pricingConfigService');
@@ -284,23 +285,29 @@ const persistPatrolFindings = async (findings) => {
     await prisma.notification.createMany({ data: notifications });
   }
 
-  // 写入操作日志
+  // 写入操作日志：仅当巡检结果与上一条 PATROL_RUN 不同时才写（A101，避免每小时重复行）。
+  // fingerprint 是 severity/rule/title 集合的摘要，标题本身不入日志。
   try {
-    await prisma.operationLog.create({
-      data: {
-        actorType: 'SYSTEM',
-        action: 'PATROL_RUN',
-        entity: 'System',
-        entityId: 'patrol',
-        newValue: JSON.stringify({
-          totalFindings: findings.length,
-          critical: findings.filter((f) => f.severity === SEVERITY.CRITICAL).length,
-          warning: findings.filter((f) => f.severity === SEVERITY.WARNING).length,
-          info: findings.filter((f) => f.severity === SEVERITY.INFO).length,
-          rules: [...new Set(findings.map((f) => f.rule))],
-        }),
-      },
+    const newValue = JSON.stringify({
+      totalFindings: findings.length,
+      critical: findings.filter((f) => f.severity === SEVERITY.CRITICAL).length,
+      warning: findings.filter((f) => f.severity === SEVERITY.WARNING).length,
+      info: findings.filter((f) => f.severity === SEVERITY.INFO).length,
+      rules: [...new Set(findings.map((f) => f.rule))].sort(),
+      fingerprint: crypto.createHash('sha256')
+        .update(JSON.stringify([...new Set(findings.map((f) => `${f.severity}|${f.rule}|${f.title}`))].sort()))
+        .digest('hex'),
     });
+    const last = await prisma.operationLog.findFirst({
+      where: { action: 'PATROL_RUN', entity: 'System', entityId: 'patrol' },
+      orderBy: { createdAt: 'desc' },
+      select: { newValue: true },
+    });
+    if (last?.newValue !== newValue) {
+      await prisma.operationLog.create({
+        data: { actorType: 'SYSTEM', action: 'PATROL_RUN', entity: 'System', entityId: 'patrol', newValue },
+      });
+    }
   } catch {
     /* best effort */
   }
