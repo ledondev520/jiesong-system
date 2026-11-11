@@ -4,12 +4,12 @@
  * Pos: 前端布局组件测试
  */
 
-import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { ThemeProvider } from './ThemeProvider';
+import type { ReactNode } from "react";
+import { describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { ThemeProvider } from "./ThemeProvider";
 
-vi.mock('next-themes', () => ({
+vi.mock("next-themes", () => ({
   ThemeProvider: ({
     children,
     attribute,
@@ -35,19 +35,22 @@ vi.mock('next-themes', () => ({
   ),
 }));
 
-describe('ThemeProvider', () => {
-  it('使用约定的主题配置并渲染子节点', () => {
+describe("ThemeProvider", () => {
+  it("使用约定的主题配置并渲染子节点", () => {
     render(
       <ThemeProvider>
         <span>child</span>
       </ThemeProvider>,
     );
 
-    const provider = screen.getByTestId('next-theme-provider');
-    expect(provider).toHaveAttribute('data-attribute', 'class');
-    expect(provider).toHaveAttribute('data-default-theme', 'system');
-    expect(provider).toHaveAttribute('data-enable-system', 'true');
-    expect(provider).toHaveAttribute('data-disable-transition-on-change', 'true');
-    expect(screen.getByText('child')).toBeInTheDocument();
+    const provider = screen.getByTestId("next-theme-provider");
+    expect(provider).toHaveAttribute("data-attribute", "class");
+    expect(provider).toHaveAttribute("data-default-theme", "system");
+    expect(provider).toHaveAttribute("data-enable-system", "true");
+    expect(provider).toHaveAttribute(
+      "data-disable-transition-on-change",
+      "true",
+    );
+    expect(screen.getByText("child")).toBeInTheDocument();
   });
 });

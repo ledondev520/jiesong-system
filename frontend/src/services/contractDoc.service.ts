@@ -4,32 +4,42 @@
  * Pos: 前端服务层，封装合同文档生成相关API调用
  */
 
-import api from '@/lib/axios';
-import { ApiResponse } from '@/types';
+import api from "@/lib/axios";
+import { ApiResponse } from "@/types";
 
 export const contractDocService = {
   /**
    * 检查模板状态
    */
   checkTemplate: async () => {
-    return api.get<ApiResponse<{ exists: boolean }>, ApiResponse<{ exists: boolean }>>('/contract-doc/template/check');
+    return api.get<
+      ApiResponse<{ exists: boolean }>,
+      ApiResponse<{ exists: boolean }>
+    >("/contract-doc/template/check");
   },
 
   /**
    * 获取模板列表（当前后端仅支持单模板）
    */
   getTemplates: async () => {
-    return api.get<ApiResponse<{ items: Array<{
-      exists: boolean;
-      filename?: string;
-      size?: number;
-      updatedAt?: string;
-    }> }>, ApiResponse<{ items: Array<{
-      exists: boolean;
-      filename?: string;
-      size?: number;
-      updatedAt?: string;
-    }> }>>('/contract-doc/templates');
+    return api.get<
+      ApiResponse<{
+        items: Array<{
+          exists: boolean;
+          filename?: string;
+          size?: number;
+          updatedAt?: string;
+        }>;
+      }>,
+      ApiResponse<{
+        items: Array<{
+          exists: boolean;
+          filename?: string;
+          size?: number;
+          updatedAt?: string;
+        }>;
+      }>
+    >("/contract-doc/templates");
   },
 
   /**
@@ -38,17 +48,23 @@ export const contractDocService = {
    */
   uploadTemplate: async (file: File) => {
     const formData = new FormData();
-    formData.append('template', file);
-    return api.post<ApiResponse<void>, ApiResponse<void>, FormData>('/contract-doc/template', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    formData.append("template", file);
+    return api.post<ApiResponse<void>, ApiResponse<void>, FormData>(
+      "/contract-doc/template",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
   },
 
   /**
    * 删除合同模板
    */
   deleteTemplate: async () => {
-    return api.delete<ApiResponse<void>, ApiResponse<void>>('/contract-doc/template');
+    return api.delete<ApiResponse<void>, ApiResponse<void>>(
+      "/contract-doc/template",
+    );
   },
 
   /**
@@ -63,14 +79,14 @@ export const contractDocService = {
       storeName?: string;
       deliveryAddress?: string;
       deliveryContact?: string;
-    }
+    },
   ) => {
     const response = await api.post(
       `/contract-doc/generate/${purchaseContractId}`,
       options || {},
       {
-        responseType: 'blob',
-      }
+        responseType: "blob",
+      },
     );
     return response as unknown as Blob;
   },
@@ -82,7 +98,7 @@ export const contractDocService = {
    */
   downloadDocument: (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename;
     document.body.appendChild(link);
@@ -100,7 +116,7 @@ export const contractDocService = {
     try {
       const response = await api.get(
         `/contract-doc/pdf/${purchaseContractId}`,
-        { responseType: 'blob' }
+        { responseType: "blob" },
       );
       return response as unknown as Blob;
     } catch {
@@ -111,11 +127,14 @@ export const contractDocService = {
   /**
    * 导出采购合同 PDF（blob 下载）
    */
-  exportPurchasePdf: async (purchaseContractId: string, contractNo?: string) => {
+  exportPurchasePdf: async (
+    purchaseContractId: string,
+    contractNo?: string,
+  ) => {
     const response = await api.post(
       `/contract-doc/generate/${purchaseContractId}`,
-      { format: 'pdf' },
-      { responseType: 'blob' },
+      { format: "pdf" },
+      { responseType: "blob" },
     );
     contractDocService.downloadDocument(
       response as unknown as Blob,

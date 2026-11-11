@@ -4,12 +4,12 @@
  * Pos: 前端认证基础设施，统一管理访问令牌
  */
 
-const AUTH_TOKEN_KEY = 'jiesong_access_token';
+const AUTH_TOKEN_KEY = "jiesong_access_token";
 
 let memoryToken: string | null = null;
 
 const canUseSessionStorage = (): boolean =>
-  typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
+  typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
 
 export const getAuthToken = (): string | null => {
   if (memoryToken) {
@@ -37,4 +37,3 @@ export const clearAuthToken = (): void => {
     window.sessionStorage.removeItem(AUTH_TOKEN_KEY);
   }
 };
-

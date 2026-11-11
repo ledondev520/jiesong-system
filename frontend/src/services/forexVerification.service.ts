@@ -1,4 +1,4 @@
-import { createCrudService } from './crudService';
+import { createCrudService } from "./crudService";
 
 export interface ForexVerification {
   id: string;
@@ -15,4 +15,6 @@ export interface ForexVerification {
   note?: string | null;
 }
 
-export const forexVerificationService = createCrudService<ForexVerification>( '/forex-verifications');
+export const forexVerificationService = createCrudService<ForexVerification>(
+  "/forex-verifications",
+);

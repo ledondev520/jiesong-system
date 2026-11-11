@@ -4,8 +4,8 @@
  * Pos: 前端服务层，对接后端CSV分析接口
  */
 
-import api from '@/lib/axios';
-import { ApiResponse } from '@/types';
+import api from "@/lib/axios";
+import { ApiResponse } from "@/types";
 
 // ==================== 类型定义 ====================
 
@@ -16,8 +16,8 @@ export interface TemplateItem {
   category: string;
   storeCount: number;
   frequency: number;
-  priority: '强烈建议' | '建议' | '可选';
-  isTemplateStore: boolean;      // 是否为密歇根模板店采购过的物品
+  priority: "强烈建议" | "建议" | "可选";
+  isTemplateStore: boolean; // 是否为密歇根模板店采购过的物品
   avgQtyPerStore: number | null; // 每家门店平均采购量（均值）
   unit: string;
   manufacturers: string[];
@@ -30,7 +30,7 @@ export interface UniversalTemplate {
   totalStores: number;
   totalProducts: number;
   mustHaveCount: number;
-  templateStore: string;         // 参照模板门店（密歇根）
+  templateStore: string; // 参照模板门店（密歇根）
   items: TemplateItem[];
   byCategory: Record<string, TemplateItem[]>;
 }
@@ -64,14 +64,16 @@ export const procurementTemplateService = {
    * 职责：获取CSV中所有门店列表（去重并规范化）
    */
   getStoreList: () =>
-    api.get<ApiResponse<string[]>, ApiResponse<string[]>>('/procurement-template/stores'),
+    api.get<ApiResponse<string[]>, ApiResponse<string[]>>(
+      "/procurement-template/stores",
+    ),
 
   /**
    * 职责：获取跨所有门店的通用采购模板（含优先级、品类分组）
    */
   getUniversalTemplate: () =>
     api.get<ApiResponse<UniversalTemplate>, ApiResponse<UniversalTemplate>>(
-      '/procurement-template/universal',
+      "/procurement-template/universal",
     ),
 
   /**

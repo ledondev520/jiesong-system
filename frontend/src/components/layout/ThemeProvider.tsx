@@ -4,9 +4,9 @@
  * Pos: 布局基础组件，为全应用提供主题上下文
  */
 
-'use client';
+"use client";
 
-import { ThemeProvider as NextThemeProvider } from 'next-themes';
+import { ThemeProvider as NextThemeProvider } from "next-themes";
 
 interface ThemeProviderProps {
   children: React.ReactNode;

@@ -31,7 +31,6 @@ vi.mock("@/services/user.service", () => ({
   },
 }));
 
-
 vi.mock("sonner", () => ({
   toast: {
     error: (...args: unknown[]) => mockToastError(...args),

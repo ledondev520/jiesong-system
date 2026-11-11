@@ -4,8 +4,8 @@
  * Pos: 商品管理页智能匹配服务层
  */
 
-import api from '@/lib/axios';
-import type { ApiResponse, HsCodeRecord, PaginatedResponse } from '@/types';
+import api from "@/lib/axios";
+import type { ApiResponse, HsCodeRecord, PaginatedResponse } from "@/types";
 
 export type HsCodeMatch = HsCodeRecord;
 
@@ -13,7 +13,7 @@ export interface BatchHsCodeMatchResult {
   productName: string;
   hsCode: string | null;
   match: HsCodeRecord | null;
-  confidence: 'exact' | 'high' | 'low' | 'none';
+  confidence: "exact" | "high" | "low" | "none";
 }
 
 export interface UpdateHsCodeInput {
@@ -38,8 +38,8 @@ export const hsCodeService = {
    * @param fuzzy - 启用相似度模糊搜索（有 keyword 或 code 时才生效）
    */
   list: async ({
-    keyword = '',
-    code = '',
+    keyword = "",
+    code = "",
     page = 1,
     pageSize = 20,
     fuzzy = false,
@@ -52,23 +52,34 @@ export const hsCodeService = {
     fuzzy?: boolean;
   } = {}) => {
     return api.get<
-      ApiResponse<PaginatedResponse<HsCodeRecord & { similarity?: number; fuzzy?: boolean }>>,
-      ApiResponse<PaginatedResponse<HsCodeRecord & { similarity?: number; fuzzy?: boolean }>>
-    >('/hs-codes', {
+      ApiResponse<
+        PaginatedResponse<
+          HsCodeRecord & { similarity?: number; fuzzy?: boolean }
+        >
+      >,
+      ApiResponse<
+        PaginatedResponse<
+          HsCodeRecord & { similarity?: number; fuzzy?: boolean }
+        >
+      >
+    >("/hs-codes", {
       params: {
         keyword: keyword || undefined,
         code: code || undefined,
         page,
         pageSize,
-        fuzzy: fuzzy ? 'true' : undefined,
+        fuzzy: fuzzy ? "true" : undefined,
       },
     });
   },
 
   search: async (keyword: string) => {
-    return api.get<ApiResponse<HsCodeRecord[]>, ApiResponse<HsCodeRecord[]>>('/hs-codes/search', {
-      params: { keyword },
-    });
+    return api.get<ApiResponse<HsCodeRecord[]>, ApiResponse<HsCodeRecord[]>>(
+      "/hs-codes/search",
+      {
+        params: { keyword },
+      },
+    );
   },
 
   searchByProductName: async (keyword: string) => {
@@ -76,7 +87,9 @@ export const hsCodeService = {
   },
 
   getByCode: async (code: string) => {
-    return api.get<ApiResponse<HsCodeRecord>, ApiResponse<HsCodeRecord>>(`/hs-codes/${code}`);
+    return api.get<ApiResponse<HsCodeRecord>, ApiResponse<HsCodeRecord>>(
+      `/hs-codes/${code}`,
+    );
   },
 
   searchByHsCode: async (code: string) => {
@@ -84,11 +97,17 @@ export const hsCodeService = {
   },
 
   update: async (code: string, data: UpdateHsCodeInput) => {
-    return api.put<ApiResponse<HsCodeRecord>, ApiResponse<HsCodeRecord>>(`/hs-codes/${code}`, data);
+    return api.put<ApiResponse<HsCodeRecord>, ApiResponse<HsCodeRecord>>(
+      `/hs-codes/${code}`,
+      data,
+    );
   },
 
   batchMatch: async (productNames: string[]) => {
-    return api.post<ApiResponse<BatchHsCodeMatchResult[]>, ApiResponse<BatchHsCodeMatchResult[]>>('/hs-codes/batch-match', {
+    return api.post<
+      ApiResponse<BatchHsCodeMatchResult[]>,
+      ApiResponse<BatchHsCodeMatchResult[]>
+    >("/hs-codes/batch-match", {
       productNames,
     });
   },

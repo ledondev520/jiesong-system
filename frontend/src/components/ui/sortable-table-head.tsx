@@ -4,11 +4,11 @@
  * Pos: 通用 UI 组件，配合 useTableSort 使用
  */
 
-'use client';
+"use client";
 
-import { cn } from '@/lib/utils';
-import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
-import type { SortDirection } from '@/lib/hooks/useTableSort';
+import { cn } from "@/lib/utils";
+import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import type { SortDirection } from "@/lib/hooks/useTableSort";
 
 interface SortableTableHeadProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
   sortKey: string;
@@ -36,19 +36,19 @@ export function SortableTableHead({
     <th
       data-slot="table-head"
       className={cn(
-        'text-muted-foreground h-10 px-4 text-left align-middle text-xs font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
-        'cursor-pointer select-none hover:text-foreground transition-colors',
-        isActive && 'text-foreground',
-        className
+        "text-muted-foreground h-10 px-4 text-left align-middle text-xs font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "cursor-pointer select-none hover:text-foreground transition-colors",
+        isActive && "text-foreground",
+        className,
       )}
       onClick={() => onSort(sortKey)}
       {...props}
     >
       <span className="inline-flex items-center gap-1">
         {children}
-        {isActive && currentSortDir === 'asc' ? (
+        {isActive && currentSortDir === "asc" ? (
           <ArrowUp className="h-3 w-3" />
-        ) : isActive && currentSortDir === 'desc' ? (
+        ) : isActive && currentSortDir === "desc" ? (
           <ArrowDown className="h-3 w-3" />
         ) : (
           <ArrowUpDown className="h-3 w-3 opacity-30" />

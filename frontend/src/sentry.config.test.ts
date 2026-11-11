@@ -4,18 +4,18 @@
  * Pos: 前端构建期依赖回归测试
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 
-describe('Sentry config imports', () => {
-  it('imports client config', async () => {
-    await expect(import('../sentry.client.config')).resolves.toBeDefined();
+describe("Sentry config imports", () => {
+  it("imports client config", async () => {
+    await expect(import("../sentry.client.config")).resolves.toBeDefined();
   });
 
-  it('imports server config', async () => {
-    await expect(import('../sentry.server.config')).resolves.toBeDefined();
+  it("imports server config", async () => {
+    await expect(import("../sentry.server.config")).resolves.toBeDefined();
   });
 
-  it('imports edge config', async () => {
-    await expect(import('../sentry.edge.config')).resolves.toBeDefined();
+  it("imports edge config", async () => {
+    await expect(import("../sentry.edge.config")).resolves.toBeDefined();
   });
 });

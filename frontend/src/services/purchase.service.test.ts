@@ -4,11 +4,11 @@
  * Pos: 前端业务服务测试
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import api from '@/lib/axios';
-import { purchaseService } from './purchase.service';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import api from "@/lib/axios";
+import { purchaseService } from "./purchase.service";
 
-vi.mock('@/lib/axios', () => ({
+vi.mock("@/lib/axios", () => ({
   default: {
     get: vi.fn(),
     post: vi.fn(),
@@ -21,139 +21,167 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('purchaseService api', () => {
-  it('getAll: 传递查询参数', async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+describe("purchaseService api", () => {
+  it("getAll: 传递查询参数", async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
 
-    await purchaseService.getAll({ page: 1, pageSize: 20, keyword: '采购' });
+    await purchaseService.getAll({ page: 1, pageSize: 20, keyword: "采购" });
 
-    expect(api.get).toHaveBeenCalledWith('/purchases', {
-      params: { page: 1, pageSize: 20, keyword: '采购' },
+    expect(api.get).toHaveBeenCalledWith("/purchases", {
+      params: { page: 1, pageSize: 20, keyword: "采购" },
     });
   });
 
-  it('getById: 通过id获取详情', async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+  it("getById: 通过id获取详情", async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
 
-    await purchaseService.getById('pc1');
+    await purchaseService.getById("pc1");
 
-    expect(api.get).toHaveBeenCalledWith('/purchases/pc1');
+    expect(api.get).toHaveBeenCalledWith("/purchases/pc1");
   });
 
-  it('create: 提交新增数据', async () => {
-    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+  it("create: 提交新增数据", async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
     const payload = {
-      supplierId: 'sup-001',
-      contractNo: 'CG25001',
+      supplierId: "sup-001",
+      contractNo: "CG25001",
       taxRate: 13,
-      items: [{ productId: 'p1', quantity: 10, unitPrice: 100 }],
+      items: [{ productId: "p1", quantity: 10, unitPrice: 100 }],
     };
 
     await purchaseService.create(payload);
 
-    expect(api.post).toHaveBeenCalledWith('/purchases', payload);
+    expect(api.post).toHaveBeenCalledWith("/purchases", payload);
   });
 
-  it('update: 提交更新数据', async () => {
-    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-    const payload = { note: 'updated' };
+  it("update: 提交更新数据", async () => {
+    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
+    const payload = { note: "updated" };
 
-    await purchaseService.update('pc1', payload);
+    await purchaseService.update("pc1", payload);
 
-    expect(api.put).toHaveBeenCalledWith('/purchases/pc1', payload);
+    expect(api.put).toHaveBeenCalledWith("/purchases/pc1", payload);
   });
 
-  it('delete: 通过id删除', async () => {
-    (api.delete as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+  it("delete: 通过id删除", async () => {
+    (api.delete as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
 
-    await purchaseService.delete('pc1');
+    await purchaseService.delete("pc1");
 
-    expect(api.delete).toHaveBeenCalledWith('/purchases/pc1');
+    expect(api.delete).toHaveBeenCalledWith("/purchases/pc1");
   });
 
-  it('updateProductionDetails: 批量提交生产规格和装柜输入资料', async () => {
-    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-    const items = [{
-      id: 'pi-1',
-      specification: '标准箱',
-      boxes: 10,
-      grossWeight: 100,
-      netWeight: 95,
-      volume: 1.2,
-      length: null,
-      width: null,
-      height: null,
-    }];
+  it("updateProductionDetails: 批量提交生产规格和装柜输入资料", async () => {
+    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
+    const items = [
+      {
+        id: "pi-1",
+        specification: "标准箱",
+        boxes: 10,
+        grossWeight: 100,
+        netWeight: 95,
+        volume: 1.2,
+        length: null,
+        width: null,
+        height: null,
+      },
+    ];
 
-    await purchaseService.updateProductionDetails('pc1', items);
+    await purchaseService.updateProductionDetails("pc1", items);
 
-    expect(api.put).toHaveBeenCalledWith('/purchases/pc1/production-details', { items });
+    expect(api.put).toHaveBeenCalledWith("/purchases/pc1/production-details", {
+      items,
+    });
   });
 
-  it('getInvoicePreparation: 读取合同内唯一催票与发票登记状态', async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+  it("getInvoicePreparation: 读取合同内唯一催票与发票登记状态", async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
 
-    await purchaseService.getInvoicePreparation('pc1');
+    await purchaseService.getInvoicePreparation("pc1");
 
-    expect(api.get).toHaveBeenCalledWith('/purchases/pc1/invoice-preparation');
+    expect(api.get).toHaveBeenCalledWith("/purchases/pc1/invoice-preparation");
   });
 
-  it('registerInvoiceNumbers: 通过专用入口登记多个号码', async () => {
-    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
+  it("registerInvoiceNumbers: 通过专用入口登记多个号码", async () => {
+    (api.put as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
 
-    await purchaseService.registerInvoiceNumbers('pc1', ['INV-001', 'INV-002']);
+    await purchaseService.registerInvoiceNumbers("pc1", ["INV-001", "INV-002"]);
 
-    expect(api.put).toHaveBeenCalledWith('/purchases/pc1/invoice-numbers', {
-      invoiceNumbers: ['INV-001', 'INV-002'],
+    expect(api.put).toHaveBeenCalledWith("/purchases/pc1/invoice-numbers", {
+      invoiceNumbers: ["INV-001", "INV-002"],
     });
   });
 });
 
-describe('purchaseService.getNextContractNo', () => {
-  it('获取下一个合同编号', async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { contractNo: 'CG2500001' } });
+describe("purchaseService.getNextContractNo", () => {
+  it("获取下一个合同编号", async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { contractNo: "CG2500001" },
+    });
 
     await purchaseService.getNextContractNo();
 
-    expect(api.get).toHaveBeenCalledWith('/purchases/options/next-no');
+    expect(api.get).toHaveBeenCalledWith("/purchases/options/next-no");
   });
 });
 
-describe('purchaseService.getSuppliersByProducts', () => {
-  it('根据商品ID获取供应商', async () => {
-    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { supplierIds: ['s1', 's2'] } });
+describe("purchaseService.getSuppliersByProducts", () => {
+  it("根据商品ID获取供应商", async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { supplierIds: ["s1", "s2"] },
+    });
 
-    await purchaseService.getSuppliersByProducts(['p1', 'p2']);
+    await purchaseService.getSuppliersByProducts(["p1", "p2"]);
 
-    expect(api.post).toHaveBeenCalledWith('/purchases/suppliers-by-products', { productIds: ['p1', 'p2'] });
+    expect(api.post).toHaveBeenCalledWith("/purchases/suppliers-by-products", {
+      productIds: ["p1", "p2"],
+    });
   });
 });
 
-describe('purchaseService.parseQuote', () => {
-  it('调用 AI 解析接口并标准化返回值', async () => {
+describe("purchaseService.parseQuote", () => {
+  it("调用 AI 解析接口并标准化返回值", async () => {
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: {
         data: {
-          items: [{ name: '瓷砖', quantity: '100', price: '45.5', unit: 'sqm' }],
+          items: [
+            { name: "瓷砖", quantity: "100", price: "45.5", unit: "sqm" },
+          ],
         },
       },
     });
 
-    const result = await purchaseService.parseQuote('报价文本');
+    const result = await purchaseService.parseQuote("报价文本");
 
-    expect(api.post).toHaveBeenCalledWith('/ai/parse', { type: 'quote', content: '报价文本' });
+    expect(api.post).toHaveBeenCalledWith("/ai/parse", {
+      type: "quote",
+      content: "报价文本",
+    });
     expect(result).toEqual({
       success: true,
-      data: [{ productId: undefined, productName: '瓷砖', quantity: 100, unitPrice: 45.5, unit: 'sqm', note: undefined }],
+      data: [
+        {
+          productId: undefined,
+          productName: "瓷砖",
+          quantity: 100,
+          unitPrice: 45.5,
+          unit: "sqm",
+          note: undefined,
+        },
+      ],
     });
   });
 });
 
-it('采购正常导入默认不携带historical，只有显式历史参数才发送true', async () => {
-  const file = new File(['synthetic'], 'synthetic.xlsx');
+it("采购正常导入默认不携带historical，只有显式历史参数才发送true", async () => {
+  const file = new File(["synthetic"], "synthetic.xlsx");
   await purchaseService.importExcel(file);
   expect(vi.mocked(api.post).mock.calls.at(-1)?.[1]).toBeInstanceOf(FormData);
-  expect((vi.mocked(api.post).mock.calls.at(-1)?.[1] as FormData).has('historical')).toBe(false);
+  expect(
+    (vi.mocked(api.post).mock.calls.at(-1)?.[1] as FormData).has("historical"),
+  ).toBe(false);
   await purchaseService.importExcel(file, { historical: true });
-  expect((vi.mocked(api.post).mock.calls.at(-1)?.[1] as FormData).get('historical')).toBe('true');
+  expect(
+    (vi.mocked(api.post).mock.calls.at(-1)?.[1] as FormData).get("historical"),
+  ).toBe("true");
 });

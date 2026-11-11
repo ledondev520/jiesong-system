@@ -10,7 +10,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 
 interface PageSizeSelectProps {
   /** 当前每页条数 */
@@ -34,10 +34,7 @@ export function PageSizeSelect({
   options = [20, 50, 100],
 }: PageSizeSelectProps) {
   return (
-    <Select
-      value={String(value)}
-      onValueChange={(v) => onChange(Number(v))}
-    >
+    <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
       <SelectTrigger className="h-8 w-[130px] text-xs">
         <SelectValue />
       </SelectTrigger>
