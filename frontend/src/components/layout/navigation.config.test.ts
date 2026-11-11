@@ -105,7 +105,6 @@ describe("navigation.config helpers", () => {
       "/dashboard/inventory": "inventory",
       "/dashboard/logistics": "inventory",
       "/dashboard/products": "products",
-      "/dashboard/sales/create": "orders",
       "/dashboard/tax-refunds/abc": "documents",
       "/dashboard/customs/new": "documents",
       "/dashboard/hs-codes": "hs-codes",

@@ -135,13 +135,6 @@ const coreCases = [
   { id: 'sales_tax_refund_preparation', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}/tax-refund-preparation`) },
   { id: 'sales_tax_refund_preparation_export', method: 'GET', path: optionalPath('salesId', (id) => `/api/v1/sales/${id}/tax-refund-preparation/export`), acceptsBlob: true },
 
-  { id: 'containers_list', method: 'GET', path: '/api/v1/containers?page=1&pageSize=20', save: saveFirstId('containerId') },
-  { id: 'container_next_no', method: 'GET', path: optionalPath('portId', (id) => `/api/v1/containers/next-no/${id}`) },
-  { id: 'container_detail', method: 'GET', path: optionalPath('containerId', (id) => `/api/v1/containers/${id}`) },
-  { id: 'container_items', method: 'GET', path: optionalPath('containerId', (id) => `/api/v1/containers/${id}/items`) },
-  { id: 'container_items_summary', method: 'GET', path: optionalPath('containerId', (id) => `/api/v1/containers/${id}/items/summary`) },
-  { id: 'container_products', method: 'GET', path: optionalPath('containerId', (id) => `/api/v1/containers/${id}/products`) },
-  { id: 'container_visualization', method: 'GET', path: optionalPath('containerId', (id) => `/api/v1/containers/${id}/visualization`) },
 
   { id: 'inventory_list', method: 'GET', path: '/api/v1/inventory?page=1&pageSize=20', save: saveFirstId('inventoryId') },
   { id: 'inventory_stats', method: 'GET', path: '/api/v1/inventory/stats' },

@@ -30,6 +30,7 @@ const nextConfig: NextConfig = {
       { source: '/dashboard/system/logs', destination: '/dashboard/settings/logs', permanent: true },
       { source: '/dashboard/system/notifications', destination: '/dashboard/notifications', permanent: true },
       { source: '/dashboard/about', destination: '/dashboard/settings/ai-usage', permanent: true },
+      { source: '/dashboard/sales/create', destination: '/dashboard/orders/new', permanent: true }, // A99: old create page removed
       { source: '/dashboard/ai/sessions', destination: '/dashboard/settings/ai-usage', permanent: true },
     ];
   },

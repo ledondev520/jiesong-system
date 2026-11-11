@@ -81,7 +81,7 @@ test('真实SQLite：分批验货幂等、并发限量、故障回滚与老板�
   let authorization = tokenAt(0);
   const guard = async () => { let error; await authenticate({ headers: { authorization }, method: 'POST', originalUrl: '/api/v1/purchases' }, {}, (e) => { error = e; }); return error?.statusCode ?? 200; };
   assert.equal(await guard(), 403);
-  await require('./authService').updateUser(boss.id, { role: 'ADMIN' });
+  await require('../controllers/userController').update({ params: { id: boss.id }, body: { role: 'ADMIN' } }, { status() { return this; }, json() {} }, (e) => { if (e) throw e; });
   authorization = tokenAt(1);
   assert.equal(await guard(), 200);
   let updateError;

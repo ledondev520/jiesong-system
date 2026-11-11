@@ -17,7 +17,6 @@ const PURCHASE_NESTS = new Set(['purchaseItem', 'purchaseItems', 'purchaseContra
 const WAREHOUSE_EXEMPTIONS = [
   ['/customs-declarations', ['totalAmount', 'unitPrice', 'totalPrice']], // OD-6: customs declared values
   ['/sales', ['unitPrice', 'totalPrice']], // OD-6 point 3: USD sales/packing line prices
-  ['/containers', ['unitPrice', 'totalPrice']], // container aliases of the sales order
 ];
 const warehouseExemptKeys = (urlPath) => {
   const found = WAREHOUSE_EXEMPTIONS.find(([prefix]) => urlPath === prefix || urlPath.startsWith(`${prefix}/`) || urlPath.startsWith(`${prefix}?`));

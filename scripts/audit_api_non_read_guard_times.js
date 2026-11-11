@@ -72,7 +72,6 @@ const cases = [
   { id: 'system_logs_export_csv', category: 'export_guard', method: 'GET', path: '/api/v1/system/logs/export/csv', expectedStatuses: [200] },
 
   // Common write routes with explicit validation guards.
-  { id: 'container_create_missing_port', category: 'write_guard', method: 'POST', path: '/api/v1/containers', body: {}, expectedStatuses: [400] },
   { id: 'contract_template_create_missing_fields', category: 'write_guard', method: 'POST', path: '/api/v1/contract-templates', body: {}, expectedStatuses: [400] },
   { id: 'contract_file_upload_missing_file', category: 'write_guard', method: 'POST', path: '/api/v1/contracts/perf-contract/files', expectedStatuses: [400] },
   { id: 'finance_payment_create_missing_fields', category: 'write_guard', method: 'POST', path: '/api/v1/finance/payments', body: {}, expectedStatuses: [400] },

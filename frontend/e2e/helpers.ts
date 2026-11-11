@@ -331,19 +331,6 @@ export const mockApiRoutes = async (page: Page) => {
     updatedAt: now,
   };
 
-  const containers = [
-    {
-      id: "ct-1",
-      containerNo: "C2026030001",
-      contractNo: "EXP2600001",
-      status: "PENDING",
-      destinationPort: "洛杉矶港",
-      totalBoxes: 20,
-      totalVolume: 32.5,
-      eta: "2026-03-20T00:00:00.000Z",
-    },
-  ];
-
   const payables = [
     {
       id: purchaseContract.id,
@@ -1351,11 +1338,6 @@ export const mockApiRoutes = async (page: Page) => {
 
     if (pathname === "/api/v1/users" && method === "GET") {
       await fulfillJson(route, asPaginated([mockUser]));
-      return;
-    }
-
-    if (pathname === "/api/v1/containers" && method === "GET") {
-      await fulfillJson(route, asPaginated(containers));
       return;
     }
 
@@ -2367,7 +2349,7 @@ export const mockApiRoutes = async (page: Page) => {
     }
 
     if (
-      /^\/api\/v1\/(purchases|sales|products|suppliers|stores|users|containers)\/[^/]+$/.test(
+      /^\/api\/v1\/(purchases|sales|products|suppliers|stores|users)\/[^/]+$/.test(
         pathname,
       ) &&
       method === "DELETE"

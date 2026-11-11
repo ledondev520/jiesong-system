@@ -58,7 +58,6 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | salesController.js | 出口合同 + 价格计算 + 源文件附件；旧下载/删除入口复用财务凭证访问边界 |
 | fileController.js | 合同附件；退税确认清单含核验行，所有下载及删除入口经 fileService.assertFileAccess 限制为管理员/财务 |
 | taxRefundController.js | 退税记录与工作台、出货材料确认和受限月度导出 |
-| containerController.js | 货柜管理 + 装箱明细 |
 | inventoryController.js | 库存查询；采购/验货来源状态由业务事实驱动，手工和批量不可绕过 |
 | financeController.js | 付款与账款管理 |
 | financialStatementsController.js | 月度财务三文件预览、确认导入与账期查询 |
@@ -138,7 +137,6 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 - 采购模板：`routes/procurementTemplate.js` 的门店列表、通用模板、历史采购明细三个读取入口均先执行 `authenticate`，保持既有响应格式。
 
 - `inventorySnapshot.js`：库存行占用用条件更新（状态/未占用/数量），并发出货冲突 409；以自有装箱行扣减对应采购来源、单位的合格库存，旧销售明细兼容不双计；回滚保留验货来源；实际自有出库数量必须有限且为正，草稿零值、非自有拼柜与价格/单证补录不受影响。
-- `containerService.js`：旧货柜状态入口委托 `salesService.updateSalesStatus`，沿用单向流转、装载校验、结清检查与原子扣库；新建只允许草稿，表头保存只能携带未改变的状态。真实权限拒绝、取消重试、旧入口绕过及缺库存回滚见 `integration/sales-role-exceptions.integration.js`。
 - `salesService.updateSalesStatus` 以规范化后的当前状态判断真实流转，历史 `OUT_STOCK` 重放 `SHIPPED` 只规范状态，不重新校验装载、改发运时间或扣库。
 - `integration/sales-partial-metadata.integration.js` 使用真实认证 HTTP 和独立只读 SQLite 回读，验证备注/日期/港口局部保存、必填汇率省略与显式无效输入、既有可写角色/BOSS 拒绝以及发运/结清后的货物与出库保护；仅创建 0700/0600 临时合成库。
 - `integration/bank-import-lifecycle.integration.js` 用已提交迁移和真实认证 HTTP 验证银行预览放弃不落库、混合行按既有语义部分导入、账号/币种及批次行数/余额、重放保留已关联/忽略来源及老板只读边界；工作簿仅在内存中生成，独立只读 SQLite 回查且不改合同/付款/会计余额，由 `npm run test:db` 执行。

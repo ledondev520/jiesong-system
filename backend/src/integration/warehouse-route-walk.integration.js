@@ -80,7 +80,7 @@ test('HTTP/SQLite: no WAREHOUSE JSON response on any GET route carries a forbidd
     }
   }
   const idFor = {
-    purchases: purchase.id, sales: sale.id, containers: sale.id, suppliers: supplier.id, products: product.id, inventory: inventory.id,
+    purchases: purchase.id, sales: sale.id, suppliers: supplier.id, products: product.id, inventory: inventory.id,
     customers: customer.id, stores: store.id, 'customs-declarations': declaration.id,
     'forex-verifications': forex.id, 'tax-refunds': refund.id,
   };

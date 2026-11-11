@@ -88,7 +88,7 @@ test('真实 SQLite：限制验证码尝试、过期和重放；新账号待审�
   await assert.rejects(service.sendCode(payload.email), /已有账号/);
   const auth = require('./authService');
   await assert.rejects(auth.login(payload.email, payload.password), /尚未开通/);
-  await auth.updateUser(user.id, { isActive: true });
+  await prisma.user.update({ where: { id: user.id }, data: { isActive: true } }); // admin approval (A99: PUT /users/:id is the only update path)
   const login = await auth.login('NEW@EXAMPLE.COM', payload.password);
   assert.ok(login.token); assert.equal(login.user.id, user.id);
   const { authenticate } = require('../middleware/auth');
