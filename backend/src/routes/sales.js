@@ -17,17 +17,18 @@ const purchaseDraftController = require('../controllers/purchaseDraftController'
 const { exportSalesContractExcel } = require('../services/exportService');
 const { exportSalesContractPdf } = require('../services/pdfExportService');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, param, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 const { upload, pdfCheckUpload } = require('../utils/upload');
 
 const router = Router();
-const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
+const WRITE_ROLES = ROLE_SETS.OPERATORS;
 // 装柜计划含 Confidential 箱规/重量：显式人类角色白名单（含 BOSS 只读）；Agent 无 req.user，roleAuth 返回 401。
 const LOADING_PLAN_ROLES = [...WRITE_ROLES, 'BOSS'];
 // 单柜财务/退税清单含 Confidential 收付款与成本：与 /finance/* 一致，WAREHOUSE 无账务读权限。
 // R3 P1-3：导出工作簿/PDF含采购成本与退税，定价预检/生成只给商务角色；均不含 WAREHOUSE。
-const EXPORT_DOC_ROLES = ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'];
+const EXPORT_DOC_ROLES = ROLE_SETS.COMMERCIAL;
 const EXPORT_PACKET_ROLES = ['ADMIN', 'SALES', 'FINANCE'];
 const FINANCE_VIEW_ROLES = ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'];
 
@@ -80,7 +81,7 @@ router.post('/:id/items', withIdValidation, roleAuth(...WRITE_ROLES), withAuditL
 
 // POST /api/v1/sales/:id/items/:itemId/reprice - 改单行数量/售价（A84；审计行在服务事务内写入）
 // 不含 WAREHOUSE（OD-3：仓库看不到金额，也就不能改价）与只读的 BOSS。
-router.post('/:id/items/:itemId/reprice', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE'), salesController.updateItemLine);
+router.post('/:id/items/:itemId/reprice', withIdValidation, roleAuth(ROLE_SETS.COMMERCIAL), salesController.updateItemLine);
 
 // ==================== 装箱明细 ====================
 

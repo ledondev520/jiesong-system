@@ -9,6 +9,7 @@
 const { Router } = require('express');
 const { authenticate } = require('../middleware/auth');
 const { roleAuth } = require('../middleware/roleAuth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const hsCodeService = require('../services/hsCodeService');
 const aiService = require('../services/aiService');
 const hsciqService = require('../services/hsciqService');
@@ -206,7 +207,7 @@ router.get('/:code', async (req, res, next) => {
  */
 router.post(
   '/:code/fill-declaration',
-  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth(ROLE_SETS.OPERATORS),
   async (req, res, next) => {
     try {
       const { productDescription, productName } = req.body;
@@ -321,7 +322,7 @@ router.post(
  * Body: { productNames: string[] }
  * 思路：开放给 SALES/PURCHASE/FINANCE 等角色，一键生成三张表时无需 ADMIN
  */
-router.post('/batch-match', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE'), async (req, res, next) => {
+router.post('/batch-match', roleAuth(ROLE_SETS.OPERATORS), async (req, res, next) => {
   try {
     const { productNames } = req.body;
 
@@ -351,7 +352,7 @@ router.post('/batch-match', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'W
  */
 router.post(
   '/ai-recommend',
-  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth(ROLE_SETS.OPERATORS),
   async (req, res, next) => {
   try {
     const { productDescription } = req.body;

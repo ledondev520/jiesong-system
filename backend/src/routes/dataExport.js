@@ -12,6 +12,7 @@
 const { Router } = require('express');
 const systemController = require('../controllers/systemController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { paymentsExportGuard } = require('../middleware/paymentsExportGuard');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -21,7 +22,7 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/v1/export/:type - 导出数据（权限与 /system/export/:type 对齐，防止 RBAC 旁路）
-router.get('/:type', roleAuth('ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'), paymentsExportGuard, withAuditLog(
+router.get('/:type', roleAuth(ROLE_SETS.OPERATORS), paymentsExportGuard, withAuditLog(
   {
     entity: 'DataExport',
     action: 'EXPORT',

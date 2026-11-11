@@ -205,3 +205,14 @@ test('OD-6：库存快照的 totalCost 与 averageCost 对 WAREHOUSE 保持可�
   assert.equal('totalAmount' in out.contract, false);
   assert.equal('totalCost' in out.contract, false);
 });
+
+test('A98 exemptions: customs keeps declared values, sales keeps USD line prices, other prefixes strip them', () => {
+  const { warehouseExemptKeys } = require('./warehouseRedaction');
+  const body = { totalAmount: 9, receivedAmount: 3, items: [{ unitPrice: 2, totalPrice: 4, purchaseCost: 1, invoiceNo: 'INV-1' }] };
+  const run = (path) => redactWarehouseMoney('WAREHOUSE', body, warehouseExemptKeys(path));
+  assert.deepEqual(run('/customs-declarations/x'), { totalAmount: 9, items: [{ unitPrice: 2, totalPrice: 4, invoiceCount: 1 }] });
+  assert.deepEqual(run('/sales/x'), { items: [{ unitPrice: 2, totalPrice: 4, invoiceCount: 1 }] });
+  assert.deepEqual(run('/forex-verifications'), { items: [{ invoiceCount: 1 }] });
+  assert.deepEqual(run('/salesx'), { items: [{ invoiceCount: 1 }] }, 'prefix match is per path segment');
+  assert.equal(redactWarehouseMoney('ADMIN', body, warehouseExemptKeys('/forex-verifications')), body);
+});

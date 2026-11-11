@@ -9,6 +9,7 @@
 const { Router } = require('express');
 const aiController = require('../controllers/aiController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 const { SUPPORTED_AGENT_TYPES } = require('../services/openAgentService');
@@ -34,37 +35,37 @@ router.post('/anthropic/v1/messages/count_tokens', authenticateOpenAgentRuntime,
 router.use(authenticate);
 
 // POST /api/v1/ai/chat - 智能问答（支持图片）
-router.post('/chat', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+router.post('/chat', roleAuth(ROLE_SETS.OPERATORS), [
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.chat);
 
 // POST /api/v1/ai/chat/stream - 流式智能问答（SSE）
-router.post('/chat/stream', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+router.post('/chat/stream', roleAuth(ROLE_SETS.OPERATORS), [
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.chatStream);
 
 // POST /api/v1/ai/parse - 解析输入内容（辅助录入，支持图片）
-router.post('/parse', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+router.post('/parse', roleAuth(ROLE_SETS.OPERATORS), [
   body('type').notEmpty().withMessage('解析类型不能为空'),
 ], handleValidation, aiController.parseInput);
 
 // POST /api/v1/ai/agents/prompt - 运行预置业务 Agent（agentType 可选，默认 unified）
-router.post('/agents/prompt', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+router.post('/agents/prompt', roleAuth(ROLE_SETS.OPERATORS), [
   body('agentType').optional().isIn(SUPPORTED_AGENT_TYPES).withMessage('agentType 不合法'),
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.agentPrompt);
 
 // GET /api/v1/ai/agents/tools - 获取 Agent 工具注册表
-router.get('/agents/tools', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), aiController.agentToolRegistry);
+router.get('/agents/tools', roleAuth(ROLE_SETS.OPERATORS), aiController.agentToolRegistry);
 
 // POST /api/v1/ai/agents/prompt-stream - SSE 流式运行预置业务 Agent
-router.post('/agents/prompt-stream', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+router.post('/agents/prompt-stream', roleAuth(ROLE_SETS.OPERATORS), [
   body('agentType').optional().isIn(SUPPORTED_AGENT_TYPES).withMessage('agentType 不合法'),
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.agentPromptStream);
 
 // POST /api/v1/ai/agents/execute-action - 执行用户确认后的 Agent 写操作
-router.post('/agents/execute-action', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+router.post('/agents/execute-action', roleAuth(ROLE_SETS.OPERATORS), [
   body('actionId').notEmpty().withMessage('actionId 不能为空'),
 ], handleValidation, withAuditLog(
   {
@@ -78,7 +79,7 @@ router.post('/agents/execute-action', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FI
 ));
 
 // POST /api/v1/ai/agents/cancel-action - 取消一个待确认的 Agent 写操作
-router.post('/agents/cancel-action', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), [
+router.post('/agents/cancel-action', roleAuth(ROLE_SETS.OPERATORS), [
   body('actionId').notEmpty().withMessage('actionId 不能为空'),
 ], handleValidation, aiController.cancelAgentAction);
 
@@ -92,7 +93,7 @@ router.get('/sessions', aiController.getSessions);
 router.get('/standalone-token-usage', aiController.getStandaloneTokenUsage);
 
 // DELETE /api/v1/ai/sessions/:sessionId - 删除会话
-router.delete('/sessions/:sessionId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.delete('/sessions/:sessionId', roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   {
     entity: 'ChatSession',
     action: 'DELETE',
@@ -109,7 +110,7 @@ router.delete('/sessions/:sessionId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FI
 ));
 
 // PUT /api/v1/ai/config - 配置AI设置（仅管理员）
-router.put('/config', roleAuth('ADMIN'), withAuditLog(
+router.put('/config', roleAuth(ROLE_SETS.ADMIN), withAuditLog(
   {
     entity: 'SystemConfig',
     action: 'UPDATE',
@@ -139,12 +140,12 @@ router.get('/greeting/stream', aiController.getGreetingStream);
 const aiUsageController = require('../controllers/aiUsageController');
 
 // GET /api/v1/ai/usage/trend - 用量趋势（按日期聚合）
-router.get('/usage/trend', roleAuth('ADMIN'), aiUsageController.getUsageTrend);
+router.get('/usage/trend', roleAuth(ROLE_SETS.ADMIN), aiUsageController.getUsageTrend);
 
 // GET /api/v1/ai/usage/calls - 调用明细列表
-router.get('/usage/calls', roleAuth('ADMIN'), aiUsageController.getCallDetails);
+router.get('/usage/calls', roleAuth(ROLE_SETS.ADMIN), aiUsageController.getCallDetails);
 
 // GET /api/v1/ai/usage/summary - 用量汇总（今日/本周/本月/总计）
-router.get('/usage/summary', roleAuth('ADMIN'), aiUsageController.getUsageSummary);
+router.get('/usage/summary', roleAuth(ROLE_SETS.ADMIN), aiUsageController.getUsageSummary);
 
 module.exports = router;

@@ -7,9 +7,10 @@
 const { Router } = require('express');
 const { authenticate } = require('../middleware/auth');
 const { roleAuth } = require('../middleware/roleAuth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 
 // R3 P1-3：含采购成本/退税的读取排除 WAREHOUSE；创建 ForexVerification/TaxRefund 与其路由写权限一致（/generate 会建这两类记录）。
-const COMMERCIAL_ROLES = ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE'];
+const COMMERCIAL_ROLES = ROLE_SETS.COMMERCIAL;
 const SETTLEMENT_DOC_ROLES = ['ADMIN', 'SALES', 'FINANCE'];
 const { createError, wrapAsync } = require('../middleware/errorHandler');
 const { success } = require('../utils/response');

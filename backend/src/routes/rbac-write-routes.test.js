@@ -94,7 +94,7 @@ test('RBAC: 邮箱注册公开入口保留限流校验，管理员创建用户�
   const adminRegistration = blocks.find((item) => getRouteInfo('auth.js', item).routeKey === 'auth POST /register');
   assert.ok(adminRegistration);
   assert.match(adminRegistration, /authenticate/);
-  assert.match(adminRegistration, /roleAuth\('ADMIN'\)/);
+  assert.match(adminRegistration, /roleAuth\((?:'ADMIN'|ROLE_SETS\.ADMIN)\)/);
 });
 
 test('logout owns cookie CSRF validation rather than bearer role authorization', () => {

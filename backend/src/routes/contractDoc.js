@@ -10,6 +10,7 @@ const { Router } = require('express');
 const multer = require('multer');
 const contractDocController = require('../controllers/contractDocController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -32,7 +33,7 @@ router.get('/templates', contractDocController.getTemplates);
 // POST /api/v1/contract-doc/template - 上传合同模板（仅管理员）
 router.post(
   '/template',
-  roleAuth('ADMIN'),
+  roleAuth(ROLE_SETS.ADMIN),
   upload.single('template'),
   withAuditLog(
     {
@@ -51,7 +52,7 @@ router.post(
 );
 
 // DELETE /api/v1/contract-doc/template - 删除模板（仅管理员）
-router.delete('/template', roleAuth('ADMIN'), withAuditLog(
+router.delete('/template', roleAuth(ROLE_SETS.ADMIN), withAuditLog(
   {
     entity: 'ContractTemplate',
     action: 'DELETE',
