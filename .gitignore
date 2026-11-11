@@ -165,7 +165,6 @@ docs/*财务分析报告*.md
 
 # 原始出口/报关业务文件属于本地凭证，不进入源码仓库
 /docs/wps-import/*
-!/docs/wps-import/README.md
 /docs/*.xlsx
 /docs/*.xls
 
