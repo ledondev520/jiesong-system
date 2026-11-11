@@ -2,8 +2,6 @@
  * Input: 出口合同的装柜计划（后端 loading-plan）、合同ID/号
  * Output: 货柜页签：摘要 + 柜型模拟 + 桌面 3D（懒加载）/手机 2D 回退 + 打印、PNG、PDF 导出
  * Pos: 订单详情“货柜”页签的自包含面板；只渲染后端计划，不排柜
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

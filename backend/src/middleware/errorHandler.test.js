@@ -2,8 +2,6 @@
  * Input: node:test、node:assert/strict、错误处理中间件及 Busboy/Multer 合成错误
  * Output: 错误状态与中文提示回归；精确白名单400、既有状态优先、未知错误500
  * Pos: 后端错误处理测试文件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

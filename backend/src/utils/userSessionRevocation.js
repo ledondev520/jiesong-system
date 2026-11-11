@@ -1,7 +1,7 @@
 /**
  * Input: 事务客户端、用户当前状态与拟更新字段
  * Output: 角色变更/停用时递增 sessionVersion 并撤销该用户全部浏览器会话
- * Pos: authService.updateUser 与 userController.update/remove 共用，避免两套入口口径漂移
+ * Pos: userController.update/remove 使用（A99 后唯一的用户更新入口）
  */
 
 const { createError } = require('../middleware/errorHandler');

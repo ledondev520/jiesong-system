@@ -2,7 +2,6 @@
  * Input: active purchase page with generated synthetic workbook bytes and mocked HTTP service
  * Output: cancel, mixed-result and failed-request/reselection component lifecycle coverage
  * Pos: purchase Excel UI regression; jsdom components, not a browser or database claim
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {

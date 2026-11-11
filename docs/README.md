@@ -49,7 +49,6 @@
 | qa/financial-library-source-readbacks-2026-10-06.md | 聚焦验收 | 现有资料库CLI合成来源入库、脱敏/有序行/来源身份回读、空筛选和迟到旧Sheet修复及hosted定义边界 |
 | qa/README.md | 子目录索引 | 维护聚焦QA证据及执行层级 |
 | qa/account-name-lifecycle-2026-10-06.md | 聚焦验收 | 两个人类用户入口的名称取消、后页目录、真实失败保留和重试；明确Agent客户端隔离及浏览器未执行 |
-| wps-import/README.md | 子目录索引 | WPS 增量导入源文件归档（按月），供幂等导入脚本在本地/VPS 使用 |
 | quality/发布结论_M5_20260212.md | 发布报告 | 记录 M5 门禁证据、风险评估与 Go/No-Go 结论 |
 | 周节奏指标看板.md | 指标看板 | 追踪每周质量/效率/回归率并给出迭代建议 |
 

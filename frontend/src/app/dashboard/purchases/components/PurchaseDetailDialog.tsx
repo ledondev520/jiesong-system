@@ -2,8 +2,6 @@
  * Input: 采购合同详情（含商品明细）、开关与关闭回调
  * Output: 采购列表页的合同详情弹窗（金额汇总、商品明细、备注）
  * Pos: 采购列表页（ContractsPageContent）拆出的只读展示组件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { RemarkText } from "@/components/ui/remark-text";
@@ -42,8 +40,8 @@ export function PurchaseDetailDialog({
   detail,
   onClose,
 }: PurchaseDetailDialogProps) {
-  // OD-2/OD-3：WAREHOUSE 响应不含金额，显示「无权查看」而不是崩溃或 ¥0
-  const moneyHidden = useAuthStore((state) => state.user?.role === "WAREHOUSE");
+  // OD-2/OD-3/OD-8：非 ADMIN 响应不含金额，显示「无权查看」而不是崩溃或 ¥0
+  const moneyHidden = useAuthStore((state) => state.user?.role !== "ADMIN");
   const money = (value: number | undefined) =>
     moneyHidden ? HIDDEN_MONEY : `¥${(value ?? 0).toLocaleString()}`;
   return (

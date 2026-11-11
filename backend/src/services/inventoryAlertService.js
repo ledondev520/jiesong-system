@@ -7,7 +7,7 @@
 const prisma = require('../utils/prisma');
 const { INVENTORY_STATUS, NOTIFICATION_TYPE, ROLES } = require('../config/constants');
 
-const DEFAULT_NOTIFY_ROLES = [ROLES.ADMIN, ROLES.PURCHASE, ROLES.WAREHOUSE];
+const DEFAULT_NOTIFY_ROLES = [ROLES.ADMIN, ROLES.SALES];
 
 const normalizeKeyword = (value) => String(value || '').trim();
 

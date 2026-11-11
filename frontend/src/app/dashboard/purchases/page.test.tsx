@@ -2,8 +2,6 @@
  * Input: 采购合同页面、purchaseService、router、URL参数、toast
  * Output: 采购合同页交互逻辑测试结果
  * Pos: 前端业务页交互测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -400,8 +398,8 @@ describe("ContractsPage 交互逻辑", () => {
       expect(mockImportExcel).toHaveBeenCalledWith(file, { historical: true }),
     );
   });
-  it("采购员没有历史确认，正常导入不携带历史参数", async () => {
-    mockRole = "PURCHASE";
+  it("SALES 没有历史确认，正常导入不携带历史参数", async () => {
+    mockRole = "SALES";
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     render(<ContractsPage />);
     await screen.findByRole("heading", { name: "采购合同" });

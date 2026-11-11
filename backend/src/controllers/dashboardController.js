@@ -4,8 +4,6 @@
  * Pos: 仪表盘控制器，提供首页统计数据
  * 
  * 2026-01-20 更新：Container已合并到SalesContract
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
@@ -128,7 +126,7 @@ const getStats = async (req, res, next) => {
     };
 
     // 3. 异步生成通知（不阻塞响应）
-    if (req.user?.id && req.user.role !== 'BOSS') {
+    if (req.user?.id) {
       generateForUser(req.user.id).catch(() => {});
     }
 

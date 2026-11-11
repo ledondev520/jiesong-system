@@ -2,24 +2,23 @@
  * Input: 合同文档控制器
  * Output: 合同文档生成路由
  * Pos: 路由层，处理合同文档生成相关请求
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
 const multer = require('multer');
 const contractDocController = require('../controllers/contractDocController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 合同文档含供应商银行信息（Restricted）：与 B60 读模型一致，SALES/WAREHOUSE 403；生成仅 DOC_ROLES，BOSS 只读。
-const DOC_ROLES = ['ADMIN', 'PURCHASE', 'FINANCE'];
-// OD-4：BOSS 可下载 PDF（GET /pdf 只在内存渲染，不写库不落盘）；生成 POST /generate 仍不含 BOSS。
-const PDF_DOWNLOAD_ROLES = [...DOC_ROLES, 'BOSS'];
+// 合同文档含供应商银行信息（Restricted）：OD-8 后生成与下载仅 ADMIN，SALES 403。
+const DOC_ROLES = ['ADMIN']; // embeds supplier bank details (Restricted)
+// GET /pdf 只在内存渲染，不写库不落盘。
+const PDF_DOWNLOAD_ROLES = DOC_ROLES;
 
 router.use(authenticate);
 
@@ -32,7 +31,7 @@ router.get('/templates', contractDocController.getTemplates);
 // POST /api/v1/contract-doc/template - 上传合同模板（仅管理员）
 router.post(
   '/template',
-  roleAuth('ADMIN'),
+  roleAuth(ROLE_SETS.ADMIN),
   upload.single('template'),
   withAuditLog(
     {
@@ -51,7 +50,7 @@ router.post(
 );
 
 // DELETE /api/v1/contract-doc/template - 删除模板（仅管理员）
-router.delete('/template', roleAuth('ADMIN'), withAuditLog(
+router.delete('/template', roleAuth(ROLE_SETS.ADMIN), withAuditLog(
   {
     entity: 'ContractTemplate',
     action: 'DELETE',

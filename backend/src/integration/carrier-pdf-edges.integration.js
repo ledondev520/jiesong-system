@@ -2,10 +2,9 @@
  * Input: real PDFKit bytes, Express carrier-check routes and private migrated SQLite
  * Output: four bounded multi-page, row-difference, image-only and malformed cases
  * Pos: extends the genuine-PDF happy path already in trade-lifecycle.integration.js
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -96,7 +95,7 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
   for (const role of ['SALES', 'FINANCE']) {
     users[role] = await db.user.create({ data: {
       username: `synthetic-carrier-${role}`, name: `Synthetic ${role}`,
-      password: randomBytes(32).toString('hex'), role,
+      password: randomBytes(32).toString('hex'), role: dbRole(role),
     } });
     tokens[role] = require('jsonwebtoken').sign({ userId: users[role].id }, process.env.JWT_SECRET);
   }
@@ -212,7 +211,7 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
     const packet = (await call('POST', `/sales/${sale.id}/export-packet/generate`, {
       spotRate: 7.2, sellerName: 'Synthetic seller', buyerName: 'Synthetic buyer',
       packageKind: 'CARTON', tradeTerm: 'FOB', documentDate: '2026-10-01',
-    }, { expected: 201 })).data;
+    }, { role: 'FINANCE', expected: 201 })).data; // OD-8: export packet is ADMIN only (FINANCE persona = ADMIN)
     const rows = await db.packingItem.findMany({ where: { salesContractId: sale.id }, orderBy: { createdAt: 'asc' } });
     // 3. 为实际装箱行建立合成已放行报关依据。
     const declaration = await db.customsDeclaration.create({ data: {

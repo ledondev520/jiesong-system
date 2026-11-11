@@ -2,8 +2,6 @@
  * Input: 编辑/删除回调、确认文案、可选额外菜单项
  * Output: 行内「更多 ▾」菜单；删除必须经过确认对话框
  * Pos: 通用 UI 组件，DataTable 行操作列使用（UX 规范 §8.5）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

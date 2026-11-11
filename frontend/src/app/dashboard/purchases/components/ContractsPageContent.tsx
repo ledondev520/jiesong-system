@@ -2,8 +2,6 @@
  * Input: 采购合同服务、SortableTableHead、useServerSort
  * Output: 手机前置操作与双列紧凑概览的采购合同管理页面（合同号/供应商/商品服务端检索、分页、具名桌面操作）
  * Pos: 核心业务页面，管理供应商采购合同
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -105,15 +103,13 @@ import { PurchaseDetailDialog } from "./PurchaseDetailDialog";
 
 export default function ContractsPageContent() {
   const readOnly = useBusinessReadOnly();
-  // OD-2/OD-3：WAREHOUSE 响应不含合同金额，列表显示「无权查看」而不是 ¥0 / 未录入
-  const moneyHidden = useAuthStore((state) => state.user?.role === "WAREHOUSE");
+  // OD-2/OD-3/OD-8：非 ADMIN 响应不含合同金额，列表显示「无权查看」而不是 ¥0 / 未录入
+  const moneyHidden = useAuthStore((state) => state.user?.role !== "ADMIN");
   const canImportHistory = useAuthStore(
     (state) => state.user?.role === "ADMIN",
   );
-  // 合同文档含供应商银行信息：SALES/WAREHOUSE 后端 403，不展示入口
-  const canGenerateDoc = useAuthStore((state) =>
-    ["ADMIN", "PURCHASE", "FINANCE"].includes(state.user?.role ?? ""),
-  );
+  // 合同文档含供应商银行信息：仅 ADMIN（OD-8），SALES 后端 403，不展示入口
+  const canGenerateDoc = useAuthStore((state) => state.user?.role === "ADMIN");
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status") || "ALL";

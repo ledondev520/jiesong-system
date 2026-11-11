@@ -2,8 +2,6 @@
  * Input: Prisma客户端
  * Output: 门店相关的HTTP响应
  * Pos: 门店控制器，处理门店CRUD请求
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

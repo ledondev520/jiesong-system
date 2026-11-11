@@ -2,8 +2,6 @@
  * Input: 真实 openai SDK 客户端 + 回环（127.0.0.1）模拟 SSE 服务，占位密钥，无外网
  * Output: 回退触发判定在真实 SDK 错误形态下的回归测试（连接拒绝、响应头后停滞、仅 role 分片后停滞、流内 error 事件）
  * Pos: 后端 AI 回退适配层测试（补充 fallbackClient.test.js 的假错误对象）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

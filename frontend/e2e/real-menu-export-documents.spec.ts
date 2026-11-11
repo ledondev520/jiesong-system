@@ -1,9 +1,7 @@
 /**
- * Input: Real role fixture, SALES menu UI, isolated Express/SQLite and XLSX downloads
+ * Input: Real role fixture, ADMIN menu UI (OD-8: three-forms and export packet are ADMIN only), isolated Express/SQLite and XLSX downloads
  * Output: Six prerequisite, generation, cancellation, retry and workbook-content cases
  * Pos: Hosted browser acceptance for internal customs/refund and commercial documents
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -112,13 +110,13 @@ test.afterEach(async () => {
   expect(pageErrors).toEqual([]);
 });
 /**
- * 职责：真实 SALES 登录后经出口菜单和合同卡片进入详情
+ * 职责：真实 ADMIN（FINANCE 角色画像，OD-8 映射为 ADMIN）登录后经出口菜单和合同卡片进入详情
  * @param page 当前验收页面
- * @returns 当前合成 SALES 用户的登录令牌
+ * @returns 当前合成 ADMIN 用户的登录令牌
  * @throws 登录、菜单导航或详情标题断言失败
  */
 async function enterFromMenu(page: Page) {
-  const token = await loginAs(page, fixture, "SALES");
+  const token = await loginAs(page, fixture, "FINANCE");
   await page
     .getByRole("link", { name: "出口订单", exact: true })
     .first()
@@ -218,7 +216,7 @@ async function previewPacket(page: Page, dialog: Locator) {
   return (await response.json()).data;
 }
 
-test("SALES menu prerequisites and cancelled three-form preview write no records", async ({
+test("ADMIN menu prerequisites and cancelled three-form preview write no records", async ({
   page,
 }) => {
   await enterFromMenu(page);
@@ -243,7 +241,7 @@ test("SALES menu prerequisites and cancelled three-form preview write no records
   await expect(dialog).not.toBeVisible();
 });
 
-test("SALES menu generates linked internal drafts, downloads intact customs workbook and reads records after reload", async ({
+test("ADMIN menu generates linked internal drafts, downloads intact customs workbook and reads records after reload", async ({
   page,
 }) => {
   await enterFromMenu(page);
@@ -400,7 +398,7 @@ test("SALES menu generates linked internal drafts, downloads intact customs work
   expect(readExportDocuments(fixture)).toEqual(saved);
 });
 
-test("SALES repeated click sends one generation, while explicit later generation appends the existing version", async ({
+test("ADMIN repeated click sends one generation, while explicit later generation appends the existing version", async ({
   page,
 }) => {
   await enterFromMenu(page);
@@ -451,7 +449,7 @@ test("SALES repeated click sends one generation, while explicit later generation
   );
 });
 
-test("SALES commercial prerequisites and cancelled preview do not reprice or archive", async ({
+test("ADMIN commercial prerequisites and cancelled preview do not reprice or archive", async ({
   page,
 }) => {
   await enterFromMenu(page);
@@ -481,7 +479,7 @@ test("SALES commercial prerequisites and cancelled preview do not reprice or arc
   expect(readExportDocuments(fixture)).toEqual(before);
 });
 
-test("SALES commercial confirmation downloads three accurate sheets and archived re-download keeps identical bytes", async ({
+test("ADMIN commercial confirmation downloads three accurate sheets and archived re-download keeps identical bytes", async ({
   page,
 }) => {
   await enterFromMenu(page);
@@ -535,7 +533,7 @@ test("SALES commercial confirmation downloads three accurate sheets and archived
   expect(readExportDocuments(fixture)).toEqual(saved);
 });
 
-test("SALES genuine generation error preserves the dialog and explicit repaired retry creates one draft set", async ({
+test("ADMIN genuine generation error preserves the dialog and explicit repaired retry creates one draft set", async ({
   page,
   request,
 }) => {

@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { copyTemplate } = require('../testHelpers/sqlite-template');
 
-test('真实SQLite：分批验货幂等、并发限量、故障回滚与老板权限', async (t) => {
+test('真实SQLite：分批验货幂等、并发限量、故障回滚与 OD-8 角色', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-receipt-test-'));
   fs.chmodSync(directory, 0o700);
   const databaseFile = path.join(directory, 'synthetic.db');
@@ -29,7 +29,7 @@ test('真实SQLite：分批验货幂等、并发限量、故障回滚与老板�
   const config = require('../config');
   const { authenticate, clearAuthCache } = require('../middleware/auth');
   const admin = await db.user.create({ data: { username: 'synthetic-admin', name: '合成管理员', role: 'ADMIN', password: 'test-only-unused-password-hash' } });
-  const boss = await db.user.create({ data: { username: 'synthetic-boss', name: '合成老板', role: 'BOSS', password: 'test-only-unused-password-hash' } });
+  const boss = await db.user.create({ data: { username: 'synthetic-boss', name: '合成老板', role: 'BOSS', password: 'test-only-unused-password-hash' } }); // retired role (OD-8)
   const supplier = await db.supplier.create({ data: { name: '合成供应商' } });
   const product = await db.product.create({ data: { customsName: '合成商品', unit: '件' } });
   const createContract = async (contractNo) => db.purchaseContract.create({ data: { contractNo, supplierId: supplier.id, status: 'SHIPPED', totalAmount: 100, items: { create: { productId: product.id, quantity: 10, unit: '件', unitPrice: 10, totalPrice: 100 } } }, include: { items: true } });
@@ -75,39 +75,33 @@ test('真实SQLite：分批验货幂等、并发限量、故障回滚与老板�
   assert.equal(await db.purchaseReceipt.count({ where: { purchaseContractId: raceReplayContract.id } }), 1);
   assert.equal((await service.createPurchaseReceipt(raceReplayContract.id, arrival('same-nonce', 4, raceReplayContract.items[0].id), admin.id, db)).idempotentReplay, true);
 
-  // 签名中谎称ADMIN仍按数据库BOSS判定；两套用户维护入口必须即时清缓存。
+  // 签名中谎称ADMIN仍按数据库角色（已停用 BOSS）判定；两套用户维护入口必须即时清缓存。
   // 角色变更会递增 sessionVersion 使旧令牌失效，故每次变更后按当前版本重签。
   const tokenAt = (sessionVersion) => `Bearer ${jwt.sign({ userId: boss.id, role: 'ADMIN', sessionVersion }, config.jwt.secret)}`;
   let authorization = tokenAt(0);
   const guard = async () => { let error; await authenticate({ headers: { authorization }, method: 'POST', originalUrl: '/api/v1/purchases' }, {}, (e) => { error = e; }); return error?.statusCode ?? 200; };
   assert.equal(await guard(), 403);
-  await require('./authService').updateUser(boss.id, { role: 'ADMIN' });
+  await require('../controllers/userController').update({ params: { id: boss.id }, body: { role: 'ADMIN' } }, { status() { return this; }, json() {} }, (e) => { if (e) throw e; });
   authorization = tokenAt(1);
   assert.equal(await guard(), 200);
   let updateError;
-  await require('../controllers/userController').update({ params: { id: boss.id }, body: { role: 'BOSS' } }, { status() { return this; }, json() {} }, (e) => { updateError = e; });
+  await require('../controllers/userController').update({ params: { id: boss.id }, body: { role: 'SALES' } }, { status() { return this; }, json() {} }, (e) => { updateError = e; });
   assert.equal(updateError, undefined);
   authorization = tokenAt(2);
-  assert.equal(await guard(), 403);
+  assert.equal(await guard(), 200); // SALES does purchase entry
   clearAuthCache(boss.id);
 
   const app = require('../app');
   server = await new Promise((resolve) => { const instance = app.listen(0, '127.0.0.1', () => resolve(instance)); });
   const base = `http://127.0.0.1:${server.address().port}`;
+  // OD-8: SALES reads purchases but no finance surface.
   for (const [method, url, expected] of [
-    ['GET', `/api/v1/purchases/${contract.id}/receipts`, 200], ['GET', '/api/v1/finance/stats', 200],
-    ['POST', `/api/v1/purchases/${contract.id}/receipts`, 403], ['POST', '/api/v1/finance/payments', 403],
-    ['POST', '/api/v1/ai/chat', 403], ['POST', '/mcp', 403], ['GET', '/api/v1/purchases/export', 403],
+    ['GET', `/api/v1/purchases/${contract.id}/receipts`, 200], ['GET', '/api/v1/finance/stats', 403],
+    ['POST', '/api/v1/finance/payments', 403], ['GET', '/api/v1/finance/statements/2026/10', 403],
     ['GET', '/api/v1/finance/statements/evidence/documents', 403], ['GET', '/api/v1/auth/users', 403],
   ]) {
     const response = await fetch(`${base}${url}`, { method, headers: { authorization, 'Content-Type': 'application/json' }, ...(method === 'POST' ? { body: '{}' } : {}) });
     assert.equal(response.status, expected, `${method} ${url}`);
     await response.arrayBuffer();
   }
-  const period = await db.financialPeriod.create({ data: { year: 2026, month: 10, periodLabel: '合成账期', reportDate: new Date('2026-10-31') } });
-  assert.ok(period.id);
-  const reportResponse = await fetch(`${base}/api/v1/finance/statements/2026/10`, { headers: { authorization } });
-  assert.equal(reportResponse.status, 200);
-  const report = (await reportResponse.json()).data;
-  for (const field of ['accountBalances', 'generalLedgerEntries', 'dataSources']) assert.equal(Object.hasOwn(report, field), false);
 });

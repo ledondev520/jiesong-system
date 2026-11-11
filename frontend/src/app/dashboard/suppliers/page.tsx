@@ -2,8 +2,6 @@
  * Input: 供应商服务API、React Hook Form
  * Output: 独立供应商编辑会话，失败保留草稿，晚到保存与目录响应不覆盖新选择；初始为未选择空状态，危险区在只读摘要与编辑态均可见
  * Pos: 采购模块基础档案表单页
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -277,9 +275,9 @@ export default function SuppliersPage() {
 
   const counts = countSuppliers(suppliers);
   const isAdmin = useAuthStore((state) => state.user?.role === "ADMIN");
-  // Archive (DELETE /suppliers/:id) is ADMIN/PURCHASE only on the server.
+  // Archive (DELETE /suppliers/:id) is ADMIN/SALES on the server (OD-8).
   const canArchive = useAuthStore((state) =>
-    ["ADMIN", "PURCHASE"].includes(state.user?.role ?? ""),
+    ["ADMIN", "SALES"].includes(state.user?.role ?? ""),
   );
   const [hardDeletePreview, setHardDeletePreview] =
     useState<SupplierHardDeletePreview | null>(null);

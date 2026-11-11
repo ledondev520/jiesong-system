@@ -1,14 +1,12 @@
 /**
- * Input: 桩化的销售/货柜 service 与 WAREHOUSE / SALES 角色
+ * Input: 桩化的销售 service 与 WAREHOUSE / SALES 角色
  * Output: A59 OD-7：销售写接口响应对 WAREHOUSE 不含合同总额、已收金额与收款记录，其他角色原样
  * Pos: 后端控制器测试
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const salesService = require('../services/salesService');
-const containerService = require('../services/containerService');
 const sales = require('./salesController');
-const containers = require('./containerController');
 
 const row = () => ({
   id: 'c1', status: 'CONFIRMED', totalAmount: 1234, receivedAmount: 321,
@@ -29,17 +27,14 @@ const cases = [
   ['POST /sales', sales, 'create', salesService, 'createSalesContract'],
   ['PUT /sales/:id', sales, 'update', salesService, 'updateSalesContract'],
   ['PUT /sales/:id/status', sales, 'updateStatus', salesService, 'updateSalesStatus'],
-  ['POST /containers', containers, 'create', containerService, 'create'],
-  ['PUT /containers/:id', containers, 'update', containerService, 'update'],
-  ['PUT /containers/:id/status', containers, 'updateStatus', containerService, 'updateStatus'],
 ];
 
 for (const [label, target, name, service, method] of cases) {
-  test(`A59 OD-7：${label} 对 WAREHOUSE 去掉总额/已收/收款记录，保留状态`, async (t) => {
-    const wh = await call(t, target, name, service, method, 'WAREHOUSE');
+  test(`A59 OD-7：${label} 对 SALES（非 ADMIN）去掉总额/已收/收款记录，保留状态`, async (t) => {
+    const wh = await call(t, target, name, service, method, 'SALES');
     for (const key of ['totalAmount', 'receivedAmount', 'payments']) assert.equal(key in wh, false, key);
     assert.equal(wh.status, 'CONFIRMED');
-    const sa = await call(t, target, name, service, method, 'SALES');
+    const sa = await call(t, target, name, service, method, 'ADMIN');
     assert.equal(sa.totalAmount, 1234);
     assert.equal(sa.receivedAmount, 321);
     assert.equal(sa.payments.length, 1);

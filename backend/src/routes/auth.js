@@ -2,14 +2,13 @@
  * Input: 认证控制器
  * Output: 认证相关路由
  * Pos: 认证路由，处理邮箱验证码注册、登录/浏览器会话、邮箱验证码找回密码
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
 const authController = require('../controllers/authController');
 const { validateLogin, validateRegister, validateResetPassword, validateChangePassword, passwordRule, emailRule, handleValidation } = require('../utils/validators');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withAuditLog } = require('../middleware/auditLog');
 const { strictRateLimit } = require('../middleware/rateLimit');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
@@ -95,7 +94,7 @@ router.post('/reset-password',
 router.post(
   '/register',
   authenticate,
-  roleAuth('ADMIN'),
+  roleAuth(ROLE_SETS.ADMIN),
   validateRegister,
   handleValidation,
   withAuditLog(
@@ -120,7 +119,7 @@ router.post(
   '/change-password',
   authenticate,
   validateChangePassword, handleValidation,
-  roleAuth('ADMIN', 'BOSS', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth(ROLE_SETS.ALL),
   withAuditLog(
     {
       entity: 'User',
@@ -136,17 +135,6 @@ router.post(
 );
 
 // GET /api/v1/auth/users - 获取用户列表（仅管理员）
-router.get('/users', authenticate, roleAuth('ADMIN'), authController.getUsers);
-
-// PUT /api/v1/auth/users/:id - 更新用户（仅管理员）
-router.put(
-  '/users/:id',
-  authenticate,
-  roleAuth('ADMIN'),
-  withAuditLog(
-    { entity: 'User', action: 'UPDATE', model: 'user' },
-    authController.updateUser
-  )
-);
+router.get('/users', authenticate, roleAuth(ROLE_SETS.ADMIN), authController.getUsers);
 
 module.exports = router;

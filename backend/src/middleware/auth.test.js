@@ -2,17 +2,14 @@
  * Input: node:test、node:assert/strict、授权中间件
  * Output: 认证授权中间件的单元测试结果
  * Pos: 后端授权校验测试文件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 const prisma = require('../utils/prisma');
-const { hashAgentSecret } = require('../utils/agentCredentials');
 const { authenticate } = require('./auth');
-const { roleAuth, adminOnly, capabilityAuth, accessAuth } = require('./roleAuth');
+const { roleAuth, adminOnly } = require('./roleAuth');
 
 /**
  * 职责：创建捕获next错误的函数
@@ -72,70 +69,6 @@ test('adminOnly: 仅允许管理员', () => {
   assert.equal(capture.error, undefined);
 });
 
-test('capabilityAuth: Agent grant 匹配时放行', () => {
-  const req = {
-    authActor: { actorType: 'AGENT' },
-    agent: {
-      grants: [
-        { resource: 'search', action: 'read' },
-      ],
-    },
-  };
-  const middleware = capabilityAuth('search.read');
-  const { next, capture } = createNextCapture();
-
-  middleware(req, {}, next);
-
-  assert.equal(capture.called, true);
-  assert.equal(capture.error, undefined);
-});
-
-test('capabilityAuth: Agent grant 缺失时拒绝', () => {
-  const req = {
-    authActor: { actorType: 'AGENT' },
-    agent: {
-      grants: [
-        { resource: 'purchase', action: 'create' },
-      ],
-    },
-  };
-  const middleware = capabilityAuth('search.read');
-  const { next, capture } = createNextCapture();
-
-  middleware(req, {}, next);
-
-  assert.equal(capture.called, true);
-  assert.equal(capture.error.statusCode, 403);
-});
-
-test('accessAuth: 用户按角色授权通过', () => {
-  const req = {
-    authActor: { actorType: 'USER' },
-    user: { id: 'user-1', role: 'PURCHASE' },
-  };
-  const middleware = accessAuth({ roles: ['ADMIN', 'PURCHASE'], capabilities: ['purchase.create'] });
-  const { next, capture } = createNextCapture();
-
-  middleware(req, {}, next);
-
-  assert.equal(capture.called, true);
-  assert.equal(capture.error, undefined);
-});
-
-test('accessAuth: Agent 按 capability 授权通过', () => {
-  const req = {
-    authActor: { actorType: 'AGENT' },
-    agent: { grants: [{ resource: 'purchase', action: 'create' }] },
-  };
-  const middleware = accessAuth({ roles: ['ADMIN'], capabilities: ['purchase.create'] });
-  const { next, capture } = createNextCapture();
-
-  middleware(req, {}, next);
-
-  assert.equal(capture.called, true);
-  assert.equal(capture.error, undefined);
-});
-
 test('authenticate: Bearer JWT 用户令牌认证成功后附加 user 与 authActor', async () => {
   const originalFindUnique = prisma.user.findUnique;
   const token = jwt.sign(
@@ -173,117 +106,35 @@ test('authenticate: Bearer JWT 用户令牌认证成功后附加 user 与 authAc
   }
 });
 
-test('authenticate: Agent token 认证成功后附加 agent 与 authActor', async () => {
-  const originalAgentCredential = prisma.agentCredential;
-  const rawToken = 'jsa_key123.secret456';
-
-  prisma.agentCredential = {
-    findUnique: async ({ where }) => {
-      assert.deepEqual(where, { credentialKey: 'key123' });
-      return {
-        id: 'cred-1',
-        credentialKey: 'key123',
-        secretHash: hashAgentSecret('secret456'),
-        status: 'ACTIVE',
-        expiresAt: null,
-        revokedAt: null,
-        agentAccount: {
-          id: 'agent-1',
-          name: '采购机器人',
-          slug: 'purchase-bot',
-          status: 'ACTIVE',
-        },
-        grants: [
-          { resource: 'search', action: 'read' },
-          { resource: 'purchase', action: 'create' },
-        ],
-      };
-    },
-  };
-
-  try {
-    const req = {
-      method: 'GET',
-      baseUrl: '/api/v1/search',
-      path: '/',
-      headers: {
-        authorization: `Bearer ${rawToken}`,
-      },
-    };
+test('authenticate: 旧 Agent (jsa_) token 已无认证入口，一律401', async () => {
+  for (const [method, baseUrl, path] of [['GET', '/api/v1/search', '/'], ['POST', '/api/v1/purchases', '/'], ['POST', '/mcp', '/']]) {
     const { next, capture } = createNextCapture();
-
-    await authenticate(req, {}, next);
-
-    assert.equal(capture.called, true);
-    assert.equal(capture.error, undefined);
-    assert.equal(req.user, undefined);
-    assert.equal(req.agent.id, 'agent-1');
-    assert.equal(req.agentCredential.id, 'cred-1');
-    assert.equal(req.authActor.actorType, 'AGENT');
-    assert.equal(req.authActor.agentAccountId, 'agent-1');
-    assert.equal(req.authActor.agentCredentialId, 'cred-1');
-    assert.deepEqual(req.agent.grants, [
-      { resource: 'search', action: 'read', scopeJson: null },
-      { resource: 'purchase', action: 'create', scopeJson: null },
-    ]);
-  } finally {
-    prisma.agentCredential = originalAgentCredential;
+    await authenticate({ method, baseUrl, path, headers: { authorization: 'Bearer jsa_key0.s0' } }, {}, next);
+    assert.equal(capture.error?.statusCode, 401, `${method} ${baseUrl}${path}`);
+    assert.equal(capture.error?.message, '无效的Token');
   }
 });
 
-test('authenticate: Agent token 对未登记路由默认403（含零权限token）', async () => {
-  const originalAgentCredential = prisma.agentCredential;
-  prisma.agentCredential = {
-    findUnique: async () => ({
-      id: 'cred-0', credentialKey: 'key0', secretHash: hashAgentSecret('s0'), status: 'ACTIVE',
-      expiresAt: null, revokedAt: null,
-      agentAccount: { id: 'agent-0', name: 'zero', slug: 'zero', status: 'ACTIVE' },
-      grants: [],
-    }),
-  };
-  try {
-    for (const [method, baseUrl, path] of [
-      ['GET', '/api/v1/bank-flow', '/transactions'], ['GET', '/api/v1/finance', '/statements'],
-      ['GET', '/api/v1/suppliers', '/'], ['GET', '/api/v1/files', '/1/download'],
-      ['GET', '/api/v1/purchases', '/'], ['GET', '/api/v1/sales', '/1/export-excel'],
-    ]) {
-      const { next, capture } = createNextCapture();
-      await authenticate({ method, baseUrl, path, headers: { authorization: 'Bearer jsa_key0.s0' } }, {}, next);
-      assert.equal(capture.error?.statusCode, 403, `${method} ${baseUrl}${path}`);
-    }
-    const { next, capture } = createNextCapture();
-    await authenticate({ method: 'POST', baseUrl: '/mcp', path: '/', headers: { authorization: 'Bearer jsa_key0.s0' } }, {}, next);
-    assert.equal(capture.error, undefined);
-  } finally {
-    prisma.agentCredential = originalAgentCredential;
-  }
-});
-
-test('BOSS以数据库角色判定：拒绝业务/AI/MCP写及生成文件GET，允许明确汇总GET', async () => {
+test('OD-8：已停用角色（PURCHASE/FINANCE/WAREHOUSE/BOSS）按数据库角色在每个入口 403，ADMIN/SALES 通过', async () => {
   const config = require('../config');
   const { clearAuthCache } = require('./auth');
   const original = prisma.user.findUnique;
-  const id = 'boss-synthetic-role-test';
+  const id = 'retired-synthetic-role-test';
   const token = jwt.sign({ userId: id, role: 'ADMIN' }, config.jwt.secret);
-  prisma.user.findUnique = async () => ({ id, role: 'BOSS', isActive: true, sessionVersion: 0 });
+  let role;
+  prisma.user.findUnique = async () => ({ id, role, isActive: true, sessionVersion: 0 });
   try {
-    for (const [method, path, allowed] of [
-      ['GET', '/api/v1/reports/business-overview', true], ['GET', '/api/v1/finance/stats', true],
-      ['GET', '/api/v1/sales/record/finance-summary', true], ['GET', '/api/v1/sales/record/loading-plan?containerType=40HQ', true], ['GET', '/api/v1/purchases/record/receipts', true],
-      ['GET', '/api/v1/purchases/record/receipts/batch/inspections', true],
-      ['GET', '/api/v1/containers/record/items', true], ['GET', '/api/v1/containers/record/items/summary', true],
-      ['GET', '/api/v1/containers/record/products', true], ['GET', '/api/v1/containers/record/visualization', true],
-      ['POST', '/api/v1/finance/payments', false], ['PUT', '/api/v1/purchases/record', false],
-      ['POST', '/api/v1/ai/agents/execute-action', false], ['POST', '/mcp', false],
-      ['GET', '/api/v1/sales/record/export-excel', false], ['GET', '/api/v1/purchases/export', false],
-      ['GET', '/api/v1/contract-doc/pdf/record', true], ['POST', '/api/v1/contract-doc/generate/record', false], ['GET', '/api/v1/system/configs', false],
-      ['GET', '/api/v1/users', false], ['GET', '/api/v1/finance/statements/evidence/documents', false],
-      ['POST', '/api/v1/auth/change-password', true], ['POST', '/api/v1/notifications/read-all', true],
-      ['PUT', '/api/v1/system/notifications/record/read', true], ['POST', '/api/v1/notifications/generate', false],
-    ]) {
+    for (role of ['PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS', 'ADMIN', 'SALES']) {
+      for (const [method, path] of [['GET', '/api/v1/purchases'], ['GET', '/api/v1/reports/business-overview'], ['POST', '/api/v1/auth/change-password']]) {
+        const { next, capture } = createNextCapture();
+        await authenticate({ headers: { authorization: `Bearer ${token}` }, method, originalUrl: path }, {}, next);
+        const retired = !['ADMIN', 'SALES'].includes(role);
+        assert.equal(capture.error?.statusCode ?? 200, retired ? 403 : 200, `${role} ${method} ${path}`);
+      }
       const { next, capture } = createNextCapture();
-      await authenticate({ headers: { authorization: `Bearer ${token}` }, method, originalUrl: path }, {}, next);
-      assert.equal(capture.error?.statusCode ?? 200, allowed ? 200 : 403, `${method} ${path}`);
+      await authenticate({ headers: { authorization: `Bearer ${token}` }, method: 'POST', originalUrl: '/api/v1/auth/logout' }, {}, next);
+      assert.equal(capture.error?.statusCode ?? 200, 200, `${role} can still log out`);
+      clearAuthCache(id);
     }
   } finally { prisma.user.findUnique = original; clearAuthCache(id); }
 });

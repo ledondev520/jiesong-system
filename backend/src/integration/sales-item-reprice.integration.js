@@ -30,7 +30,7 @@ test('HTTP/SQLite: line re-price recomputes totals, audits every change, gates r
   const jwt = require('jsonwebtoken');
   const tokens = {}; const users = {};
   for (const role of ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
-    users[role] = await db.user.create({ data: { username: `synthetic-reprice-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    users[role] = await db.user.create({ data: { username: `synthetic-reprice-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } }); // retired roles stored as-is (OD-8)
     tokens[role] = jwt.sign({ userId: users[role].id }, process.env.JWT_SECRET);
   }
   const port = await db.port.create({ data: { name: '合成港口', code: 'QA-RP' } });
@@ -61,7 +61,7 @@ test('HTTP/SQLite: line re-price recomputes totals, audits every change, gates r
 
   // Role gating: WAREHOUSE (OD-3, no amounts) and BOSS (read-only) are refused; anonymous 401; nothing written.
   assert.equal((await post(order.id, a.id, { sellingPrice: 3 }, 'ANONYMOUS')).status, 401);
-  for (const role of ['WAREHOUSE', 'BOSS']) assert.equal((await post(order.id, a.id, { sellingPrice: 3 }, role)).status, 403, role);
+  for (const role of ['PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) assert.equal((await post(order.id, a.id, { sellingPrice: 3 }, role)).status, 403, role);
   assert.equal((await logs()).length, 0);
 
   // Validation: nothing written.
@@ -77,13 +77,13 @@ test('HTTP/SQLite: line re-price recomputes totals, audits every change, gates r
   assert.equal(priced.status, 200);
   assert.equal(await total(), 50);
   // Quantity + price together: 8*3.5 + 5*4 = 48.
-  assert.equal((await post(order.id, a.id, { quantity: 8, sellingPrice: 3.5 }, 'FINANCE')).status, 200);
+  assert.equal((await post(order.id, a.id, { quantity: 8, sellingPrice: 3.5 }, 'ADMIN')).status, 200);
   assert.equal(await total(), 48);
   // Same values -> no change, no audit row.
   assert.equal((await post(order.id, a.id, { quantity: 8, sellingPrice: 3.5 })).status, 200);
   const rows = await logs();
   assert.equal(rows.length, 2);
-  assert.deepEqual([rows[0].userId, rows[1].userId], [users.SALES.id, users.FINANCE.id]);
+  assert.deepEqual([rows[0].userId, rows[1].userId], [users.SALES.id, users.ADMIN.id]);
   assert.deepEqual(JSON.parse(rows[0].oldValue), { salesContractId: order.id, sellingPrice: 2 });
   assert.deepEqual(JSON.parse(rows[0].newValue), { salesContractId: order.id, sellingPrice: 3 });
   assert.deepEqual(JSON.parse(rows[1].oldValue), { salesContractId: order.id, quantity: 10, sellingPrice: 3 });

@@ -2,8 +2,6 @@
  * Input: node:test、子进程内 stub 的 fetch / Prisma（全部使用合成密钥与 .invalid 域名）
  * Output: 经 aiService 的 DeepSeek 自动回退端到端测试（聊天、SSE、解析、用量、熔断、禁用）
  * Pos: 后端 AI 服务回退测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

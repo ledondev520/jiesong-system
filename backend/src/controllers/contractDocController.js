@@ -2,8 +2,6 @@
  * Input: 采购合同ID
  * Output: 购销合同 Word/PDF 文档
  * Pos: 控制器，处理合同文档生成、下载与预览请求
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

@@ -5,7 +5,6 @@ Input: parsed/attachment_inventory.csv + tmp/wps_11_export_list_raw/11-报关记
 Output: parsed/purchase_evidence_*.csv/json/md
 Pos: WPS 历史出货采购合同凭证抽取脚本；只抽取供应商、合同头与明细，不写数据库；保留显式百分号税率语义，支持 PDF 文本表格明细抽取，对已人工复核的扫描 PDF 保留路径级 OCR 兜底
 
-Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
 """
 
 from __future__ import annotations

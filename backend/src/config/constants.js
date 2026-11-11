@@ -2,18 +2,13 @@
  * Input: 业务需求
  * Output: 系统常量定义
  * Pos: 常量配置，定义业务枚举值
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 // 用户角色
 const ROLES = {
-  ADMIN: 'ADMIN',       // 管理员
-  BOSS: 'BOSS',         // 老板（业务只读）
-  PURCHASE: 'PURCHASE', // 采购
-  SALES: 'SALES',       // 销售
-  FINANCE: 'FINANCE',   // 财务
-  WAREHOUSE: 'WAREHOUSE', // 仓库
+  // OD-8 (owner, 2026-11-11): PURCHASE, FINANCE, WAREHOUSE and BOSS are retired.
+  ADMIN: 'ADMIN',       // 管理员：全部可见
+  SALES: 'SALES',       // 销售：资料/合同/采购录入，不看财务
 };
 
 // 采购状态

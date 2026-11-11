@@ -2,8 +2,6 @@
  * Input: 后端装柜计划 LoadingPlan 与柜序号
  * Output: 静态 2D 装柜图（俯视 x/y + 侧视 x/z 两张 SVG，门在右侧、块上标装货步骤）
  * Pos: 手机端 3D 回退与打印/导出共用的装柜图，不依赖 three.js
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import type { LoadingPlan, PlacedBlock } from "@/lib/containerLoading";

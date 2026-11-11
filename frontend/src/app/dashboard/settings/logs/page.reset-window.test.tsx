@@ -3,8 +3,6 @@
  * Output: ① 关键词防抖提交后、被动 effect 发出新请求之前到达的旧响应不得把渲染期重置的 loading 改回 false；
  *         ② 非第 1 页时改关键词，仍按原顺序先以旧页码 + 新关键词请求、再请求第 1 页（保留中间请求）
  * Pos: 系统日志页加载状态 resetPendingRef 窗口与请求顺序回归测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { Profiler } from "react";

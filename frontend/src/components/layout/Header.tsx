@@ -2,8 +2,6 @@
  * Input: 用户状态、导航配置
  * Output: 顶部导航栏及等待服务端确认、按认证代次保护的逐浏览器退出
  * Pos: 全局 Header，移动端使用紧凑搜索入口，负责装配导航、通知、用户菜单
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -99,20 +97,18 @@ export function Header() {
       <div className="flex shrink-0 items-center gap-1 md:gap-2">
         <ThemeToggle />
         <HeaderNotifications />
-        {/* AI 助手面板开关（Ctrl/⌘+J）：BOSS 无权限 */}
-        {user?.role !== Role.BOSS && (
-          <Button
-            variant={aiOpen ? "secondary" : "ghost"}
-            size="icon"
-            className="h-11 w-11 rounded-md md:h-9 md:w-9"
-            onClick={toggleAiPanel}
-            aria-label="AI 助手"
-            aria-pressed={aiOpen}
-            title="AI 助手 (Ctrl/⌘+J)"
-          >
-            <Bot className="h-4 w-4" />
-          </Button>
-        )}
+        {/* AI 助手面板开关（Ctrl/⌘+J） */}
+        <Button
+          variant={aiOpen ? "secondary" : "ghost"}
+          size="icon"
+          className="h-11 w-11 rounded-md md:h-9 md:w-9"
+          onClick={toggleAiPanel}
+          aria-label="AI 助手"
+          aria-pressed={aiOpen}
+          title="AI 助手 (Ctrl/⌘+J)"
+        >
+          <Bot className="h-4 w-4" />
+        </Button>
         {/* 用户菜单：桌面端保留，移动端通过底部TabBar"更多"入口访问 */}
         <HeaderUserMenu
           displayName={user?.name}

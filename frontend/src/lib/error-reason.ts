@@ -2,8 +2,6 @@
  * Input: 任意被 reject 的值（axios 拦截器会 reject 响应体对象或中文 Error）
  * Output: 给用户看的失败原因字符串
  * Pos: ErrorState 的原因提取；格式「<失败的事>：<服务端原因>」见 UX 规范 §8.9
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const FALLBACK_REASON = "请稍后重试";

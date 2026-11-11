@@ -1,9 +1,7 @@
 /**
- * Input: 用户服务 API、Agent 服务 API
+ * Input: 用户服务 API
  * Output: 账号管理、未开通/已停用账号核对入口和完整分页目录
  * Pos: 系统设置子页面，管理员管理所有账号
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -13,11 +11,9 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { useTableSort } from "@/lib/hooks/useTableSort";
 import { format } from "date-fns";
 import { User, Role } from "@/types";
-import type { AgentAccount } from "@/types";
 import { clearApiGetCache } from "@/lib/axios";
 import { loadPaginatedCatalog } from "@/services/paginatedCatalog";
 import { userService } from "@/services/user.service";
-import { agentService } from "@/services/agent.service";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -30,29 +26,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { SemanticBadge } from "@/components/ui/status-badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Bot,
-  Copy,
-  KeyRound,
   Pencil,
   Plus,
   RefreshCw,
   Search,
-  ShieldCheck,
-  ShieldX,
   Trash,
   UserCog,
   X,
@@ -60,7 +37,6 @@ import {
 import { PageSizeSelect } from "@/components/ui/page-size-select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserDialog } from "./components/UserDialog";
-import { AgentAccountDialog } from "@/components/dialog/AgentAccountDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/store/auth.store";
@@ -97,24 +73,6 @@ export default function UsersPage() {
   const [deleting, setDeleting] = useState(false);
   const [usersError, setUsersError] = useState(false);
 
-  // ── Agent 账号状态 ──
-  const [agents, setAgents] = useState<AgentAccount[]>([]);
-  const [agentLoading, setAgentLoading] = useState(true);
-  const [agentDialogOpen, setAgentDialogOpen] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<AgentAccount | null>(null);
-  const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
-  const [oneTimeToken, setOneTimeToken] = useState("");
-  const [tokenAction, setTokenAction] = useState<"issue" | "rotate">("issue");
-  const origin =
-    typeof window !== "undefined" && window.location?.origin
-      ? window.location.origin
-      : "https://your-vps-host";
-
-  const automatedInstallCommand = useMemo(() => {
-    if (!oneTimeToken) return "";
-    return `JIESONG_BASE_URL="${origin}" JIESONG_AGENT_TOKEN="${oneTimeToken}" curl -fsSL ${origin}/agent/install.sh | bash`;
-  }, [origin, oneTimeToken]);
-
   // ── 数据加载 ──
   const requestUsers = useCallback(
     () =>
@@ -138,58 +96,26 @@ export default function UsersPage() {
     [],
   );
 
-  const requestAgents = useCallback(
-    () =>
-      runAwait(
-        () => agentService.getAll({ page: 1, pageSize: 100 }),
-        (response) => {
-          setAgents(response.data?.items || []);
-        },
-        () => {
-          toast.error("加载 Agent 列表失败");
-        },
-        () => {
-          setAgentLoading(false);
-        },
-      ),
-    [],
-  );
-
   const loadUsers = useCallback(() => {
     setLoading(true);
     setUsersError(false);
     return requestUsers();
   }, [requestUsers]);
 
-  const loadAgents = useCallback(() => {
-    setAgentLoading(true);
-    return requestAgents();
-  }, [requestAgents]);
-
-  // loading/agentLoading 初值为 true、usersError 初值为 false，挂载时原先 loadX 内的同步置位不改变状态，
-  // effect 只按原顺序（先用户、后 Agent）发请求。
   useEffect(() => {
     void requestUsers();
-    void requestAgents();
-  }, [requestUsers, requestAgents]);
+  }, [requestUsers]);
 
   // ── 用户操作 ──
   const getRoleBadge = (role: Role) => {
     switch (role) {
-      case Role.BOSS:
-        return <SemanticBadge tone="info">老板（只读）</SemanticBadge>;
       case Role.ADMIN:
         return <SemanticBadge tone="danger">管理员</SemanticBadge>;
-      case Role.PURCHASE:
-        return <SemanticBadge tone="info">采购</SemanticBadge>;
       case Role.SALES:
         return <SemanticBadge tone="success">销售</SemanticBadge>;
-      case Role.FINANCE:
-        return <SemanticBadge tone="warning">财务</SemanticBadge>;
-      case Role.WAREHOUSE:
-        return <SemanticBadge tone="secondary">仓库</SemanticBadge>;
       default:
-        return <SemanticBadge tone="secondary">{role}</SemanticBadge>;
+        // OD-8：停用角色（PURCHASE/FINANCE/WAREHOUSE/BOSS）无法登录，需管理员重新分配
+        return <SemanticBadge tone="secondary">{role}（已停用）</SemanticBadge>;
     }
   };
 
@@ -236,96 +162,6 @@ export default function UsersPage() {
     } catch (error) {
       toast.error(editingUser ? "更新失败" : "创建失败");
       throw error;
-    }
-  };
-
-  // ── Agent 操作 ──
-  const copyText = async (text: string, successMessage: string) => {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.setAttribute("readonly", "true");
-      textarea.style.position = "absolute";
-      textarea.style.left = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      textarea.remove();
-    }
-    toast.success(successMessage);
-  };
-
-  // react-hooks/purity 警告保留：渲染期读取当前时间，每次重渲染按当时时间判断过期/即将过期。
-  // 改为挂载或加载时取一次时间会让页面长时间打开后徽标不再更新（行为变化），故不改。
-  const getCredentialRisk = (expiresAt?: string | null) => {
-    if (!expiresAt) return null;
-    const diffMs = new Date(expiresAt).getTime() - Date.now();
-    const diffDays = Math.ceil(diffMs / (24 * 60 * 60 * 1000));
-    if (diffDays < 0) return "expired";
-    if (diffDays <= 14) return "expiring";
-    return null;
-  };
-
-  const handleAgentCreateOrUpdate = async (
-    payload: Parameters<typeof agentService.create>[0],
-  ) => {
-    try {
-      if (editingAgent) {
-        await agentService.update(editingAgent.id, payload);
-        toast.success("Agent 更新成功");
-      } else {
-        await agentService.create(payload);
-        toast.success("Agent 创建成功");
-      }
-      setAgentDialogOpen(false);
-      setEditingAgent(null);
-      await loadAgents();
-    } catch {
-      toast.error(editingAgent ? "Agent 更新失败" : "Agent 创建失败");
-    }
-  };
-
-  const openIssueTokenDialog = (token: string, action: "issue" | "rotate") => {
-    setOneTimeToken(token);
-    setTokenAction(action);
-    setTokenDialogOpen(true);
-  };
-
-  const handleIssueCredential = async (agent: AgentAccount) => {
-    try {
-      const response = await agentService.issueCredential(
-        agent.id,
-        `${agent.slug}-credential`,
-        90,
-      );
-      toast.success("Agent 凭证签发成功");
-      openIssueTokenDialog(response.data?.token || "", "issue");
-      await loadAgents();
-    } catch {
-      toast.error("签发凭证失败");
-    }
-  };
-
-  const handleRotateCredential = async (credentialId: string) => {
-    try {
-      const response = await agentService.rotateCredential(credentialId, 90);
-      toast.success("Agent 凭证轮换成功");
-      openIssueTokenDialog(response.data?.token || "", "rotate");
-      await loadAgents();
-    } catch {
-      toast.error("轮换凭证失败");
-    }
-  };
-
-  const handleRevokeCredential = async (credentialId: string) => {
-    try {
-      await agentService.revokeCredential(credentialId);
-      toast.success("Agent 凭证已吊销");
-      await loadAgents();
-    } catch {
-      toast.error("吊销凭证失败");
     }
   };
 
@@ -388,19 +224,9 @@ export default function UsersPage() {
     <div className="space-y-6">
       <PageHeader
         title="账号管理"
-        description="管理系统用户与外部 Agent 账号"
+        description="管理系统用户"
         actions={
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditingAgent(null);
-                setAgentDialogOpen(true);
-              }}
-            >
-              <Bot className="mr-2 h-4 w-4" />
-              新增 Agent
-            </Button>
             <Button onClick={handleCreate}>
               <Plus className="mr-2 h-4 w-4" />
               新增用户
@@ -755,163 +581,6 @@ export default function UsersPage() {
         )}
       </div>
 
-      {/* ══════════ Agent 区块 ══════════ */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Bot className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-medium">外部 Agent</h3>
-          <Badge variant="outline" className="text-[10px]">
-            {agents.length}
-          </Badge>
-        </div>
-
-        {agentLoading ? (
-          <div className="surface-panel py-8 text-center text-sm text-muted-foreground">
-            加载中...
-          </div>
-        ) : agents.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-8 text-center">
-              <Bot className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
-                暂无 Agent 账号，点击上方「新增 Agent」创建
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3">
-            {agents.map((agent) => (
-              <Card key={agent.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Bot className="h-4 w-4 text-primary" />
-                        {agent.name}
-                        <span className="font-mono text-xs text-muted-foreground">
-                          ({agent.slug})
-                        </span>
-                      </CardTitle>
-                      {agent.description ? (
-                        <CardDescription>{agent.description}</CardDescription>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          agent.status === "ACTIVE" ? "default" : "secondary"
-                        }
-                      >
-                        {agent.status === "ACTIVE" ? "已启用" : "已停用"}
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditingAgent(agent);
-                          setAgentDialogOpen(true);
-                        }}
-                      >
-                        编辑
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleIssueCredential(agent)}
-                      >
-                        <KeyRound className="mr-1.5 h-3.5 w-3.5" />
-                        签发凭证
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                {(agent.credentials || []).length > 0 && (
-                  <CardContent className="pt-0 space-y-2">
-                    {(agent.credentials || []).map((credential) => (
-                      <div
-                        key={credential.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
-                      >
-                        <div className="space-y-0.5">
-                          <p className="font-medium text-sm">
-                            {credential.label || credential.credentialKey}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {credential.secretPreview || "hash"}
-                            {" · "}
-                            {format(
-                              new Date(credential.createdAt),
-                              "yyyy-MM-dd",
-                            )}
-                            {credential.expiresAt
-                              ? ` · 到期 ${format(new Date(credential.expiresAt), "yyyy-MM-dd")}`
-                              : ""}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              credential.status === "ACTIVE"
-                                ? "default"
-                                : "secondary"
-                            }
-                            className="text-[10px]"
-                          >
-                            {credential.status}
-                          </Badge>
-                          {getCredentialRisk(credential.expiresAt) ===
-                            "expiring" && (
-                            <Badge
-                              variant="outline"
-                              className="border-status-amber/40 text-status-amber text-[10px]"
-                            >
-                              即将过期
-                            </Badge>
-                          )}
-                          {getCredentialRisk(credential.expiresAt) ===
-                            "expired" && (
-                            <Badge
-                              variant="destructive"
-                              className="text-[10px]"
-                            >
-                              已过期
-                            </Badge>
-                          )}
-                          {credential.status === "ACTIVE" && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleRotateCredential(credential.id)
-                                }
-                              >
-                                <RefreshCw className="mr-1 h-3.5 w-3.5" />
-                                轮换
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  handleRevokeCredential(credential.id)
-                                }
-                              >
-                                <ShieldX className="mr-1 h-3.5 w-3.5 text-destructive" />
-                                吊销
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                )}
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* ── 对话框 ── */}
       <UserDialog
         open={isDialogOpen}
@@ -951,48 +620,6 @@ export default function UsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <AgentAccountDialog
-        open={agentDialogOpen}
-        onOpenChange={setAgentDialogOpen}
-        agent={editingAgent}
-        onSubmit={handleAgentCreateOrUpdate}
-      />
-
-      <Dialog open={tokenDialogOpen} onOpenChange={setTokenDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-              一次性 Token
-            </DialogTitle>
-            <DialogDescription>
-              {tokenAction === "issue" ? "新签发的 token" : "轮换后的新 token"}{" "}
-              只展示这一遍，请立即保存到安全位置。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="rounded-lg border bg-muted/40 p-4 font-mono text-sm break-all">
-            {oneTimeToken}
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium">自动化安装命令</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  void copyText(automatedInstallCommand, "安装命令已复制")
-                }
-              >
-                <Copy className="mr-2 h-4 w-4" />
-                复制
-              </Button>
-            </div>
-            <div className="rounded-lg border bg-muted/40 p-4 font-mono text-xs break-all">
-              {automatedInstallCommand}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

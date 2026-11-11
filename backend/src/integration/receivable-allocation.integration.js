@@ -56,14 +56,14 @@ test('HTTP/SQLite: receivable allocations preserve ledger and existing role boun
   const tokens = {};
   const roles = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS'];
   for (const role of [...roles, 'INACTIVE']) {
-    const user = await db.user.create({ data: { username: `synthetic-receivable-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'SALES' : role, isActive: role !== 'INACTIVE' } });
+    const user = await db.user.create({ data: { username: `synthetic-receivable-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'SALES' : role /* retired roles stored as-is (OD-8) */, isActive: role !== 'INACTIVE' } });
     // The actual database role must override this deliberately misleading JWT claim.
     tokens[role] = jwt.sign({ userId: user.id, role: 'ADMIN' }, process.env.JWT_SECRET);
   }
   const app = require('../app'); // Import does not start background jobs/provider calls.
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
-  const call = async (method, route, body, role = 'SALES', origin = base, extraHeaders = {}) => {
+  const call = async (method, route, body, role = 'ADMIN', origin = base, extraHeaders = {}) => {
     const requestId = `synthetic-receivable-request-${++requestNumber}`;
     const response = await fetch(origin + route, { method, headers: { ...(tokens[role] ? { authorization: `Bearer ${tokens[role]}` } : {}), 'content-type': 'application/json', 'x-request-id': requestId, ...extraHeaders }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     if (method === 'POST' && route === '/finance/payments' && [200, 201].includes(response.status)) expectedAuditRequests.add(requestId);
@@ -106,7 +106,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     const list = await good('GET', `/finance/receivables?search=${a.contractNo}`);
     assert.equal(list.items[0].receivedAmount, 40);
     assert.equal(list.items[0].unreceiveAmount, 960);
-    await good('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: b.id, amount: 35 }] }, 'FINANCE');
+    await good('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: b.id, amount: 35 }] }, 'ADMIN');
     assert.equal(allocated(source.id), 100);
     assert.equal(balance(b.id), 60);
     assert.equal(snapshot().payments.find(row => row.id === source.id).type, 'RECEIVABLE_RECEIPT_ALLOCATED');
@@ -118,7 +118,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     const automaticTarget = await sale({ contractNo: 'EXP269006', totalAmount: 40 });
     const automaticSource = await receipt({ note: 'EXP269006 synthetic remaining receipt' });
     await good('POST', `/finance/payments/${automaticSource.id}/allocate`, { allocations: [{ salesContractId: b.id, amount: 60 }] });
-    const match = await good('POST', '/finance/payments/auto-match', undefined, 'FINANCE');
+    const match = await good('POST', '/finance/payments/auto-match', undefined, 'ADMIN');
     assert.equal(match.matchedCount, 1);
     assert.equal(match.matched[0].amount, 40, 'auto-match records remaining allocation rather than original source amount');
     assert.equal(match.matched[0].salesContractId, automaticTarget.id);
@@ -128,8 +128,8 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.equal(ordinary.status, 201, 'ordinary unlinked receipt creation remains supported');
     const direct = { type: 'RECEIVABLE_COLLECTION', salesContractId: a.id, amount: 5, currency: 'USD', paymentDate: '2026-10-01' };
     const headers = { 'X-Idempotency-Key': 'synthetic-ordinary-receivable-collection' };
-    const created = await call('POST', '/finance/payments', direct, 'SALES', base, headers);
-    const retry = await call('POST', '/finance/payments', direct, 'SALES', base, headers);
+    const created = await call('POST', '/finance/payments', direct, 'ADMIN', base, headers);
+    const retry = await call('POST', '/finance/payments', direct, 'ADMIN', base, headers);
     assert.equal(created.status, 201, 'ordinary direct collection creation remains supported');
     assert.equal(retry.status, 200);
     assert.equal(retry.body.data.id, created.body.data.id);
@@ -185,9 +185,9 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     worker = { child, receive };
     worker.base = `http://127.0.0.1:${(await receive('ready')).port}/api/v1`;
     child.send({ type: 'arm' }); await receive('armed');
-    const stale = call('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 60 }] }, 'SALES', worker.base);
+    const stale = call('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 60 }] }, 'ADMIN', worker.base);
     await receive('gated');
-    await good('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 80 }] }, 'FINANCE');
+    await good('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 80 }] }, 'ADMIN');
     const before = snapshot();
     child.send({ type: 'release' });
     const result = await stale;
@@ -211,12 +211,10 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     // No new allocation idempotency/undo operation is assumed: the existing endpoint rejects a spent source.
   });
 
-  await t.test('current database roles permit ordinary allocation but deny BOSS, inactive and anonymous writes', async () => {
+  await t.test('OD-8: only ADMIN allocates or reads receipts; SALES, retired, inactive and anonymous are refused', async () => {
     const a = await sale(), source = await receipt();
-    for (const role of ['ADMIN', 'SALES', 'FINANCE']) {
-      await good('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 1 }] }, role);
-    }
-    for (const role of ['PURCHASE', 'WAREHOUSE']) {
+    await good('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 1 }] }, 'ADMIN');
+    for (const role of ['SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE']) {
       assert.equal((await call('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 1 }] }, role)).status, 403);
     }
     for (const [role, expected] of [['BOSS', 403], ['INACTIVE', 401], ['ANONYMOUS', 401]]) {
@@ -224,14 +222,16 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       assert.equal((await call('POST', `/finance/payments/${source.id}/allocate`, { allocations: [{ salesContractId: a.id, amount: 1 }] }, role)).status, expected);
       assert.deepEqual(snapshot(), before);
     }
-    assert.equal(balance(a.id), 3);
+    assert.equal(balance(a.id), 1);
+    assert.equal((await good('GET', '/finance/unallocated-payments')).find(row => row.id === source.id).remainingAmount, 99);
+    assert.equal((await good('GET', `/finance/payments?salesContractId=${a.id}`)).items.length, 1);
     for (const role of ['SALES', 'FINANCE', 'BOSS']) {
-      assert.equal((await good('GET', '/finance/unallocated-payments', undefined, role)).find(row => row.id === source.id).remainingAmount, 97);
-      assert.equal((await good('GET', `/finance/payments?salesContractId=${a.id}`, undefined, role)).items.length, 3);
+      assert.equal((await call('GET', '/finance/unallocated-payments', undefined, role)).status, 403, role);
+      assert.equal((await call('GET', `/finance/payments?salesContractId=${a.id}`, undefined, role)).status, 403, role);
     }
   });
 
-  await t.test('known-difference reconciliation uses cutoff/currency rules and ADMIN/FINANCE/BOSS read access', async () => {
+  await t.test('known-difference reconciliation uses cutoff/currency rules and ADMIN-only read access (OD-8)', async () => {
     const period = await db.financialPeriod.create({ data: { year: 2026, month: 9, periodLabel: 'Synthetic September', reportDate: new Date('2026-09-30T00:00:00Z'), balanceSheet: { create: { accountsReceivable: 900 } } } });
     for (const fields of [
       { contractNo: 'EXP269001', totalAmount: 100, shippedAt: new Date('2026-09-02T00:00:00Z') },
@@ -249,7 +249,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     }
     const before = snapshot();
     const route = '/finance/receivable-reconciliation?year=2026&month=9';
-    for (const role of ['ADMIN', 'FINANCE', 'BOSS']) {
+    for (const role of ['ADMIN']) {
       const result = await good('GET', route, undefined, role);
       assert.equal(result.cutoffDate, '2026-09-30');
       assert.equal(result.contractCount, 2);
@@ -264,8 +264,8 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       assert.equal(result.translatedOperatingReceivableCny, 770);
       assert.equal(result.residualCny, -220);
     }
-    for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE']) assert.equal((await call('GET', route, undefined, role)).status, 403);
-    assert.equal(await good('GET', '/finance/receivable-reconciliation?year=2026&month=8', undefined, 'FINANCE'), null);
+    for (const role of ['SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) assert.equal((await call('GET', route, undefined, role)).status, 403);
+    assert.equal(await good('GET', '/finance/receivable-reconciliation?year=2026&month=8', undefined, 'ADMIN'), null);
     assert.deepEqual(snapshot(), before, 'reconciliation GET must not change any evidence or ledger rows');
   });
   assert.equal(fs.statSync(directory).mode & 0o777, 0o700);

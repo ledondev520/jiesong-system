@@ -2,8 +2,6 @@
  * Input: 后端通知 API
  * Output: Header 通知下拉与按通知去重的待完成已读操作
  * Pos: 前端布局子组件，重复点击不重复减少未读计数
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

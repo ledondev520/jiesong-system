@@ -2,7 +2,6 @@
  * Input: 完整 Git 历史与 PR base/head SHA（环境变量 PR_BASE_SHA / PR_HEAD_SHA）
  * Output: UI-only 判定（docs/redesign/UX-REDESIGN-2026.md §14.1）；`ui-only` 模式不通过则退出 1，`backend-gate` 模式输出 backend_changed=true|false
  * Pos: 轻量 UI PR 流程的 CI 门禁；标签只会"增加"检查，不会放宽任何必过检查
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const fs = require('node:fs');
 const path = require('node:path');

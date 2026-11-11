@@ -1,17 +1,15 @@
-'use client';
+"use client";
 
 /**
  * Input: React 子组件树
  * Output: 渲染子组件；若子组件 throw，展示友好错误卡片而非白屏
  * Pos: 全局最外层 Error Boundary，在 app/layout.tsx 中包裹整个应用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { AlertTriangle } from 'lucide-react';
-import { errorLogger } from '@/lib/error-logger';
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle } from "lucide-react";
+import { errorLogger } from "@/lib/error-logger";
 
 interface State {
   hasError: boolean;
@@ -31,18 +29,18 @@ export class GlobalErrorBoundary extends React.Component<
 > {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, message: '' };
+    this.state = { hasError: false, message: "" };
   }
 
   static getDerivedStateFromError(error: unknown): State {
     const message =
-      error instanceof Error ? error.message : String(error ?? '未知错误');
+      error instanceof Error ? error.message : String(error ?? "未知错误");
     return { hasError: true, message };
   }
 
   componentDidCatch(error: unknown, info: React.ErrorInfo) {
     // 使用errorLogger进行去重记录
-    errorLogger.error('GlobalErrorBoundary', {
+    errorLogger.error("GlobalErrorBoundary", {
       error,
       componentStack: info.componentStack,
     });
@@ -60,7 +58,9 @@ export class GlobalErrorBoundary extends React.Component<
             <div className="flex justify-center">
               <AlertTriangle className="h-12 w-12 text-destructive" />
             </div>
-            <h2 className="text-xl font-semibold text-foreground">页面出现异常</h2>
+            <h2 className="text-xl font-semibold text-foreground">
+              页面出现异常
+            </h2>
             <p className="text-sm text-muted-foreground">
               系统遇到了一个意外错误，请点击下方按钮刷新页面。
             </p>

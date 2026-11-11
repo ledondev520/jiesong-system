@@ -7,8 +7,6 @@
  * 2026-02-21 新增：GET /:id/export-excel 生成三 Sheet 标准出口 Excel
  * 2026-06-03 新增：/:id/files 出口源文件附件上传、列表、下载、删除
  * 2026-07-10 升级：船司装箱单 PDF 原件、差异、历史和人工结论持久化
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
@@ -17,19 +15,19 @@ const purchaseDraftController = require('../controllers/purchaseDraftController'
 const { exportSalesContractExcel } = require('../services/exportService');
 const { exportSalesContractPdf } = require('../services/pdfExportService');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, param, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 const { upload, pdfCheckUpload } = require('../utils/upload');
 
 const router = Router();
-const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
-// 装柜计划含 Confidential 箱规/重量：显式人类角色白名单（含 BOSS 只读）；Agent 无 req.user，roleAuth 返回 401。
-const LOADING_PLAN_ROLES = [...WRITE_ROLES, 'BOSS'];
-// 单柜财务/退税清单含 Confidential 收付款与成本：与 /finance/* 一致，WAREHOUSE 无账务读权限。
-// R3 P1-3：导出工作簿/PDF含采购成本与退税，定价预检/生成只给商务角色；均不含 WAREHOUSE。
-const EXPORT_DOC_ROLES = ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'];
-const EXPORT_PACKET_ROLES = ['ADMIN', 'SALES', 'FINANCE'];
-const FINANCE_VIEW_ROLES = ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'];
+const WRITE_ROLES = ROLE_SETS.ALL;
+// 装柜计划含 Confidential 箱规/重量：ADMIN/SALES；Agent 无 req.user，roleAuth 返回 401。
+const LOADING_PLAN_ROLES = WRITE_ROLES;
+// 单柜财务/退税清单与导出工作簿/PDF 含收付款、成本与退税：与 /finance/* 一致，仅 ADMIN（OD-8）。
+const EXPORT_DOC_ROLES = ROLE_SETS.ADMIN; // OD-7: the workbook/PDF prints contract totals
+const EXPORT_PACKET_ROLES = ROLE_SETS.ADMIN;
+const FINANCE_VIEW_ROLES = ROLE_SETS.ADMIN; // OD-8: SALES never sees finance
 
 router.use(authenticate);
 
@@ -79,8 +77,8 @@ router.post('/:id/items', withIdValidation, roleAuth(...WRITE_ROLES), withAuditL
 ));
 
 // POST /api/v1/sales/:id/items/:itemId/reprice - 改单行数量/售价（A84；审计行在服务事务内写入）
-// 不含 WAREHOUSE（OD-3：仓库看不到金额，也就不能改价）与只读的 BOSS。
-router.post('/:id/items/:itemId/reprice', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE'), salesController.updateItemLine);
+// ADMIN/SALES（OD-8：SALES 录入合同价格，但响应不回显合同总额，OD-7）。
+router.post('/:id/items/:itemId/reprice', withIdValidation, roleAuth(ROLE_SETS.ALL), salesController.updateItemLine);
 
 // ==================== 装箱明细 ====================
 
@@ -124,7 +122,7 @@ const exportPacketValidation = [
 ];
 
 // POST /api/v1/sales/:id/purchase-drafts - 生成采购单：每个供应商一份 DRAFT 采购合同（草稿不是应付）
-router.post('/:id/purchase-drafts', withIdValidation, roleAuth('ADMIN', 'PURCHASE'), withAuditLog(
+router.post('/:id/purchase-drafts', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'PurchaseContract', action: 'GENERATE_FROM_SALES' },
   purchaseDraftController.generate
 ));

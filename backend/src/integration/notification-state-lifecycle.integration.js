@@ -61,7 +61,7 @@ test('HTTP/SQLite: own notification read states and counts survive reload and re
   // One current user only, created inside the disposable fixture with no account changes.
   const user = await db.user.create({ data: {
     username: 'synthetic-notification-user', name: 'Synthetic notification user',
-    password: randomBytes(32).toString('hex'), role: 'PURCHASE',
+    password: randomBytes(32).toString('hex'), role: 'SALES',
   } });
   const rows = [];
   for (let index = 0; index < 4; index += 1) {

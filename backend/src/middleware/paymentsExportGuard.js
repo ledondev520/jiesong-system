@@ -7,7 +7,7 @@ const { createError } = require('./errorHandler');
 
 // 付款流水属账务读取：WAREHOUSE 无任何账务读权限（与 routes/finance.js 一致）
 const paymentsExportGuard = (req, res, next) => (
-  req.params.type === 'payments' && req.user?.role === 'WAREHOUSE'
+  req.params.type === 'payments' && req.user?.role !== 'ADMIN'
     ? next(createError('无权导出付款记录', 403))
     : next()
 );

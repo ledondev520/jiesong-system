@@ -24,8 +24,8 @@ export interface TabConfig {
   visibleRoles?: Role[];
 }
 
-// 与 backend/src/routes/bankFlow.js、finance.js 的账务读角色一致（WAREHOUSE 无账务读）
-export const FINANCE_LEDGER_ROLES = [Role.ADMIN, Role.FINANCE, Role.BOSS];
+// 与 backend/src/routes/bankFlow.js、finance.js 一致：账务仅 ADMIN（OD-8）
+export const FINANCE_LEDGER_ROLES = [Role.ADMIN];
 
 export type NavGroup = "main" | "business" | "data" | "system";
 
@@ -76,14 +76,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     childPrefixes: [],
     children: [],
     group: "business",
-    // 与 backend/src/routes/quotes.js 的读取角色一致（WAREHOUSE 无权访问）。
-    visibleRoles: [
-      Role.ADMIN,
-      Role.SALES,
-      Role.PURCHASE,
-      Role.FINANCE,
-      Role.BOSS,
-    ],
   },
   {
     key: "orders",
@@ -169,13 +161,8 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       },
     ],
     group: "business",
-    visibleRoles: [
-      Role.ADMIN,
-      Role.FINANCE,
-      Role.BOSS,
-      Role.SALES,
-      Role.PURCHASE,
-    ],
+    // OD-8：SALES 看不到财务
+    visibleRoles: FINANCE_LEDGER_ROLES,
   },
   {
     key: "customers",
@@ -197,7 +184,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     children: [],
     group: "data",
   },
-  // PURCHASE 经此入口维护商品档案；API 权限仍由后端 roleAuth 决定，菜单不授予权限。
   {
     key: "products",
     href: "/dashboard/products",
@@ -218,7 +204,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     children: [],
     group: "data",
   },
-  // AI 由顶栏按钮进入（后续侧栏面板），不设菜单项；保留以便路由归属与 BOSS 拦截。
+  // AI 由顶栏按钮进入（后续侧栏面板），不设菜单项；保留以便路由归属。
   {
     key: "ai",
     href: "/dashboard/ai",
@@ -230,7 +216,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     group: "system",
     hidden: true,
   },
-  // 通知从顶栏铃铛进入；BOSS 无其他系统入口，仅保留路由归属。
+  // 通知从顶栏铃铛进入，仅保留路由归属。
   {
     key: "notifications",
     href: "/dashboard/notifications",
@@ -241,7 +227,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     children: [],
     group: "system",
     hidden: true,
-    visibleRoles: [Role.BOSS],
   },
   {
     key: "admin",
@@ -267,8 +252,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
 export const getVisibleModuleNavItems = (role?: Role | null) =>
   MODULE_NAV_ITEMS.filter(
     (item) =>
-      (role !== Role.BOSS || item.key !== "ai") &&
-      (!item.visibleRoles || (role ? item.visibleRoles.includes(role) : false)),
+      !item.visibleRoles || (role ? item.visibleRoles.includes(role) : false),
   ).map((item) => ({
     ...item,
     children: item.children.filter(

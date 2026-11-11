@@ -2,8 +2,6 @@
  * Input: Express错误对象（包括 Multer/Busboy 请求解析错误）
  * Output: 统一格式的错误响应，Multer输入限制及无 statusCode 的精确白名单 Busboy 畸形输入错误返回400
  * Pos: 错误处理中间件，统一异常响应格式
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 /**

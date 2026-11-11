@@ -11,8 +11,6 @@ import {
  * Input: API 401 响应、浏览器认证持久化状态
  * Output: 区分未登录与会话失效，统一清理、单次提示与登录页跳转
  * Pos: 前端认证基础设施，收敛失效会话处理入口
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { clearAuthToken, getAuthToken } from "@/lib/auth-token";

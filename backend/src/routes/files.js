@@ -2,19 +2,18 @@
  * Input: fileController、认证中间件、上传中间件
  * Output: 统一合同附件路由
  * Pos: 合同附件管理路由，挂载在 /api/v1 下
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
 const fileController = require('../controllers/fileController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { contractUpload } = require('../utils/upload');
 const { withAuditLog } = require('../middleware/auditLog');
 const { param, handleValidation } = require('../utils/validators');
 
 const router = Router();
-const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
+const WRITE_ROLES = ROLE_SETS.ALL;
 const withContractIdValidation = [
   param('contractId').notEmpty().withMessage('合同ID不能为空').isString().withMessage('合同ID格式无效'),
   handleValidation,

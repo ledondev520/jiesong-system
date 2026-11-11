@@ -1,6 +1,6 @@
 /**
  * Input: 登录角色（ROLES）、Prisma；应付统一取 payablesService
- * Output: 首页待办：每个列表的总数 + 前 5 条；BOSS 另有应收/应付/本月毛利三个数字
+ * Output: 首页待办：每个列表的总数 + 前 5 条；ADMIN 另有应收/应付/本月毛利三个数字（OD-8 前属 BOSS）
  * Pos: GET /dashboard/todos 的只读聚合（规格 §4.9）；不写库，只算当前角色可见的列表
  *
  * 口径说明（当前库结构下的最小可靠定义）：
@@ -39,7 +39,7 @@ const withHistorical = (rows, build) => {
 };
 // shortcut: CONFIRMED orders are scanned oldest-first up to this cap (count undercounts beyond it); upgrade to SQL NOT EXISTS if volumes reach it.
 const CONFIRMED_SCAN_CAP = 500;
-const { ADMIN, BOSS, PURCHASE, SALES, FINANCE, WAREHOUSE } = ROLES;
+const { ADMIN, SALES } = ROLES;
 
 const item = (id, contractNo, party, amount, date) => ({
   id, contractNo, party: party ?? null, amount: amount ?? null, date: date ?? null,
@@ -61,7 +61,7 @@ const quotesByStatus = (status, dateField) => async (db) => {
 
 const LISTS = {
   ordersToPurchase: {
-    label: '订单待采购', roles: [PURCHASE, ADMIN],
+    label: '订单待采购', roles: [SALES, ADMIN],
     async load(db) {
       const orders = await db.salesContract.findMany({
         where: { status: SALES_STATUS.CONFIRMED }, orderBy: { createdAt: 'asc' }, take: CONFIRMED_SCAN_CAP,
@@ -80,7 +80,7 @@ const LISTS = {
   quotesToSend: { label: '报价待发送', roles: [SALES, ADMIN], load: quotesByStatus('DRAFT', 'createdAt') },
   quotesAwaitingCustomer: { label: '报价待客户确认', roles: [SALES, ADMIN], load: quotesByStatus('SENT', 'sentAt') },
   paymentsDue: {
-    label: '待付款', roles: [FINANCE, PURCHASE, ADMIN],
+    label: '待付款', roles: [ADMIN],
     async load(db) {
       const rows = (await db.purchaseContract.findMany({
         where: payableWhere(),
@@ -92,7 +92,7 @@ const LISTS = {
     },
   },
   receiptsToInspect: {
-    label: '待收货验货', roles: [WAREHOUSE, PURCHASE, ADMIN],
+    label: '待收货验货', roles: [SALES, ADMIN],
     async load(db) {
       const where = { status: PURCHASE_STATUS.SHIPPED };
       const [count, rows] = await Promise.all([
@@ -105,10 +105,10 @@ const LISTS = {
       return asList(count, rows.map((r) => item(r.id, r.contractNo, r.supplier?.name, r.totalAmount, r.expectedDate)));
     },
   },
-  toLoad: { label: '待装柜', roles: [WAREHOUSE, SALES, ADMIN], load: (db) => salesByStatus(db, SALES_STATUS.CONFIRMED) },
-  toShip: { label: '待发运', roles: [WAREHOUSE, SALES, ADMIN], load: (db) => salesByStatus(db, SALES_STATUS.PACKING) },
+  toLoad: { label: '待装柜', roles: [SALES, ADMIN], load: (db) => salesByStatus(db, SALES_STATUS.CONFIRMED) },
+  toShip: { label: '待发运', roles: [SALES, ADMIN], load: (db) => salesByStatus(db, SALES_STATUS.PACKING) },
   missingInvoice: {
-    label: '缺进项发票', roles: [FINANCE, ADMIN],
+    label: '缺进项发票', roles: [ADMIN],
     async load(db) {
       const candidates = (await db.purchaseContract.findMany({
         where: { status: { in: [PURCHASE_STATUS.SHIPPED, PURCHASE_STATUS.RECEIVED, PURCHASE_STATUS.COMPLETED] } },
@@ -122,7 +122,7 @@ const LISTS = {
     },
   },
   overdueReceivables: {
-    label: '逾期未收款', roles: [FINANCE, SALES, BOSS, ADMIN],
+    label: '逾期未收款', roles: [ADMIN],
     async load() {
       const { getOverdueReceivables } = require('./financeService');
       const rows = await getOverdueReceivables();
@@ -130,7 +130,7 @@ const LISTS = {
     },
   },
   refundable: {
-    label: '可申报退税', roles: [FINANCE, ADMIN],
+    label: '可申报退税', roles: [ADMIN],
     async load(db, now) {
       // 与退税工作台同源：同一服务、同一申报月份（上海当月，页面默认值）。count = 材料核验通过的出口，pending = 工作台「待处理出口」。
       // shortcut: 每次打开首页都会跑一遍工作台汇总（含发票核验）；慢了就缓存或拆出只数不核验的汇总。
@@ -157,7 +157,7 @@ async function salesByStatus(db, status) {
   return asList(count, rows.map((r) => item(r.id, r.contractNo, null, r.totalAmount, r.estimatedArrival)));
 }
 
-/** BOSS 的三个数字；应付走共享函数，毛利复用经营概览同一计算（本月 = 上海自然月至今发运）。 */
+/** ADMIN 的三个数字（OD-8 前属 BOSS）；应付走共享函数，毛利复用经营概览同一计算（本月 = 上海自然月至今发运）。 */
 async function loadBossFigures(db, now) {
   const { getStats } = require('./financeService');
   const { getBusinessOverview } = require('../controllers/dashboardController');
@@ -188,7 +188,7 @@ async function getDashboardTodos(role, { db = prisma, now = new Date() } = {}) {
   await Promise.all(visible.map(async ([key, def]) => {
     lists[key] = { label: def.label, ...(await def.load(db, now)) };
   }));
-  return { role, lists, ...(role === BOSS ? { figures: await loadBossFigures(db, now) } : {}) };
+  return { role, lists, ...(role === ADMIN ? { figures: await loadBossFigures(db, now) } : {}) };
 }
 
 module.exports = { getDashboardTodos, LISTS, DASHBOARD_TODO_CUTOFF };

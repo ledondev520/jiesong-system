@@ -1,5 +1,6 @@
 /** A81: SalesContract (the container) blNo round-trip over real HTTP/SQLite, WAREHOUSE read, additive-only migration; synthetic data only. */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -14,7 +15,7 @@ test('migration is additive only: one nullable ADD COLUMN on sales_contracts', (
   assert.deepEqual(statements, ['ALTER TABLE "sales_contracts" ADD COLUMN "blNo" TEXT;']);
 });
 
-test('HTTP/SQLite: blNo create/update/get/list, WAREHOUSE can read it, bad values rejected', async (t) => {
+test('HTTP/SQLite: blNo update/get/list, WAREHOUSE can read it, bad values rejected', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-blno-'));
   fs.chmodSync(directory, 0o700);
   const database = path.join(directory, 'synthetic.db');
@@ -51,7 +52,7 @@ test('HTTP/SQLite: blNo create/update/get/list, WAREHOUSE can read it, bad value
   const jwt = require('jsonwebtoken');
   const tokens = {};
   for (const role of ['ADMIN', 'SALES', 'WAREHOUSE']) {
-    const user = await db.user.create({ data: { username: `synthetic-blno-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-blno-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     tokens[role] = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
   }
   const port = await db.port.create({ data: { name: '合成提单港口', code: 'QA-BL' } });
@@ -71,28 +72,23 @@ test('HTTP/SQLite: blNo create/update/get/list, WAREHOUSE can read it, bad value
     return result.data;
   };
 
-  // Create with blNo (trimmed), then read it back through get and list as ADMIN and WAREHOUSE.
-  const created = await call('POST', '/containers', { portId: port.id, blNo: '  MAEU123456789  ' }, 'SALES', 201);
-  assert.equal(created.blNo, 'MAEU123456789');
+  // A99: /containers is gone; the order header (PUT /sales/:id) is the only blNo write path. Value is trimmed.
+  const created = await db.salesContract.create({ data: { contractNo: 'EXP-SYN-BL-1', exchangeRate: 7, portId: port.id } });
+  assert.equal((await call('PUT', `/sales/${created.id}`, { blNo: '  MAEU123456789  ' }, 'SALES')).blNo, 'MAEU123456789');
   for (const role of ['ADMIN', 'WAREHOUSE']) {
-    assert.equal((await call('GET', `/containers/${created.id}`, undefined, role)).blNo, 'MAEU123456789', `${role} get`);
-    const listed = (await call('GET', '/containers?page=1&pageSize=20', undefined, role)).items.find((row) => row.id === created.id);
-    assert.equal(listed.blNo, 'MAEU123456789', `${role} containers list`);
     const orders = (await call('GET', '/sales?page=1&pageSize=20', undefined, role)).items.find((row) => row.id === created.id);
     assert.equal(orders.blNo, 'MAEU123456789', `${role} sales list`);
     assert.equal((await call('GET', `/sales/${created.id}`, undefined, role)).blNo, 'MAEU123456789', `${role} sales detail`);
   }
 
-  // Update through both header endpoints; an omitted blNo keeps the stored value, empty clears it.
-  assert.equal((await call('PUT', `/containers/${created.id}`, { blNo: 'COSU987654321' }, 'WAREHOUSE')).blNo, 'COSU987654321');
-  assert.equal((await call('PUT', `/containers/${created.id}`, { note: 'x' }, 'ADMIN')).blNo, 'COSU987654321');
-  assert.equal((await call('PUT', `/sales/${created.id}`, { blNo: 'ONEY555' }, 'SALES')).blNo, 'ONEY555');
-  assert.equal((await call('PUT', `/sales/${created.id}`, { note: 'y' }, 'SALES')).blNo, 'ONEY555');
-  assert.equal((await call('PUT', `/containers/${created.id}`, { blNo: '   ' }, 'ADMIN')).blNo, null);
+  // An omitted blNo keeps the stored value, empty clears it; WAREHOUSE may set it (operational identifier).
+  assert.equal((await call('PUT', `/sales/${created.id}`, { blNo: 'COSU987654321' }, 'WAREHOUSE')).blNo, 'COSU987654321');
+  assert.equal((await call('PUT', `/sales/${created.id}`, { note: 'y' }, 'SALES')).blNo, 'COSU987654321');
+  assert.equal((await call('PUT', `/sales/${created.id}`, { blNo: '   ' }, 'ADMIN')).blNo, null);
 
   // Bad values are rejected and nothing is stored.
-  await call('PUT', `/containers/${created.id}`, { blNo: 'X'.repeat(51) }, 'ADMIN', 400);
-  await call('PUT', `/containers/${created.id}`, { blNo: 12345 }, 'ADMIN', 400);
+  await call('PUT', `/sales/${created.id}`, { blNo: 'X'.repeat(51) }, 'ADMIN', 400);
+  await call('PUT', `/sales/${created.id}`, { blNo: 12345 }, 'ADMIN', 400);
   await call('PUT', `/sales/${created.id}`, { blNo: 'A\nB' }, 'SALES', 400);
   assert.equal((await db.salesContract.findUnique({ where: { id: created.id } })).blNo, null);
 });

@@ -2,8 +2,6 @@
  * Input: 认证状态仓库（zustand persist）、路由导航能力、Sidebar、Header、MobileTabBar
  * Output: 验证会话后呈现 Dashboard，未登录重定向与网络失败重试
  * Pos: 仪表盘路由层，承载导航框架和内容区域；移动端使用底部 TabBar 替代侧边栏
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -13,8 +11,6 @@ import { getAuthToken } from "@/lib/auth-token";
 import { getBrowserCsrf } from "@/lib/browser-session";
 import { authService } from "@/services/auth.service";
 import { Button } from "@/components/ui/button";
-import { Role } from "@/types";
-import { isBossRestrictedPath } from "@/lib/hooks/useBusinessReadOnly";
 import { useAuthStore } from "@/store/auth.store";
 import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -209,13 +205,7 @@ export default function DashboardLayout({
             >
               {/* 桌面端面包屑在顶栏；手机端顶栏放品牌，面包屑留在内容区 */}
               <Breadcrumbs className="md:hidden" />
-              {user?.role === Role.BOSS && isBossRestrictedPath(pathname) ? (
-                <div role="alert" className="rounded-md border p-4 text-sm">
-                  老板角色仅可查看经营和业务信息，该页面包含管理或写入操作。
-                </div>
-              ) : (
-                children
-              )}
+              {children}
             </main>
           </div>
           <LazyAIAssistantMount />

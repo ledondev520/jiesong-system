@@ -2,7 +2,6 @@
  * Input: 手机视口宽度
  * Output: 共享路由清单、整页宽度检查与单视口三项验收注册函数
  * Pos: mobile-*.spec.ts 的共用模块（非 spec，不参与分片）
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, test, type Page } from "@playwright/test";
 import { mockApiRoutes, signInAsAdmin } from "./helpers";
@@ -18,7 +17,7 @@ export const routes = [
   "/dashboard/products",
   "/dashboard/inventory",
   "/dashboard/sales",
-  "/dashboard/sales/create",
+  "/dashboard/orders/new",
   "/dashboard/sales/sc-001",
   "/dashboard/customs",
   "/dashboard/customs?view=customs",
@@ -39,7 +38,6 @@ export const routes = [
   "/dashboard/settings/logs",
   "/dashboard/notifications",
   "/dashboard/settings/ai-usage",
-  "/dashboard/settings/ai-access",
   "/dashboard/settings/ports",
   "/dashboard/settings/categories",
   "/dashboard/settings/customs-brokers",

@@ -44,7 +44,7 @@ test('HTTP/SQLite: customers API roles, archive-not-delete, USD/incoterm rules a
   const jwt = require('jsonwebtoken');
   const tokens = {};
   for (const role of ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-customers-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-customers-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } }); // retired roles stored as-is: they must be refused (OD-8)
     tokens[role] = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
   }
   const port = await db.port.create({ data: { name: '合成客户港口', code: 'QA-CUST' } });
@@ -65,7 +65,7 @@ test('HTTP/SQLite: customers API roles, archive-not-delete, USD/incoterm rules a
   };
   const storeInput = (name, extra = {}) => ({ name, portId: port.id, ...extra });
 
-  // Roles: only ADMIN and SALES write; every authenticated role (incl. BOSS) reads; anonymous gets 401.
+  // Roles (OD-8): ADMIN and SALES read and write; retired roles get 403; anonymous gets 401.
   await call('POST', '/customers', { name: '合成匿名客户' }, 'ANONYMOUS', 401);
   for (const role of ['PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
     await call('POST', '/customers', { name: `合成${role}客户` }, role, 403);
@@ -76,18 +76,18 @@ test('HTTP/SQLite: customers API roles, archive-not-delete, USD/incoterm rules a
   assert.equal(seapot.defaultCurrency, 'USD');
   assert.equal(seapot.defaultIncoterm, 'FOB');
   assert.equal(seapot.isActive, true);
-  for (const role of ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
+  for (const role of ['PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) await call('GET', '/customers', undefined, role, 403);
+  for (const role of ['ADMIN', 'SALES']) {
     const list = await call('GET', '/customers', undefined, role);
     assert.deepEqual(list.items.map((row) => row.id), [seapot.id], role);
     assert.equal((await call('GET', `/customers/${seapot.id}`, undefined, role)).id, seapot.id);
     assert.deepEqual((await call('GET', `/customers/${seapot.id}/stores`, undefined, role)).items, []);
-    // Contact fields are Confidential: WAREHOUSE keeps name/id but never sees contact data (LR-FIX-1).
     const detail = await call('GET', `/customers/${seapot.id}`, undefined, role);
     for (const row of [list.items[0], detail]) {
       assert.equal(row.name, 'Synthetic Seapot');
-      for (const field of ['contactName', 'contactEmail', 'contactPhone']) assert.equal(field in row, role !== 'WAREHOUSE', `${role} ${field}`);
+      for (const field of ['contactName', 'contactEmail', 'contactPhone']) assert.equal(field in row, true, `${role} ${field}`);
     }
-    if (role !== 'WAREHOUSE') assert.equal(detail.contactEmail, 'buyer@example.invalid');
+    assert.equal(detail.contactEmail, 'buyer@example.invalid');
   }
   await call('PUT', `/customers/${seapot.id}`, { note: '老板不可改' }, 'BOSS', 403);
   await call('DELETE', `/customers/${seapot.id}`, undefined, 'ADMIN', 404); // no hard delete route exists

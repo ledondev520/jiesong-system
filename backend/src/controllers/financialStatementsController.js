@@ -2,8 +2,6 @@
  * Input: HTTP 请求（路由参数、三类上传工作簿、预览凭证）
  * Output: 财务数据包预览、确认写入、查询与分析 JSON 响应
  * Pos: 财务报表 HTTP Adapter；三类上传来源不能绕过预览直接写库
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const financialStatementsService = require('../services/financialStatementsService');
@@ -35,8 +33,8 @@ const getStatementDetail = async (req, res, next) => {
     if (isNaN(year) || isNaN(month)) {
       return res.status(400).json({ code: 400, message: '年份或月份参数无效' });
     }
-    // 行级账簿与来源文件元数据仅允许ADMIN/FINANCE，在加载之前收窄查询。
-    const includeEvidence = ['ADMIN', 'FINANCE'].includes(req.user?.role);
+    // 行级账簿与来源文件元数据仅允许ADMIN，在加载之前收窄查询。
+    const includeEvidence = req.user?.role === 'ADMIN';
     const data = await financialStatementsService.getPeriodDetail(year, month, undefined, { includeEvidence });
     if (!data) {
       return res.status(404).json({ code: 404, message: '未找到该账期数据' });

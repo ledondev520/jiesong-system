@@ -2,8 +2,6 @@
  * Input: 内联供应商表单状态
  * Output: 新增供应商弹窗（独立编辑会话）
  * Pos: 采购合同创建入口（CreatePurchasePageContent 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

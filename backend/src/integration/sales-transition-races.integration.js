@@ -4,6 +4,7 @@
  * Pos: sales lifecycle concurrency regression; never reads existing business databases
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -32,8 +33,8 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
     await db.$disconnect(); fs.rmSync(directory, { recursive: true, force: true });
   });
   const users = {};
-  for (const role of ['SALES', 'WAREHOUSE']) {
-    const user = await db.user.create({ data: { username: `synthetic-sales-race-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role } });
+  for (const role of ['SALES', 'WAREHOUSE', 'ADMIN']) {
+    const user = await db.user.create({ data: { username: `synthetic-sales-race-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: dbRole(role) } });
     users[role] = jwt.sign({ userId: user.id }, secret);
   }
   for (let n = 0; n < 2; n += 1) {
@@ -57,13 +58,13 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
   }
   const call = async (worker, sale, action) => {
     const url = action.kind === 'payment' ? '/finance/payments'
-      : `/${action.root || 'sales'}/${sale.id}${action.kind === 'header' ? '' : '/status'}`;
+      : `/${action.root || 'sales'}/${sale.id}/status`;
     const body = action.kind === 'payment'
       ? { type: 'RECEIVABLE_COLLECTION', salesContractId: sale.id, amount: 180, currency: 'USD', paymentDate: '2026-10-01' }
-      : { status: action.status, ...(action.kind === 'header' ? { note: 'synthetic stale metadata' } : {}) };
+      : { status: action.status };
     const response = await fetch(worker.base + url, {
       method: action.kind === 'payment' ? 'POST' : 'PUT',
-      headers: { authorization: `Bearer ${users[action.role || 'SALES']}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${users[action.role || (action.kind === 'payment' ? 'ADMIN' : 'SALES')]}`, 'content-type': 'application/json' },
       body: JSON.stringify(body), signal: AbortSignal.timeout(15000),
     });
     const result = await response.json();
@@ -121,7 +122,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
   for (const [first, second] of [['CANCELLED', 'SHIPPED'], ['SHIPPED', 'CANCELLED']]) {
     await t.test(`${first} queued against ${second}: first valid terminal decision wins`, async () => {
       const sale = await fixture();
-      const { results, reads } = await race(sale, [status(first, 'sales'), status(second, 'containers', 'WAREHOUSE')]);
+      const { results, reads } = await race(sale, [status(first, 'sales'), status(second, 'sales', 'WAREHOUSE')]);
       assert.deepEqual(results.map(result => result.status), [200, 400]);
       assert.deepEqual(reads.map(read => read.status), ['PACKING', first]);
       await assertState(sale, first);
@@ -135,7 +136,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
   ]) {
     await t.test(`packing: ${first} versus ${second} cannot skip lifecycle evidence`, async () => {
       const sale = await fixture();
-      const { results } = await race(sale, [status(first, 'containers', 'WAREHOUSE'), status(second)]);
+      const { results } = await race(sale, [status(first, 'sales', 'WAREHOUSE'), status(second)]);
       assert.deepEqual(results.map(result => result.status), codes);
       await assertState(sale, expected, results.find(result => result.data?.shippedAt)?.data.shippedAt);
     });
@@ -147,7 +148,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
     await t.test(`shipped: ${first} versus ${second} keeps one allocation and timestamp`, async () => {
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
-      const { results } = await race(sale, [status(first), status(second, 'containers', 'WAREHOUSE')]);
+      const { results } = await race(sale, [status(first), status(second, 'sales', 'WAREHOUSE')]);
       assert.deepEqual(results.map(result => result.status), codes);
       await assertState(sale, 'ARRIVED', timestamp);
     });
@@ -156,8 +157,8 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
     await t.test(`${firstKind} first: arrival and synthetic settlement converge without losing ledger`, async () => {
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
-      const arrival = status('ARRIVED', 'containers', 'WAREHOUSE');
-      const payment = { kind: 'payment', role: 'SALES' };
+      const arrival = status('ARRIVED', 'sales', 'WAREHOUSE');
+      const payment = { kind: 'payment', role: 'ADMIN' }; // OD-8: payments are ADMIN only
       const actions = firstKind === 'arrival' ? [arrival, payment] : [payment, arrival];
       const { results } = await race(sale, actions);
       assert.deepEqual(results.map(result => result.status), firstKind === 'arrival' ? [200, 201] : [201, 200]);
@@ -168,7 +169,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
     await t.test(`${firstKind} first: shipment replay and settlement preserve pending arrival`, async () => {
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
-      const shipment = status('SHIPPED', 'containers', 'WAREHOUSE');
+      const shipment = status('SHIPPED', 'sales', 'WAREHOUSE');
       const payment = { kind: 'payment' };
       const actions = firstKind === 'shipment' ? [shipment, payment] : [payment, shipment];
       const { results } = await race(sale, actions);
@@ -181,7 +182,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
       assert.equal((await call(workers[0], sale, status('ARRIVED'))).status, 200);
-      const arrival = status('ARRIVED', 'containers', 'WAREHOUSE');
+      const arrival = status('ARRIVED', 'sales', 'WAREHOUSE');
       const payment = { kind: 'payment' };
       const actions = firstKind === 'arrival' ? [arrival, payment] : [payment, arrival];
       const { results } = await race(sale, actions);
@@ -197,12 +198,12 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
       assert.equal((await call(workers[0], sale, { kind: 'payment' })).status, 201);
-      const { results } = await race(sale, [status(first, 'containers', 'WAREHOUSE'), status(second)]);
+      const { results } = await race(sale, [status(first, 'sales', 'WAREHOUSE'), status(second)]);
       assert.deepEqual(results.map(result => result.status), codes);
       await assertState(sale, 'COMPLETED', timestamp, 1);
     });
   }
-  for (const root of ['sales', 'containers']) {
+  for (const root of ['sales']) {
     await t.test(`stale ${root} PACKING request queued behind arrival cannot reverse shipment`, async () => {
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
@@ -212,12 +213,4 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
       await assertState(sale, 'ARRIVED', timestamp);
     });
   }
-  await t.test('stale full legacy header queued behind shipment rejects all fields atomically', async () => {
-    const sale = await fixture();
-    const { results, reads } = await race(sale, [status('SHIPPED'), { kind: 'header', root: 'containers', status: 'PACKING', role: 'WAREHOUSE' }]);
-    assert.deepEqual(results.map(result => result.status), [200, 400]);
-    assert.deepEqual(reads.map(read => read.status), ['PACKING', 'SHIPPED']);
-    const contract = await assertState(sale, 'SHIPPED', results[0].data.shippedAt);
-    assert.equal(contract.note, null);
-  });
 });

@@ -5,8 +5,6 @@
  *         银行流水自动关联在批内递减合同余额，不会把多笔流水挂满同一合同；人工银行关联校验合同未取消、方向与币种（OUT→采购/CNY，IN→销售/USD）；
  *         发票→采购合同另有硬护栏（累计额≤合同额×1.01、税号冲突排除、早于签约30天以上排除）与仅动自动关联的重配 rematchAutoInvoiceLinks
  * Pos: 财务模块-智能关联业务逻辑层
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
@@ -807,7 +805,9 @@ async function listContractsForMatch(contractType, search = '', purpose = MATCH_
 
 module.exports = {
   MATCH_PURPOSE,
+  maxStringSimilarity,
   loadPurchaseContracts,
+  loadSalesContracts,
   loadPendingBankTxns,
   loadPendingInvoices,
   runAutoMatch,

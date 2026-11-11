@@ -2,8 +2,6 @@
  * Input: planSlices 的页高、总高与断点；collectBreaks 的 DOM（以 data-top 桩出位置）
  * Output: 长表格分页位置的测试结果（C5-05），含「表头不单独成页」
  * Pos: containerExport 的纯函数测试；PDF 光栅输出需浏览器，未覆盖
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it, vi } from "vitest";

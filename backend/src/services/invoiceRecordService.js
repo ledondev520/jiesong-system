@@ -2,8 +2,6 @@
  * Input: Prisma client、InvoiceRecord / FinanceDataBatch 模型
  * Output: 发票查询、统计接口（筛选条件与有效/红冲分类取交集）
  * Pos: 财务模块-发票记录业务逻辑层
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

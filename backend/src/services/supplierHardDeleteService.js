@@ -2,8 +2,6 @@
  * Input: Prisma 事务客户端、供应商ID、预览确认令牌
  * Output: 供应商永久删除的预览（计数、阻断原因、确认令牌）与单事务删除
  * Pos: 仅 ADMIN 路由使用；归档（软停用）仍走 supplierController.remove
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const crypto = require('crypto');
 const config = require('../config');

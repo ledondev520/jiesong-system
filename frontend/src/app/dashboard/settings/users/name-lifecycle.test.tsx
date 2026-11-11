@@ -1,9 +1,7 @@
 /**
  * Input: Both human-user pages, real UserDialog and private migrated loopback API
  * Output: Name-only search/save/reopen/reload, cancellation and genuine failure retry evidence
- * Pos: Account management ordinary-name lifecycle regression; Agent section excluded
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
+ * Pos: Account management ordinary-name lifecycle regression
  */
 import {
   act,
@@ -61,17 +59,6 @@ vi.mock("@/lib/axios", () => ({
       throw new Error("Delete is outside name-only QA");
     },
   },
-}));
-// Row31 loads its Agent section independently. Stop that unrelated call before
-// HTTP rather than reading credentials/Agent tables or supplying business rows.
-vi.mock("@/services/agent.service", () => ({
-  agentService: {
-    getAll: () =>
-      Promise.reject(new Error("Agent section outside name-only QA")),
-  },
-}));
-vi.mock("@/components/dialog/AgentAccountDialog", () => ({
-  AgentAccountDialog: () => null,
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("sonner", () => ({

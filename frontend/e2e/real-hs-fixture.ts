@@ -2,8 +2,6 @@
  * Input: Test-only HS backend, real login/HTTP and private committed-migration SQLite
  * Output: Isolated HS catalogue browser fixture and independent persisted snapshots
  * Pos: Hosted HS checks; no business mocks, provider calls or production data
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync, statSync } from "node:fs";
@@ -11,15 +9,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 
-export type HsRole =
-  "ADMIN" | "PURCHASE" | "FINANCE" | "SALES" | "WAREHOUSE" | "BOSS";
+// OD-8: personas keep old job names; each user holds ADMIN or SALES.
+export type HsRole = "ADMIN" | "PURCHASE" | "FINANCE" | "SALES";
 export interface HsFixture {
   server: ChildProcess;
   directory: string;
   baseURL: string;
   hsCode: string;
   productName: string;
-  users: Record<HsRole, { id: string; username: string }>;
+  users: Record<HsRole, { id: string; username: string; role: string }>;
 }
 export type HsSnapshot = Record<
   string,
@@ -183,7 +181,10 @@ export async function loginHsAs(page: Page, fixture: HsFixture, role: HsRole) {
   const response = await login;
   expect(response.status()).toBe(200);
   const data = (await response.json()).data;
-  expect(data.user).toMatchObject({ id: fixture.users[role].id, role });
+  expect(data.user).toMatchObject({
+    id: fixture.users[role].id,
+    role: fixture.users[role].role,
+  });
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(
     page.getByRole("button", { name: "用户菜单" }).first(),

@@ -2,8 +2,6 @@
  * Input: 报关单状态值
  * Output: 统一状态徽章与状态选项
  * Pos: 报关单管理共享展示组件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { SemanticBadge } from "@/components/ui/status-badge";

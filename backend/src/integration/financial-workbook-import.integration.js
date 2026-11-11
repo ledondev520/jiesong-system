@@ -2,10 +2,9 @@
  * Input: actual authenticated multipart finance routes, synthetic XLSX and committed migrations
  * Output: financial preview/confirmation, HTTP readback and independent SQL/literal amount/source acceptance
  * Pos: isolated financial import regression; no production data, providers or archived workbooks
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -138,8 +137,8 @@ test('HTTP/SQLite: financial workbook imports preserve cached source amounts and
   fs.chmodSync(database, 0o600);
   db = require('../utils/prisma');
   const tokens = {};
-  for (const role of ['FINANCE', 'ADMIN', 'BOSS', 'PURCHASE', 'SALES', 'WAREHOUSE', 'INACTIVE']) {
-    const user = await db.user.create({ data: { username: `synthetic-financial-import-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role: role === 'INACTIVE' ? 'FINANCE' : role, isActive: role !== 'INACTIVE' } });
+  for (const role of ['FINANCE', 'ADMIN', 'SALES', 'INACTIVE']) { // FINANCE persona is stored as ADMIN (OD-8)
+    const user = await db.user.create({ data: { username: `synthetic-financial-import-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role: role === 'INACTIVE' ? 'ADMIN' : dbRole(role), isActive: role !== 'INACTIVE' } });
     tokens[role] = require('jsonwebtoken').sign({ userId: user.id, role: 'ADMIN' }, process.env.JWT_SECRET);
   }
   await db.financialPeriod.create({ data: { year: 2025, month: 12, periodLabel: 'Synthetic unrelated 2025-12', reportDate: new Date('2025-12-31T00:00:00Z'), balanceSheet: { create: { totalAssets: 73, totalLiabilities: 3, totalEquity: 70 } } } });
@@ -381,11 +380,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       assert.equal(stored.rowCount, rowCount);
     }
     assert.deepEqual((await call('GET', '/finance/statements/2026/12', undefined, 200, 'ADMIN')).data, detail);
-    const boss = (await call('GET', '/finance/statements/2026/12', undefined, 200, 'BOSS')).data;
-    assert.equal(boss.incomeStatement.revenueMonth, 800.25);
-    assert.equal(Object.hasOwn(boss, 'accountBalances'), false);
-    assert.equal(Object.hasOwn(boss, 'generalLedgerEntries'), false);
-    assert.equal(Object.hasOwn(boss, 'dataSources'), false);
+    await call('GET', '/finance/statements/2026/12', undefined, 403, 'SALES'); // OD-8: SALES never sees finance
     assert.deepEqual(unrelated(), originalUnrelated);
   });
 
@@ -461,7 +456,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     const before = snapshot();
     for (const mode of ['file', 'bundle']) {
       for (const action of ['preview', 'confirm']) {
-        for (const role of ['BOSS', 'PURCHASE', 'SALES', 'WAREHOUSE', 'INACTIVE', 'ANONYMOUS']) {
+        for (const role of ['SALES', 'INACTIVE', 'ANONYMOUS']) {
           await call('POST', `/finance/statements/import-${mode}/${action}`, mode === 'file' ? fileForm(bytes) : bundleForm(sources), ['INACTIVE', 'ANONYMOUS'].includes(role) ? 401 : 403, role);
         }
       }

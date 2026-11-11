@@ -14,7 +14,6 @@ test('userController: 模块可正常加载并导出', () => {
 
 const prisma = require('../utils/prisma');
 const controller = require('./userController');
-const authService = require('../services/authService');
 
 // 记录事务内调用；existing 为事务内读到的用户当前状态
 const mockTx = (t, existing, { otherAdmins = 1 } = {}) => {
@@ -39,7 +38,7 @@ const run = (handler, req) => new Promise((resolve) => {
 
 test('update: 角色变更递增 sessionVersion 并撤销该用户全部浏览器会话', async (t) => {
   const calls = mockTx(t, { role: 'SALES', isActive: true });
-  const { error } = await run(controller.update, { params: { id: 'u1' }, body: { role: 'FINANCE' }, user: { id: 'admin' } });
+  const { error } = await run(controller.update, { params: { id: 'u1' }, body: { role: 'ADMIN' }, user: { id: 'admin' } });
   assert.equal(error, undefined);
   assert.deepEqual(calls.updates[0].sessionVersion, { increment: 1 });
   assert.deepEqual(calls.revoked, [{ userId: 'u1' }]);
@@ -52,11 +51,22 @@ test('update: 仅改姓名或角色未变时不撤销会话', async (t) => {
   assert.deepEqual(calls.revoked, []);
 });
 
-test('authService.updateUser: 停用与角色变更同样递增版本并撤销会话', async (t) => {
+test('update: 管理员绑定或修改邮箱写入 email/phone，递增 sessionVersion 并撤销浏览器会话', async (t) => {
   const calls = mockTx(t, { role: 'SALES', isActive: true });
-  await authService.updateUser('u1', { isActive: false });
+  const { error } = await run(controller.update, { params: { id: 'u1' }, body: { email: 'synthetic-user@example.test', phone: '+86 000-0000' }, user: { id: 'admin' } });
+  assert.equal(error, undefined);
+  assert.equal(calls.updates[0].email, 'synthetic-user@example.test');
+  assert.equal(calls.updates[0].phone, '+86 000-0000');
   assert.deepEqual(calls.updates[0].sessionVersion, { increment: 1 });
   assert.deepEqual(calls.revoked, [{ userId: 'u1' }]);
+});
+
+test('update: 只改电话不撤销会话', async (t) => {
+  const calls = mockTx(t, { role: 'SALES', isActive: true });
+  await run(controller.update, { params: { id: 'u1' }, body: { phone: '+86 000-0001' }, user: { id: 'admin' } });
+  assert.equal(calls.updates[0].phone, '+86 000-0001');
+  assert.equal(calls.updates[0].sessionVersion, undefined);
+  assert.deepEqual(calls.revoked, []);
 });
 
 test('remove: DELETE 改为软停用并撤销会话，不物理删除', async (t) => {
@@ -81,7 +91,7 @@ test('remove: 不能停用自己，也不能停用最后一个有效 ADMIN', asy
   assert.deepEqual(calls.revoked, []);
 });
 
-test('update/updateUser: 不能经 PUT 降级或停用自己及最后一个有效 ADMIN', async (t) => {
+test('update: 不能经 PUT 降级或停用自己及最后一个有效 ADMIN', async (t) => {
   const self = mockTx(t, { role: 'ADMIN', isActive: true });
   const demoteSelf = await run(controller.update, { params: { id: 'admin' }, body: { role: 'SALES' }, user: { id: 'admin' } });
   assert.equal(demoteSelf.error.statusCode, 400);
@@ -89,7 +99,6 @@ test('update/updateUser: 不能经 PUT 降级或停用自己及最后一个有�
   mockTx(t, { role: 'ADMIN', isActive: true }, { otherAdmins: 0 });
   const last = await run(controller.update, { params: { id: 'u1' }, body: { isActive: false }, user: { id: 'admin' } });
   assert.equal(last.error.statusCode, 400);
-  await assert.rejects(authService.updateUser('u1', { role: 'SALES' }, 'admin'), /最后一个有效管理员/);
   const ok = mockTx(t, { role: 'ADMIN', isActive: true }, { otherAdmins: 1 });
   assert.equal((await run(controller.update, { params: { id: 'u1' }, body: { role: 'SALES' }, user: { id: 'admin' } })).error, undefined);
   assert.equal(ok.updates.length, 1);

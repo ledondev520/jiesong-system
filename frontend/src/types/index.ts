@@ -1,10 +1,7 @@
+// OD-8 (owner, 2026-11-11): two roles only; PURCHASE/FINANCE/WAREHOUSE/BOSS are retired and refused by the backend.
 export enum Role {
   ADMIN = "ADMIN",
-  BOSS = "BOSS",
-  PURCHASE = "PURCHASE",
   SALES = "SALES",
-  FINANCE = "FINANCE",
-  WAREHOUSE = "WAREHOUSE",
 }
 
 export interface User {
@@ -19,46 +16,6 @@ export interface User {
   lastLoginAt?: string; // DateTime string
   createdAt: string;
   updatedAt: string;
-}
-
-interface AgentGrant {
-  id?: string;
-  agentAccountId?: string;
-  agentCredentialId?: string | null;
-  resource: string;
-  action: string;
-  scopeJson?: string | null;
-  createdAt?: string;
-}
-
-interface AgentCredential {
-  id: string;
-  credentialKey: string;
-  label?: string | null;
-  status: string;
-  secretPreview?: string | null;
-  expiresAt?: string | null;
-  lastUsedAt?: string | null;
-  createdAt: string;
-  revokedAt?: string | null;
-}
-
-export interface AgentAccount {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  status: string;
-  defaultMode: string;
-  createdAt: string;
-  updatedAt: string;
-  grants?: AgentGrant[];
-  credentials?: AgentCredential[];
-}
-
-export interface AgentCredentialIssueResult {
-  credential: AgentCredential;
-  token: string;
 }
 
 interface Port {
@@ -219,7 +176,6 @@ export interface HsCodeRecord {
   rcepRatesJson?: string | null;
   basicInfoJson?: string | null;
   taxInfoJson?: string | null;
-  rawPayloadJson?: string | null;
   fetchedAt?: string | null;
   effectiveDate: string;
   /** 模糊检索相似度 0–1（仅部分列表接口返回） */

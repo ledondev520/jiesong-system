@@ -2,8 +2,6 @@
  * Input: Test-only role scenarios, Express child process and private synthetic SQLite
  * Output: Real login/HTTP forwarding plus independent business, document, header and dashboard readback
  * Pos: Shared hosted role-browser fixture; never mocks business responses
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync } from "node:fs";
@@ -11,7 +9,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 
-export type Role = "PURCHASE" | "WAREHOUSE" | "SALES" | "BOSS" | "FINANCE";
+// OD-8: personas keep old job names; each user holds ADMIN or SALES (fixture.users[persona].role).
+export type Role = "PURCHASE" | "WAREHOUSE" | "SALES" | "FINANCE";
 type Scenario =
   | "purchase"
   | "warehouse"
@@ -58,7 +57,7 @@ export interface RoleFixture {
     contractId: string;
     contractNo: string;
   };
-  users: Record<Role, { id: string; username: string }>;
+  users: Record<Role, { id: string; username: string; role: string }>;
 }
 
 export interface ReceiptPoolSnapshot {
@@ -443,7 +442,7 @@ export async function loginAs(page: Page, fixture: RoleFixture, role: Role) {
   const response = await login;
   expect(response.status()).toBe(200);
   const data = (await response.json()).data;
-  expect(data.user.role).toBe(role);
+  expect(data.user.role).toBe(fixture.users[role].role);
   expect(data.user.id).toBe(fixture.users[role].id);
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(

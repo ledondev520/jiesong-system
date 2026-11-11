@@ -3,8 +3,6 @@ import { authFetchInit } from "@/lib/browser-session";
  * Input: Cookie模式内存CSRF、共享 axios 实例、标签认证令牌与可取消文件请求
  * Output: 合同附件 API 与无缓存认证二进制读取，保留后端权限和可读错误
  * Pos: 合同附件服务层，屏蔽采购/出口合同差异
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import api, { type ApiRequestConfig } from "@/lib/axios";

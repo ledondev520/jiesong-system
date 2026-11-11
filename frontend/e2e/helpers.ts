@@ -2,7 +2,6 @@
  * Input: Playwright 页面与业务服务 DTO
  * Output: 合成 API 夹具（含版本化报价配置）、认证会话与页面异常断言
  * Pos: 浏览器验收共用辅助；注册仅申请审核，采购汇总遵循 receipts DTO
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, type Locator, type Page, type Route } from "@playwright/test";
 import { createHash } from "node:crypto";
@@ -331,19 +330,6 @@ export const mockApiRoutes = async (page: Page) => {
     createdAt: now,
     updatedAt: now,
   };
-
-  const containers = [
-    {
-      id: "ct-1",
-      containerNo: "C2026030001",
-      contractNo: "EXP2600001",
-      status: "PENDING",
-      destinationPort: "洛杉矶港",
-      totalBoxes: 20,
-      totalVolume: 32.5,
-      eta: "2026-03-20T00:00:00.000Z",
-    },
-  ];
 
   const payables = [
     {
@@ -1355,11 +1341,6 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
-    if (pathname === "/api/v1/containers" && method === "GET") {
-      await fulfillJson(route, asPaginated(containers));
-      return;
-    }
-
     if (pathname === "/api/v1/purchases/options/next-no" && method === "GET") {
       await fulfillJson(route, { contractNo: "CG2600002" });
       return;
@@ -2368,7 +2349,7 @@ export const mockApiRoutes = async (page: Page) => {
     }
 
     if (
-      /^\/api\/v1\/(purchases|sales|products|suppliers|stores|users|containers)\/[^/]+$/.test(
+      /^\/api\/v1\/(purchases|sales|products|suppliers|stores|users)\/[^/]+$/.test(
         pathname,
       ) &&
       method === "DELETE"

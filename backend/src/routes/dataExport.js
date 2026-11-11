@@ -5,13 +5,12 @@
  *
  * 安全说明：该路由与 system.js 中的 /system/export/:type 指向同一控制器，
  * 已对齐相同的 roleAuth 权限配置，防止绕过 RBAC 直接访问。
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
 const systemController = require('../controllers/systemController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { paymentsExportGuard } = require('../middleware/paymentsExportGuard');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -21,7 +20,7 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/v1/export/:type - 导出数据（权限与 /system/export/:type 对齐，防止 RBAC 旁路）
-router.get('/:type', roleAuth('ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'), paymentsExportGuard, withAuditLog(
+router.get('/:type', roleAuth(ROLE_SETS.ALL), paymentsExportGuard, withAuditLog(
   {
     entity: 'DataExport',
     action: 'EXPORT',

@@ -4,8 +4,6 @@
  * Pos: 库存控制器，处理库存查询、状态变更与批量操作
  * 
  * 2026-01-20 更新：Container已合并到SalesContract
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

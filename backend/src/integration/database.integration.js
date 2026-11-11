@@ -2,8 +2,6 @@
  * Input: Prisma schema、seed 脚本、临时 SQLite 数据库
  * Output: 数据库集成测试结果（schema 可创建、事务可回滚、seed 幂等）
  * Pos: 后端数据库集成测试入口
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');

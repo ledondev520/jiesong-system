@@ -6,7 +6,7 @@
 const prisma = require('./prisma');
 
 const keepStoredPrices = async (role, contractId, input) => {
-  if (role !== 'WAREHOUSE' || !Array.isArray(input?.items)) return input;
+  if (role === 'ADMIN' || !Array.isArray(input?.items)) return input;
   const stored = await prisma.purchaseItem.findMany({ where: { purchaseContractId: contractId }, select: { id: true, productId: true, unitPrice: true } });
   const pool = [...stored];
   const take = (match) => { const i = pool.findIndex(match); return i < 0 ? null : pool.splice(i, 1)[0]; };

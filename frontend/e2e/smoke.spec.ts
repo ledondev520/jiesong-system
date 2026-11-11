@@ -136,9 +136,9 @@ test.describe("关键按钮交互", () => {
     await page.waitForLoadState("domcontentloaded");
     await safeClick(page.getByRole("button", { name: "新建", exact: true }));
     await safeClick(page.getByRole("menuitem", { name: /^新建出口订单/ }));
-    await expect(page).toHaveURL(/\/dashboard\/sales\/create$/);
+    await expect(page).toHaveURL(/\/dashboard\/orders\/new$/);
     await expect(
-      page.getByRole("heading", { name: "创建出口合同" }),
+      page.getByRole("heading", { name: "新建出口订单" }),
     ).toBeVisible();
   });
 

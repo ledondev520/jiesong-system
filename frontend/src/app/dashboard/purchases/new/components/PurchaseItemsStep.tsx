@@ -2,8 +2,6 @@
  * Input: 采购表单、商品目录、价格历史
  * Output: 步骤 1：AI 智能录入与采购明细
  * Pos: 采购合同创建入口（CreatePurchasePageContent 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

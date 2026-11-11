@@ -2,8 +2,6 @@
  * Input: reportsService.getBusinessOverview API 与 URL 已应用发运期间
  * Output: 保留历史期间、区分日期草稿并隔离晚到请求的经营数据报表页面（老板视角）；指标卡统一用 KpiStat，全部应收逾期时给出琥珀色提示
  * Pos: Dashboard > 经营执行，提供公司整体经营状况、资金风险、库存健康度与趋势
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

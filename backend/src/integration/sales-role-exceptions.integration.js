@@ -28,8 +28,8 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
   const jwt = require('jsonwebtoken');
   const config = require('../config');
   const users = {};
-  for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE', 'BOSS', 'INACTIVE']) {
-    const user = await db.user.create({ data: { username: `synthetic-exceptions-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'SALES' : role, isActive: role !== 'INACTIVE' } });
+  for (const role of ['SALES', 'ADMIN', 'PURCHASE', 'WAREHOUSE', 'BOSS', 'INACTIVE']) {
+    const user = await db.user.create({ data: { username: `synthetic-exceptions-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'SALES' : role /* retired roles stored as-is (OD-8) */, isActive: role !== 'INACTIVE' } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id, role: 'ADMIN' }, config.jwt.secret) };
   }
   const product = await db.product.create({ data: { customsName: 'SYNTHETIC SALES EXCEPTION WIDGET', unit: '件' } });
@@ -59,15 +59,15 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
   const cargo = (quantity = 50, productId = product.id) => ({ productId, storeId: store.id, quantity, unit: '件', boxes: 5, grossWeight: 20000, netWeight: 19000, volume: 5, length: 1000, width: 1000, height: 1000, unitPrice: 3 });
 
   await t.test('permission denials use live user identity and leave business rows unchanged', async () => {
-    const purchaseResult = await call('POST', '/purchases', { supplierId: supplier.id, taxRate: 13, items: [{ productId: product.id, quantity: 100, unit: '件', unitPrice: 10 }] }, { role: 'PURCHASE', expected: 201 });
+    const purchaseResult = await call('POST', '/purchases', { supplierId: supplier.id, taxRate: 13, items: [{ productId: product.id, quantity: 100, unit: '件', unitPrice: 10 }] }, { role: 'SALES', expected: 201 });
     const purchase = purchaseResult.contract || purchaseResult;
     const before = await snapshot();
     for (const [method, url, body, role, expected] of [
       ['POST', '/sales', { exchangeRate: 7.2 }, null, 401],
       ['POST', '/sales', { exchangeRate: 7.2 }, 'INACTIVE', 401],
       ['POST', '/sales', { exchangeRate: 7.2 }, 'BOSS', 403],
-      ['POST', `/purchases/${purchase.id}/receipts`, { requestId: 'synthetic-denied-receipt', items: [{ purchaseItemId: purchase.items[0].id, arrivedQuantity: 100 }] }, 'SALES', 403],
-      ['POST', `/purchases/${purchase.id}/receipts/synthetic-receipt/inspection`, { requestId: 'synthetic-denied-inspection', items: [] }, 'SALES', 403],
+      ['POST', `/purchases/${purchase.id}/receipts`, { requestId: 'synthetic-denied-receipt', items: [{ purchaseItemId: purchase.items[0].id, arrivedQuantity: 100 }] }, 'WAREHOUSE', 403],
+      ['POST', `/purchases/${purchase.id}/receipts/synthetic-receipt/inspection`, { requestId: 'synthetic-denied-inspection', items: [] }, 'PURCHASE', 403],
       ['GET', '/finance/statements/evidence/documents', undefined, 'SALES', 403],
       ['GET', '/tax-refunds/workbench/synthetic-sale/preparation', undefined, 'SALES', 403],
       ['POST', '/auth/register', { username: 'synthetic-denied-admin' }, 'SALES', 403],
@@ -84,34 +84,6 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
     }
   });
 
-  await t.test('legacy status endpoint cannot skip shipment, arrival or settlement validation', async () => {
-    for (const status of ['SHIPPED', 'ARRIVED', 'COMPLETED', 'NOT_A_STATUS']) {
-      const sale = await createSale();
-      const before = await snapshot();
-      await call('PUT', `/containers/${sale.id}/status`, { status }, { expected: 400 });
-      assert.deepEqual(await snapshot(), before);
-    }
-  });
-
-  await t.test('legacy header edit cannot bypass state validation or partially save other fields', async () => {
-    const sale = await createSale({ note: 'original synthetic note' });
-    const before = await snapshot();
-    await call('PUT', `/containers/${sale.id}`, { status: 'SHIPPED', note: 'must roll back' }, { expected: 400 });
-    assert.deepEqual(await snapshot(), before);
-    const saved = await call('PUT', `/containers/${sale.id}`, { status: 'draft', note: 'updated synthetic metadata' });
-    assert.equal(saved.status, 'DRAFT');
-    assert.equal(saved.note, 'updated synthetic metadata');
-  });
-
-  await t.test('legacy creation cannot fabricate an already shipped or settled empty contract', async () => {
-    for (const status of ['SHIPPED', 'ARRIVED', 'COMPLETED', 'NOT_A_STATUS']) {
-      const before = await snapshot();
-      await call('POST', '/containers', { portId: port.id, status }, { expected: 400 });
-      assert.deepEqual(await snapshot(), before);
-    }
-    assert.equal((await call('POST', '/containers', { portId: port.id }, { expected: 201 })).status, 'DRAFT');
-  });
-
   await t.test('cancel retry stays cancelled and creation replay never revives it', async () => {
     const payload = { exchangeRate: 7.2, items: [{ productId: product.id, storeId: store.id, quantity: 1, costPrice: 10, sellingPrice: 3 }] };
     const sale = await call('POST', '/sales', payload, { expected: 201, key: 'synthetic-cancel-retry' });
@@ -123,7 +95,7 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
     assert.equal(replay.status, 'CANCELLED');
     assert.equal(replay.idempotentReplay, true);
     await call('POST', '/sales', { ...payload, note: 'changed' }, { expected: 409, key: 'synthetic-cancel-retry' });
-    for (const root of ['sales', 'containers']) {
+    for (const root of ['sales']) {
       for (const status of ['CONFIRMED', 'SHIPPED', 'ARRIVED', 'COMPLETED']) {
         await call('PUT', `/${root}/${sale.id}/status`, { status }, { expected: 400 });
       }
@@ -138,7 +110,7 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
     await call('POST', `/sales/${sale.id}/packing-items`, { ...cargo(1, missingStockProduct.id), grossWeight: 10000 }, { expected: 201 });
     await call('PUT', `/sales/${sale.id}/status`, { status: 'CONFIRMED' });
     const before = await snapshot();
-    for (const root of ['sales', 'containers']) {
+    for (const root of ['sales']) {
       await call('PUT', `/${root}/${sale.id}/status`, { status: 'SHIPPED' }, { expected: 400 });
       assert.deepEqual(await snapshot(), before);
     }
@@ -150,13 +122,13 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
     const a = await createSale(), b = await createSale();
     for (const sale of [a, b]) {
       await call('POST', `/sales/${sale.id}/packing-items`, cargo(60, sharedProduct.id), { expected: 201 });
-      assert.equal((await call('PUT', `/containers/${sale.id}/status`, { status: 'CONFIRMED' })).status, 'PACKING');
+      assert.equal((await call('PUT', `/sales/${sale.id}/status`, { status: 'CONFIRMED' })).status, 'PACKING');
     }
-    const shipped = await call('PUT', `/containers/${a.id}/status`, { status: 'SHIPPED' });
+    const shipped = await call('PUT', `/sales/${a.id}/status`, { status: 'SHIPPED' });
     let before = await snapshot();
     assert.equal(before.inventory.filter(row => row.productId === sharedProduct.id && row.status === 'OUTBOUND').reduce((sum, row) => sum + row.quantity, 0), 60);
     assert.equal(before.inventory.filter(row => row.productId === sharedProduct.id && row.status === 'INBOUND').reduce((sum, row) => sum + row.quantity, 0), 40);
-    for (const root of ['sales', 'containers']) {
+    for (const root of ['sales']) {
       const replay = await call('PUT', `/${root}/${a.id}/status`, { status: 'SHIPPED' });
       assert.equal(replay.shippedAt, shipped.shippedAt);
       assert.deepEqual((await snapshot()).inventory, before.inventory);
@@ -167,23 +139,23 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
     }
     assert.equal((await db.salesContract.findUnique({ where: { id: b.id } })).status, 'PACKING');
     assert.equal((await db.salesContract.findUnique({ where: { id: b.id } })).shippedAt, null);
-    await call('PUT', `/containers/${a.id}`, { status: 'DRAFT', note: 'must not reverse' }, { expected: 400 });
-    const edited = await call('PUT', `/containers/${a.id}`, { status: 'SHIPPED', note: 'permitted synthetic metadata' });
+    // A99: the order header ignores status, so a header edit cannot reverse the shipment.
+    const edited = await call('PUT', `/sales/${a.id}`, { status: 'DRAFT', note: 'permitted synthetic metadata' });
     assert.equal(edited.status, 'SHIPPED');
     assert.deepEqual((await snapshot()).inventory, before.inventory);
-    assert.equal((await call('PUT', `/containers/${a.id}/status`, { status: 'ARRIVED' })).status, 'ARRIVED');
-    for (const root of ['sales', 'containers']) {
+    assert.equal((await call('PUT', `/sales/${a.id}/status`, { status: 'ARRIVED' })).status, 'ARRIVED');
+    for (const root of ['sales']) {
       await call('PUT', `/${root}/${a.id}/status`, { status: 'COMPLETED' }, { expected: 400 });
     }
     assert.deepEqual((await snapshot()).inventory, before.inventory);
     // This records a synthetic internal receipt; no payment provider is contacted.
-    await call('POST', '/finance/payments', { type: 'RECEIVABLE_COLLECTION', salesContractId: a.id, amount: 180, currency: 'USD', paymentDate: '2026-10-01' }, { expected: 201 });
+    await call('POST', '/finance/payments', { type: 'RECEIVABLE_COLLECTION', salesContractId: a.id, amount: 180, currency: 'USD', paymentDate: '2026-10-01' }, { role: 'ADMIN', expected: 201 }); // OD-8: payments are ADMIN only
     assert.equal((await db.salesContract.findUnique({ where: { id: a.id } })).status, 'COMPLETED');
     before = await snapshot();
-    assert.equal((await call('PUT', `/containers/${a.id}/status`, { status: 'COMPLETED' })).status, 'COMPLETED');
+    assert.equal((await call('PUT', `/sales/${a.id}/status`, { status: 'COMPLETED' })).status, 'COMPLETED');
     assert.deepEqual((await snapshot()).inventory, before.inventory);
-    await call('PUT', `/containers/${a.id}/status`, { status: 'SHIPPED' }, { expected: 400 });
-    await call('PUT', `/containers/${a.id}/status`, { status: 'CANCELLED' }, { expected: 400 });
+    await call('PUT', `/sales/${a.id}/status`, { status: 'SHIPPED' }, { expected: 400 });
+    await call('PUT', `/sales/${a.id}/status`, { status: 'CANCELLED' }, { expected: 400 });
   });
 
   await t.test('legacy OUT_STOCK shipment replay preserves the existing allocation and timestamp', async () => {
@@ -196,7 +168,7 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
     // Simulate a persisted pre-normalization alias, keeping real outbound evidence.
     await db.salesContract.update({ where: { id: sale.id }, data: { status: 'OUT_STOCK' } });
     const before = (await snapshot()).inventory;
-    for (const root of ['sales', 'containers']) {
+    for (const root of ['sales']) {
       await db.salesContract.update({ where: { id: sale.id }, data: { status: 'OUT_STOCK' } });
       const replay = await call('PUT', `/${root}/${sale.id}/status`, { status: 'SHIPPED' });
       const actual = (await snapshot()).inventory;
@@ -210,12 +182,12 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
   await t.test('unchanged legacy custom-state metadata stays editable without permitting a transition', async () => {
     const sale = await createSale();
     await db.salesContract.update({ where: { id: sale.id }, data: { status: 'CUSTOM_LEGACY' } });
-    const edited = await call('PUT', `/containers/${sale.id}`, { status: 'custom_legacy', note: 'synthetic historical metadata' });
+    const edited = await call('PUT', `/sales/${sale.id}`, { status: 'custom_legacy', note: 'synthetic historical metadata' });
     assert.equal(edited.status, 'CUSTOM_LEGACY');
     assert.equal(edited.note, 'synthetic historical metadata');
+    assert.equal((await call('PUT', `/sales/${sale.id}`, { status: 'SHIPPED', note: 'header ignores status' })).status, 'CUSTOM_LEGACY');
     const before = await snapshot();
-    await call('PUT', `/containers/${sale.id}`, { status: 'SHIPPED', note: 'must not bypass' }, { expected: 400 });
-    await call('PUT', `/containers/${sale.id}/status`, { status: 'SHIPPED' }, { expected: 400 });
+    await call('PUT', `/sales/${sale.id}/status`, { status: 'SHIPPED' }, { expected: 400 });
     assert.deepEqual(await snapshot(), before);
   });
 
@@ -225,8 +197,8 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
     await db.packingItem.create({ data: { salesContractId: sale.id, ...cargo(50, missingStockProduct.id), totalPrice: 150, isOwnedByJiesong: false, sourceParty: 'Synthetic third-party cargo owner' } });
     await db.salesContract.update({ where: { id: sale.id }, data: { grossWeight: 20000, volume: 5, totalBoxes: 5, totalAmount: 150 } });
     const before = (await snapshot()).inventory;
-    await call('PUT', `/containers/${sale.id}/status`, { status: 'CONFIRMED' });
-    const shipped = await call('PUT', `/containers/${sale.id}/status`, { status: 'SHIPPED' });
+    await call('PUT', `/sales/${sale.id}/status`, { status: 'CONFIRMED' });
+    const shipped = await call('PUT', `/sales/${sale.id}/status`, { status: 'SHIPPED' });
     assert.equal(shipped.status, 'SHIPPED');
     assert.deepEqual((await snapshot()).inventory, before);
     assert.equal((await call('GET', `/sales/${sale.id}`)).hasThirdPartyCargo, true);

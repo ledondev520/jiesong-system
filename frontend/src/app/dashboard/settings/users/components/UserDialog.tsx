@@ -191,16 +191,10 @@ function UserDialogSession({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value={Role.BOSS}>
-                        老板（业务只读）
-                      </SelectItem>
                       <SelectItem value={Role.ADMIN}>
                         管理员 (所有权限)
                       </SelectItem>
-                      <SelectItem value={Role.PURCHASE}>采购人员</SelectItem>
                       <SelectItem value={Role.SALES}>销售人员</SelectItem>
-                      <SelectItem value={Role.FINANCE}>财务人员</SelectItem>
-                      <SelectItem value={Role.WAREHOUSE}>仓库人员</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

@@ -2,8 +2,6 @@
  * Input: 退税材料准备的阻塞文案数组、可选的当前原因筛选
  * Output: 每行一条的阻塞原因 chips（类型 + 计数），原文放在「查看原因」折叠里
  * Pos: 退税工作台待申报清单；分组规则与 BlockerGroups 相同，保证 chips 计数与展开内容一致
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { Badge } from "@/components/ui/badge";
 import { BlockerGroups, groupBlockers } from "./BlockerGroups";

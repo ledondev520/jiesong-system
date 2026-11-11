@@ -2,8 +2,6 @@
  * Input: 缓存文件路径、TTL 配置
  * Output: 内存 + 文件持久化的 AI 结果缓存工具
  * Pos: 工具层，为 AI 推荐接口提供直接返回的缓存，节省 API 成本与等待
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

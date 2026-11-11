@@ -2,8 +2,6 @@
  * Input: Express请求对象
  * Output: JSONL日志输出
  * Pos: 日志中间件，记录所有HTTP请求（含脱敏、耗时、响应状态）
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 /**

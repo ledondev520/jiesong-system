@@ -2,7 +2,6 @@
  * Input: Prisma、客户/门店请求字段
  * Output: 客户与门店字段校验、新门店所属客户解析（DATA-MODEL-2026 §2.4 的 API 规则）
  * Pos: 客户 API 与门店创建共用；校验失败抛 400，不写库
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const prisma = require('../utils/prisma');
 const { createError } = require('../middleware/errorHandler');

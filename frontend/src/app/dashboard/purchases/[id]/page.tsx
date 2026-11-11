@@ -2,8 +2,6 @@
  * Input: 采购合同详情API、购销合同生成服务、系统配置（盖章平台/开票抬头）、RecordHeader、UrlTabs、PurchaseFlowPanel、SortableTableHead、useTableSort
  * Output: 采购合同记录页：头部（单号、5 个事实 chips、唯一主操作、「单证」/「更多」菜单、阻塞条）、四维状态 chips、?tab= 页签（概览/明细/生产/收货验货/付款与发票/附件）
  * Pos: 采购管理子页面，承载「签合同→盖章→付款→生产完工→催票」的单合同主线路；在线盖章与生成购销合同收进「单证」菜单，两者都先确认对外法律文件；取消合同在「更多」里并先确认
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -260,9 +258,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
   const router = useRouter();
   const userRole = useAuthStore((state) => state.user?.role);
   // 与后端供应商银行字段可见角色一致；其余角色拿到的是被剔除的数据，不能显示成「未登记」
-  const canSeeSupplierBank = ["ADMIN", "FINANCE", "PURCHASE", "BOSS"].includes(
-    userRole || "",
-  );
+  const canSeeSupplierBank = userRole === "ADMIN";
   const [loadError, setLoadError] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const { id } = use(params);
@@ -625,11 +621,11 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     totalAmount: contract.totalAmount,
     paidAmount: contract.paidAmount,
   });
-  // OD-2/OD-3：WAREHOUSE 服务端已剥离金额与发票号，页面显示「无权查看」，绝不把缺失值显示成 ¥0
-  const moneyHidden = userRole === "WAREHOUSE";
+  // OD-2/OD-3/OD-8：非 ADMIN 服务端已剥离金额与发票号，页面显示「无权查看」，绝不把缺失值显示成 ¥0
+  const moneyHidden = userRole !== "ADMIN";
   const yuan = (value: number) =>
     moneyHidden ? HIDDEN_MONEY : `¥${value.toLocaleString()}`;
-  // 明细表（UX 润色批）沿用 formatMoney/formatUnitPrice，WAREHOUSE 同样显示「无权查看」
+  // 明细表（UX 润色批）沿用 formatMoney/formatUnitPrice，非 ADMIN 同样显示「无权查看」
   const yuanFmt = (value: number) =>
     moneyHidden ? HIDDEN_MONEY : formatMoney(value, "CNY");
   const yuanUnit = (value: number) =>
@@ -705,24 +701,12 @@ export default function PurchaseDetailPage({ params }: PageProps) {
     },
   ];
 
-  // 「单证」：对外法律文件（盖章、购销合同）仍先确认；老板只读时整组隐藏
-  const canGenerateDoc = ["ADMIN", "PURCHASE", "FINANCE"].includes(
-    userRole || "",
-  );
-  // OD-4：老板只读，但可下载（查看）合同 PDF；生成/盖章仍隐藏
+  // 「单证」：对外法律文件（盖章、购销合同）仍先确认；只读时整组隐藏
+  const canGenerateDoc = userRole === "ADMIN";
   const documentsMenu = readOnly
-    ? userRole === "BOSS"
-      ? [
-          {
-            key: "view",
-            label: "查看合同",
-            onSelect: viewContractPdf,
-            disabled: pdfLoading,
-          },
-        ]
-      : []
+    ? []
     : [
-        // 合同文档含供应商银行信息：SALES/WAREHOUSE 后端 403，不展示入口
+        // 合同文档含供应商银行信息：仅 ADMIN（OD-8），SALES 后端 403，不展示入口
         ...(canGenerateDoc
           ? [
               {
@@ -1285,8 +1269,8 @@ export default function PurchaseDetailPage({ params }: PageProps) {
           description="支持 PDF、JPG、PNG、XLSX、DOCX 格式，单文件最大 10MB，用于归档原始合同或补充文件"
           emptyHint="暂无附件，点击「上传附件」归档合同文件"
           categoryOptions={[
-            // 与后端 fileService.assertFileAccess 一致：合同文书类仅 ADMIN/PURCHASE/FINANCE 可上传
-            ...(["ADMIN", "PURCHASE", "FINANCE"].includes(userRole || "")
+            // 与后端 fileService.assertFileAccess 一致：合同文书类仅 ADMIN 可上传（OD-8）
+            ...(userRole === "ADMIN"
               ? [
                   { value: "SIGNED_CONTRACT" as const, label: "供应商盖章件" },
                   { value: "SUPPLIER_INVOICE" as const, label: "供应商发票" },
@@ -1294,7 +1278,7 @@ export default function PurchaseDetailPage({ params }: PageProps) {
               : []),
             { value: "OTHER", label: "其他附件" },
             // 与后端 assertReceiptPhotoAccess 一致：仅到货角色可补传到货照片
-            ...(["ADMIN", "PURCHASE", "WAREHOUSE"].includes(userRole || "")
+            ...(["ADMIN", "SALES"].includes(userRole || "")
               ? [{ value: "RECEIPT_PHOTO" as const, label: "到货照片" }]
               : []),
           ]}

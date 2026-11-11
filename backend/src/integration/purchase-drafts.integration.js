@@ -31,7 +31,7 @@ test('HTTP/SQLite: generating purchase drafts is per-supplier, DRAFT-only, guard
   const jwt = require('jsonwebtoken');
   const tokens = {};
   for (const role of ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-drafts-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-drafts-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } }); // retired roles stored as-is (OD-8)
     tokens[role] = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
   }
 
@@ -55,7 +55,7 @@ test('HTTP/SQLite: generating purchase drafts is per-supplier, DRAFT-only, guard
   const app = require('../app');
   server = await new Promise((resolve) => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
-  const post = async (orderId, body, role = 'PURCHASE') => {
+  const post = async (orderId, body, role = 'SALES') => {
     const response = await fetch(`${base}/sales/${orderId}/purchase-drafts`, {
       method: 'POST',
       headers: { ...(tokens[role] ? { authorization: `Bearer ${tokens[role]}` } : {}), 'Content-Type': 'application/json' },
@@ -69,7 +69,7 @@ test('HTTP/SQLite: generating purchase drafts is per-supplier, DRAFT-only, guard
 
   // Roles: only ADMIN and PURCHASE may generate; anonymous 401.
   assert.equal((await post(order.id, { lines: valid }, 'ANONYMOUS')).status, 401);
-  for (const role of ['SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']) assert.equal((await post(order.id, { lines: valid }, role)).status, 403, role);
+  for (const role of ['PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) assert.equal((await post(order.id, { lines: valid }, role)).status, 403, role);
 
   // Validation: nothing is written for any rejected request.
   const rejected = [

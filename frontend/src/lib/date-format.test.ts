@@ -2,8 +2,6 @@
  * Input: 日期格式化工具
  * Output: 日期/日期时间格式转换测试（北京时间）
  * Pos: 前端工具函数测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it } from "vitest";

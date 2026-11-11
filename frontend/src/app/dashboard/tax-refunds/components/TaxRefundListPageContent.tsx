@@ -2,8 +2,6 @@
  * Input: 退税服务、URL 查询参数、router
  * Output: 「单证与退税」唯一页面标题；页签 报关单 · 退税工作台 · 退税记录（默认页签按角色，view 显式写入 URL）；退税记录 KPI（可退/已退/进度，本页口径）与列表
  * Pos: 单证与退税主页面（/dashboard/customs）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -87,11 +85,11 @@ export function TaxRefundListPageContent() {
     useBrowserQuery(searchParams.toString()),
   );
   const role = useAuthStore((state) => state.user?.role);
-  // 默认页签按角色：仅财务进退税工作台；管理员和其余角色（销售、单证）进报关单。
-  const defaultView = role === "FINANCE" ? "workbench" : "customs";
+  // 默认进报关单；退税工作台（GET /tax-refunds/workbench）仅 ADMIN（OD-8）。
+  const defaultView = "customs";
   const requestedView = browserQuery.get("view");
   const activeView =
-    requestedView === "workbench" ||
+    (requestedView === "workbench" && role === "ADMIN") ||
     requestedView === "customs" ||
     requestedView === "refunds"
       ? requestedView
@@ -324,9 +322,11 @@ export function TaxRefundListPageContent() {
           <TabsTrigger value="customs" variant="line">
             报关单
           </TabsTrigger>
-          <TabsTrigger value="workbench" variant="line">
-            退税工作台
-          </TabsTrigger>
+          {role === "ADMIN" && (
+            <TabsTrigger value="workbench" variant="line">
+              退税工作台
+            </TabsTrigger>
+          )}
           <TabsTrigger value="refunds" variant="line">
             退税记录
           </TabsTrigger>

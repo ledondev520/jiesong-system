@@ -2,8 +2,6 @@
  * Input: Isolated committed-migration role fixture and ordinary sales header HTTP routes
  * Output: Header save/readback and rejected-save/explicit-retry conservation checks
  * Pos: Synthetic SALES fixture acceptance; no browser, production or payment/shipment execution
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -158,8 +156,9 @@ test('sales header HTTP: ordinary supplement preserves cargo/amount facts and in
     assert.equal(response.body.data.signedAt, '2026-10-03T00:00:00.000Z');
     assert.equal(response.body.data.estimatedArrival, '2026-11-03T00:00:00.000Z');
     assert.equal(response.body.data.packingItems[0].id, before.packing_items[0].id);
-    assert.equal(response.body.data.totalAmount, 20);
-    assert.equal(response.body.data.receivedAmount, 5);
+    // OD-7/OD-8: the SALES reader gets no contract total or received amount; the snapshot below keeps 20/5 unchanged.
+    assert.equal('totalAmount' in response.body.data, false);
+    assert.equal('receivedAmount' in response.body.data, false);
     assert.deepEqual(f.snapshot(), after);
   }
 });

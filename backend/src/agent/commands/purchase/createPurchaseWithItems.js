@@ -1,7 +1,7 @@
 /**
  * Input: 采购合同头信息 + 明细列表
  * Output: 原子化创建后的完整采购合同；删除草稿不使自动编号重复，竞争冲突整笔重试
- * Pos: Agent 命令层采购录入能力，供 HTTP / CLI / MCP 复用
+ * Pos: Agent 命令层采购录入能力，供 HTTP 与 AI 助手复用
  */
 
 const prisma = require('../../../utils/prisma');

@@ -2,8 +2,6 @@
  * Input: Real Express/auth, committed migrations and independently seeded synthetic SQLite
  * Output: Dashboard KPI/funds, historical risk/task, trace and current-role destination evidence
  * Pos: Workbench read acceptance; no reports, browser, production or provider requests
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -62,13 +60,14 @@ async function dashboardFixture(t) {
     return { status: response.status, body: await response.json(), limit: response.headers.get('x-ratelimit-limit') };
   };
   const tokens = {};
-  for (const role of ['PURCHASE', 'BOSS']) {
+  // OD-8: PURCHASE persona signs in as SALES, FINANCE persona as ADMIN.
+  for (const role of ['PURCHASE', 'FINANCE']) {
     const login = await call('/auth/login', undefined, {
       username: f.users[role].username, password: 'test-only-role-browser-password-never-production',
     });
     assert.equal(login.status, 200);
     assert.equal(login.limit, '10');
-    assert.equal(login.body.data.user.role, role);
+    assert.equal(login.body.data.user.role, f.users[role].role);
     assert.equal(login.body.data.user.id, f.users[role].id);
     tokens[role] = login.body.data.token;
   }
@@ -94,7 +93,7 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
   /**
    * 职责：以指定当前角色读取成功业务响应。
    * @param route 只读业务路由
-   * @param role 当前 PURCHASE 或 BOSS 用户
+   * @param role 当前 PURCHASE（SALES）或 FINANCE（ADMIN）人物
    * @returns 真实 API data
    * @throws 身份、HTTP 或业务响应失败
    */
@@ -113,7 +112,11 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       [['IN_STOCK', 8], ['OUT_STOCK', 4], ['PRODUCING', 20]].sort());
     assert.equal(before.sales_contracts.find(row => row.id === 'dashboard-old-risk').amountSource, 'DERIVED');
     assert.equal(before.sales_contracts.find(row => row.id === 'dashboard-packing-only').amountSource, 'FORMAL_DOCUMENT');
-    for (const role of ['PURCHASE', 'BOSS']) {
+    // OD-8: analytics and statements are ADMIN only; the SALES persona is refused both.
+    for (const route of ['/dashboard/analytics', '/finance/statements']) {
+      assert.equal((await f.call(route, f.tokens.PURCHASE)).status, 403);
+    }
+    for (const role of ['FINANCE']) {
       const data = await read('/dashboard/analytics', role);
       // The overloaded draft has complete positive header inputs; only the empty confirmed contract needs inputs.
       assert.deepEqual(data.alerts, { draftPurchases: 2, exportPendingParams: 1 });
@@ -123,11 +126,6 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       assert.equal(data.contracts.sales.receivable, 750);
       // Payables count only in-effect contracts (decision 12): drafts and cancelled excluded; SIGNED 300-100 = 200, COMPLETED 0.
       assert.equal(data.contracts.purchase.unpaidAmount, 200);
-      // B60: statements are ADMIN/FINANCE/BOSS only, so PURCHASE is refused.
-      if (role === 'PURCHASE') {
-        assert.equal((await f.call('/finance/statements', f.tokens[role])).status, 403);
-        continue;
-      }
       const periods = await read('/finance/statements', role);
       // The API lists periods ascending; the mounted workbench must choose max year/month, not its first row.
       assert.deepEqual(periods.map(row => [row.year, row.month, row.periodLabel]),
@@ -188,10 +186,10 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
       assert.equal((await f.call(route)).status, 401);
     }
     assert.equal((await f.call('/dashboard/trade-workflows?scope=unknown', f.tokens.PURCHASE)).status, 400);
-    for (const role of ['PURCHASE', 'BOSS']) {
+    for (const role of ['PURCHASE', 'FINANCE']) {
       const current = await read('/auth/me', role);
       assert.equal(current.id, f.users[role].id);
-      assert.equal(current.role, role);
+      assert.equal(current.role, f.users[role].role);
       const recent = await read('/dashboard/trade-workflows?limit=6&scope=recent', role);
       const action = recent[0].nextAction;
       assert.equal(action.href, `/dashboard/purchases/${f.purchaseId}`);

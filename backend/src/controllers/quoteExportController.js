@@ -1,7 +1,7 @@
 /**
  * Input: authenticated GET requests for a quote's generated documents
  * Output: the workbook / HTML written straight to the response; no file is stored (generated documents are Restricted)
- * Pos: thin controller over quoteExportService.js; BOSS is excluded by roleAuth and by the bossReadOnly whitelist
+ * Pos: thin controller over quoteExportService.js
  */
 const quoteExportService = require('../services/quoteExportService');
 

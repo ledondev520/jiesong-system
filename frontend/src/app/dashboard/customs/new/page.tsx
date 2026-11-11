@@ -2,8 +2,6 @@
  * Input: customsDeclarationService、router、toast
  * Output: 新建报关单页面
  * Pos: 报关单管理创建入口
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

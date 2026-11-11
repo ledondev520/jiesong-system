@@ -2,8 +2,6 @@
  * Input: 前端常量配置
  * Output: 常量配置单元测试
  * Pos: 前端配置常量测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, it, expect } from "vitest";

@@ -2,8 +2,6 @@
  * Input: value（当前每页条数）、onChange（变更回调）、options（可选条数列表）
  * Output: 每页条数选择器组件
  * Pos: 通用UI组件，用于所有有分页的列表页面
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import {
@@ -12,7 +10,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 
 interface PageSizeSelectProps {
   /** 当前每页条数 */
@@ -36,10 +34,7 @@ export function PageSizeSelect({
   options = [20, 50, 100],
 }: PageSizeSelectProps) {
   return (
-    <Select
-      value={String(value)}
-      onValueChange={(v) => onChange(Number(v))}
-    >
+    <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
       <SelectTrigger className="h-8 w-[130px] text-xs">
         <SelectValue />
       </SelectTrigger>

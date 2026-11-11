@@ -2,7 +2,6 @@
  * Input: 合成 API 夹具与手机、平板、桌面视口（320/390/430 三个手机视口遍历在 mobile-<宽度>.spec.ts）
  * Output: 页面可达、设置菜单精确命名与收起、账簿滚动及核心交互验收
  * Pos: Playwright 移动端回归，保持运行时异常与整页宽度检查
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, test } from "@playwright/test";
 import { mockApiRoutes, signInAsAdmin } from "./helpers";
@@ -91,42 +90,6 @@ test.describe("手机核心操作", () => {
     await page.getByRole("button", { name: "更多", exact: true }).click();
     await page.getByRole("button", { name: "退出登录", exact: true }).click();
     await expect(page).toHaveURL(/\/login$/);
-  });
-
-  test("出口两步表单、日期选择、必填校验与装箱编辑", async ({ page }) => {
-    await signInAsAdmin(page, "/dashboard/sales/create");
-    await page.getByRole("button", { name: "签订日期", exact: true }).click();
-    await expect(page.locator('[data-slot="popover-content"]')).toBeVisible();
-    await expectFitsViewport(page);
-    await page.keyboard.press("Escape");
-    await page
-      .getByRole("button", { name: "下一步：出口明细", exact: true })
-      .click();
-    await expect(
-      page.getByRole("button", { name: "创建合同", exact: true }),
-    ).toBeVisible();
-    await expectFitsViewport(page);
-    await page.getByRole("button", { name: "创建合同", exact: true }).click();
-    await expect(
-      page.getByText("请选择商品", { exact: true }).last(),
-    ).toBeVisible();
-    await page.goto("/dashboard/sales/sc-001?tab=container");
-    await page
-      .getByRole("button", { name: "编辑 不锈钢门", exact: true })
-      .click();
-    const dialog = page.getByRole("dialog");
-    await expect(
-      dialog.getByRole("button", { name: "保存", exact: true }),
-    ).toBeVisible();
-    await dialog
-      .getByRole("button", { name: "保存", exact: true })
-      .scrollIntoViewIfNeeded();
-    await expectFitsViewport(page);
-    await dialog.getByRole("button", { name: "取消", exact: true }).click();
-    for (const name of ["明细", "单证", "收款", "货柜"]) {
-      await page.getByRole("tab", { name, exact: true }).click();
-      await expectFitsViewport(page);
-    }
   });
 
   test("采购供应商选择与手机档案定位", async ({ page }) => {

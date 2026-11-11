@@ -2,8 +2,6 @@
  * Input: 实时库存服务、采购合同店铺汇总、共享列表URL状态、SortableTableHead、useServerSort
  * Output: 支持当前筛选刷新、窄屏操作与长名称显示的库存状态管理 Tab 组件（店铺筛选、单条/批量状态流转（需确认）、桌面表列排序；入库日期列、无合同来源时隐藏采购合同列、可用库存口径说明；采购/验货来源库存自动流转）
  * Pos: 库存页（/dashboard/inventory）主体
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

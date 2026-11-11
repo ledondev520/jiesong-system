@@ -2,13 +2,12 @@
  * Input: 用户控制器
  * Output: 用户管理路由
  * Pos: 用户路由，处理用户CRUD
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
 const userController = require('../controllers/userController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, passwordRule, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -16,7 +15,7 @@ const router = Router();
 
 // 所有用户路由需要认证且仅管理员可访问
 router.use(authenticate);
-router.use(roleAuth('ADMIN'));
+router.use(roleAuth(ROLE_SETS.ADMIN));
 
 // GET /api/v1/users - 获取用户列表
 router.get('/', withPaginationValidation, userController.list);

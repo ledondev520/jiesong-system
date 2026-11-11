@@ -2,8 +2,6 @@
  * Input: Prisma客户端、JWT、bcrypt
  * Output: 认证相关业务逻辑（版本化登录会话、注册、统一密码管理、邮箱找回密码）
  * Pos: 认证服务，处理用户认证和授权逻辑
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const bcrypt = require('bcrypt');
@@ -14,7 +12,7 @@ const { ROLES } = require('../config/constants');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
 const { assertPassword } = require('../utils/passwordPolicy');
-const { shouldRevokeSessions, revokeBrowserSessions, assertAdminKept } = require('../utils/userSessionRevocation');
+const { revokeBrowserSessions } = require('../utils/userSessionRevocation');
 
 /**
  * 职责：用户登录验证并生成Token
@@ -223,50 +221,6 @@ const getUsers = async (page = 1, pageSize = 20) => {
   return { users, total };
 };
 
-/**
- * 职责：更新用户信息
- * @param {string} id - 用户ID
- * @param {Object} userData - 更新数据
- * @returns {Object} 更新后的用户
- */
-const updateUser = async (id, userData, actorId) => {
-  const { name, role, email, phone, isActive } = userData;
-  if (role !== undefined && !Object.values(ROLES).includes(role)) throw createError('角色无效', 400);
-  
-  const user = await prisma.$transaction(async (tx) => {
-    const existing = await tx.user.findUnique({ where: { id }, select: { role: true, isActive: true } });
-    if (!existing) throw createError('用户不存在', 404);
-    await assertAdminKept(tx, id, existing, { role, isActive }, actorId);
-    const revoke = shouldRevokeSessions(existing, { role, isActive });
-    const updated = await tx.user.update({
-      where: { id },
-      data: {
-        name,
-        role,
-        email,
-        phone,
-        isActive,
-        ...(email !== undefined || revoke ? { sessionVersion: { increment: 1 } } : {}),
-      },
-      select: {
-        id: true,
-        username: true,
-        name: true,
-        role: true,
-        email: true,
-        phone: true,
-        isActive: true,
-        createdAt: true,
-      },
-    });
-    if (revoke) await revokeBrowserSessions(tx, id);
-    return updated;
-  });
-  
-  clearAuthCache(id);
-  return user;
-};
-
 /** 邮箱持有验证、验证码消费及会话撤销在同一事务中完成。 */
 const verifyAndResetPassword = (payload) => require('./passwordResetService').resetPassword(payload);
 
@@ -277,6 +231,5 @@ module.exports = {
   getUserById,
   changePassword,
   getUsers,
-  updateUser,
   verifyAndResetPassword,
 };

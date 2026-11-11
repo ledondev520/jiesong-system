@@ -2,8 +2,6 @@
  * Input: 合同状态 status 与后端派生的 subStatus（付款/到货/生产资料）
  * Output: 紧挨主状态的子状态徽章，让「已完成」不再冒充已付清或已到货
  * Pos: 采购列表、采购详情、应付列表、订单采购页共用；只做语义文案，沿用 SemanticBadge 色调，不新增样式；到货徽章的「0/2」带 title「已到货数量 / 订购数量」
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { SemanticBadge } from "@/components/ui/status-badge";
 import type { PurchaseSubStatus as SubStatus } from "@/types";

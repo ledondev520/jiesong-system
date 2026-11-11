@@ -2,7 +2,6 @@
  * Input: 合成 XLS/XLSX multipart、畸形文件名及模拟认证/服务
  * Output: 采购内存上传兼容性、鉴权顺序、限制及四类上传路由的 NUL 输入400回归
  * Pos: localhost HTTP 上传边界测试；仅 os.tmpdir()，无真实数据库
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -65,7 +64,7 @@ test('purchase imports use memory and all representative upload routes reject NU
     assert.equal((await send(name)).status, 200, name);
   }
   assert.equal((await send('synthetic.xls', xlsx.write(book, { type: 'buffer', bookType: 'biff8' }))).status, 200);
-  for (const role of ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE']) {
+  for (const role of ['ADMIN', 'SALES']) {
     assert.equal((await send('synthetic.xlsx', bytes, role, true)).status, 200);
     assert.deepEqual(seen.at(-1).options, { historical: true });
   }
@@ -74,7 +73,7 @@ test('purchase imports use memory and all representative upload routes reject NU
   assert.equal((await send('large.xlsx', Buffer.alloc(64 * 1024 + 1))).status, 400);
   // An otherwise invalid upload must still authenticate/authorize before parsing.
   assert.equal((await send('bad.pdf', bytes, 'anonymous')).status, 401);
-  assert.equal((await send('bad.pdf', bytes, 'BOSS')).status, 403);
+  assert.equal((await send('bad.pdf', bytes, 'WAREHOUSE')).status, 403); // retired role (OD-8)
   assert.equal(seen.length, accepted);
 
   // Construct raw headers to ensure NUL bytes really reach Busboy unchanged.

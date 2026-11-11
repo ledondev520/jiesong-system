@@ -2,8 +2,6 @@
  * Input: 出货汇总CSV文件
  * Output: 清洗后的数据导入SQLite数据库
  * Pos: 数据导入脚本，一次性历史数据迁移工具
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

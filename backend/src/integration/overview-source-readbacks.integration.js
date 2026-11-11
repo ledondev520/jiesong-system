@@ -2,10 +2,9 @@
  * Input: actual Express read routes and committed migrations with private synthetic SQLite
  * Output: three source-backed shipping margin/cash, current finance and payment-trend read cases
  * Pos: ordinary overview acceptance; no uploads, production data, providers or business writes
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -14,7 +13,7 @@ const { execFileSync } = require('node:child_process');
 
 const NOW = Date.parse('2026-10-06T12:00:00Z');
 const PAYMENT_DATE = Date.parse('2026-10-01T12:00:00Z');
-const ROLES = ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE', 'WAREHOUSE'];
+const ROLES = ['ADMIN', 'FINANCE', 'SALES']; // FINANCE persona is stored as ADMIN (OD-8)
 // Verified with CI Node 20.19.0; Date/object-form mock timers require at least 20.11.
 // Also requires Python 3 sqlite3 and the existing installed Prisma client.
 
@@ -121,7 +120,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     { id: 'old-income', type: 'INCOME', amount: 9999, currency: 'USD', paymentDate: Date.parse('2026-06-01T12:00:00Z') },
   ];
   seed({
-    users: ROLES.map(role => ({ id: `user-${role}`, username: `synthetic-overview-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role, createdAt: NOW, updatedAt: NOW })),
+    users: ROLES.map(role => ({ id: `user-${role}`, username: `synthetic-overview-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role: dbRole(role), createdAt: NOW, updatedAt: NOW })),
     suppliers: [{ id: 'supplier-source', name: 'Synthetic Source Supplier', createdAt: NOW, updatedAt: NOW }],
     products: [{ id: 'product-source', customsName: 'Synthetic Source Widget', unit: '件', createdAt: NOW, updatedAt: NOW }],
     purchase_contracts: purchases.map(row => ({ ...row, createdAt: NOW, updatedAt: NOW })),
@@ -168,7 +167,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
   await t.test('Shanghai shipped-day margin and cash keep literal ownership/cost sources and the same sales drilldown', async () => {
     const before = snapshot();
     const period = { startDate: '2026-10-01', endDate: '2026-10-01' };
-    const report = await get('/reports/business-overview', period, 'BOSS');
+    const report = await get('/reports/business-overview', period, 'FINANCE');
     assert.deepEqual(report.period, { ...period, dateField: 'shippedAt' });
     assert.deepEqual(project(report.overview, ['currency', 'contractCount', 'totalSales', 'totalPurchases', 'grossProfit', 'profitMargin', 'marginReady', 'cashReady', 'netCashCny', 'unavailableContracts']), {
       currency: 'CNY', contractCount: 2, totalSales: 900, totalPurchases: 700,
@@ -186,7 +185,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     // One active source product has the default zero alert threshold; no stock rows exist.
     // D and X are the two SHIPPED headers; ARRIVED/draft/cancelled headers are not in transit.
     assert.deepEqual(report.inventory, { totalItems: 1, inTransitContainers: 2, lowStockItems: 0 });
-    const detail = await get('/sales', { shipped: 'true', shippedFrom: '2026-10-01', shippedTo: '2026-10-01', pageSize: 100 }, 'BOSS');
+    const detail = await get('/sales', { shipped: 'true', shippedFrom: '2026-10-01', shippedTo: '2026-10-01', pageSize: 100 }, 'FINANCE');
     assert.deepEqual(detail.items.map(row => row.id), ['sale-formal', 'sale-derived']);
     assert.equal(detail.pagination.total, 2);
     for (const row of detail.items) {
@@ -194,7 +193,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       assert.deepEqual(project(row, ['id', 'contractNo', 'totalAmount', 'receivedAmount', 'amountSource', 'exchangeRate', 'status']), project(stored, ['id', 'contractNo', 'totalAmount', 'receivedAmount', 'amountSource', 'exchangeRate', 'status']));
       assert.equal(row.shippedAt, new Date(stored.shippedAt).toISOString());
     }
-    const nextDay = await get('/reports/business-overview', { startDate: '2026-10-02', endDate: '2026-10-02' }, 'BOSS');
+    const nextDay = await get('/reports/business-overview', { startDate: '2026-10-02', endDate: '2026-10-02' }, 'FINANCE');
     assert.deepEqual(project(nextDay.overview, ['contractCount', 'totalSales', 'totalPurchases', 'grossProfit', 'netCashCny']), {
       contractCount: 1, totalSales: 90, totalPurchases: 20, grossProfit: 70, netCashCny: -4,
     });
@@ -216,9 +215,9 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     };
     // D contributes 60/50 (own receipts, clamped to owned total, not scaled by 60/100); F keeps formal 60/30 despite its third-party 40;
     // next-day 10 and draft 20 remain current receivables, cancelled rows do not.
-    for (const role of ROLES.filter(role => role !== 'WAREHOUSE')) assert.deepEqual(await get('/finance/stats', {}, role), expected);
-    await get('/finance/stats', {}, 'WAREHOUSE', 403);
-    const receivables = await get('/finance/receivables', { pageSize: 100 }, 'BOSS');
+    for (const role of ROLES.filter(role => role !== 'SALES')) assert.deepEqual(await get('/finance/stats', {}, role), expected);
+    await get('/finance/stats', {}, 'SALES', 403);
+    const receivables = await get('/finance/receivables', { pageSize: 100 }, 'FINANCE');
     assert.deepEqual(receivables.items.map(row => project(row, ['id', 'totalAmount', 'receivedAmount', 'unreceiveAmount'])), [
       { id: 'sale-draft', totalAmount: 20, receivedAmount: 0, unreceiveAmount: 20 },
       { id: 'sale-next-day', totalAmount: 10, receivedAmount: 0, unreceiveAmount: 10 },
@@ -226,7 +225,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       { id: 'sale-derived', totalAmount: 60, receivedAmount: 50, unreceiveAmount: 10 },
     ]);
     assert.equal(receivables.pagination.total, 4);
-    const payables = await get('/finance/payables', { pageSize: 100 }, 'BOSS');
+    const payables = await get('/finance/payables', { pageSize: 100 }, 'FINANCE');
     assert.deepEqual(payables.items.map(row => project(row, ['id', 'totalAmount', 'paidAmount', 'unpaidAmount'])), [
       { id: 'purchase-current', totalAmount: 1000, paidAmount: 200, unpaidAmount: 800 },
     ]);
@@ -239,10 +238,10 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     const thirty = [{ label: '9/28', receivables: 45, payables: 200 }];
     const ninety = [{ label: '8/17', receivables: 11, payables: 7 }, ...thirty];
     assert.equal(new Date().toISOString(), '2026-10-06T12:00:00.000Z');
-    assert.deepEqual(await get('/finance/payment-trends', { days: 30 }, 'BOSS'), thirty);
+    assert.deepEqual(await get('/finance/payment-trends', { days: 30 }, 'FINANCE'), thirty);
     assert.deepEqual(await get('/finance/payment-trends', { days: 90 }, 'FINANCE'), ninety);
     assert.deepEqual(await get('/finance/payment-trends', {}, 'ADMIN'), ninety);
-    assert.deepEqual(await get('/finance/payment-trends', { days: 30 }, 'SALES'), thirty);
+    await get('/finance/payment-trends', { days: 30 }, 'SALES', 403); // OD-8
     await get('/finance/payment-trends', { days: 31 }, 'FINANCE', 400);
     await get('/finance/payment-trends', { days: 30 }, 'ANONYMOUS', 401);
     assert.deepEqual(snapshot(), before, 'trends must not create allocations, update balances or change decoy rows');

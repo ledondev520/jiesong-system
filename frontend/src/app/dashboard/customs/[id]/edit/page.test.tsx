@@ -2,8 +2,6 @@
  * Input: 编辑报关单页、customsDeclarationService、router、toast
  * Output: 真实字段回填与保留明细身份测试
  * Pos: 报关单管理编辑页测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

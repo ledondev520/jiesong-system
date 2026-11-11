@@ -2,8 +2,6 @@
  * Input: multer库、配置
  * Output: 文件上传中间件；磁盘上传写流前校验并保护可信根下的日期目录，非法格式返回客户端错误
  * Pos: 文件上传工具，处理合同文件等上传；附件下载/删除路径统一经 resolveContainedUploadPath 做 realpath 包含校验
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const multer = require('multer');

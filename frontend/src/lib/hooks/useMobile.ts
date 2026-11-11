@@ -2,20 +2,18 @@
  * Input: 浏览器窗口尺寸
  * Output: 当前视口是否为移动端（< 768px）的布尔值
  * Pos: 工具 hook，用于条件渲染移动端/桌面端差异化布局
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from "react";
 
 const MOBILE_BREAKPOINT = 768;
 
 const getMobileSnapshot = () => {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
 
-  if (typeof window.matchMedia === 'function') {
+  if (typeof window.matchMedia === "function") {
     return window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`).matches;
   }
 
@@ -23,20 +21,20 @@ const getMobileSnapshot = () => {
 };
 
 const subscribeToMobileChanges = (onStoreChange: () => void) => {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return () => {};
   }
 
-  if (typeof window.matchMedia !== 'function') {
+  if (typeof window.matchMedia !== "function") {
     const resizeHandler = () => onStoreChange();
-    window.addEventListener('resize', resizeHandler);
-    return () => window.removeEventListener('resize', resizeHandler);
+    window.addEventListener("resize", resizeHandler);
+    return () => window.removeEventListener("resize", resizeHandler);
   }
 
   const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
   const handler = () => onStoreChange();
-  mql.addEventListener('change', handler);
-  return () => mql.removeEventListener('change', handler);
+  mql.addEventListener("change", handler);
+  return () => mql.removeEventListener("change", handler);
 };
 
 /**
@@ -48,5 +46,9 @@ const subscribeToMobileChanges = (onStoreChange: () => void) => {
  * @returns boolean - true 表示当前为移动端视口（< 768px）
  */
 export function useMobile(): boolean {
-  return useSyncExternalStore(subscribeToMobileChanges, getMobileSnapshot, () => false);
+  return useSyncExternalStore(
+    subscribeToMobileChanges,
+    getMobileSnapshot,
+    () => false,
+  );
 }

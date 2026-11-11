@@ -2,8 +2,6 @@
  * Input: Hosted library fixture, real login/Express and independent private SQLite reads
  * Output: Fixture-contract proof for current ADMIN/FINANCE login and source detail
  * Pos: Browser-independent verification of the exact hosted financial library backend
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -44,7 +42,7 @@ test('financial library hosted fixture: real ADMIN/FINANCE login reads the actua
     assert.equal(login.status, 200);
     const identity = (await login.json()).data;
     assert.equal(identity.user.id, fixture.users[role].id);
-    assert.equal(identity.user.role, role);
+    assert.equal(identity.user.role, fixture.users[role].role);
     const before = readDatabase(directory);
     const response = await fetch(`${fixture.baseURL}/api/v1/finance/statements/evidence/documents/${fixture.documents.GENERAL_LEDGER}`, { headers: { authorization: `Bearer ${identity.token}` } });
     assert.equal(response.status, 200);

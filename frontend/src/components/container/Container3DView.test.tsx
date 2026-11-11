@@ -2,8 +2,6 @@
  * Input: Container3DView组件、后端装柜计划夹具（Canvas/drei 以替身渲染）
  * Output: 3D装箱统计渲染、每块一个 instancedMesh、估算标注与多柜切换测试结果
  * Pos: 容器可视化组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

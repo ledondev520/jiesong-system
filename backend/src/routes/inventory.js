@@ -2,13 +2,12 @@
  * Input: 库存控制器
  * Output: 库存管理路由
  * Pos: 库存路由，处理库存查询和状态变更
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
 const inventoryController = require('../controllers/inventoryController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -35,7 +34,7 @@ router.get('/product/:productId', inventoryController.getByProduct);
 router.get('/contract/:contractId', inventoryController.getByContract);
 
 // PUT /api/v1/inventory/batch-status - 批量更新库存状态（静态路由优先）
-router.put('/batch-status', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/batch-status', roleAuth(ROLE_SETS.ALL), withAuditLog(
   {
     entity: 'Inventory',
     action: 'BATCH_UPDATE',
@@ -54,13 +53,13 @@ router.put('/batch-status', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'W
 router.get('/:id', withIdValidation, inventoryController.getById);
 
 // PUT /api/v1/inventory/:id/status - 更新库存状态
-router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id/status', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'Inventory', action: 'UPDATE', model: 'inventory' },
   inventoryController.updateStatus
 ));
 
 // POST /api/v1/inventory/:id/location - 登记/修改批次号与库位（A83；仅仓储相关角色）
-router.post('/:id/location', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'WAREHOUSE'), withAuditLog(
+router.post('/:id/location', withIdValidation, roleAuth('ADMIN', 'SALES'), withAuditLog(
   { entity: 'Inventory', action: 'UPDATE_LOCATION', model: 'inventory', captureBefore: true, captureAfter: true },
   inventoryController.updateLocation
 ));

@@ -2,13 +2,12 @@
  * Input: 门店控制器
  * Output: 门店管理路由
  * Pos: 门店路由，处理门店CRUD操作
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
 const storeController = require('../controllers/storeController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -26,19 +25,19 @@ router.get('/:id', withIdValidation, storeController.getById);
 router.post('/', [
   body('name').notEmpty().withMessage('门店名称不能为空'),
   body('portId').notEmpty().withMessage('港口ID不能为空'),
-], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+], roleAuth(ROLE_SETS.ALL), handleValidation, withAuditLog(
   { entity: 'Store', action: 'CREATE', model: 'store' },
   storeController.create
 ));
 
 // PUT /api/v1/stores/:id - 更新门店
-router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'Store', action: 'UPDATE', model: 'store' },
   storeController.update
 ));
 
 // DELETE /api/v1/stores/:id - 删除门店
-router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'Store', action: 'DELETE', model: 'store' },
   storeController.remove
 ));

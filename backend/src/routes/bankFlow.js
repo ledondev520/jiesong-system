@@ -2,21 +2,20 @@
  * Input: bankFlowController、auth middleware
  * Output: 银行流水与发票查询路由
  * Pos: 财务模块-银行流水/发票 REST 路由
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
 const ctrl = require('../controllers/bankFlowController');
 const importCtrl = require('../controllers/financeImportController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withPaginationValidation } = require('../utils/validators');
 
 const router = Router();
 
 router.use(authenticate);
-// 银行流水与发票为 Restricted：读仅 ADMIN/FINANCE/BOSS（BOSS 写入由 bossReadOnly 拒绝），导入仅 ADMIN/FINANCE
-router.use(roleAuth('ADMIN', 'FINANCE', 'BOSS'));
+// 银行流水与发票为 Restricted：读写仅 ADMIN（OD-8）
+router.use(roleAuth(ROLE_SETS.ADMIN));
 
 // GET /api/v1/bank-flow/transactions
 router.get('/transactions', withPaginationValidation, ctrl.listTransactions);
@@ -46,15 +45,15 @@ router.get('/reconciliation/full', ctrl.getFullReconciliation);
 router.get('/incoming-summary', ctrl.getIncomingSummary);
 
 // POST /api/v1/bank-flow/import/preview — 预览银行对账单
-router.post('/import/preview', roleAuth('ADMIN', 'FINANCE'), importCtrl.upload.single('file'), importCtrl.previewBankFlow);
+router.post('/import/preview', roleAuth(ROLE_SETS.ADMIN), importCtrl.upload.single('file'), importCtrl.previewBankFlow);
 
 // POST /api/v1/bank-flow/import — 导入银行对账单
-router.post('/import', roleAuth('ADMIN', 'FINANCE'), importCtrl.upload.single('file'), importCtrl.importBankFlow);
+router.post('/import', roleAuth(ROLE_SETS.ADMIN), importCtrl.upload.single('file'), importCtrl.importBankFlow);
 
 // POST /api/v1/bank-flow/invoices/import/preview — 预览发票
-router.post('/invoices/import/preview', roleAuth('ADMIN', 'FINANCE'), importCtrl.upload.single('file'), importCtrl.previewInvoices);
+router.post('/invoices/import/preview', roleAuth(ROLE_SETS.ADMIN), importCtrl.upload.single('file'), importCtrl.previewInvoices);
 
 // POST /api/v1/bank-flow/invoices/import — 导入发票
-router.post('/invoices/import', roleAuth('ADMIN', 'FINANCE'), importCtrl.upload.single('file'), importCtrl.importInvoices);
+router.post('/invoices/import', roleAuth(ROLE_SETS.ADMIN), importCtrl.upload.single('file'), importCtrl.importInvoices);
 
 module.exports = router;

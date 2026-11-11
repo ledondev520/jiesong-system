@@ -33,7 +33,7 @@ test('HTTP/SQLite: partial sales metadata preserves omitted fields and rejects i
   const config = require('../config');
   const users = {};
   for (const role of ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS', 'INACTIVE']) {
-    const user = await db.user.create({ data: { username: `synthetic-partial-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'SALES' : role, isActive: role !== 'INACTIVE' } });
+    const user = await db.user.create({ data: { username: `synthetic-partial-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'SALES' : role /* retired roles stored as-is (OD-8) */, isActive: role !== 'INACTIVE' } });
     // Authentication must read the actual database role, not trust this claim.
     users[role] = jwt.sign({ userId: user.id, role: 'ADMIN' }, config.jwt.secret);
   }
@@ -106,18 +106,18 @@ c.close()`, dbFile], { encoding: 'utf8', timeout: 10000 }));
     }
   });
 
-  await t.test('existing writer roles remain allowed; BOSS, inactive and unauthenticated writes remain denied', async () => {
-    for (const role of ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE']) {
+  await t.test('ADMIN/SALES may edit; retired, inactive and unauthenticated writes are denied (OD-8)', async () => {
+    for (const role of ['ADMIN', 'SALES']) {
       await call('PUT', `/sales/${sale.id}`, { note: `Synthetic ${role} edit` }, { role });
       assert.equal(header().note, `Synthetic ${role} edit`);
       assert.equal(header().exchangeRate, 7.3);
     }
-    for (const [role, expected] of [['BOSS', 403], ['INACTIVE', 401], [null, 401]]) {
+    for (const [role, expected] of [['PURCHASE', 403], ['FINANCE', 403], ['WAREHOUSE', 403], ['BOSS', 403], ['INACTIVE', 401], [null, 401]]) {
       const before = snapshot();
       await call('PUT', `/sales/${sale.id}`, { note: 'Synthetic denied edit' }, { role, expected });
       assert.deepEqual(snapshot(), before);
     }
-    assert.equal((await call('GET', `/sales/${sale.id}`, undefined, { role: 'BOSS' })).id, sale.id);
+    assert.equal((await call('GET', `/sales/${sale.id}`, undefined, { role: 'SALES' })).id, sale.id);
   });
 
   await t.test('shipped/completed metadata edits preserve cargo, outbound evidence, status and settled amounts', async () => {

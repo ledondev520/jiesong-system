@@ -2,8 +2,6 @@
  * Input: HSCIQ API (https://www.hsciq.com/mcp)、config.hsciq（API Key + Base URL）
  * Output: 海关只读查询，含缓存、并发请求共享、配额预留、总超时与受控上游错误
  * Pos: 服务层，封装 HSCIQ 外部 API 调用，为 HS 编码推荐与申报要素提供权威数据源
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

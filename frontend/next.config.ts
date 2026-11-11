@@ -6,8 +6,6 @@ import { getApiProxyBaseUrl } from "./src/lib/api-base-url";
  * Input: 环境变量 NEXT_PUBLIC_API_BASE_URL（生产环境后端地址）
  * Output: Next.js 构建与代理配置
  * Pos: 前端构建入口配置，控制 API 代理路径与 Sentry/Vercel 集成
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 // 开发环境默认代理到本地后端，生产环境使用环境变量
@@ -31,7 +29,8 @@ const nextConfig: NextConfig = {
       { source: '/dashboard/system', destination: '/dashboard/settings', permanent: true },
       { source: '/dashboard/system/logs', destination: '/dashboard/settings/logs', permanent: true },
       { source: '/dashboard/system/notifications', destination: '/dashboard/notifications', permanent: true },
-      { source: '/dashboard/about', destination: '/dashboard/settings/ai-access', permanent: true },
+      { source: '/dashboard/about', destination: '/dashboard/settings/ai-usage', permanent: true },
+      { source: '/dashboard/sales/create', destination: '/dashboard/orders/new', permanent: true }, // A99: old create page removed
       { source: '/dashboard/ai/sessions', destination: '/dashboard/settings/ai-usage', permanent: true },
     ];
   },

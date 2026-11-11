@@ -5,8 +5,6 @@
  *
  * JSON: { "contracts": [{ "contractNo": "EXP...", "totalAmount": 1.23 }] }
  * Usage: node scripts/import_formal_sales_contract_amounts.js --input <restricted.json> [--expected-count 45] [--apply]
- *
- * Note: 我被更新时，必须同步更新本头注释 + scripts/README.md。
  */
 
 const fs = require('fs');

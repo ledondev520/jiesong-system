@@ -2,8 +2,6 @@
  * Input: Next.js 页面的 searchParams（字符串或数组值）
  * Output: withQuery —— 把查询参数原样拼到重定向目标后面
  * Pos: 旧路由兼容 stub 共用，避免书签里的查询参数在重定向时丢失
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 export type RedirectSearchParams = Record<
   string,

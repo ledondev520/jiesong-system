@@ -2,8 +2,6 @@
  * Input: LazyAIAssistantMount、AI 面板状态、当前路径
  * Output: 停靠式 AI 助手的懒加载、开合、快捷键、?ai=1、移动全屏与 BOSS 边界测试
  * Pos: 全局 AI 面板宿主测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

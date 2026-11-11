@@ -2,8 +2,6 @@
  * Input: AI 推荐输入与结果状态
  * Output: AI 智能推荐弹窗
  * Pos: 出口模块子页面 - HSCode 检索（page.tsx 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

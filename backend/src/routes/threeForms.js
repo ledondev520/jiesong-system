@@ -7,10 +7,11 @@
 const { Router } = require('express');
 const { authenticate } = require('../middleware/auth');
 const { roleAuth } = require('../middleware/roleAuth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 
 // R3 P1-3：含采购成本/退税的读取排除 WAREHOUSE；创建 ForexVerification/TaxRefund 与其路由写权限一致（/generate 会建这两类记录）。
-const COMMERCIAL_ROLES = ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE'];
-const SETTLEMENT_DOC_ROLES = ['ADMIN', 'SALES', 'FINANCE'];
+const COMMERCIAL_ROLES = ROLE_SETS.ADMIN; // OD-8: forex/tax-refund amounts
+const SETTLEMENT_DOC_ROLES = ROLE_SETS.ADMIN;
 const { createError, wrapAsync } = require('../middleware/errorHandler');
 const { success } = require('../utils/response');
 const threeFormsService = require('../services/threeFormsService');
@@ -35,7 +36,7 @@ router.post('/preview', roleAuth(...COMMERCIAL_ROLES), wrapAsync(async (req, res
 /**
  * POST /api/three-forms/generate
  * 一键生成三张表（报关单、外汇核销单、出口退税单）
- * 思路：SALES/PURCHASE/FINANCE/WAREHOUSE 均可发起，不限 ADMIN
+ * 思路：OD-8 后仅 ADMIN 可发起（含退税/核销金额）
  */
 router.post('/generate', roleAuth(...SETTLEMENT_DOC_ROLES), wrapAsync(async (req, res) => {
   const {

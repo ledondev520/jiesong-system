@@ -2,8 +2,6 @@
  * Input: 路由源码文件与明确列举的公开认证入口
  * Output: 写操作路由 RBAC 覆盖测试结果
  * Pos: 后端路由权限测试，确保所有写路由均接入 roleAuth
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');
@@ -94,7 +92,7 @@ test('RBAC: 邮箱注册公开入口保留限流校验，管理员创建用户�
   const adminRegistration = blocks.find((item) => getRouteInfo('auth.js', item).routeKey === 'auth POST /register');
   assert.ok(adminRegistration);
   assert.match(adminRegistration, /authenticate/);
-  assert.match(adminRegistration, /roleAuth\('ADMIN'\)/);
+  assert.match(adminRegistration, /roleAuth\((?:'ADMIN'|ROLE_SETS\.ADMIN)\)/);
 });
 
 test('logout owns cookie CSRF validation rather than bearer role authorization', () => {

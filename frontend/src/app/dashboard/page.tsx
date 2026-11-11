@@ -1,9 +1,7 @@
 /**
  * Input: 当前用户、后端按角色裁剪的首页待办（GET /dashboard/todos）
- * Output: 首页：各角色的待办列表与（BOSS）应收/应付/本月毛利
+ * Output: 首页：各角色的待办列表与（ADMIN）应收/应付/本月毛利
  * Pos: 工作台首页；一次批量只读请求，前端不判断角色、不重算口径
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -89,7 +87,7 @@ function DashboardContent() {
                     新建采购合同
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => router.push("/dashboard/sales/create")}
+                    onSelect={() => router.push("/dashboard/orders/new")}
                   >
                     <Ship className="mr-2 h-4 w-4" />
                     新建出口订单

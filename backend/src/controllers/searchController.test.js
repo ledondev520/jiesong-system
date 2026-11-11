@@ -17,7 +17,7 @@ test('searchController.search: 调用查询命令并返回统一响应', async (
 
   try {
     let payload = null;
-    const req = { query: { q: '瓷砖', types: 'product,supplier', limit: '5' } };
+    const req = { query: { q: '瓷砖', types: 'product,supplier', limit: '5' }, user: { role: 'ADMIN' } };
     const res = {
       status(code) {
         this.statusCode = code;

@@ -2,7 +2,7 @@
  * Input: 明确选择的财务资料、版本化结构化迁移包、目标库预检计划与 Prisma Adapter
  * Output: 可校验迁移包、只读计划、事务内仅新增/跳过结果；不含原始工作簿或数据库凭据
  * Pos: 财务资料跨机迁移核心；没有 update/delete/upsert，不改变业务账期及既有资料
- * Note: 更新时同步 backend/src/README.md、SECURITY.md、AGENTS.md 与数据分类。
+ * Note: 控制变化时同步 SECURITY.md。
  */
 const crypto = require('node:crypto');
 

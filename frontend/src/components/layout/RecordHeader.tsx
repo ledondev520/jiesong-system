@@ -2,8 +2,6 @@
  * Input: 单号、状态、3-5 个关键事实、唯一主操作、「单证」/「更多」菜单项、阻塞原因
  * Output: 记录页（出口订单/采购合同/报关单/退税记录）统一头部：事实 chips、一个主按钮、菜单、阻塞提示条
  * Pos: 通用布局组件，基于 PageHeader（PHASE3 §1 archetype B）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

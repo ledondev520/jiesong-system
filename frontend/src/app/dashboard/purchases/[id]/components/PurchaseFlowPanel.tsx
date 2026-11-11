@@ -2,8 +2,6 @@
  * Input: 采购合同详情（含供应商/明细/付款记录）、付款与供应商发票准备 Interface
  * Output: 付款轨迹与保留失败草稿的付款登记、汇款文本、催票清单和选填发票附件
  * Pos: 采购合同详情页子组件，覆盖「签合同 → 付定金 → 付尾款 → 催发票」链路动作
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -130,12 +128,10 @@ export function PurchaseFlowPanel({
   const isMobile = useMobile();
   const readOnly = useBusinessReadOnly();
   const userRole = useAuthStore((state) => state.user?.role);
-  // 与后端一致：供应商发票原件仅 ADMIN/PURCHASE/FINANCE 可上传
-  const canUploadInvoiceFile = ["ADMIN", "PURCHASE", "FINANCE"].includes(
-    userRole || "",
-  );
-  // OD-2/OD-3：WAREHOUSE 服务端不返回发票号与金额；本面板只显示状态，不显示数字、不预填号码
-  const moneyHidden = userRole === "WAREHOUSE";
+  // 与后端一致：供应商发票原件仅 ADMIN 可上传（OD-8）
+  const canUploadInvoiceFile = userRole === "ADMIN";
+  // OD-2/OD-3/OD-8：非 ADMIN 服务端不返回发票号与金额；本面板只显示状态，不显示数字、不预填号码
+  const moneyHidden = userRole !== "ADMIN";
   const invoiceFileInputRef = useRef<HTMLInputElement>(null);
   const [remitOpen, setRemitOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);

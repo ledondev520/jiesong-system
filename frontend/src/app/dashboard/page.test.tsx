@@ -2,8 +2,6 @@
  * Input: 首页、router、合成待办响应（按角色）
  * Output: 各角色待办展示、BOSS 数字、失败重试与快捷入口测试结果
  * Pos: 前端首页交互测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,8 +28,9 @@ vi.mock("@/store/auth.store", () => ({
 }));
 
 vi.mock("@/lib/hooks/useBusinessReadOnly", () => ({
-  BusinessWrite: ({ children }: { children: React.ReactNode }) =>
-    mockRole === Role.BOSS ? null : <>{children}</>,
+  BusinessWrite: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 vi.mock("@/services/dashboardTodos.service", () => ({
@@ -60,10 +59,9 @@ describe("DashboardPage 待办首页", () => {
     mockRole = Role.ADMIN;
   });
 
-  it("PURCHASE：只展示后端返回的列表，金额按币种格式化并链接详情", async () => {
-    mockRole = Role.PURCHASE;
+  it("ADMIN：只展示后端返回的列表，金额按币种格式化并链接详情", async () => {
     respond({
-      role: "PURCHASE",
+      role: "ADMIN",
       lists: {
         ordersToPurchase: {
           label: "订单待采购",
@@ -95,10 +93,9 @@ describe("DashboardPage 待办首页", () => {
     expect(screen.queryByLabelText("关键数字")).not.toBeInTheDocument();
   });
 
-  it("BOSS：显示应收/应付/本月毛利及口径说明，不显示写入口", async () => {
-    mockRole = Role.BOSS;
+  it("ADMIN：显示应收/应付/本月毛利及口径说明（OD-8 前属 BOSS）", async () => {
     respond({
-      role: "BOSS",
+      role: "ADMIN",
       lists: {
         overdueReceivables: {
           label: "逾期未收款",
@@ -125,9 +122,6 @@ describe("DashboardPage 待办首页", () => {
     expect(within(figures).getByText("—")).toBeInTheDocument();
     expect(within(figures).getByText(/草稿\/已取消不计/)).toBeInTheDocument();
     expect(screen.getByText("全部处理完毕")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "新建" }),
-    ).not.toBeInTheDocument();
   });
 
   it("SALES：报价待发送/待客户确认卡片带数量、美元金额、详情与筛选入口", async () => {
@@ -202,6 +196,6 @@ describe("DashboardPage 待办首页", () => {
     await user.click(
       await screen.findByRole("menuitem", { name: /新建出口订单/ }),
     );
-    expect(mockPush).toHaveBeenCalledWith("/dashboard/sales/create");
+    expect(mockPush).toHaveBeenCalledWith("/dashboard/orders/new");
   });
 });

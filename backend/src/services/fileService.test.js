@@ -78,7 +78,7 @@ test('createFile: 用户上传的合同凭证落盘后收紧为 0600 权限', as
         path: filePath,
         mimetype: 'application/pdf',
         size: 4,
-      }, null, 'SIGNED_CONTRACT', { role: 'PURCHASE' });
+      }, null, 'SIGNED_CONTRACT', { role: 'ADMIN' });
     });
 
     assert.equal(fs.statSync(filePath).mode & 0o777, 0o600);
@@ -124,7 +124,7 @@ test('createFile: 到货照片分类只接受 JPG/PNG，错误文件不留在磁
           path: filePath,
           mimetype: 'application/pdf',
           size: 4,
-        }, null, 'RECEIPT_PHOTO', { role: 'WAREHOUSE' }),
+        }, null, 'RECEIPT_PHOTO', { role: 'SALES' }),
         (error) => error.statusCode === 400 && /到货照片仅支持 JPG、PNG/.test(error.message),
       );
     });
@@ -135,10 +135,10 @@ test('createFile: 到货照片分类只接受 JPG/PNG，错误文件不留在磁
   }
 });
 
-test('createFile: 到货照片仅采购合同 + ADMIN/PURCHASE/WAREHOUSE 可上传，其余 403 且清理当前上传', async t => {
+test('createFile: 到货照片仅采购合同 + ADMIN/SALES 可上传（OD-8），其余 403 且清理当前上传', async t => {
   const cases = [
-    ['SALES 角色', 'PURCHASE', { role: 'SALES' }],
-    ['FINANCE 角色', 'PURCHASE', { role: 'FINANCE' }],
+    ['已停用 PURCHASE 角色', 'PURCHASE', { role: 'PURCHASE' }],
+    ['已停用 FINANCE 角色', 'PURCHASE', { role: 'FINANCE' }],
     ['无用户', 'PURCHASE', undefined],
     ['销售合同', 'SALES', { role: 'ADMIN' }],
   ];
@@ -163,10 +163,10 @@ test('createFile: 到货照片仅采购合同 + ADMIN/PURCHASE/WAREHOUSE 可上�
 });
 
 test('assertReceiptPhotoAccess: 到货照片删除沿用同一角色/合同类型门槛，其他分类不受影响', () => {
-  for (const role of ['ADMIN', 'PURCHASE', 'WAREHOUSE']) {
+  for (const role of ['ADMIN', 'SALES']) {
     assert.doesNotThrow(() => fileService.assertReceiptPhotoAccess('PURCHASE', 'RECEIPT_PHOTO', { role }));
   }
-  for (const user of [{ role: 'SALES' }, { role: 'FINANCE' }, undefined]) {
+  for (const user of [{ role: 'PURCHASE' }, { role: 'WAREHOUSE' }, undefined]) { // retired roles
     assert.throws(() => fileService.assertReceiptPhotoAccess('PURCHASE', 'RECEIPT_PHOTO', user), (e) => e.statusCode === 403);
   }
   assert.throws(() => fileService.assertReceiptPhotoAccess('SALES', 'RECEIPT_PHOTO', { role: 'ADMIN' }), (e) => e.statusCode === 403);
@@ -191,7 +191,7 @@ test('createFile: 验证/权限/持久化失败仅清理当前上传，保留既
         }, async () => {
           await assert.rejects(() => fileService.createFile('purchase-1', failure === 'invalid-type' ? 'TYPO' : 'PURCHASE', {
             originalname: 'current.pdf', path: current, mimetype: 'application/pdf', size: 25,
-          }, null, failure === 'category' ? 'PRODUCTION_PHOTO' : 'SIGNED_CONTRACT', { role: 'PURCHASE' }), error => {
+          }, null, failure === 'category' ? 'PRODUCTION_PHOTO' : 'SIGNED_CONTRACT', { role: 'ADMIN' }), error => {
             if (['invalid-type', 'category'].includes(failure)) return error.statusCode === 400;
             if (['missing-contract', 'deleted-contract'].includes(failure)) return error.statusCode === 404;
             return error.message === `synthetic ${failure === 'chmod' ? 'chmod' : 'persistence'} failure`;
@@ -210,20 +210,20 @@ test('createFile: 验证/权限/持久化失败仅清理当前上传，保留既
 
 test('assertFileAccess: 财务确认附件权限共享，普通附件不增加业务所有者限制', () => {
   const protectedFile = { description: '退税出货清单确认:synthetic:version' };
-  for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE', 'BOSS']) {
+  for (const role of ['SALES', 'PURCHASE', 'SALES', 'SALES']) {
     assert.throws(() => fileService.assertFileAccess(protectedFile, { role }), error => error.statusCode === 403);
   }
-  for (const role of ['ADMIN', 'FINANCE']) assert.doesNotThrow(() => fileService.assertFileAccess(protectedFile, { role }));
+  for (const role of ['ADMIN', 'ADMIN']) assert.doesNotThrow(() => fileService.assertFileAccess(protectedFile, { role }));
   assert.doesNotThrow(() => fileService.assertFileAccess({ description: '普通合成附件' }, { role: 'SALES' }));
   assert.throws(() => fileService.assertFileAccess({ description: '普通合成附件' }, undefined), error => error.statusCode === 403);
 });
 
-test('assertFileAccess: 出口三单归档文件拒绝 WAREHOUSE（R3 P1-3）', () => {
+test('assertFileAccess: 出口三单归档文件仅 ADMIN（R3 P1-3，OD-8）', () => {
   // 守卫在 fileService 里按前缀匹配；描述取自 exportPacketService 的常量，避免测试与实现各写一份字符串（fileService 不能反向 require，会循环）。
   const { EXPORT_PACKET_DESCRIPTION } = require('./exportPacketService');
   const packet = { description: `${EXPORT_PACKET_DESCRIPTION}:v1` };
-  assert.throws(() => fileService.assertFileAccess(packet, { role: 'WAREHOUSE' }), error => error.statusCode === 403);
-  for (const role of ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE']) assert.doesNotThrow(() => fileService.assertFileAccess(packet, { role }));
+  assert.throws(() => fileService.assertFileAccess(packet, { role: 'SALES' }), error => error.statusCode === 403);
+  assert.doesNotThrow(() => fileService.assertFileAccess(packet, { role: 'ADMIN' }));
 });
 
 test('createFile: 清理失败不覆盖原始错误或泄露文件路径', async t => {
@@ -619,30 +619,29 @@ test('deleteFileRecord: 根内普通文件正常删除，物理文件已不存�
   assert.equal(deletes, 2);
 });
 
-test('采购合同文书类附件：SALES/WAREHOUSE 不能读、写、删，也看不到列表行；其它类别照旧', () => {
+test('采购合同文书类附件：SALES 不能读、写、删（OD-8：仅 ADMIN），也看不到列表行；其它类别照旧', () => {
   const fileService = require('./fileService');
   const row = (category) => ({ id: category, category, contractType: 'PURCHASE' });
   const restricted = ['SYSTEM_GENERATED_PDF', 'SYSTEM_GENERATED_WORD', 'SIGNED_CONTRACT', 'SUPPLIER_INVOICE'];
   for (const category of restricted) {
-    for (const role of ['SALES', 'WAREHOUSE']) {
+    for (const role of ['SALES']) {
       for (const action of ['read', 'write', 'delete']) {
         assert.throws(() => fileService.assertFileAccess(row(category), { role }, { action }), /无权/);
       }
     }
-    fileService.assertFileAccess(row(category), { role: 'PURCHASE' }, { action: 'delete' });
-    fileService.assertFileAccess(row(category), { role: 'BOSS' });
-    assert.throws(() => fileService.assertFileAccess(row(category), { role: 'BOSS' }, { action: 'delete' }), /无权/);
+    fileService.assertFileAccess(row(category), { role: 'ADMIN' }, { action: 'delete' });
+    fileService.assertFileAccess(row(category), { role: 'ADMIN' });
   }
   fileService.assertFileAccess(row('PRODUCTION_PHOTO'), { role: 'SALES' }, { action: 'delete' });
   fileService.assertFileAccess({ ...row('SIGNED_CONTRACT'), contractType: 'SALES' }, { role: 'SALES' }, { action: 'delete' });
   const all = [...restricted, 'PRODUCTION_PHOTO', 'OTHER'].map(row);
-  assert.deepEqual(fileService.filterVisibleFiles(all, { role: 'WAREHOUSE' }).map((f) => f.id), ['PRODUCTION_PHOTO', 'OTHER']);
-  assert.equal(fileService.filterVisibleFiles(all, { role: 'FINANCE' }).length, 6);
+  assert.deepEqual(fileService.filterVisibleFiles(all, { role: 'SALES' }).map((f) => f.id), ['PRODUCTION_PHOTO', 'OTHER']);
+  assert.equal(fileService.filterVisibleFiles(all, { role: 'ADMIN' }).length, 6);
 });
 
 
-test('createFile: SALES/WAREHOUSE 上传采购合同文书类别返回 403，且不留下本次上传文件（R3 P1-2）', async () => {
-  for (const role of ['SALES', 'WAREHOUSE']) {
+test('createFile: SALES 上传采购合同文书类别返回 403，且不留下本次上传文件（R3 P1-2）', async () => {
+  for (const role of ['SALES']) {
     for (const category of ['SIGNED_CONTRACT', 'SUPPLIER_INVOICE', 'SYSTEM_GENERATED_PDF', 'SYSTEM_GENERATED_WORD']) {
       const tempDir = fs.mkdtempSync(path.join(testUploadRoot, 'restricted-upload-'));
       const filePath = path.join(tempDir, 'synthetic.pdf');

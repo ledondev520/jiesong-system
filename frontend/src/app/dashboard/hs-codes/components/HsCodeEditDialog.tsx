@@ -2,8 +2,6 @@
  * Input: 证据化人工税则更新表单状态
  * Output: 人工更新税则弹窗
  * Pos: 出口模块子页面 - HSCode 检索（page.tsx 拆分）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

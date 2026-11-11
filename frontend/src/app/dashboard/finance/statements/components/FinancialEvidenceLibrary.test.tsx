@@ -2,8 +2,6 @@
  * Input: 财务资料库公开查询边界与可控合成响应
  * Output: 资料计数/隐私说明、空筛选及迟到旧Sheet的界面回归
  * Pos: 资料库组件测试；真实来源/数据库另由独立HTTP集成覆盖
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { describe, expect, it, vi } from "vitest";
 import {

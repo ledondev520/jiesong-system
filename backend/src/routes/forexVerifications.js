@@ -7,6 +7,7 @@
 const { Router } = require('express');
 const forexVerificationController = require('../controllers/forexVerificationController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -26,21 +27,21 @@ router.get('/', withPaginationValidation, forexVerificationController.list);
 router.get('/:id', withIdValidation, forexVerificationController.getById);
 router.post(
   '/',
-  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  roleAuth(ROLE_SETS.ADMIN),
   forexFieldGuard,
   withAuditLog({ entity: 'ForexVerification', action: 'CREATE', model: 'forexVerification' }, forexVerificationController.create),
 );
 router.put(
   '/:id',
   withIdValidation,
-  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  roleAuth(ROLE_SETS.ADMIN),
   forexFieldGuard,
   withAuditLog({ entity: 'ForexVerification', action: 'UPDATE', model: 'forexVerification' }, forexVerificationController.update),
 );
 router.delete(
   '/:id',
   withIdValidation,
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.ADMIN),
   withAuditLog({ entity: 'ForexVerification', action: 'DELETE', model: 'forexVerification' }, forexVerificationController.remove),
 );
 

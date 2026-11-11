@@ -2,8 +2,6 @@
  * Input: Private synthetic CLI-ingested backend and production frontend browser
  * Output: Real ADMIN/FINANCE login, loopback HTTP forwarding and independent SQLite reads
  * Pos: Hosted financial library fixture; no business response mocks or production access
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { spawn, execFileSync, type ChildProcess } from "node:child_process";
 import { chmodSync, mkdtempSync, rmSync } from "node:fs";
@@ -15,7 +13,10 @@ export interface LibraryFixture {
   server: ChildProcess;
   directory: string;
   baseURL: string;
-  users: Record<"ADMIN" | "FINANCE", { id: string; username: string }>;
+  users: Record<
+    "ADMIN" | "FINANCE",
+    { id: string; username: string; role: string }
+  >;
   documents: Record<"GENERAL_LEDGER" | "PAYROLL", string>;
 }
 
@@ -163,6 +164,6 @@ export async function loginLibrary(
   expect(response.status()).toBe(200);
   const data = (await response.json()).data;
   expect(data.user.id).toBe(fixture.users[role].id);
-  expect(data.user.role).toBe(role);
+  expect(data.user.role).toBe(fixture.users[role].role); // OD-8: FINANCE persona = ADMIN
   await expect(page).toHaveURL(/\/dashboard$/);
 }

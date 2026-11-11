@@ -4,15 +4,12 @@
  * Pos: 路由入口，注册所有API路由
  * 
  * 架构说明：货柜功能已合并到 sales（出口合同），每个 EXP 编号即为货柜标识
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const { Router } = require('express');
 
 // 导入各业务路由
 const authRoutes = require('./auth');
-const agentRoutes = require('./agents');
 const supplierRoutes = require('./suppliers');
 const storeRoutes = require('./stores');
 const quoteRoutes = require('./quotes');
@@ -21,7 +18,6 @@ const pricingPreviewRoutes = require('./pricing');
 const productRoutes = require('./products');
 const purchaseRoutes = require('./purchases');
 const salesRoutes = require('./sales');
-const containerRoutes = require('./containers');
 // 注意：Container 已合并到 SalesContract，不再单独使用
 const inventoryRoutes = require('./inventory');
 const financeRoutes = require('./finance');
@@ -53,14 +49,13 @@ const router = Router();
 
 // ==================== 路由注册 ====================
 
+// OD-2/OD-3（A98 默认开启）：所有 JSON 响应对 WAREHOUSE 剥离发票号与金额；豁免见 warehouseRedaction.js WAREHOUSE_EXEMPTIONS
+router.use(warehouseMoneyRedaction);
+
 // 认证路由（无需Token）
 router.use('/auth', authRoutes);
-router.use('/agents', agentRoutes);
 
 // 业务路由（需要Token）
-// OD-2/OD-3：这些前缀的 JSON 响应对 WAREHOUSE 统一剥离发票号与采购金额（销售/AI 面由 A55 复用同一 helper）
-['/suppliers', '/products', '/purchases', '/inventory', '/dashboard', '/search', '/procurement-template', '/contract-templates']
-  .forEach((prefix) => router.use(prefix, warehouseMoneyRedaction));
 router.use('/suppliers', supplierRoutes);
 router.use('/stores', storeRoutes);
 router.use('/quotes', quoteRoutes);
@@ -69,7 +64,6 @@ router.use('/pricing', pricingPreviewRoutes);
 router.use('/products', productRoutes);
 router.use('/purchases', purchaseRoutes);
 router.use('/sales', salesRoutes); // 出口合同管理（含货柜/装箱功能）
-router.use('/containers', containerRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/finance', financeRoutes);
 router.use('/system', systemRoutes);

@@ -2,8 +2,6 @@
  * Input: Real SALES login/menu, existing private role fixture and rendered canvas pixels
  * Output: One 3D lifecycle case with independent zero-write readback and page/console error checks
  * Pos: Hosted Chromium acceptance for the existing export-detail visualization
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import {

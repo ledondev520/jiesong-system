@@ -143,7 +143,7 @@ export function TaxRefundPreparationDialog({
   onConfirmed,
 }: TaxRefundPreparationDialogProps) {
   const role = useAuthStore((state) => state.user?.role);
-  const canConfirm = role === "ADMIN" || role === "FINANCE";
+  const canConfirm = role === "ADMIN";
   const [preparation, setPreparation] = useState<
     (TaxRefundPreparation & Partial<ShipmentPreparation>) | null
   >(null);

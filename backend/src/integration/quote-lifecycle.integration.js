@@ -43,7 +43,7 @@ test('quote service over HTTP', async (t) => {
   const tile = await db.product.create({ data: { customsName: 'Synthetic tile', categoryId: tileCategory.id } });
 
   const tokenFor = async (role) => {
-    const user = await db.user.create({ data: { username: `synthetic-${role.toLowerCase()}`, name: role, password: 'unused-hash', role } });
+    const user = await db.user.create({ data: { username: `synthetic-${role.toLowerCase()}`, name: role, password: 'unused-hash', role } }); // retired roles stored as-is (OD-8)
     return { id: user.id, token: require('jsonwebtoken').sign({ userId: user.id }, process.env.JWT_SECRET) };
   };
   const roles = {};
@@ -215,7 +215,7 @@ test('quote service over HTTP', async (t) => {
   await t.test('export.xlsx and print view are streamed, role-limited and never stored', async () => {
     const quote = await ok('SALES', 'POST', '/quotes', { items: [line(), line({ productId: tile.id, storeId: storeB.id, quantity: 2 })] });
     const raw = async (role, route) => fetch(base + route, { headers: { authorization: `Bearer ${roles[role].token}` } });
-    for (const role of ['SALES', 'ADMIN', 'PURCHASE', 'FINANCE']) {
+    for (const role of ['SALES', 'ADMIN']) {
       const response = await raw(role, `/quotes/${quote.id}/export.xlsx`);
       assert.equal(response.status, 200, role);
       assert.match(response.headers.get('content-type'), /spreadsheetml/);
@@ -225,7 +225,7 @@ test('quote service over HTTP', async (t) => {
     const html = await (await raw('SALES', `/quotes/${quote.id}/print`)).text();
     assert.ok(html.includes(quote.quoteNo));
     assert.ok(!html.includes('10000')); // no cost column
-    for (const role of ['BOSS', 'WAREHOUSE']) {
+    for (const role of ['PURCHASE', 'FINANCE', 'BOSS', 'WAREHOUSE']) {
       assert.equal((await raw(role, `/quotes/${quote.id}/export.xlsx`)).status, 403, role);
       assert.equal((await raw(role, `/quotes/${quote.id}/print`)).status, 403, role);
     }
@@ -244,29 +244,27 @@ test('quote service over HTTP', async (t) => {
     const html = await printOf();
     for (const text of ['Synthetic Seller Co', '1 Synthetic Road', 'Bank Details', 'Account: 000-SYNTH']) assert.ok(html.includes(text), text);
     const configsFor = async (role) => (await ok(role, 'GET', '/system/configs'));
-    for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE']) {
+    for (const role of ['SALES']) {
       const configs = await configsFor(role);
       assert.equal(configs.companyName, 'Synthetic Seller Co', role);
       assert.ok(!Object.hasOwn(configs, 'companyBankInfo'), role);
     }
-    for (const role of ['ADMIN', 'FINANCE']) assert.equal((await configsFor(role)).companyBankInfo, 'Bank: SYNTHETIC\nAccount: 000-SYNTH');
+    for (const role of ['ADMIN']) assert.equal((await configsFor(role)).companyBankInfo, 'Bank: SYNTHETIC\nAccount: 000-SYNTH');
     await db.systemConfig.deleteMany({ where: { key: { in: ['companyName', 'companyAddress', 'companyBankInfo'] } } });
   });
 
-  await t.test('roles: WAREHOUSE denied, PURCHASE/FINANCE read-only, BOSS read-only, anonymous 401', async () => {
+  await t.test('roles (OD-8): ADMIN and SALES read and write, retired roles denied, anonymous 401', async () => {
     const quote = await ok('ADMIN', 'POST', '/quotes', { items: [line()] });
     assert.equal((await call(null, 'GET', '/quotes')).status, 401);
-    assert.equal((await call('WAREHOUSE', 'GET', '/quotes')).status, 403);
-    assert.equal((await call('WAREHOUSE', 'GET', `/quotes/${quote.id}`)).status, 403);
-    for (const role of ['PURCHASE', 'FINANCE', 'BOSS']) {
-      assert.equal((await call(role, 'GET', '/quotes')).status, 200, role);
-      const detail = await call(role, 'GET', `/quotes/${quote.id}`);
-      assert.equal(detail.status, 200, role);
-      assert.equal(detail.data.items[0].costCny, 10000);
+    for (const role of ['PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
+      assert.equal((await call(role, 'GET', '/quotes')).status, 403, role);
+      assert.equal((await call(role, 'GET', `/quotes/${quote.id}`)).status, 403, role);
       assert.equal((await call(role, 'POST', '/quotes', {})).status, 403, role);
-      assert.equal((await call(role, 'PUT', `/quotes/${quote.id}`, { note: 'x' })).status, 403, role);
     }
-    assert.equal((await call('WAREHOUSE', 'POST', '/quotes', {})).status, 403);
+    const detail = await call('SALES', 'GET', `/quotes/${quote.id}`);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.data.items[0].costCny, 10000); // reference cost stays visible to the quoting role (OD-11 asks the owner)
+    assert.equal((await call('SALES', 'PUT', `/quotes/${quote.id}`, { note: 'sales edit' })).status, 200);
     assert.equal((await call('ADMIN', 'PUT', `/quotes/${quote.id}`, { note: 'admin edit' })).status, 200);
     assert.equal((await db.quote.findUnique({ where: { id: quote.id } })).createdById, roles.ADMIN.id);
   });

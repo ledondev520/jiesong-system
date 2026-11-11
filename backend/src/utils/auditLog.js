@@ -2,8 +2,6 @@
  * Input: Prisma客户端、请求对象
  * Output: 操作日志记录，供应商银行路由字段仅保留脱敏变更轨迹
  * Pos: 审计日志工具，记录用户操作
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('./prisma');

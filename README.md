@@ -122,7 +122,7 @@ python3 -m unittest discover -s tests -p test_prepare_export_packet.py
 
 ## 数据库与部署边界
 
-当前运行模型是 SQLite。`docker-compose`、Render 配置及旧 Supabase 指南中的 PostgreSQL 配置与当前 schema 不兼容，不是本分支可直接使用的部署步骤。切换 PostgreSQL 必须另做 schema、迁移 SQL、查询语义和备份恢复的验证，不能仅替换连接字符串。
+当前运行模型是 SQLite。旧 `docker-compose`、Render、Vercel 配置及 Supabase 指南已删除（A101）。切换 PostgreSQL 必须另做 schema、迁移 SQL、查询语义和备份恢复的验证，不能仅替换连接字符串。
 
 本轮仅验证本地分支和合成临时库，没有部署。现有部署资料见 `DEPLOY.md`，执行前须核实实际数据库路径、上传目录及备份方案。
 
@@ -156,7 +156,6 @@ python3 -m unittest discover -s tests -p test_prepare_export_packet.py
 - [后端测试](backend/README.md#5-运行测试) - test:db 包含真实只读概览来源验收、上海期间与收付趋势，以及合成邮箱注册 HTTP 成功/重放与未激活 SALES 安全字段回读
 - [前端浏览器验收](frontend/e2e/README.md) - 真实角色与合成资料验收约定，含出口3D绘制/控制/响应式返回和 Header 个人设置本地保存/重载/部分失败重试的 hosted CI 定义；定义检查不代表浏览器通过
 - [普通用户名称验收](docs/qa/account-name-lifecycle-2026-10-06.md) - 两个现有用户管理入口完整目录搜索与真实失败保留草稿重试；仅名称合成HTTP/React检查
-- [历史 Supabase 迁移指南](docs/Supabase迁移指南.md) - 历史方案，与当前 SQLite schema 不兼容
 
 ## License
 

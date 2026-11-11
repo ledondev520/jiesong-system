@@ -2,8 +2,6 @@
  * Input: Scenario name, optional private temporary root and the role-browser-server.js child fixture
  * Output: Started synthetic role HTTP fixture (metadata, login, call, independent read-only SQLite helper)
  * Pos: Shared by role-browser-server.test.js and role-browser-documents.test.js so node --test runs them in parallel
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -57,7 +55,7 @@ async function fixtureFor(t, scenario, temporaryRoot = os.tmpdir()) {
     const response = await call('POST', '/auth/login', { username: metadata.users[role].username, password });
     assert.equal(response.status, 200);
     assert.equal(response.limit, '10'); // Existing login limiter is active, without a test bypass.
-    assert.equal(response.body.data.user.role, role);
+    assert.equal(response.body.data.user.role, metadata.users[role].role);
     assert.equal(response.body.data.user.id, metadata.users[role].id);
     return response.body.data.token;
   };

@@ -2,8 +2,6 @@
  * Input: 三张表生成参数、共享 Axios 认证传输与真实二进制响应
  * Output: 报关、核销、退税单生成及保留响应文件名和 Blob 字节的下载
  * Pos: 出口三表联动生成服务层
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import api, { type ApiRequestConfig } from "@/lib/axios";

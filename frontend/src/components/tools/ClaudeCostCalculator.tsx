@@ -2,27 +2,38 @@
  * Input: 用户上传的截图（包含 token 使用数据）
  * Output: Claude 4.5 Opus 模型费用计算结果
  * Pos: 小工具组件，用于计算 API 调用费用
- * 
+ *
  * 费率说明（Claude 4.5 Opus）：
  * - Input: $5 / 百万 token
  * - Output: $20 / 百万 token
  * - Cache Read: $0.5 / 百万 token
  * - Cache Write: $6.25 / 百万 token
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useState, useCallback, useEffect, useRef } from 'react';
-import NextImage from 'next/image';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Calculator, Upload, Image as ImageIcon, Loader2, DollarSign, Sparkles } from 'lucide-react';
-import { toast } from 'sonner';
-import { aiService } from '@/services/ai.service';
+import { useState, useCallback, useEffect, useRef } from "react";
+import NextImage from "next/image";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Calculator,
+  Upload,
+  Image as ImageIcon,
+  Loader2,
+  DollarSign,
+  Sparkles,
+} from "lucide-react";
+import { toast } from "sonner";
+import { aiService } from "@/services/ai.service";
 
 // Claude 4.5 Opus 费率（美元/百万 token）
 const RATES = {
@@ -77,7 +88,7 @@ export function ClaudeCostCalculator() {
   // 解析 AI 识别结果
   const parseAIResponse = useCallback((text: string): Partial<TokenUsage> => {
     const result: Partial<TokenUsage> = {};
-    
+
     // 尝试多种格式解析
     const patterns = [
       /cache\s*read[:\s]*([0-9,]+)/i,
@@ -87,12 +98,18 @@ export function ClaudeCostCalculator() {
       /total[:\s]*([0-9,]+)/i,
     ];
 
-    const keys: (keyof TokenUsage)[] = ['cacheRead', 'cacheWrite', 'input', 'output', 'total'];
-    
+    const keys: (keyof TokenUsage)[] = [
+      "cacheRead",
+      "cacheWrite",
+      "input",
+      "output",
+      "total",
+    ];
+
     patterns.forEach((pattern, index) => {
       const match = text.match(pattern);
       if (match) {
-        const numStr = match[1].replace(/,/g, '');
+        const numStr = match[1].replace(/,/g, "");
         result[keys[index]] = parseInt(numStr) || 0;
       }
     });
@@ -101,12 +118,13 @@ export function ClaudeCostCalculator() {
   }, []);
 
   // 调用 AI 识别图片
-  const recognizeImage = useCallback(async (base64Image: string) => {
-    setIsProcessing(true);
-    try {
-      // 调用后端 AI 服务识别图片
-      const response = await aiService.parseImageTokenUsage(
-        `请识别这张图片中的 token 使用统计数据。提取以下数值：
+  const recognizeImage = useCallback(
+    async (base64Image: string) => {
+      setIsProcessing(true);
+      try {
+        // 调用后端 AI 服务识别图片
+        const response = await aiService.parseImageTokenUsage(
+          `请识别这张图片中的 token 使用统计数据。提取以下数值：
 1. Cache Read (缓存读取)
 2. Cache Write (缓存写入)
 3. Input (输入)
@@ -117,18 +135,44 @@ export function ClaudeCostCalculator() {
 {"cacheRead": 92258867, "cacheWrite": 3352546, "input": 1592822, "output": 699243, "total": 97903478}
 
 只返回 JSON，不要其他文字。`,
-        base64Image,
-      );
+          base64Image,
+        );
 
-      const data = response.data;
-      
-      if (data && data.message) {
-        const content = data.message;
-        // 尝试解析 JSON
-        try {
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
+        const data = response.data;
+
+        if (data && data.message) {
+          const content = data.message;
+          // 尝试解析 JSON
+          try {
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]);
+              const newUsage: TokenUsage = {
+                cacheRead: parsed.cacheRead || 0,
+                cacheWrite: parsed.cacheWrite || 0,
+                input: parsed.input || 0,
+                output: parsed.output || 0,
+                total: parsed.total || 0,
+              };
+              // 如果没有 total，计算它
+              if (!newUsage.total) {
+                newUsage.total =
+                  newUsage.cacheRead +
+                  newUsage.cacheWrite +
+                  newUsage.input +
+                  newUsage.output;
+              }
+              setUsage(newUsage);
+              toast.success("已识别图片中的数据");
+              return;
+            }
+          } catch {
+            // JSON 解析失败，尝试文本解析
+          }
+
+          // 尝试文本解析
+          const parsed = parseAIResponse(content);
+          if (Object.keys(parsed).length > 0) {
             const newUsage: TokenUsage = {
               cacheRead: parsed.cacheRead || 0,
               cacheWrite: parsed.cacheWrite || 0,
@@ -136,65 +180,50 @@ export function ClaudeCostCalculator() {
               output: parsed.output || 0,
               total: parsed.total || 0,
             };
-            // 如果没有 total，计算它
             if (!newUsage.total) {
-              newUsage.total = newUsage.cacheRead + newUsage.cacheWrite + 
-                              newUsage.input + newUsage.output;
+              newUsage.total =
+                newUsage.cacheRead +
+                newUsage.cacheWrite +
+                newUsage.input +
+                newUsage.output;
             }
             setUsage(newUsage);
-            toast.success('已识别图片中的数据');
+            toast.success("已识别图片中的数据");
             return;
           }
-        } catch {
-          // JSON 解析失败，尝试文本解析
         }
-        
-        // 尝试文本解析
-        const parsed = parseAIResponse(content);
-        if (Object.keys(parsed).length > 0) {
-          const newUsage: TokenUsage = {
-            cacheRead: parsed.cacheRead || 0,
-            cacheWrite: parsed.cacheWrite || 0,
-            input: parsed.input || 0,
-            output: parsed.output || 0,
-            total: parsed.total || 0,
-          };
-          if (!newUsage.total) {
-            newUsage.total = newUsage.cacheRead + newUsage.cacheWrite + 
-                            newUsage.input + newUsage.output;
-          }
-          setUsage(newUsage);
-          toast.success('已识别图片中的数据');
-          return;
-        }
+
+        toast.info("无法自动识别，请手动输入数值");
+      } catch (error: unknown) {
+        console.error("图片识别失败:", error);
+        const errorMsg =
+          typeof error === "object" &&
+          error !== null &&
+          "message" in error &&
+          typeof (error as { message?: unknown }).message === "string"
+            ? (error as { message: string }).message
+            : "未知错误";
+        toast.error(`图片识别失败: ${errorMsg}`);
+      } finally {
+        setIsProcessing(false);
       }
-      
-      toast.info('无法自动识别，请手动输入数值');
-    } catch (error: unknown) {
-      console.error('图片识别失败:', error);
-      const errorMsg =
-        typeof error === 'object' &&
-        error !== null &&
-        'message' in error &&
-        typeof (error as { message?: unknown }).message === 'string'
-          ? (error as { message: string }).message
-          : '未知错误';
-      toast.error(`图片识别失败: ${errorMsg}`);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [parseAIResponse]);
+    },
+    [parseAIResponse],
+  );
 
   // 处理图片（上传或粘贴）
-  const handleImage = useCallback(async (file: File | Blob) => {
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64 = event.target?.result as string;
-      setImagePreview(base64);
-      await recognizeImage(base64);
-    };
-    reader.readAsDataURL(file);
-  }, [recognizeImage]);
+  const handleImage = useCallback(
+    async (file: File | Blob) => {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string;
+        setImagePreview(base64);
+        await recognizeImage(base64);
+      };
+      reader.readAsDataURL(file);
+    },
+    [recognizeImage],
+  );
 
   // 处理文件上传
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,7 +237,10 @@ export function ClaudeCostCalculator() {
   useEffect(() => {
     const handlePaste = async (e: ClipboardEvent) => {
       // 检查是否在输入框中，如果是则不处理
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
@@ -216,7 +248,7 @@ export function ClaudeCostCalculator() {
       if (!items) return;
 
       for (const item of items) {
-        if (item.type.startsWith('image/')) {
+        if (item.type.startsWith("image/")) {
           e.preventDefault();
           const file = item.getAsFile();
           if (file) {
@@ -227,15 +259,19 @@ export function ClaudeCostCalculator() {
       }
     };
 
-    document.addEventListener('paste', handlePaste);
-    return () => document.removeEventListener('paste', handlePaste);
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
   }, [handleImage]);
 
   // 更新单个数值
   const updateValue = (field: keyof TokenUsage, value: string) => {
-    const numValue = parseInt(value.replace(/,/g, '')) || 0;
+    const numValue = parseInt(value.replace(/,/g, "")) || 0;
     const newUsage = { ...usage, [field]: numValue };
-    newUsage.total = newUsage.cacheRead + newUsage.cacheWrite + newUsage.input + newUsage.output;
+    newUsage.total =
+      newUsage.cacheRead +
+      newUsage.cacheWrite +
+      newUsage.input +
+      newUsage.output;
     setUsage(newUsage);
   };
 
@@ -262,7 +298,9 @@ export function ClaudeCostCalculator() {
           {isProcessing ? (
             <div className="flex flex-col items-center gap-3 py-4">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">正在识别图片中的数据...</p>
+              <p className="text-sm text-muted-foreground">
+                正在识别图片中的数据...
+              </p>
             </div>
           ) : imagePreview ? (
             <div className="space-y-3">
@@ -276,15 +314,15 @@ export function ClaudeCostCalculator() {
                 />
               </div>
               <div className="flex justify-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setImagePreview(null)}
                 >
                   清除图片
                 </Button>
-                <Button 
-                  variant="secondary" 
+                <Button
+                  variant="secondary"
                   size="sm"
                   onClick={() => recognizeImage(imagePreview)}
                 >
@@ -296,23 +334,23 @@ export function ClaudeCostCalculator() {
           ) : (
             <>
               <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm font-medium mb-1">
-                按 Ctrl+V 粘贴截图
-              </p>
+              <p className="text-sm font-medium mb-1">按 Ctrl+V 粘贴截图</p>
               <p className="text-xs text-muted-foreground mb-3">
                 或点击下方按钮选择图片文件
               </p>
               <label className="cursor-pointer">
-                <input 
+                <input
                   id="claude-cost-screenshot-upload"
                   name="claudeCostScreenshotUpload"
-                  type="file" 
-                  className="hidden" 
+                  type="file"
+                  className="hidden"
                   accept="image/*"
                   onChange={handleFileUpload}
                 />
                 <Button variant="secondary" size="sm" asChild>
-                  <span><ImageIcon className="h-4 w-4 mr-2" /> 选择图片</span>
+                  <span>
+                    <ImageIcon className="h-4 w-4 mr-2" /> 选择图片
+                  </span>
                 </Button>
               </label>
             </>
@@ -327,8 +365,8 @@ export function ClaudeCostCalculator() {
               id="cacheRead"
               type="text"
               placeholder="0"
-              value={usage.cacheRead ? formatNumber(usage.cacheRead) : ''}
-              onChange={(e) => updateValue('cacheRead', e.target.value)}
+              value={usage.cacheRead ? formatNumber(usage.cacheRead) : ""}
+              onChange={(e) => updateValue("cacheRead", e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -337,8 +375,8 @@ export function ClaudeCostCalculator() {
               id="cacheWrite"
               type="text"
               placeholder="0"
-              value={usage.cacheWrite ? formatNumber(usage.cacheWrite) : ''}
-              onChange={(e) => updateValue('cacheWrite', e.target.value)}
+              value={usage.cacheWrite ? formatNumber(usage.cacheWrite) : ""}
+              onChange={(e) => updateValue("cacheWrite", e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -347,8 +385,8 @@ export function ClaudeCostCalculator() {
               id="input"
               type="text"
               placeholder="0"
-              value={usage.input ? formatNumber(usage.input) : ''}
-              onChange={(e) => updateValue('input', e.target.value)}
+              value={usage.input ? formatNumber(usage.input) : ""}
+              onChange={(e) => updateValue("input", e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -357,8 +395,8 @@ export function ClaudeCostCalculator() {
               id="output"
               type="text"
               placeholder="0"
-              value={usage.output ? formatNumber(usage.output) : ''}
-              onChange={(e) => updateValue('output', e.target.value)}
+              value={usage.output ? formatNumber(usage.output) : ""}
+              onChange={(e) => updateValue("output", e.target.value)}
             />
           </div>
         </div>

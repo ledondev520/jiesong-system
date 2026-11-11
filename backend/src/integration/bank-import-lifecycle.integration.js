@@ -4,6 +4,7 @@
  * Pos: internal bank-row regression; in-memory workbooks, no providers or real transfers
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -37,8 +38,8 @@ test('HTTP/SQLite: bank imports preserve preview, row/source and linkage boundar
   db = require('../utils/prisma');
   const jwt = require('jsonwebtoken');
   const tokens = {};
-  for (const role of ['ADMIN', 'FINANCE', 'BOSS', 'PURCHASE', 'SALES', 'WAREHOUSE', 'INACTIVE']) {
-    const user = await db.user.create({ data: { username: `synthetic-bank-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'FINANCE' : role, isActive: role !== 'INACTIVE' } });
+  for (const role of ['ADMIN', 'FINANCE', 'SALES', 'INACTIVE']) {
+    const user = await db.user.create({ data: { username: `synthetic-bank-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'ADMIN' : dbRole(role), isActive: role !== 'INACTIVE' } });
     // Database role/status must win over deliberately misleading JWT role claims.
     tokens[role] = jwt.sign({ userId: user.id, role: 'ADMIN' }, process.env.JWT_SECRET);
   }
@@ -102,7 +103,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       assert.equal(preview.preview[3].currency, 'USD');
       assert.deepEqual(snapshot(), before, 'discarding preview requires no rollback or cancel request');
     }
-    for (const [role, expected] of [['BOSS', 403], ['PURCHASE', 403], ['SALES', 403], ['WAREHOUSE', 403], ['INACTIVE', 401], ['ANONYMOUS', 401]]) {
+    for (const [role, expected] of [['SALES', 403], ['INACTIVE', 401], ['ANONYMOUS', 401]]) {
       for (const route of ['/bank-flow/import/preview', '/bank-flow/import']) {
         await call('POST', route, form(rows), role, expected);
         assert.deepEqual(snapshot(), before, 'denied upload must not create a batch or rows');
@@ -195,10 +196,11 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       assert.deepEqual(snapshot(), before, 'replay must retain original source, IDs, match metadata and no empty batch');
     }
     for (const [route, body] of [['/finance/match', matchBody], ['/finance/unmatch', { entityType: 'BANK', entityId: linked.id }], ['/finance/ignore', { entityType: 'BANK', entityId: linked.id }]]) {
-      await call('POST', route, body, 'BOSS', 403);
+      await call('POST', route, body, 'SALES', 403);
       assert.deepEqual(snapshot(), before);
     }
-    const read = await call('GET', `/bank-flow/transactions?batchId=${batchId}&currency=USD`, undefined, 'BOSS');
+    await call('GET', `/bank-flow/transactions?batchId=${batchId}&currency=USD`, undefined, 'SALES', 403); // OD-8: SALES never sees finance
+    const read = await call('GET', `/bank-flow/transactions?batchId=${batchId}&currency=USD`);
     assert.equal(read.items.find(stored => stored.id === linked.id).matchedContractId, sale.id);
     const unmatched = await call('GET', '/finance/unmatched?type=BANK');
     assert.equal(unmatched.bankTotal, 2, 'matched and ignored rows leave the existing pending queue');

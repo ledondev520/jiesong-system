@@ -2,8 +2,6 @@
  * Input: PurchaseDetailDialog、WAREHOUSE 角色、不含金额的合同详情
  * Output: 金额显示「无权查看」而非 ¥ 数字或 ¥0 的回归测试
  * Pos: 采购列表详情弹窗测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it, vi } from "vitest";

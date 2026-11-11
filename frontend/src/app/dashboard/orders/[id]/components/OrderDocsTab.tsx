@@ -114,14 +114,14 @@ export function OrderDocsTab({
                     建议或人工确认补齐；申报三表会阻止不完整单据生成。
                   </p>
                 </div>
-                {/* R3 P1-3：三表对话框仅 ADMIN/SALES/FINANCE 可用 */}
+                {/* OD-8：三表对话框仅 ADMIN 可用 */}
                 <BusinessWrite>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     className="shrink-0"
-                    disabled={role === "WAREHOUSE" || role === "PURCHASE"}
+                    disabled={role !== "ADMIN"}
                     onClick={onResolveHs}
                   >
                     处理未匹配 HS 编码

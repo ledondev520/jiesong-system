@@ -2,8 +2,6 @@
  * Input: Private synthetic directory and committed migrations
  * Output: Generated XLS/XLSX sources, actual CLI imports and independent SQLite snapshots
  * Pos: Financial library HTTP/hosted-browser fixture; no real sources or providers
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const fs = require('node:fs');
 const path = require('node:path');

@@ -1,12 +1,13 @@
 /** 真实 HTTP/SQLite 销售发运货物保护回归；仅使用临时合成数据，不读取业务库。 */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { copyTemplate } = require('../testHelpers/sqlite-template');
 
-test('HTTP/SQLite：发运后不能通过销售或旧货柜入口篡改已出库货物', async t => {
+test('HTTP/SQLite：发运后不能通过销售入口篡改已出库货物', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-sales-cargo-test-'));
   fs.chmodSync(directory, 0o700);
   const dbFile = path.join(directory, 'synthetic.db');
@@ -25,7 +26,7 @@ test('HTTP/SQLite：发运后不能通过销售或旧货柜入口篡改已出库
   const config = require('../config');
   const users = {};
   for (const role of ['ADMIN', 'PURCHASE', 'WAREHOUSE', 'SALES', 'FINANCE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id }, config.jwt.secret) };
   }
   const supplier = await db.supplier.create({ data: { name: '合成供应商', taxId: 'SYNTHETIC-TAX-ID' } });
@@ -65,7 +66,7 @@ test('HTTP/SQLite：发运后不能通过销售或旧货柜入口篡改已出库
   await call('POST', `/sales/${sale.id}/import-purchase-items`, { items: [{ purchaseItemId: pi.id, boxes: 5 }] }, { role: 'SALES', expected: 400 });
   assert.deepEqual(await snapshot(), before, '被拒绝的发运后导入不能修改装箱行、合同或库存');
   const manualCargo = { productId: product.id, quantity: 50, unit: '件', boxes: 5, grossWeight: 20000, netWeight: 19000, volume: 5, length: 1000, width: 1000, height: 1000 };
-  for (const root of ['sales', 'containers']) {
+  for (const root of ['sales']) {
     const itemsPath = root === 'sales' ? 'packing-items' : 'items';
     await call('POST', `/${root}/${sale.id}/${itemsPath}`, manualCargo, { role: 'SALES', expected: 400 });
     await call('PUT', `/${root}/${sale.id}/${itemsPath}/${packing.id}`, { unit: '箱' }, { role: 'SALES', expected: 400 });
@@ -76,7 +77,7 @@ test('HTTP/SQLite：发运后不能通过销售或旧货柜入口篡改已出库
     assert.deepEqual(await snapshot(), before, `${root} 拒绝货物变更后必须保持出库与装箱一致`);
   }
   const draft = await call('POST', '/sales', { exchangeRate: 7.2 }, { role: 'SALES', expected: 201 });
-  for (const root of ['sales', 'containers']) {
+  for (const root of ['sales']) {
     const itemsPath = root === 'sales' ? 'packing-items' : 'items';
     await call('PUT', `/${root}/${draft.id}/${itemsPath}/${packing.id}`, { quantity: 1 }, { role: 'SALES', expected: 404 });
     await call('DELETE', `/${root}/${draft.id}/${itemsPath}/${packing.id}`, undefined, { role: 'SALES', expected: 404 });
@@ -86,7 +87,6 @@ test('HTTP/SQLite：发运后不能通过销售或旧货柜入口篡改已出库
   assert.deepEqual(await snapshot(), before, '不能借用未发运合同号修改其他货柜的装箱行');
   // 历史资料和单证价格可补录；相同数量/单位重复保存不应误报。
   await call('PUT', `/sales/${sale.id}/packing-items/${packing.id}`, { quantity: 50, unit: '件', unitPrice: 12, invoiceNo: 'SYNTHETIC-INVOICE', note: '合成单证补录' }, { role: 'SALES' });
-  await call('PUT', `/containers/${sale.id}/items/${packing.id}`, { quantity: '50', unit: '件', unitPrice: '12', note: '合成价格补录' }, { role: 'SALES' });
   assert.deepEqual((await snapshot()).inventory, before.inventory);
   await call('PUT', `/sales/${sale.id}/status`, { status: 'SHIPPED' }, { role: 'SALES' });
   assert.equal((await snapshot()).contract.shippedAt.getTime(), before.contract.shippedAt.getTime());
@@ -94,25 +94,25 @@ test('HTTP/SQLite：发运后不能通过销售或旧货柜入口篡改已出库
 
   // 手工装箱行没有采购字段锁，仍需同样保护已出库数量。
   const manual = await call('POST', '/sales', { exchangeRate: 7.2 }, { role: 'SALES', expected: 201 });
-  const manualPacking = await call('POST', `/containers/${manual.id}/items`, manualCargo, { role: 'SALES', expected: 201 });
-  await call('PUT', `/containers/${manual.id}/items/${manualPacking.id}`, { note: '发运前可编辑', quantity: '50' }, { role: 'SALES' });
+  const manualPacking = await call('POST', `/sales/${manual.id}/packing-items`, manualCargo, { role: 'SALES', expected: 201 });
+  await call('PUT', `/sales/${manual.id}/packing-items/${manualPacking.id}`, { note: '发运前可编辑', quantity: 50 }, { role: 'SALES' });
   await call('PUT', `/sales/${manual.id}/status`, { status: 'CONFIRMED' }, { role: 'SALES' });
   await call('PUT', `/sales/${manual.id}/status`, { status: 'SHIPPED' }, { role: 'SALES' });
-  for (const root of ['sales', 'containers']) {
+  for (const root of ['sales']) {
     const itemsPath = root === 'sales' ? 'packing-items' : 'items';
     await call('PUT', `/${root}/${manual.id}/${itemsPath}/${manualPacking.id}`, { quantity: 100 }, { role: 'SALES', expected: 400 });
   }
   // 防御旧入口已经留下的状态错误；出库证据仍然有效。
   await db.salesContract.update({ where: { id: manual.id }, data: { status: 'DRAFT' } });
   await call('POST', `/sales/${manual.id}/packing-items`, manualCargo, { role: 'SALES', expected: 400 });
-  await call('DELETE', `/containers/${manual.id}/items/${manualPacking.id}`, undefined, { role: 'SALES', expected: 400 });
+  await call('DELETE', `/sales/${manual.id}/packing-items/${manualPacking.id}`, undefined, { role: 'SALES', expected: 400 });
   await db.salesContract.update({ where: { id: manual.id }, data: { status: 'SHIPPED' } });
 
   await call('PUT', `/sales/${sale.id}/status`, { status: 'ARRIVED' }, { role: 'SALES' });
   await call('POST', `/sales/${sale.id}/packing-items`, manualCargo, { role: 'SALES', expected: 400 });
   await call('POST', '/finance/payments', { type: 'RECEIVABLE_COLLECTION', salesContractId: sale.id, currency: 'USD', amount: 600, paymentDate: '2026-10-01' }, { role: 'FINANCE', expected: 201 });
   assert.equal((await db.salesContract.findUnique({ where: { id: sale.id } })).status, 'COMPLETED');
-  await call('POST', `/containers/${sale.id}/items`, manualCargo, { role: 'SALES', expected: 400 });
+  await call('POST', `/sales/${sale.id}/packing-items`, manualCargo, { role: 'SALES', expected: 400 });
   const inventory = await db.inventory.findMany();
   assert.equal(inventory.filter(row => row.status === 'OUTBOUND').reduce((sum, row) => sum + row.quantity, 0), 100);
   assert.equal(inventory.filter(row => row.status === 'INBOUND').reduce((sum, row) => sum + row.quantity, 0), 0);

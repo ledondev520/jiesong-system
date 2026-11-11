@@ -2,8 +2,6 @@
  * Input: 已发运订单的 OrderOverviewTab / OrderContainerTab 渲染
  * Output: 历史装箱告警不显示红色，利用率不显示绿色「达标」
  * Pos: BL-7 复核 P3：中性处理延伸到概览页签与利用率数字；未发运订单保持原告警色
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { describe, expect, it, vi } from "vitest";

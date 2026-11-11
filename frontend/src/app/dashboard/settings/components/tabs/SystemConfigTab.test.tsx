@@ -2,8 +2,6 @@
  * Input: SystemConfigTab、configService mock
  * Output: 系统配置 Tab 关键 UI 与保存字段回归
  * Pos: 设置 > 系统配置单测
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

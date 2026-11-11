@@ -35,13 +35,13 @@
 同时验证明确重试可用；不通过本地默认值补齐不完整的服务端配置。
 
 ## 分区与路径迁移（J29）
-设置侧栏按规格 §3.5 分区：报价规则、账号管理、公司信息、港口、商品分类、报关行、数据导入导出、AI 接入、AI 用量、系统日志；侧栏「设置」不再重复列出这些子页面。「高级：采样参数」折叠区在报价规则页（`SystemConfigTab`，默认收起）；独立的「高级」导航入口尚未实现。
+设置侧栏按规格 §3.5 分区：报价规则、账号管理、公司信息、港口、商品分类、报关行、数据导入导出、AI 用量、系统日志；侧栏「设置」不再重复列出这些子页面。「高级：采样参数」折叠区在报价规则页（`SystemConfigTab`，默认收起）；独立的「高级」导航入口尚未实现。
 
 | 旧路径 | 新路径 |
 |---|---|
-| `/dashboard/users`（与旧 487 行 `settings/users`） | `settings/users`（保留 907 行版本，含 Agent 账号） |
+| `/dashboard/users`（与旧 487 行 `settings/users`） | `settings/users`（A96 起不再含 Agent 账号） |
 | `/dashboard/system/logs` | `settings/logs` |
-| `/dashboard/about` | `settings/ai-access` |
+| `/dashboard/about` | `settings/ai-usage`（A96 删除 AI 接入页） |
 | `/dashboard/ai/sessions` | `settings/ai-usage` |
 | `/dashboard/system/notifications` | `/dashboard/notifications`（所有角色） |
 | `/dashboard/system` | 删除，重定向到 `/dashboard/settings` |

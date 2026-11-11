@@ -2,21 +2,32 @@
  * Input: 商品名称、门店名称
  * Output: 匹配的出口合同列表
  * Pos: 工作台小工具，快速查询商品位置
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Search, Package, MapPin, Ship, ArrowRight, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { aiService, type TrackResult } from '@/services/ai.service';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  Search,
+  Package,
+  MapPin,
+  Ship,
+  ArrowRight,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
+import { aiService, type TrackResult } from "@/services/ai.service";
 
 /**
  * 职责：商品追踪组件
@@ -28,15 +39,15 @@ import { aiService, type TrackResult } from '@/services/ai.service';
  */
 export function ProductTracker() {
   const router = useRouter();
-  const [productKeyword, setProductKeyword] = useState('');
-  const [storeKeyword, setStoreKeyword] = useState('');
+  const [productKeyword, setProductKeyword] = useState("");
+  const [storeKeyword, setStoreKeyword] = useState("");
   const [results, setResults] = useState<TrackResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
   const handleSearch = async () => {
     if (!productKeyword.trim()) {
-      toast.error('请输入商品名称');
+      toast.error("请输入商品名称");
       return;
     }
 
@@ -49,8 +60,8 @@ export function ProductTracker() {
       });
       setResults(response.data || []);
     } catch (error) {
-      console.error('查询失败:', error);
-      toast.error('查询失败，请稍后重试');
+      console.error("查询失败:", error);
+      toast.error("查询失败，请稍后重试");
       setResults([]);
     } finally {
       setLoading(false);
@@ -62,7 +73,7 @@ export function ProductTracker() {
       <StatusBadge
         status={status}
         statusMap={{
-          CANCELLED: { label: '已取消', tone: 'danger' },
+          CANCELLED: { label: "已取消", tone: "danger" },
         }}
       />
     );
@@ -88,7 +99,7 @@ export function ProductTracker() {
               placeholder="商品名称（如：不锈钢门）*"
               value={productKeyword}
               onChange={(e) => setProductKeyword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="pl-9"
             />
           </div>
@@ -98,11 +109,15 @@ export function ProductTracker() {
               placeholder="门店名称（可选）"
               value={storeKeyword}
               onChange={(e) => setStoreKeyword(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="pl-9"
             />
           </div>
-          <Button onClick={handleSearch} disabled={loading} className="shrink-0">
+          <Button
+            onClick={handleSearch}
+            disabled={loading}
+            className="shrink-0"
+          >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -131,13 +146,17 @@ export function ProductTracker() {
                     <div
                       key={`${item.salesContractId}-${index}`}
                       className="flex cursor-pointer items-center justify-between rounded-lg border bg-background p-3 transition-colors hover:bg-muted/50"
-                      onClick={() => router.push(`/dashboard/sales/${item.salesContractId}`)}
+                      onClick={() =>
+                        router.push(`/dashboard/sales/${item.salesContractId}`)
+                      }
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <Ship className="h-5 w-5 text-primary shrink-0" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-medium">{item.contractNo}</span>
+                            <span className="font-mono font-medium">
+                              {item.contractNo}
+                            </span>
                             {getStatusBadge(item.status)}
                           </div>
                           <div className="text-sm text-muted-foreground truncate">

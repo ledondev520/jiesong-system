@@ -4,8 +4,6 @@
  * Pos: 浏览器打印、PNG 与 PDF 导出共用的版面（PDF/PNG 由页面截图生成，避开 jsPDF 中文字体限制）；
  *      表格标题用 <h3> 而非 <caption>：截图克隆会把 table 的计算高度（不含 caption）套回含 caption 的盒子，
  *      使行被拉高、整页比量得的高度长约一个标题高，末尾几行被截掉；data-pdf-block 标记分页时不拆开标题与表
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import ContainerPlan2D from "./ContainerPlan2D";

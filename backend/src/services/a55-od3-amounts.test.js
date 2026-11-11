@@ -51,11 +51,11 @@ test('OD-3：GetExportOverview 仅对 WAREHOUSE 去掉 totalAmount/receivedAmoun
     const tool = buildToolPool((spec) => spec, [], [], undefined, role).find((x) => x.name === 'GetExportOverview');
     return JSON.parse(await tool.call({}, undefined)).contracts[0];
   };
-  const wh = await run('WAREHOUSE');
+  const wh = await run('SALES');
   assert.equal('totalAmount' in wh, false);
   assert.equal('receivedAmount' in wh, false);
   assert.equal(wh.status, 'CONFIRMED');
-  const sales = await run('SALES');
+  const sales = await run('ADMIN');
   assert.equal(sales.totalAmount, 1234);
   assert.equal(sales.receivedAmount, 321);
 });
@@ -70,15 +70,15 @@ test('OD-3：SearchEntities 出口合同副标题不含总额（WAREHOUSE），�
     const tool = buildToolPool((spec) => spec, [], [], undefined, role).find((x) => x.name === 'SearchEntities');
     return JSON.parse(await tool.call({ query: 'EXP' })).items[0];
   };
-  assert.doesNotMatch((await run('WAREHOUSE')).subtitle, /1,?234/);
-  assert.match((await run('SALES')).subtitle, /1,?234/);
+  assert.doesNotMatch((await run('SALES')).subtitle, /1,?234/);
+  assert.match((await run('ADMIN')).subtitle, /1,?234/);
 });
 
 test('OD-3 字段核对：GetSupplierOverview 选择列与低库存预警没有金额/银行字段', async (t) => {
   let select;
   stubPrisma(t, prisma.supplier, 'findMany', async (args) => { select = args.select; return []; });
   const { buildToolPool } = require('./openAgentService');
-  const tool = buildToolPool((spec) => spec, [], [], undefined, 'WAREHOUSE').find((x) => x.name === 'GetSupplierOverview');
+  const tool = buildToolPool((spec) => spec, [], [], undefined, 'SALES').find((x) => x.name === 'GetSupplierOverview');
   await tool.call({});
   assert.ok(select);
   assert.deepEqual(Object.keys(select).filter((k) => /amount|price|cost|bank|paid/i.test(k)), []);
@@ -98,10 +98,10 @@ test('OD-3：GET /sales 列表控制器对 WAREHOUSE 去掉金额字段', async 
     await list({ query: {}, user: { role } }, res, (e) => { throw e; });
     return body;
   };
-  const wh = JSON.stringify(await run('WAREHOUSE'));
+  const wh = JSON.stringify(await run('SALES'));
   assert.doesNotMatch(wh, /totalAmount|receivedAmount/);
   assert.match(wh, /EXP-1/);
-  assert.match(JSON.stringify(await run('SALES')), /totalAmount/);
+  assert.match(JSON.stringify(await run('ADMIN')), /totalAmount/);
 });
 
 test('A3：出口合同 Excel 的总额/已收/未收用 B87 口径（扣除第三方货值，已收封顶）', async (t) => {
@@ -140,10 +140,10 @@ test('OD-3/OD-6：GET /sales/:id 对 WAREHOUSE 去掉合同总额、已收金额
     await getById({ params: { id: 'c1' }, user: { role } }, res, (e) => { throw e; });
     return JSON.stringify(body);
   };
-  const wh = await run('WAREHOUSE');
+  const wh = await run('SALES');
   assert.doesNotMatch(wh, /totalAmount|receivedAmount|payments/);
   assert.match(wh, /CONFIRMED/);
-  assert.match(await run('SALES'), /totalAmount/);
+  assert.match(await run('ADMIN'), /totalAmount/);
 });
 
 test('A63：导出 includeMoney 缺省即无金额（fail closed）', async (t) => {

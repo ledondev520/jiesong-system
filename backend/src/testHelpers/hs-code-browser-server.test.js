@@ -2,8 +2,6 @@
  * Input: Private migrated HS fixture, real authenticated local routes and SQLite literals
  * Output: Local search/detail, existing-role manual evidence persistence and rejection checks
  * Pos: HS fixture contract tests; no browser, AI, external provider or production records
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -75,7 +73,7 @@ async function fixture(t) {
     assert.equal(response.status, 200);
     assert.equal(response.limit, '10');
     assert.equal(response.body.data.user.id, metadata.users[role].id);
-    assert.equal(response.body.data.user.role, role);
+    assert.equal(response.body.data.user.role, metadata.users[role].role);
     return response.body.data.token;
   };
   /**
@@ -170,10 +168,10 @@ test('HS local HTTP: combined name filters within the existing truncated prefix 
   assert.deepEqual(f.snapshot(), before);
 });
 
-test('HS manual HTTP: existing ADMIN/PURCHASE/FINANCE saves persist exact evidence and refresh cached reads', { timeout: 60000 }, async t => {
+test('HS manual HTTP: ADMIN and SALES persona saves persist exact evidence and refresh cached reads', { timeout: 60000 }, async t => {
   const f = await fixture(t);
   let count = 0;
-  for (const role of ['ADMIN', 'PURCHASE', 'FINANCE']) {
+  for (const role of ['ADMIN', 'PURCHASE', 'FINANCE', 'SALES']) {
     const token = await f.login(role);
     const before = f.snapshot();
     const query = '/hs-codes?code=999901&page=1&pageSize=20';
@@ -213,7 +211,7 @@ test('HS manual HTTP: existing ADMIN/PURCHASE/FINANCE saves persist exact eviden
   }
 });
 
-test('HS manual HTTP: invalid evidence and existing reader-role saves leave complete rows unchanged', { timeout: 60000 }, async t => {
+test('HS manual HTTP: invalid evidence saves leave complete rows unchanged (OD-8: no reader-only role remains)', { timeout: 60000 }, async t => {
   const f = await fixture(t);
   const token = await f.login('PURCHASE');
   const route = `/hs-codes/${f.hsCode}`;
@@ -231,11 +229,6 @@ test('HS manual HTTP: invalid evidence and existing reader-role saves leave comp
   }
   assert.equal((await f.call('PUT', '/hs-codes/7777777777', { note: '合成不存在编辑' }, token)).status, 404);
   assert.equal((await f.call('PUT', route, { note: '合成匿名编辑' })).status, 401);
-  for (const role of ['SALES', 'WAREHOUSE', 'BOSS']) {
-    const reader = await f.login(role);
-    assert.equal((await f.call('PUT', route, { note: '合成不允许编辑' }, reader)).status, 403);
-    assert.deepEqual(f.snapshot(), before);
-  }
   const corrected = await f.call('PUT', route, {
     refundRate: 0, effectiveDate: '2026-10-03', sourceUrl: 'https://example.invalid/hs/synthetic-retry',
   }, token);

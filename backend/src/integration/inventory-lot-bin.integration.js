@@ -39,7 +39,7 @@ test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、
   const jwt = require('jsonwebtoken');
   const config = require('../config');
   const users = {};
-  for (const role of ['PURCHASE', 'WAREHOUSE', 'SALES']) {
+  for (const role of ['ADMIN', 'SALES']) {
     const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id }, config.jwt.secret) };
   }
@@ -48,7 +48,7 @@ test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、
   const app = require('../app');
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
-  const call = async (method, url, body, { role = 'WAREHOUSE', expected = 200 } = {}) => {
+  const call = async (method, url, body, { role = 'SALES', expected = 200 } = {}) => {
     const response = await fetch(base + url, { method, headers: { authorization: `Bearer ${users[role].token}`, 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     const result = await response.json();
     assert.equal(response.status, expected, `${method} ${url}: ${result.message || result.error || ''}`);
@@ -67,11 +67,11 @@ test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、
   const receive = async (purchase, item, quantity) => call('POST', `/purchases/${purchase.id}/receipts`, { requestId: `synthetic-arrival-${++sequence}`, arrivedAt: '2026-10-01', items: [{ purchaseItemId: item.id, arrivedQuantity: quantity }] });
   const inspect = (purchase, receipt, acceptedQuantity, reinspectionQuantity = 0, extra = {}) => call('POST', `/purchases/${purchase.id}/receipts/${receipt.receipt.id}/inspection`, { requestId: `synthetic-inspection-${++sequence}`, note: '合成仓储验货依据', items: [{ receiptItemId: receipt.receipt.items[0].id, acceptedQuantity, reinspectionQuantity, ...extra }] });
   const purchase = async (product, quantity, boxes = 10) => {
-    const created = await call('POST', '/purchases', { supplierId: supplier.id, taxRate: 13, items: [{ productId: product.id, quantity, unit: '件', unitPrice: 10 }] }, { role: 'PURCHASE', expected: 201 });
+    const created = await call('POST', '/purchases', { supplierId: supplier.id, taxRate: 13, items: [{ productId: product.id, quantity, unit: '件', unitPrice: 10 }] }, { role: 'SALES', expected: 201 });
     const contract = created.contract || created;
-    await call('PUT', `/purchases/${contract.id}/status`, { status: 'SIGNED' }, { role: 'PURCHASE' });
-    await call('PUT', `/purchases/${contract.id}/production-details`, { completeProduction: true, items: [{ id: contract.items[0].id, specification: '合成箱', boxes, grossWeight: 20000, netWeight: 19000, volume: 10, length: 1000, width: 1000, height: 1000 }] }, { role: 'PURCHASE' });
-    await call('PUT', `/purchases/${contract.id}/status`, { status: 'SHIPPED' }, { role: 'PURCHASE' });
+    await call('PUT', `/purchases/${contract.id}/status`, { status: 'SIGNED' }, { role: 'SALES' });
+    await call('PUT', `/purchases/${contract.id}/production-details`, { completeProduction: true, items: [{ id: contract.items[0].id, specification: '合成箱', boxes, grossWeight: 20000, netWeight: 19000, volume: 10, length: 1000, width: 1000, height: 1000 }] }, { role: 'SALES' });
+    await call('PUT', `/purchases/${contract.id}/status`, { status: 'SHIPPED' }, { role: 'SALES' });
     return contract;
   };
 
@@ -109,8 +109,8 @@ test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、
       assert.equal(row.binLocation, 'A-01-02');
     }
 
-    // 列表筛选（包含匹配），WAREHOUSE 与 SALES 均可读到批次/库位。
-    for (const role of ['WAREHOUSE', 'SALES']) {
+    // 列表筛选（包含匹配），ADMIN 与 SALES 均可读到批次/库位。
+    for (const role of ['ADMIN', 'SALES']) {
       const byLot = await call('GET', '/inventory?lotNo=2026-11&pageSize=100', undefined, { role });
       assert.equal(byLot.items.length, 2, `${role} lotNo`);
       assert.ok(byLot.items.every((row) => row.lotNo === 'LOT-2026-11' && row.binLocation === 'A-01-02'));
@@ -121,11 +121,10 @@ test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、
     const both = await call('GET', '/inventory?lotNo=LOT-2026-11&binLocation=Z-99', undefined, {});
     assert.equal(both.items.length, 0);
 
-    // 位置编辑：WAREHOUSE 可改；省略保持；空串清空；SALES 403；空请求 400；不存在 404。
+    // 位置编辑（OD-8：SALES 负责收货）：可改；省略保持；空串清空；空请求 400；不存在 404。
     assert.equal((await call('POST', `/inventory/${stock.id}/location`, { binLocation: 'B-02-03' })).binLocation, 'B-02-03');
     assert.equal((await db.inventory.findUnique({ where: { id: stock.id } })).lotNo, 'LOT-2026-11');
     assert.equal((await call('POST', `/inventory/${stock.id}/location`, { lotNo: '' })).lotNo, null);
-    await call('POST', `/inventory/${stock.id}/location`, { lotNo: 'NO' }, { role: 'SALES', expected: 403 });
     await call('POST', `/inventory/${stock.id}/location`, {}, { expected: 400 });
     await call('POST', `/inventory/${stock.id}/location`, { lotNo: 'X'.repeat(51) }, { expected: 400 });
     await call('POST', '/inventory/missing-id/location', { lotNo: 'L' }, { expected: 404 });

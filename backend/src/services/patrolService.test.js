@@ -148,6 +148,15 @@ it('真实Prisma空库验证销售巡检与通知去重，不触碰业务数据�
     assert.equal((await service.persistPatrolFindings(findings)).notified, 4);
     assert.equal((await service.persistPatrolFindings(findings)).notified, 0);
     assert.equal(await db.notification.count(), 4);
+    // A101: identical findings write one PATROL_RUN row; a changed finding set writes another.
+    const runs = () => db.operationLog.count({ where: { action: 'PATROL_RUN' } });
+    assert.equal(await runs(), 1);
+    await service.persistPatrolFindings([...findings].reverse());
+    assert.equal(await runs(), 1);
+    await service.persistPatrolFindings(findings.slice(1));
+    assert.equal(await runs(), 2);
+    await service.persistPatrolFindings(findings);
+    assert.equal(await runs(), 3);
   } finally {
     if (db) await db.$disconnect();
     fs.rmSync(dir, { recursive: true, force: true });

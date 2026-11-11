@@ -2,8 +2,6 @@
  * Input: 供应商详情 API（含 ProductSupplier 商品）、GET /purchases/price-history/:productId
  * Output: 供应商详情页：基本信息与只读「供货商品」（本供应商的最近价/最低/均价/次数）
  * Pos: 采购模块供应商档案详情，只读，不改变供应商写入口
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

@@ -39,7 +39,7 @@ vi.mock("./components/BankFlowImportDialog", () => ({
 describe("bank flow import batch strip", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it.each(["ADMIN", "FINANCE"])("%s 可见来源文件名", async (role) => {
+  it.each(["ADMIN"])("%s 可见来源文件名", async (role) => {
     useAuthStore.setState({ user: { id: "u", role } as never });
     render(<BankFlowPage />);
     expect(

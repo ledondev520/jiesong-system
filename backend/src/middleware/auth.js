@@ -2,18 +2,22 @@
  * Input: JWT Bearer、HttpOnly浏览器会话、用户角色
  * Output: 实时用户状态与会话版本认证/授权结果
  * Pos: 认证授权中间件，保护API路由
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const jwt = require('jsonwebtoken');
 const browserSessions = require('../services/browserSessionService');
 const config = require('../config');
 const { createError } = require('./errorHandler');
-const { enforceBossReadOnly } = require('./bossReadOnly');
+const { ROLES } = require('../config/constants');
+
+// OD-8 (owner, 2026-11-11): accounts still holding a retired role (PURCHASE/FINANCE/WAREHOUSE/BOSS) are refused until an admin reassigns them.
+// Logout stays open so such an account can still end its own session.
+const assertActiveRole = (req) => {
+  if (req.method === 'POST' && String(req.originalUrl || '').split('?')[0] === '/api/v1/auth/logout') return;
+  if (!Object.values(ROLES).includes(req.user?.role)) throw createError('该账号的角色已停用，请联系管理员重新分配角色', 403);
+};
 const { roleAuth, adminOnly } = require('./roleAuth');
 const prisma = require('../utils/prisma');
-const { parseAgentBearerToken, verifyAgentSecret } = require('../utils/agentCredentials');
 
 // Authentication state is read from SQLite on every request, across all workers.
 // Retain the exported invalidation API for existing user-management callers.
@@ -27,99 +31,6 @@ const attachUserActor = (req, user) => {
     agentAccountId: null,
     agentCredentialId: null,
   };
-};
-
-const authenticateAgent = async (req, rawToken) => {
-  const parsedToken = parseAgentBearerToken(rawToken);
-  if (!parsedToken) {
-    throw createError('无效的Agent Token', 401);
-  }
-
-  const credential = await prisma.agentCredential.findUnique({
-    where: { credentialKey: parsedToken.credentialKey },
-    include: {
-      agentAccount: true,
-      grants: {
-        select: {
-          resource: true,
-          action: true,
-          scopeJson: true,
-        },
-      },
-    },
-  });
-
-  if (!credential || credential.status !== 'ACTIVE' || credential.revokedAt) {
-    throw createError('Agent credential 不可用', 401);
-  }
-
-  if (credential.expiresAt && credential.expiresAt.getTime() <= Date.now()) {
-    throw createError('Agent credential 已过期', 401);
-  }
-
-  if (!credential.agentAccount || credential.agentAccount.status !== 'ACTIVE') {
-    throw createError('Agent 账号不可用', 401);
-  }
-
-  if (!verifyAgentSecret(parsedToken.secret, credential.secretHash)) {
-    throw createError('无效的Agent Token', 401);
-  }
-
-  if (typeof prisma.agentCredential?.update === 'function') {
-    try {
-      await prisma.agentCredential.update({
-        where: { id: credential.id },
-        data: { lastUsedAt: new Date() },
-      });
-    } catch {
-      // 不阻断主认证流程；lastUsedAt 属于运维辅助字段
-    }
-  }
-
-  req.agent = {
-    id: credential.agentAccount.id,
-    name: credential.agentAccount.name,
-    slug: credential.agentAccount.slug,
-    status: credential.agentAccount.status,
-    defaultMode: credential.agentAccount.defaultMode || null,
-    grants: Array.isArray(credential.grants) ? credential.grants.map((grant) => ({
-      resource: grant.resource,
-      action: grant.action,
-      scopeJson: grant.scopeJson || null,
-    })) : [],
-  };
-  req.agentCredential = {
-    id: credential.id,
-    credentialKey: credential.credentialKey,
-    label: credential.label || null,
-    status: credential.status,
-  };
-  req.authActor = {
-    actorType: 'AGENT',
-    userId: null,
-    agentAccountId: credential.agentAccount.id,
-    agentCredentialId: credential.id,
-  };
-};
-
-// Agent (jsa_) tokens are deny-by-default: only routes listed here may be reached, and each
-// still enforces its own accessAuth/capabilityAuth grant. Add a route here only together
-// with an explicit capability check on it. Human JWT/session auth is unaffected.
-const AGENT_ROUTES = [
-  ['GET', /^\/api\/v1\/search$/],
-  ['POST', /^\/api\/v1\/purchases$/],
-  ['PUT', /^\/api\/v1\/purchases\/[^/]+(\/production-details|\/invoice-numbers)?$/],
-  ['POST', /^\/api\/v1\/suppliers$/],
-  ['PUT', /^\/api\/v1\/suppliers\/[^/]+$/],
-  ['GET', /^\/mcp$/],
-  ['POST', /^\/mcp$/], // tools/call checks per-tool capabilities in routes/mcp.js
-];
-
-const assertAgentRouteAllowed = (req) => {
-  const path = `${req.baseUrl || ''}${req.path || ''}`.replace(/\/+$/, '') || '/';
-  if (!AGENT_ROUTES.some(([method, re]) => method === req.method && re.test(path))) {
-    throw createError('Agent 无权限执行此操作', 403);
-  }
 };
 
 /**
@@ -139,7 +50,7 @@ const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       attachUserActor(req, await browserSessions.authenticate(req));
-      enforceBossReadOnly(req);
+      assertActiveRole(req);
       return next();
     }
     // An explicit malformed/expired bearer must never fall back to another identity.
@@ -147,12 +58,6 @@ const authenticate = async (req, res, next) => {
     
     const token = authHeader.split(' ')[1];
 
-    if (token.startsWith('jsa_')) {
-      await authenticateAgent(req, token);
-      assertAgentRouteAllowed(req);
-      return next();
-    }
-    
     // 2. 验证Token
     let decoded;
     try {
@@ -180,7 +85,7 @@ const authenticate = async (req, res, next) => {
 
     // 4. 附加用户信息
     attachUserActor(req, publicUser);
-    enforceBossReadOnly(req);
+    assertActiveRole(req);
     next();
   } catch (error) {
     next(error);

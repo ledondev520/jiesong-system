@@ -2,13 +2,11 @@
  * Input: 泛型数组数据 + 可选默认排序
  * Output: 排序状态管理、排序后数据、排序回调
  * Pos: 通用 hook，任何表格页面可直接使用
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from "react";
 
-export type SortDirection = 'asc' | 'desc' | null;
+export type SortDirection = "asc" | "desc" | null;
 
 export interface UseTableSortResult<T, K extends string = string> {
   sortedData: T[];
@@ -32,10 +30,12 @@ export interface UseTableSortResult<T, K extends string = string> {
 export function useTableSort<T, K extends string = string>(
   data: T[],
   accessor: (item: T, key: K) => string | number | null | undefined,
-  defaultSort?: { key: K; dir: SortDirection }
+  defaultSort?: { key: K; dir: SortDirection },
 ): UseTableSortResult<T, K> {
   const [sortKey, setSortKey] = useState<K | null>(defaultSort?.key ?? null);
-  const [sortDir, setSortDir] = useState<SortDirection>(defaultSort?.dir ?? null);
+  const [sortDir, setSortDir] = useState<SortDirection>(
+    defaultSort?.dir ?? null,
+  );
 
   /**
    * 职责：点击列头时切换排序方向（asc → desc → 取消）
@@ -43,13 +43,13 @@ export function useTableSort<T, K extends string = string>(
   const onSort = useCallback((key: K) => {
     setSortKey((prevKey) => {
       if (prevKey !== key) {
-        setSortDir('asc');
+        setSortDir("asc");
         return key;
       }
       setSortDir((prevDir) => {
-        if (prevDir === 'asc') return 'desc';
-        if (prevDir === 'desc') return null;
-        return 'asc';
+        if (prevDir === "asc") return "desc";
+        if (prevDir === "desc") return null;
+        return "asc";
       });
       return key;
     });
@@ -68,17 +68,17 @@ export function useTableSort<T, K extends string = string>(
       const vb = accessor(b, sortKey);
 
       if (va == null && vb == null) return 0;
-      if (va == null) return sortDir === 'asc' ? 1 : -1;
-      if (vb == null) return sortDir === 'asc' ? -1 : 1;
+      if (va == null) return sortDir === "asc" ? 1 : -1;
+      if (vb == null) return sortDir === "asc" ? -1 : 1;
 
-      if (typeof va === 'number' && typeof vb === 'number') {
-        return sortDir === 'asc' ? va - vb : vb - va;
+      if (typeof va === "number" && typeof vb === "number") {
+        return sortDir === "asc" ? va - vb : vb - va;
       }
 
       const sa = String(va).toLowerCase();
       const sb = String(vb).toLowerCase();
-      const cmp = sa.localeCompare(sb, 'zh-CN');
-      return sortDir === 'asc' ? cmp : -cmp;
+      const cmp = sa.localeCompare(sb, "zh-CN");
+      return sortDir === "asc" ? cmp : -cmp;
     });
   }, [data, sortKey, sortDir, accessor]);
 

@@ -4,6 +4,7 @@
  * Pos: internal preparation only; no filing, settlement, signatures or real data
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -44,7 +45,7 @@ test('HTTP/SQLite: internal tax preparation retains current document and invoice
   for (const role of ['SALES', 'FINANCE']) {
     const user = await db.user.create({ data: {
       username: `synthetic-preparation-${role}`, name: `Synthetic ${role}`,
-      password: randomBytes(32).toString('hex'), role,
+      password: randomBytes(32).toString('hex'), role: dbRole(role),
     } });
     tokens[role] = require('jsonwebtoken').sign({ userId: user.id }, process.env.JWT_SECRET);
   }
@@ -110,7 +111,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
   const packet = await good('POST', `/sales/${sale.id}/export-packet/generate`, {
     spotRate: 7.2, sellerName: 'Synthetic seller', buyerName: 'Synthetic buyer',
     packageKind: 'CARTON', tradeTerm: 'FOB', documentDate: '2026-10-01',
-  }, 'SALES');
+  }, 'FINANCE'); // OD-8: export packet is ADMIN only (FINANCE persona = ADMIN)
   const rows = await db.packingItem.findMany({ where: { salesContractId: sale.id }, orderBy: { createdAt: 'asc' } });
   const declaration = await db.customsDeclaration.create({ data: {
     declarationNo: 'SYNTHETIC-PREPARATION-DECLARATION', salesContractId: sale.id,

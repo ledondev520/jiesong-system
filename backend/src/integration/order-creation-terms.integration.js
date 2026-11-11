@@ -64,7 +64,8 @@ test('HTTP/SQLite: new orders need an active customer (none → 400), adopt a si
   assert.equal(adopted.data.customerId, seapot.id);
   assert.equal(adopted.data.currency, 'USD');
   assert.equal(adopted.data.items[0].sellingPrice, 1994, '¥10,000 → 1993.87 → 1994 by the locked rule (ceil to whole USD)');
-  assert.equal(adopted.data.totalAmount, 19940);
+  assert.equal('totalAmount' in adopted.data, false, 'OD-7: SALES never sees the contract total');
+  assert.equal((await db.salesContract.findUnique({ where: { id: adopted.data.id } })).totalAmount, 19940);
   assert.deepEqual([adopted.data.incoterm, adopted.data.paymentTerms, adopted.data.portOfLoading], ['FOB', '30% deposit', 'Shanghai']);
   // Explicit values override the copied defaults; an explicit selling price is kept as entered.
   const explicit = await create(order({ incoterm: 'cif', paymentTerms: 'T/T', items: [line({ sellingPrice: 1234 })] }));

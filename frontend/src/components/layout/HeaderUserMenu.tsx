@@ -2,8 +2,6 @@
  * Input: 当前用户、资料保存、退出动作
  * Output: Header 用户菜单与个人设置弹窗
  * Pos: 前端布局子组件
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

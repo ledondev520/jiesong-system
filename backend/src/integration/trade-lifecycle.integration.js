@@ -1,5 +1,6 @@
 /** 同一笔合成采购贯穿真实 HTTP、SQLite、分批验货、装柜、发运及退税清单；不读取业务库。 */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -26,7 +27,7 @@ test('HTTP/SQLite：一笔采购两次出货守恒，库存与清单实际落库
   const config = require('../config');
   const users = {};
   for (const role of ['ADMIN', 'PURCHASE', 'WAREHOUSE', 'SALES', 'FINANCE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id }, config.jwt.secret) };
   }
   const supplier = await db.supplier.create({ data: { name: '合成供应商', taxId: 'SYNTHETIC-TAX-ID' } });
@@ -56,7 +57,7 @@ test('HTTP/SQLite：一笔采购两次出货守恒，库存与清单实际落库
     const canonical = JSON.stringify(Object.fromEntries(Object.entries(body).sort(([a], [b]) => a.localeCompare(b))));
     const key = `idempotency:sha256:${createHash('sha256').update(canonical).digest('hex')}`;
     assert.equal(key.length, 83);
-    return call('POST', '/finance/payments', body, { role: 'PURCHASE', expected, headers: { 'X-Idempotency-Key': key } });
+    return call('POST', '/finance/payments', body, { role: 'FINANCE', expected, headers: { 'X-Idempotency-Key': key } });
   };
   const deposit = await payment(339, 'synthetic-deposit');
   const replay = await payment(339, 'synthetic-deposit', 200);
@@ -76,7 +77,7 @@ test('HTTP/SQLite：一笔采购两次出货守恒，库存与清单实际落库
     await call('POST', `/sales/${sale.id}/import-purchase-items`, { items: [{ purchaseItemId: pi.id, boxes: 5 }] }, { role: 'SALES', expected: 201 });
     await call('PUT', `/sales/${sale.id}/status`, { status: 'CONFIRMED' }, { role: 'SALES' });
     assert.equal((await db.salesContract.findUnique({ where: { id: sale.id } })).status, 'PACKING');
-    const packet = await call('POST', `/sales/${sale.id}/export-packet/generate`, { spotRate: 7.2, sellerName: '合成卖方', buyerName: '合成买方', packageKind: 'WOODEN CASE', tradeTerm: 'FOB', documentDate: '2026-10-01' }, { role: 'SALES', expected: 201 });
+    const packet = await call('POST', `/sales/${sale.id}/export-packet/generate`, { spotRate: 7.2, sellerName: '合成卖方', buyerName: '合成买方', packageKind: 'WOODEN CASE', tradeTerm: 'FOB', documentDate: '2026-10-01' }, { role: 'FINANCE', expected: 201 });
     return { ...sale, packet };
   };
   const a = await prepareExport();
@@ -167,8 +168,8 @@ test('HTTP/SQLite：一笔采购两次出货守恒，库存与清单实际落库
   assert.equal((await db.inventory.findUnique({ where: { id: legacy.id } })).status, 'SHIPPING');
   await db.inventory.delete({ where: { id: legacy.id } });
   for (const [role, method, url, expected] of [
-    ['BOSS','GET','/finance/stats',200], ['BOSS','POST','/finance/payments',403],
-    ['BOSS','POST','/ai/chat',403], ['FINANCE','POST',`/purchases/${purchase.id}/receipts`,403],
-    ['SALES','POST',`/purchases/${purchase.id}/receipts`,403], ['WAREHOUSE','GET',`/purchases/${purchase.id}/receipts`,200],
+    // OD-8 personas: FINANCE = ADMIN; BOSS/WAREHOUSE = SALES (finance denied, purchase receipts allowed).
+    ['FINANCE','GET','/finance/stats',200], ['BOSS','GET','/finance/stats',403], ['BOSS','POST','/finance/payments',403],
+    ['SALES','POST',`/purchases/${purchase.id}/receipts`,400], ['WAREHOUSE','GET',`/purchases/${purchase.id}/receipts`,200],
   ]) await call(method, url, method === 'POST' ? {} : undefined, { role, expected });
 });

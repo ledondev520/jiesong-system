@@ -2,8 +2,6 @@
  * Input: 用户认证状态、路由导航配置、当前路径
  * Output: 移动端TabBar、更多菜单与经服务端确认的逐浏览器退出
  * Pos: 移动端全局导航层，替代桌面端侧边栏，提供拇指可达的5 Tab 快速跳转
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";
@@ -218,21 +216,19 @@ export function MobileTabBar({
             </nav>
           )}
 
-          {/* AI 助手：不设菜单项，从此处进入（BOSS 无权限） */}
-          {user?.role !== Role.BOSS && (
-            <div className="px-4 pb-1">
-              <button
-                onClick={() => {
-                  setMoreOpen(false);
-                  useAiPanelStore.getState().setOpen(true);
-                }}
-                className="flex min-h-[52px] w-full touch-manipulation items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted"
-              >
-                <Bot className="h-5 w-5 shrink-0" />
-                <span>AI 助手</span>
-              </button>
-            </div>
-          )}
+          {/* AI 助手：不设菜单项，从此处进入 */}
+          <div className="px-4 pb-1">
+            <button
+              onClick={() => {
+                setMoreOpen(false);
+                useAiPanelStore.getState().setOpen(true);
+              }}
+              className="flex min-h-[52px] w-full touch-manipulation items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <Bot className="h-5 w-5 shrink-0" />
+              <span>AI 助手</span>
+            </button>
+          </div>
 
           {/* 用户信息 + 退出 */}
           <div className="mx-4 mt-1 space-y-2 rounded-xl border bg-muted/40 p-3">

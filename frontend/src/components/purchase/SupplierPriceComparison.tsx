@@ -2,8 +2,6 @@
  * Input: GET /purchases/price-history/:productId 的 bySupplier 汇总
  * Output: 供应商比价表（桌面）/ MobileListCard 卡片（手机，最近价最低高亮）与「比价」弹层
  * Pos: 采购单行编辑器弹层、商品详情「采购价格」页签共用，只读
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 "use client";

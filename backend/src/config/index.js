@@ -2,8 +2,6 @@
  * Input: 环境变量 (.env)
  * Output: 统一配置对象（含显式代理白名单、JWT、活动 AI/可选回退 AI/Kimi、HSCIQ、上传、CORS 配置）
  * Pos: 配置中心，集中管理所有环境变量
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');

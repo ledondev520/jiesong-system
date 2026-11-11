@@ -2,8 +2,6 @@
  * Input: sales 路由模块
  * Output: 销售路由匹配顺序回归测试结果
  * Pos: 销售路由层测试，保障静态路由优先级
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const test = require('node:test');
@@ -105,9 +103,9 @@ test('sales export routes: 缺失合同时将404错误传给 next', async () => 
   }
 });
 
-test('loading-plan 路由：显式角色白名单（含 BOSS），拒绝未登录、Agent、未知角色', async () => {
+test('loading-plan 路由：显式角色白名单 ADMIN/SALES（OD-8），拒绝未登录、Agent、未知角色', async () => {
   const guard = getRouteHandlers(salesRouter, '/:id/loading-plan', 'get').find((layer) => layer.handle.isRoleAuth).handle;
-  assert.deepEqual([...guard.allowedRoles].sort(), ['ADMIN', 'BOSS', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE']);
+  assert.deepEqual([...guard.allowedRoles].sort(), ['ADMIN', 'SALES']);
   const statusFor = (req) => { let status; guard(req, {}, (error) => { status = error?.statusCode ?? 200; }); return status; };
   for (const role of guard.allowedRoles) assert.equal(statusFor({ user: { role } }), 200, role);
   assert.equal(statusFor({}), 401, '未登录');

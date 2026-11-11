@@ -158,7 +158,7 @@ const buildContextQueries = (message, { role } = {}) => {
     addQuery(tasks, 'exchange', () => safe(Promise.resolve().then(() => currentRates())));
   }
 
-  if (shouldSearchFinance && role !== 'WAREHOUSE') {
+  if (shouldSearchFinance && role === 'ADMIN') {
     addQuery(tasks, 'finance', () =>
       safe(Promise.all([
         getPayablesSummary(prisma),
@@ -301,7 +301,7 @@ const getDbContext = async (message, { role } = {}) => {
   const byName = await collectContextData(tasks);
 
   try {
-    appendContextLines(context, byName, salesKeyword, role !== 'WAREHOUSE');
+    appendContextLines(context, byName, salesKeyword, role === 'ADMIN');
     if (context.length === 0) {
       return '';
     }

@@ -2,8 +2,6 @@
  * Input: MobileTabBar、导航配置、认证与 AI 面板 store
  * Output: 手机底栏测试：首页·订单·采购·库存·更多、触控高度、更多面板与 AI 入口
  * Pos: 前端布局组件测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
@@ -85,14 +83,5 @@ describe("MobileTabBar", () => {
     fireEvent.click(within(sheet).getByText("AI 助手"));
     expect(useAiPanelStore.getState().open).toBe(true);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  it("BOSS 的更多面板没有 AI 助手入口", () => {
-    mockRole = Role.BOSS;
-    renderBar();
-    fireEvent.click(screen.getByText("更多"));
-    expect(
-      within(screen.getByRole("dialog")).queryByText("AI 助手"),
-    ).not.toBeInTheDocument();
   });
 });

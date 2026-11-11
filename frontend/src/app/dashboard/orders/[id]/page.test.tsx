@@ -2,8 +2,6 @@
  * Input: 出口订单详情页、sales/product/store/inventory 服务、router、toast
  * Output: 订单详情各页签（概览/明细/货柜/单证/收款）、唯一下一步、「单证 ▾」菜单与阶段/合同头失败重试测试，隔离并等待成功后的延迟退税弹窗
  * Pos: 前端详情页交互测试（原 /dashboard/sales/[id] 用例迁移，默认从 ?tab=container 进入）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

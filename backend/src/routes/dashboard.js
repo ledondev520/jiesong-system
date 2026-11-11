@@ -2,8 +2,6 @@
  * Input: dashboardController
  * Output: 仪表盘API路由及WPS同步汇总状态
  * Pos: 仪表盘路由定义
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const express = require('express');
@@ -29,7 +27,7 @@ router.get('/todos', dashboardController.getTodos);
 router.get('/track-product', dashboardController.trackProduct);
 
 // GET /api/v1/dashboard/analytics - 数据看板详细分析
-router.get('/analytics', roleAuth('ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'), dashboardController.getAnalytics);
+router.get('/analytics', roleAuth('ADMIN'), dashboardController.getAnalytics);
 
 // GET /api/v1/dashboard/trade-workflows - 出口专项单主线路与下一动作
 router.get('/trade-workflows', dashboardController.getTradeWorkflows);

@@ -2,7 +2,6 @@
  * Input: 临时合成 Git 仓库与合成 PR 评论，不依赖网络、gh 或前端依赖
  * Output: 标记信任、历史完整性、重命名、交叉合并及复核过期的真实回归结果
  * Pos: 本地与 CI 的 Node 工具测试，不修改全局 Git 配置，结束后清理
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

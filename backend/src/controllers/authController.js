@@ -2,8 +2,6 @@
  * Input: 认证服务
  * Output: 认证相关的HTTP响应
  * Pos: 认证控制器，处理固定期限浏览器会话、登录、邮箱验证注册、用户管理、找回密码请求
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const authService = require('../services/authService');
@@ -131,23 +129,6 @@ const getUsers = async (req, res, next) => {
 };
 
 /**
- * 职责：更新用户信息（管理员）
- * @param {Request} req - Express请求对象
- * @param {Response} res - Express响应对象
- * @param {NextFunction} next - 下一个中间件
- */
-const updateUser = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const userData = req.body;
-    const user = await authService.updateUser(id, userData, req.user?.id);
-    success(res, user, '用户更新成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：找回密码（验证绑定邮箱验证码并撤销已有会话）
  * @param {Request} req - Express请求对象
  * @param {Response} res - Express响应对象
@@ -181,6 +162,5 @@ module.exports = {
   getCurrentUser,
   changePassword,
   getUsers,
-  updateUser,
   resetPassword,
 };

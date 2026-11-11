@@ -2,8 +2,6 @@
  * Input: 供应商档案
  * Output: 「待完善」徽标与缺失字段清单；资料齐全时不渲染
  * Pos: 供应商列表卡片与只读摘要共用，说明「待完善」到底缺什么
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { Badge } from "@/components/ui/badge";
 import type { Supplier } from "@/types";

@@ -39,7 +39,7 @@ test('HTTP/SQLite: draft contracts are not payables and every endpoint shows the
   db = require('../utils/prisma');
   const jwt = require('jsonwebtoken');
   const config = require('../config');
-  const user = await db.user.create({ data: { username: 'synthetic-payables-finance', password: 'test-only-unused-hash', name: 'Synthetic', role: 'FINANCE' } });
+  const user = await db.user.create({ data: { username: 'synthetic-payables-finance', password: 'test-only-unused-hash', name: 'Synthetic', role: 'ADMIN' } });
   const token = jwt.sign({ userId: user.id }, config.jwt.secret);
   const supplier = await db.supplier.create({ data: { name: 'Synthetic Payables Supplier' } });
   const contracts = [
@@ -115,7 +115,7 @@ test('HTTP/SQLite: draft contracts are not payables and every endpoint shows the
 
   await t.test('AI context 财务概况', async () => {
     const { getDbContext } = require('../services/ai/contextService');
-    const context = await getDbContext('价格和应收应付');
+    const context = await getDbContext('价格和应收应付', { role: 'ADMIN' });
     assert.match(context, new RegExp(`应付总额¥${EXPECTED.total}, 已付¥${EXPECTED.paid}, 待付¥${EXPECTED.unpaid}`));
   });
 

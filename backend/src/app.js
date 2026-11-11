@@ -2,8 +2,6 @@
  * Input: 所有路由模块、中间件
  * Output: Express应用实例、管理员初始化门禁、标准100/min全局限流（显式代理白名单默认关闭）
  * Pos: 应用入口，初始化 Express 服务器
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const express = require('express');
@@ -11,12 +9,10 @@ const cors = require('cors');
 const compression = require('compression');
 const config = require('./config');
 const routes = require('./routes');
-const mcpRoutes = require('./routes/mcp');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');
 const { createApiRateLimiter, exposeApiRateLimitHeaders } = require('./middleware/apiRateLimit');
 const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
-const { startAgentCredentialAlertJob } = require('./jobs/agentCredentialAlertJob');
 const { startPatrolJob } = require('./jobs/patrolJob');
 const { startExportReminderJob } = require('./jobs/exportReminderJob');
 
@@ -97,7 +93,6 @@ app.get('/health', (req, res) => {
 
 // 4. API 路由（所有业务路由挂载在/api/v1 下）
 app.use('/api/v1', routes);
-app.use('/mcp', mcpRoutes);
 
 // ==================== 错误处理 ====================
 
@@ -116,7 +111,6 @@ async function startServer() {
   await require('./services/bootstrapAdmin').ensureBootstrapAdmin(require('./utils/prisma'));
 
   startInventoryAlertJob();
-  startAgentCredentialAlertJob();
   startExportReminderJob();
   startPatrolJob({
     runOnStart: config.nodeEnv === 'production' || process.env.PATROL_RUN_ON_START === 'true',

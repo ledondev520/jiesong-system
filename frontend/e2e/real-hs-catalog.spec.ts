@@ -2,8 +2,6 @@
  * Input: Production frontend, real existing-role auth/local HS API and private SQLite
  * Output: Four hosted search/detail/cancel/evidence-save/readback acceptance cases
  * Pos: Ordinary local HS catalogue QA; excludes AI-only copy and provider routes
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { pickDate } from "./helpers";
@@ -385,31 +383,4 @@ test("local HS genuine evidence failure retains draft, corrected save blocks rep
   await expectValues(dialogFor(page), revisedValues);
   expect(readHsSnapshot(fixture)).toEqual(after);
   expect(writes).toBe(1);
-});
-
-test("BOSS local HS search/detail remains readable while existing manual edit route rejects without writes", async ({
-  page,
-}) => {
-  const token = await enterHs(page, "BOSS");
-  await openDetail(page);
-  const before = readHsSnapshot(fixture);
-  await expect(
-    page.getByRole("button", { name: "人工更新税则", exact: true }),
-  ).toHaveCount(0);
-  const denied = await page.evaluate(
-    async ({ code, token }) => {
-      const response = await fetch(`/api/v1/hs-codes/${code}`, {
-        method: "PUT",
-        headers: {
-          authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ note: "合成只读角色拒绝写入" }),
-      });
-      return response.status;
-    },
-    { code: fixture.hsCode, token },
-  );
-  expect(denied).toBe(403);
-  expect(readHsSnapshot(fixture)).toEqual(before);
 });

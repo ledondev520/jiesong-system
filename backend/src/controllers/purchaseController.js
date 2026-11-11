@@ -2,8 +2,6 @@
  * Input: Prisma客户端、统一附件服务与上传路径工具
  * Output: 采购合同相关的HTTP响应，编号预览沿用统一序列规则；附件下载/删除复用财务凭证访问边界
  * Pos: 采购控制器，处理采购合同CRUD请求与受限附件存储、下载
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');
@@ -132,7 +130,7 @@ const list = async (req, res, next) => {
     
     const orderBy = parseListSort(
       req.query,
-      req.user?.role === 'WAREHOUSE' ? PURCHASE_SORT_COLUMNS : { ...PURCHASE_SORT_COLUMNS, ...PURCHASE_MONEY_SORT_COLUMNS },
+      req.user?.role !== 'ADMIN' ? PURCHASE_SORT_COLUMNS : { ...PURCHASE_SORT_COLUMNS, ...PURCHASE_MONEY_SORT_COLUMNS },
       [{ contractNo: 'desc' }],
     );
 
@@ -236,7 +234,7 @@ const registerInvoiceNumbers = async (req, res, next) => {
       req.params.id,
       { invoiceNumbers: req.body?.invoiceNumbers },
       undefined,
-      { appendOnly: req.user?.role === 'WAREHOUSE' }, // OD-2：WAREHOUSE 看不到已存号码，只能追加，不能整表覆盖
+      { appendOnly: req.user?.role !== 'ADMIN' }, // OD-2：WAREHOUSE 看不到已存号码，只能追加，不能整表覆盖
     );
     success(res, { ...preparation, invoiceFiles: fileService.filterVisibleFiles(preparation.invoiceFiles, req.user) }, '供应商发票号码已登记');
   } catch (error) {
@@ -276,7 +274,7 @@ const create = async (req, res, next) => {
       prismaClient: prisma,
     });
 
-    const warnings = req.user?.role === 'WAREHOUSE' ? [] : await checkPriceWarnings(input.items || [], prisma); // 警告文案含价格，WAREHOUSE 不返回
+    const warnings = req.user?.role !== 'ADMIN' ? [] : await checkPriceWarnings(input.items || [], prisma); // 警告文案含价格，WAREHOUSE 不返回
 
     if (warnings.length > 0) {
       const warningMessages = warnings.map((w) => w.message).join('；');
@@ -631,7 +629,7 @@ const getProductPriceHistory = async (req, res, next) => {
   try {
     const { productId } = req.params;
 
-    if (req.user?.role === 'WAREHOUSE') { // OD-3：历史采购价属金额类，WAREHOUSE 只得到空统计
+    if (req.user?.role !== 'ADMIN') { // OD-3：历史采购价属金额类，WAREHOUSE 只得到空统计
       return success(res, { averagePrice: null, minPrice: null, maxPrice: null, count: 0, history: [], bySupplier: [] });
     }
 

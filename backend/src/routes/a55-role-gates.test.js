@@ -1,6 +1,6 @@
 /**
- * Input: 真实挂载的 /ai、/import、/three-forms、/contract-doc 路由与真实 authenticate/roleAuth/bossReadOnly（仅 prisma 读取被桩替换）
- * Output: A55 的角色门槛：A1（ADMIN-only 读）、OD-1（PURCHASE 不可建报关草稿）、OD-4（BOSS 仅可下载合同 PDF）
+ * Input: 真实挂载的 /ai、/import、/three-forms、/contract-doc 路由与真实 authenticate/roleAuth（仅 prisma 读取被桩替换）
+ * Output: A55 的角色门槛：A1（ADMIN-only 读）、OD-1/OD-4 在 OD-8 两角色下仅 ADMIN；已停用角色一律 403
  * Pos: 后端路由权限回归测试；与 rbac-policy-matrix.test.js 互补（那边断言最大角色集合的 403，这里断言放行与特例）
  */
 const test = require('node:test');
@@ -47,7 +47,8 @@ const start = async (t) => {
   };
 };
 
-const NON_ADMIN = ['FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE', 'BOSS'];
+// OD-8: SALES is the only other live role; the retired roles must still be refused (assertActiveRole).
+const NON_ADMIN = ['SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS'];
 
 test('A1：/ai/usage/* 与 /import/{history,stats}（routes/dataImport.js） 仅 ADMIN', async (t) => {
   const call = await start(t);
@@ -58,23 +59,18 @@ test('A1：/ai/usage/* 与 /import/{history,stats}（routes/dataImport.js） 仅
   }
 });
 
-test('OD-1：POST /three-forms/customs-declaration 对 PURCHASE 403，SALES/FINANCE/ADMIN 通过角色门槛', async (t) => {
+test('OD-1 / OD-8：POST /three-forms/customs-declaration 仅 ADMIN 越过角色门槛', async (t) => {
   const call = await start(t);
-  assert.equal(await call('POST', '/three-forms/customs-declaration', 'PURCHASE'), 403);
-  assert.equal(await call('POST', '/three-forms/customs-declaration', 'WAREHOUSE'), 403);
-  for (const role of ['ADMIN', 'SALES', 'FINANCE']) {
-    // 空体 → 400 缺少出口合同 ID，说明已越过 roleAuth
-    assert.equal(await call('POST', '/three-forms/customs-declaration', role), 400, role);
-  }
+  for (const role of NON_ADMIN) assert.equal(await call('POST', '/three-forms/customs-declaration', role), 403, role);
+  // 空体 → 400 缺少出口合同 ID，说明已越过 roleAuth
+  assert.equal(await call('POST', '/three-forms/customs-declaration', 'ADMIN'), 400);
 });
 
-test('OD-4：BOSS 可下载合同 PDF（GET），仍不能生成（POST）；SALES/WAREHOUSE 两者皆 403', async (t) => {
+test('OD-4 / OD-8：合同 PDF 下载与生成仅 ADMIN（文书含供应商银行信息）', async (t) => {
   const call = await start(t);
-  assert.equal(await call('GET', '/contract-doc/pdf/x1', 'BOSS'), 404);
-  assert.equal(await call('POST', '/contract-doc/generate/x1', 'BOSS'), 403);
-  for (const role of ['SALES', 'WAREHOUSE']) {
+  for (const role of NON_ADMIN) {
     assert.equal(await call('GET', '/contract-doc/pdf/x1', role), 403, role);
     assert.equal(await call('POST', '/contract-doc/generate/x1', role), 403, role);
   }
-  for (const role of ['ADMIN', 'PURCHASE', 'FINANCE']) assert.equal(await call('GET', '/contract-doc/pdf/x1', role), 404, role);
+  assert.equal(await call('GET', '/contract-doc/pdf/x1', 'ADMIN'), 404);
 });

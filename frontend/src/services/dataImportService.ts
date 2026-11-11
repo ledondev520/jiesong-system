@@ -2,12 +2,10 @@
  * Input: axios实例
  * Output: 数据导入相关API调用
  * Pos: 前端数据导入服务
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
-import api from '@/lib/axios';
-import type { PaginatedResponse } from '@/types';
+import api from "@/lib/axios";
+import type { PaginatedResponse } from "@/types";
 
 interface ImportAnalysis {
   totalRows: number;
@@ -99,22 +97,24 @@ export interface DatabaseStats {
  */
 export const previewCSV = async (file: File): Promise<PreviewResult> => {
   const formData = new FormData();
-  formData.append('file', file);
-  
-  const response = await api.post('/import/preview', formData, {
+  formData.append("file", file);
+
+  const response = await api.post("/import/preview", formData, {
     headers: {
-      'Content-Type': 'multipart/form-data',
+      "Content-Type": "multipart/form-data",
     },
   });
-  
+
   return (response as { data: PreviewResult }).data;
 };
 
 /**
  * 职责：执行数据导入
  */
-export const executeImport = async (records: NewRecord[]): Promise<ImportResult> => {
-  const response = await api.post('/import/execute', { records });
+export const executeImport = async (
+  records: NewRecord[],
+): Promise<ImportResult> => {
+  const response = await api.post("/import/execute", { records });
   return (response as { data: ImportResult }).data;
 };
 
@@ -122,8 +122,10 @@ export const executeImport = async (records: NewRecord[]): Promise<ImportResult>
  * 职责：获取导入历史
  */
 export const getImportHistory = async (): Promise<ImportHistory[]> => {
-  const response = await api.get('/import/history');
-  const data = (response as { data: ImportHistory[] | PaginatedResponse<ImportHistory> }).data;
+  const response = await api.get("/import/history");
+  const data = (
+    response as { data: ImportHistory[] | PaginatedResponse<ImportHistory> }
+  ).data;
   if (Array.isArray(data)) {
     return data;
   }
@@ -134,6 +136,6 @@ export const getImportHistory = async (): Promise<ImportHistory[]> => {
  * 职责：获取数据库统计
  */
 export const getDatabaseStats = async (): Promise<DatabaseStats> => {
-  const response = await api.get('/import/stats');
+  const response = await api.get("/import/stats");
   return (response as { data: DatabaseStats }).data;
 };

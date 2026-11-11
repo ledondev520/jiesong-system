@@ -2,7 +2,6 @@
  * Input: 合成 multipart CSV/xlsx 与畸形 NUL 文件名、模拟认证
  * Output: system 导入内存处理、畸形请求400及零磁盘残留回归
  * Pos: system 导入 HTTP 测试；仅 os.tmpdir()，无真实数据库
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');

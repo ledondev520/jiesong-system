@@ -2,8 +2,6 @@
  * Input: 业务状态文本、可选业务对象（domain）、语义色调
  * Output: 统一状态徽章（SemanticBadge 色调 + StatusBadge 状态映射，已合并为本文件）
  * Pos: 前端UI 统一状态层；全部状态到文案与语义色的映射都在此文件（UX 规范 §8.7）
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { cva, type VariantProps } from "class-variance-authority";

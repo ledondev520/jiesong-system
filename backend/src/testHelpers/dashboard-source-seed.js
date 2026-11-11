@@ -2,8 +2,6 @@
  * Input: Private migrated SQLite and synthetic catalog/purchase identifiers
  * Output: Independently stored dashboard KPI, historical risk and product-trace facts
  * Pos: Test-only literal source fixture; never calls dashboard/business services
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const { execFileSync } = require('node:child_process');
 

@@ -2,8 +2,6 @@
  * Input: 采购合同详情页、purchaseService、contractDocService、router、toast
  * Output: 采购合同详情页交互逻辑测试结果
  * Pos: 前端详情页交互测试
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -139,7 +137,7 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     mockIsMobile.mockReturnValue(false);
     mockReadOnly = false;
     useAuthStore.setState({
-      user: { id: "synthetic", role: "PURCHASE" } as never,
+      user: { id: "synthetic", role: "ADMIN" } as never,
     });
     mockReceiptSummary.mockResolvedValue({
       data: { summary: { complete: false } },
@@ -278,25 +276,6 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("menuitem", { name: /查看合同/ }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("BOSS（只读）只有「查看合同」下载入口，没有生成/盖章（OD-4）", async () => {
-    useAuthStore.setState({ user: { id: "synthetic", role: "BOSS" } as never });
-    mockReadOnly = true;
-    mockGetById.mockResolvedValue({ data: draftContract });
-    const user = userEvent.setup();
-    renderPage("p-1");
-
-    await user.click(await screen.findByRole("button", { name: /单证/ }));
-    expect(
-      await screen.findByRole("menuitem", { name: /查看合同/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: /生成购销合同/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: /在线盖章/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -801,7 +780,7 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     expect(screen.queryByText(/— · —/)).toBeNull();
   });
 
-  it.each(["SALES", "WAREHOUSE"])(
+  it.each(["SALES"])(
     "%s 看不到收款账户块，不被告知银行信息「未登记」",
     async (role) => {
       useAuthStore.setState({
@@ -898,9 +877,7 @@ describe("PurchaseDetailPage 交互逻辑", () => {
 
   it.each([
     ["SALES", false],
-    ["WAREHOUSE", false],
-    ["PURCHASE", true],
-    ["FINANCE", true],
+    ["ADMIN", true],
   ])(
     "%s 附件类别：供应商盖章件/发票可选=%s（R3 P1-2）",
     async (role, allowed) => {
@@ -916,9 +893,9 @@ describe("PurchaseDetailPage 交互逻辑", () => {
     },
   );
 
-  it("WAREHOUSE：金额与发票号已被服务端剥离，页面显示状态与「无权查看」，没有 ¥ 数字", async () => {
+  it("SALES：金额与发票号已被服务端剥离，页面显示状态与「无权查看」，没有 ¥ 数字", async () => {
     useAuthStore.setState({
-      user: { id: "synthetic", role: "WAREHOUSE" } as never,
+      user: { id: "synthetic", role: "SALES" } as never,
     });
     mockGetById.mockResolvedValue({
       data: {

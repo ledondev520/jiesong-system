@@ -2,7 +2,6 @@
  * Input: Agent 服务、已发布 SDK 与合成业务/HTTP 数据
  * Output: Agent 路由、权限、幂等性和上游协议及失败语义回归结果
  * Pos: 后端 Agent Runtime 单测，验证干净安装与单次失败不重试
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -265,21 +264,22 @@ test('listToolRegistry: 暴露通用主 Agent 的跨域工具面与写操作确�
 
 test('isToolAllowedForRole: 按工具 allowedRoles 控制写工具授权', () => {
   assert.equal(openAgentService.isToolAllowedForRole('UpdateSystemConfig', 'ADMIN'), true);
-  assert.equal(openAgentService.isToolAllowedForRole('UpdateSystemConfig', 'FINANCE'), false);
-  assert.equal(openAgentService.isToolAllowedForRole('AllocatePayment', 'FINANCE'), true);
-  assert.equal(openAgentService.isToolAllowedForRole('UpdateInventoryStatus', 'WAREHOUSE'), true);
-  assert.equal(openAgentService.isToolAllowedForRole('UpdateInventoryStatus', 'SALES'), false);
+  assert.equal(openAgentService.isToolAllowedForRole('UpdateSystemConfig', 'SALES'), false);
+  assert.equal(openAgentService.isToolAllowedForRole('AllocatePayment', 'ADMIN'), true);
+  assert.equal(openAgentService.isToolAllowedForRole('UpdateInventoryStatus', 'SALES'), true);
+  assert.equal(openAgentService.isToolAllowedForRole('UpdateInventoryStatus', 'PURCHASE'), false); // retired role (OD-8)
+  assert.equal(openAgentService.isToolAllowedForRole('AllocatePayment', 'SALES'), false);
   assert.equal(openAgentService.isToolAllowedForRole('SearchEntities', 'SALES'), true);
 });
 
 test('buildToolRegistryPayload: 按当前角色给出可用工具与域级摘要', () => {
-  const payload = openAgentService.buildToolRegistryPayload('FINANCE');
+  const payload = openAgentService.buildToolRegistryPayload('ADMIN');
 
   assert.equal(payload.primaryAgentType, 'unified');
-  assert.equal(payload.viewerRole, 'FINANCE');
+  assert.equal(payload.viewerRole, 'ADMIN');
   assert.ok(Array.isArray(payload.domains));
   assert.ok(payload.tools.some((tool) => tool.name === 'AllocatePayment' && tool.availableForViewer === true));
-  assert.ok(payload.tools.some((tool) => tool.name === 'CreateSupplierRecord' && tool.availableForViewer === false));
+  assert.ok(payload.tools.some((tool) => tool.name === 'CreateSupplierRecord' && tool.availableForViewer === true));
 
   const financeDomain = payload.domains.find((item) => item.domain === 'finance');
   assert.ok(financeDomain);
@@ -418,10 +418,10 @@ test('R2 P1-3: 诊断 → 建议卡 → 唯一一次确认 → allocatePaymentTo
     assert.equal(rec.params.salesContractId, 'sc-fin-3');
     assert.equal(rec.params.amount, 600);
     const ids = [];
-    const cards = await openAgentService.materializeRecommendationPendingActions({ userId: 'u', userRole: 'FINANCE', collectedIds: ids, recommendations: [rec] });
+    const cards = await openAgentService.materializeRecommendationPendingActions({ userId: 'u', userRole: 'ADMIN', collectedIds: ids, recommendations: [rec] });
     assert.equal(cards.length, 1); // 仍是需要人工确认的卡片，不自动执行
     assert.equal(allocation, undefined);
-    await openAgentService.executeAction(ids[0], 'u', { userRole: 'FINANCE' });
+    await openAgentService.executeAction(ids[0], 'u', { userRole: 'ADMIN' });
     assert.deepEqual(allocation, { paymentId: 'pay-3', rows: [{ salesContractId: 'sc-fin-3', amount: 600 }] });
   });
 });
@@ -885,11 +885,11 @@ test('AI 库存确认执行时重新检查来源，不能绕开验货/发运', a
     'prisma.inventory.update': async () => { updates++; return {}; },
     'prisma.operationLog.create': async () => ({}),
   }, async () => {
-    const tool = openAgentService.buildWriteToolPool(spec => spec, 'synthetic-user', 'WAREHOUSE', [], [])
+    const tool = openAgentService.buildWriteToolPool(spec => spec, 'synthetic-user', 'SALES', [], [])
       .find(item => item.name === 'UpdateInventoryStatus');
     const action = JSON.parse(await tool.call({ id: 'synthetic-stock', status: 'OUTBOUND' }));
     managed = true;
-    await assert.rejects(openAgentService.executeAction(action.actionId, 'synthetic-user', { userRole: 'WAREHOUSE' }), /验货.*发运/);
+    await assert.rejects(openAgentService.executeAction(action.actionId, 'synthetic-user', { userRole: 'SALES' }), /验货.*发运/);
     assert.equal(updates, 0);
   });
 });
@@ -975,28 +975,27 @@ test('P0-6: 确认时按实时角色复核，SALES 拿不到 FINANCE 的收款�
     const rec = { code: 'finance.allocate', executionMode: 'confirmable_write', actionType: 'AllocatePayment', title: 't', domain: 'finance', priority: 'high', reason: 'r', params: { paymentId: 'p', salesContractId: 's', contractNo: 'C', amount: 1 } };
     assert.deepEqual(await openAgentService.materializeRecommendationPendingActions({ userId: 'u', userRole: 'SALES', collectedIds: ids, recommendations: [rec] }), []);
     assert.equal(ids.length, 0);
-    assert.equal((await openAgentService.materializeRecommendationPendingActions({ userId: 'u', userRole: 'FINANCE', collectedIds: ids, recommendations: [rec] })).length, 1);
+    assert.equal((await openAgentService.materializeRecommendationPendingActions({ userId: 'u', userRole: 'ADMIN', collectedIds: ids, recommendations: [rec] })).length, 1);
     // 已存在的 FINANCE 卡：SALES 角色（即使是同一用户）执行被 403 拒绝，卡仍可由合法角色确认
     await assert.rejects(openAgentService.executeAction(ids[0], 'u', { userRole: 'SALES' }), (e) => e.statusCode === 403);
     await assert.rejects(openAgentService.executeAction(ids[0], 'u'), (e) => e.statusCode === 403);
   });
 });
 
-test('R2 P1-2: WAREHOUSE 读不到合同金额类工具，业务角色保持可读', () => {
+test('R2 P1-2 / OD-8: SALES 读不到合同金额类工具，ADMIN 可读', () => {
   for (const name of ['GetPurchaseOverview', 'GetPurchaseContractDetail', 'GetSalesContractDetail', 'DiagnoseSalesContractFlow', 'DiagnosePurchaseExecution', 'DiagnoseTradeComplianceReadiness']) {
-    assert.equal(openAgentService.isToolAllowedForRole(name, 'WAREHOUSE'), false, name);
-    assert.equal(openAgentService.isToolAllowedForRole(name, 'SALES'), true, name);
+    assert.equal(openAgentService.isToolAllowedForRole(name, 'SALES'), false, name);
+    assert.equal(openAgentService.isToolAllowedForRole(name, 'ADMIN'), true, name);
   }
-  assert.equal(openAgentService.isToolAllowedForRole('GetInventoryOverview', 'WAREHOUSE'), true);
+  assert.equal(openAgentService.isToolAllowedForRole('GetInventoryOverview', 'SALES'), true);
 });
 
 test('P0-6: 读工具按角色收口，密钥类配置助手既不能读也不能写', async () => {
   for (const name of ['GetFinanceOverview', 'GetRecentEvents', 'GetSystemConfig']) {
-    assert.equal(openAgentService.isToolAllowedForRole(name, 'WAREHOUSE'), false, name);
     assert.equal(openAgentService.isToolAllowedForRole(name, 'SALES'), false, name);
   }
-  assert.equal(openAgentService.isToolAllowedForRole('GetFinanceOverview', 'FINANCE'), true);
-  assert.equal(openAgentService.isToolAllowedForRole('GetSystemConfig', 'FINANCE'), false);
+  assert.equal(openAgentService.isToolAllowedForRole('GetFinanceOverview', 'ADMIN'), true);
+  assert.equal(openAgentService.isToolAllowedForRole('GetSystemConfig', 'ADMIN'), true);
   await withPatched({
     ...fakePendingTable(),
     'prisma.systemConfig.findUnique': async ({ where }) => ({ key: where.key, value: '"SYNTHETIC-KEY"', note: null }),
@@ -1018,11 +1017,11 @@ test('P0-6: CreatePaymentRecord 一键确认映射到 financeService.createPayme
     'financeService.createPayment': async (data, options) => { call = { data, options }; return { payment: { id: 'pay-1' }, reused: false }; },
     'prisma.operationLog.create': async () => ({}),
   }, async () => {
-    const tool = openAgentService.buildWriteToolPool(spec => spec, 'u', 'FINANCE', [], []).find((i) => i.name === 'CreatePaymentRecord');
+    const tool = openAgentService.buildWriteToolPool(spec => spec, 'u', 'ADMIN', [], []).find((i) => i.name === 'CreatePaymentRecord');
     assert.match(JSON.parse(await tool.call({ type: 'PAYABLE', amount: 100 })).error, /purchaseContractNo/);
     const action = JSON.parse(await tool.call({ type: 'PAYABLE_PAYMENT', amount: 100, purchaseContractNo: 'PC-SYN-1' }));
     assert.match(action.description, /PC-SYN-1/);
-    const result = await openAgentService.executeAction(action.actionId, 'u', { userRole: 'FINANCE' });
+    const result = await openAgentService.executeAction(action.actionId, 'u', { userRole: 'ADMIN' });
     assert.equal(result.success, true);
     assert.equal(call.data.type, 'PAYABLE');
     assert.equal(call.data.currency, 'CNY');

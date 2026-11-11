@@ -2,8 +2,6 @@
  * Input: 业务数据与通知生成请求
  * Output: 通知的 CRUD 与自动生成逻辑
  * Pos: 通知业务服务层
- *
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const prisma = require('../utils/prisma');

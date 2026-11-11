@@ -1,4 +1,4 @@
-/** Real HTTP/SQLite GET /dashboard/todos per role: visible lists, payables basis, BOSS read-only access; synthetic fixtures only. */
+/** Real HTTP/SQLite GET /dashboard/todos per role: visible lists, payables basis, ADMIN-only figures (OD-8); synthetic fixtures only. */
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -42,7 +42,7 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   const jwt = require("jsonwebtoken");
   const config = require("../config");
   const tokens = {};
-  for (const role of ["ADMIN", "BOSS", "PURCHASE", "SALES", "FINANCE", "WAREHOUSE"]) {
+  for (const role of ["ADMIN", "SALES"]) {
     const user = await db.user.create({
       data: { username: `synthetic-todos-${role}`, password: "test-only-unused-hash", name: `Synthetic ${role}`, role },
     });
@@ -53,7 +53,7 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
     const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
   });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
-  const call = async (method, url, body, role = "PURCHASE", expected = 200) => {
+  const call = async (method, url, body, role = "SALES", expected = 200) => {
     const requestId = `synthetic-todos-${++requestNumber}`;
     const response = await fetch(base + url, {
       method,
@@ -148,7 +148,6 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
 
   const admin = await todos("ADMIN");
   assert.deepEqual(keys(admin), ["missingInvoice", "ordersToPurchase", "overdueReceivables", "paymentsDue", "quotesAwaitingCustomer", "quotesToSend", "receiptsToInspect", "refundable", "toLoad", "toShip"]);
-  assert.equal(admin.figures, undefined);
   // Unpurchased, partially stock-allocated, partially purchased and cancelled-purchase orders wait; fully purchased or fully stock-allocated do not.
   assert.deepEqual(
     admin.lists.ordersToPurchase.items.map((i) => i.contractNo).sort(),
@@ -181,18 +180,17 @@ test("HTTP/SQLite: dashboard todos are role-scoped, read-only and use the single
   assert.equal(admin.lists.refundable.count, 0);
   assert.deepEqual(admin.lists.refundable.pending, { count: workbench.summary.contracts, label: "待处理出口" });
 
-  assert.deepEqual(keys(await todos("PURCHASE")), ["ordersToPurchase", "paymentsDue", "receiptsToInspect"]);
-  assert.deepEqual(keys(await todos("SALES")), ["overdueReceivables", "quotesAwaitingCustomer", "quotesToSend", "toLoad", "toShip"]);
-  assert.deepEqual(keys(await todos("WAREHOUSE")), ["receiptsToInspect", "toLoad", "toShip"]);
-  assert.deepEqual(keys(await todos("FINANCE")), ["missingInvoice", "overdueReceivables", "paymentsDue", "refundable"]);
+  // OD-8: SALES gets the operational lists only; every amount is stripped (OD-7) and there are no figures.
+  const sales = await todos("SALES");
+  assert.deepEqual(keys(sales), ["ordersToPurchase", "quotesAwaitingCustomer", "quotesToSend", "receiptsToInspect", "toLoad", "toShip"]);
+  assert.equal(sales.figures, undefined);
+  for (const list of Object.values(sales.lists)) for (const row of list.items) assert.equal("amount" in row, false);
 
-  const boss = await todos("BOSS");
-  assert.deepEqual(keys(boss), ["overdueReceivables"]);
-  assert.equal(boss.figures.payable, 1300, "BOSS payable uses the shared in-effect basis and is not date-cut (600 current + 700 historical)");
+  assert.equal(admin.figures.payable, 1300, "ADMIN payable uses the shared in-effect basis and is not date-cut (600 current + 700 historical)");
   // Nine non-cancelled export contracts of 1000 each, nothing received: finance-overview basis.
-  assert.equal(boss.figures.receivable, 9000, "BOSS receivable equals the finance overview unreceived total");
-  assert.ok("monthGrossProfit" in boss.figures);
-  assert.ok(boss.figures.definitions.payable);
+  assert.equal(admin.figures.receivable, 9000, "ADMIN receivable equals the finance overview unreceived total");
+  assert.ok("monthGrossProfit" in admin.figures);
+  assert.ok(admin.figures.definitions.payable);
 
   // Empty state: once every quote is moved on, the quote lists are empty (not absent).
   await db.quote.updateMany({ where: { status: { in: ["DRAFT", "SENT"] } }, data: { status: "CANCELLED" } });

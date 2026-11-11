@@ -47,7 +47,7 @@ router.post('/sales', authenticate, roleAuth('ADMIN', 'SALES'), async (req, res,
  * POST /api/batch-import/purchase
  * 批量导入采购合同
  */
-router.post('/purchase', authenticate, roleAuth('ADMIN', 'PURCHASE'), async (req, res, next) => {
+router.post('/purchase', authenticate, roleAuth('ADMIN', 'SALES'), async (req, res, next) => {
   try {
     const { data } = req.body;
     const userId = req.user.id;

@@ -1,33 +1,51 @@
 /**
  * Input: 登录角色与任意响应数据
- * Output: WAREHOUSE 看不到供应商发票号和金额类字段的数据副本（其他角色原样返回）
- * Pos: OD-2/OD-3 的唯一 WAREHOUSE 红线 helper，采购/销售/AI 面共用，服务端剥离，不依赖前端隐藏
+ * Output: 非 ADMIN 角色（OD-8 后即 SALES）看不到供应商发票号和金额类字段的数据副本（ADMIN 原样返回）
+ * Pos: OD-2/OD-3/OD-7 的唯一金额红线 helper（文件名沿用 A54 的 warehouse 命名），采购/销售/AI 面共用，服务端剥离，不依赖前端隐藏
  */
 
 // 金额类：合同总额/已付/明细单价与行额/付款额/催票金额/历史价/库存成本/应付汇总
 const MONEY_KEYS = new Set([
   'totalAmount', 'paidAmount', 'unpaidAmount', 'receivedAmount', 'unitPrice', 'totalPrice', 'netUnitPrice', 'netAmount',
   'taxAmount', 'grossAmount', 'amount', 'averagePrice', 'minPrice', 'maxPrice', 'lastPrice', 'price', 'totalCost',
-  'totalPayable', 'overduePayable', 'totalReceivable',
+  'totalPayable', 'overduePayable', 'totalReceivable', 'purchaseCost',
+  'settledAmount', 'refundableAmount', 'refundedAmount', // OD-9: forex settled and tax-refund amounts; declaredAmount stays (customs value)
 ]);
+
+const NO_KEEP = new Set();
+const PURCHASE_NESTS = new Set(['purchaseItem', 'purchaseItems', 'purchaseContract', 'purchaseContracts']);
+// A98 default-on: the OD-6 route exemptions that keep some money keys visible to WAREHOUSE (path relative to /api/v1).
+const WAREHOUSE_EXEMPTIONS = [
+  ['/customs-declarations', ['totalAmount', 'unitPrice', 'totalPrice']], // OD-6: customs declared values
+  ['/sales', ['unitPrice', 'totalPrice']], // OD-6 point 3: USD sales/packing line prices
+  // OD-8: SALES owns quotes; USD quote prices and the quote total are already printed on the quote/PI export SALES may download (OD-11 confirms).
+  ['/quotes', ['unitPrice', 'totalPrice', 'totalAmount']],
+];
+const warehouseExemptKeys = (urlPath) => {
+  const found = WAREHOUSE_EXEMPTIONS.find(([prefix]) => urlPath === prefix || urlPath.startsWith(`${prefix}/`) || urlPath.startsWith(`${prefix}?`));
+  return new Set(found ? found[1] : []);
+};
 
 const isPlain = (node) => node && typeof node === 'object' && !(node instanceof Date) && !Buffer.isBuffer(node);
 
 const countInvoices = (value) => (Array.isArray(value) ? value : String(value ?? '').split(/[\s,，;；]+/)).filter(Boolean).length;
 
-const walk = (node) => {
-  if (Array.isArray(node)) return node.map(walk);
+const walk = (node, keep = NO_KEEP) => {
+  if (Array.isArray(node)) return node.map((v) => walk(v, keep));
   if (!isPlain(node)) return node;
   const copy = {};
   // OD-6：库存快照行（totalCost 与 averageCost 成对出现）的成本对 WAREHOUSE 保持可见；其他 totalCost 仍剥离
   const inventoryCost = 'totalCost' in node && 'averageCost' in node;
   Object.keys(node).forEach((key) => {
+    if (keep.has(key)) { copy[key] = walk(node[key], keep); return; }
+    // A98: an exemption never reaches into nested purchase records (CNY purchase prices, OD-2)
+    if (PURCHASE_NESTS.has(key)) { copy[key] = walk(node[key]); return; }
     if (MONEY_KEYS.has(key) && !(inventoryCost && key === 'totalCost')) return;
     if (key === 'invoiceNo') { copy.invoiceCount = countInvoices(node[key]); return; }
     if (key === 'invoiceNumbers') { copy.invoiceNumberCount = countInvoices(node[key]); return; }
     // 付款记录只保留条数/编号，金额不外泄；"已付过款"用布尔状态代替 paidAmount
     if (key === 'payments' && Array.isArray(node[key])) { copy[key] = node[key].map((p) => ({ id: p?.id })); return; }
-    copy[key] = walk(node[key]);
+    copy[key] = walk(node[key], keep);
   });
   if ('paidAmount' in node) copy.hasPaidAmount = Number(node.paidAmount) > 0;
   // OVERPAID 等 issue 文案内嵌金额：只留代码，文案改为通用说明
@@ -35,12 +53,16 @@ const walk = (node) => {
   return copy;
 };
 
-const redactWarehouseMoney = (role, data) => (role === 'WAREHOUSE' ? walk(data) : data);
+const redactWarehouseMoney = (role, data, keep) => (role !== 'ADMIN' ? walk(data, keep) : data);
 
-/** Express 中间件：在 res.json 处统一剥离；req.user 由各路由器自己的 authenticate 稍后写入，故按需读取。 */
+/**
+ * Express 中间件（A98：在 routes/index.js 对全部 API 路由默认挂载）：在 res.json 处统一剥离；
+ * req.user 由各路由器自己的 authenticate 稍后写入，故按需读取；豁免键按挂载点相对路径（/sales/...）取。
+ */
 const warehouseMoneyRedaction = (req, res, next) => {
   const json = res.json.bind(res);
-  res.json = (body) => json(redactWarehouseMoney(req.user?.role, body));
+  const keep = warehouseExemptKeys(req.path || '');
+  res.json = (body) => json(redactWarehouseMoney(req.user?.role, body, keep));
   next();
 };
 
@@ -53,13 +75,15 @@ const stripPacking = (node) => {
   Object.keys(node).forEach((key) => { if (!PACKING_SECRET_KEYS.includes(key)) copy[key] = stripPacking(node[key]); });
   return copy;
 };
-const redactPackingSecrets = (role, data) => (role === 'WAREHOUSE' ? stripPacking(data) : data);
+const redactPackingSecrets = (role, data) => (role !== 'ADMIN' ? stripPacking(data) : data);
 
 // OD-3/OD-7：销售合同行（读与写响应共用）对 WAREHOUSE 只留状态，去掉合同总额、已收金额与收款记录。
 const redactSalesContract = (role, contract) => {
-  if (role !== 'WAREHOUSE' || !contract || typeof contract !== 'object') return contract;
+  if (role === 'ADMIN' || !contract || typeof contract !== 'object') return contract;
   const { totalAmount, receivedAmount, payments, ...rest } = contract;
   return stripPacking(rest);
 };
 
-module.exports = { MONEY_KEYS, redactWarehouseMoney, redactPackingSecrets, redactSalesContract, warehouseMoneyRedaction };
+// Every key WAREHOUSE must never see outside the exemptions (used by the A98 route-walk test).
+const FORBIDDEN_WAREHOUSE_KEYS = new Set([...MONEY_KEYS, 'invoiceNo', 'invoiceNumbers', ...PACKING_SECRET_KEYS]);
+module.exports = { MONEY_KEYS, FORBIDDEN_WAREHOUSE_KEYS, WAREHOUSE_EXEMPTIONS, warehouseExemptKeys, redactWarehouseMoney, redactPackingSecrets, redactSalesContract, warehouseMoneyRedaction };

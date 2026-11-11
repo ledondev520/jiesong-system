@@ -2,8 +2,6 @@
  * Input: docs/申报要素.csv
  * Output: 更新 Product 表的 hsCode 和 declaration 字段
  * Pos: 数据导入脚本
- * 
- * Note: 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
  */
 
 const fs = require('fs');
