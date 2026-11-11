@@ -37,12 +37,6 @@ const duplicateName = async (name, exceptId) => {
   if (found) throw createError('客户名称已存在', 409);
 };
 
-// 仓库角色只需客户名称/门店归属；联系人为 Confidential，读取时剥离（LR-FIX-1 P3-2）。
-const stripContacts = (req, customer) => {
-  if (req.user?.role !== 'WAREHOUSE') return customer;
-  const { contactName, contactEmail, contactPhone, ...rest } = customer;
-  return rest;
-};
 
 const list = async (req, res, next) => {
   try {
@@ -56,7 +50,7 @@ const list = async (req, res, next) => {
       prisma.customer.findMany({ where, skip, take: pageSize, orderBy: { name: 'asc' }, include: { _count: { select: { stores: true } } } }),
       prisma.customer.count({ where }),
     ]);
-    paginated(res, items.map((item) => stripContacts(req, item)), total, page, pageSize);
+    paginated(res, items, total, page, pageSize);
   } catch (error) {
     next(error);
   }
@@ -69,7 +63,7 @@ const getById = async (req, res, next) => {
       include: { stores: { orderBy: { name: 'asc' }, include: { port: true } } },
     });
     if (!customer) throw createError('客户不存在', 404);
-    success(res, stripContacts(req, customer));
+    success(res, customer);
   } catch (error) {
     next(error);
   }

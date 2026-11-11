@@ -154,14 +154,6 @@ describe("quote detail", () => {
     );
   });
 
-  it("PURCHASE can export but has no write buttons; BOSS has neither", async () => {
-    mocks.role = "PURCHASE";
-    await renderWith("ACCEPTED");
-    expect(screen.getByText("导出 Excel")).toBeTruthy();
-    expect(screen.queryByText("转为出口订单")).toBeNull();
-    expect(screen.queryByText("复制为新报价")).toBeNull();
-  });
-
   it("BOSS sees the quote read-only without export", async () => {
     mocks.role = "BOSS";
     await renderWith("SENT");

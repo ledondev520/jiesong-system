@@ -33,9 +33,9 @@ test('agent pending actions are shared across processes and claimed atomically',
     fs.rmSync(directory, { recursive: true, force: true });
   });
 
-  const user = await procA.db.user.create({ data: { username: 'synthetic-purchaser', password: 'x', name: 'Synthetic', role: 'PURCHASE' } });
+  const user = await procA.db.user.create({ data: { username: 'synthetic-purchaser', password: 'x', name: 'Synthetic', role: 'SALES' } });
   const propose = async (proc, name) => {
-    const tool = proc.agent.buildWriteToolPool((spec) => spec, user.id, 'PURCHASE', [], [])
+    const tool = proc.agent.buildWriteToolPool((spec) => spec, user.id, 'SALES', [], [])
       .find((item) => item.name === 'CreateSupplierRecord');
     return JSON.parse(await tool.call({ name })).actionId;
   };
@@ -80,7 +80,7 @@ test('agent pending actions are shared across processes and claimed atomically',
   });
 
   await t.test('failed executor is recorded as failed with a reason and is not retried', async () => {
-    const tool = procA.agent.buildWriteToolPool((spec) => spec, user.id, 'PURCHASE', [], [])
+    const tool = procA.agent.buildWriteToolPool((spec) => spec, user.id, 'SALES', [], [])
       .find((item) => item.name === 'UpdateSupplierRecord');
     const supplier = await procA.db.supplier.create({ data: { name: 'Synthetic Supplier Gone' } });
     const id = JSON.parse(await tool.call({ id: supplier.id, name: 'Synthetic Renamed' })).actionId;

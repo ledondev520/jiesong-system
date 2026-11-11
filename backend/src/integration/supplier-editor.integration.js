@@ -61,7 +61,7 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
         username: `synthetic-editor-${role}`,
         password: "test-only-unused-hash",
         name: `Synthetic ${role}`,
-        role,
+        role, // retired roles stored as-is (OD-8)
       },
     });
     tokens[role] = jwt.sign({ userId: user.id }, config.jwt.secret);
@@ -71,7 +71,7 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
     const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
   });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
-  const call = async (method, url, body, role = "PURCHASE", expected = 200) => {
+  const call = async (method, url, body, role = "SALES", expected = 200) => {
     const requestId = `synthetic-supplier-editor-${++requestNumber}`;
     const response = await fetch(base + url, {
       method,
@@ -97,7 +97,7 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
     );
     return result.data;
   };
-  await call("POST", "/suppliers", { name: "   " }, "PURCHASE", 400);
+  await call("POST", "/suppliers", { name: "   " }, "SALES", 400);
   await call(
     "POST",
     "/suppliers",
@@ -134,7 +134,7 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
       { alias: "Synthetic alias two" },
     ],
   };
-  const created = await call("POST", "/suppliers", input, "PURCHASE", 201);
+  const created = await call("POST", "/suppliers", input, "SALES", 201);
   let saved = await call("GET", `/suppliers/${created.id}`);
   assert.equal(
     saved.hasQualityIssue,
@@ -199,7 +199,7 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
       hasQualityIssue: true,
       aliases: [{ alias: "Synthetic occupied alias" }],
     },
-    "PURCHASE",
+    "SALES",
     409,
   );
   assert.deepEqual(
@@ -214,7 +214,7 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
     "PUT",
     `/suppliers/${created.id}`,
     { aliases: [{ alias: "   " }] },
-    "PURCHASE",
+    "SALES",
     400,
   );
   assert.deepEqual(
@@ -232,7 +232,7 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
       name: "Synthetic rejected new supplier",
       aliases: [{ alias: "Synthetic occupied alias" }],
     },
-    "PURCHASE",
+    "SALES",
     409,
   );
   assert.equal(
@@ -260,7 +260,7 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
     }),
     before,
   );
-  for (const role of ["ADMIN", "SALES", "FINANCE", "WAREHOUSE"]) {
+  for (const role of ["ADMIN", "SALES"]) {
     const supplier = await call(
       "POST",
       "/suppliers",
@@ -277,7 +277,7 @@ test("HTTP/SQLite: supplier editor preserves aliases, quality state and optional
   }
   assert.equal(
     await db.supplier.count(),
-    5,
-    "the existing five business write roles remain allowed",
+    3,
+    "only ADMIN and SALES write suppliers (OD-8)",
   );
 });

@@ -64,7 +64,7 @@ test('purchase imports use memory and all representative upload routes reject NU
     assert.equal((await send(name)).status, 200, name);
   }
   assert.equal((await send('synthetic.xls', xlsx.write(book, { type: 'buffer', bookType: 'biff8' }))).status, 200);
-  for (const role of ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE']) {
+  for (const role of ['ADMIN', 'SALES']) {
     assert.equal((await send('synthetic.xlsx', bytes, role, true)).status, 200);
     assert.deepEqual(seen.at(-1).options, { historical: true });
   }
@@ -73,7 +73,7 @@ test('purchase imports use memory and all representative upload routes reject NU
   assert.equal((await send('large.xlsx', Buffer.alloc(64 * 1024 + 1))).status, 400);
   // An otherwise invalid upload must still authenticate/authorize before parsing.
   assert.equal((await send('bad.pdf', bytes, 'anonymous')).status, 401);
-  assert.equal((await send('bad.pdf', bytes, 'BOSS')).status, 403);
+  assert.equal((await send('bad.pdf', bytes, 'WAREHOUSE')).status, 403); // retired role (OD-8)
   assert.equal(seen.length, accepted);
 
   // Construct raw headers to ensure NUL bytes really reach Busboy unchanged.

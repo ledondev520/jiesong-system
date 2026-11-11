@@ -4,6 +4,7 @@
  * Pos: financial read acceptance; no uploads, providers, production data or accounting writes
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -82,8 +83,8 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
   db = require('../utils/prisma');
   const jwt = require('jsonwebtoken');
   const tokens = {};
-  for (const role of ['ADMIN', 'FINANCE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-readback-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role } });
+  for (const role of ['ADMIN', 'FINANCE', 'SALES']) {
+    const user = await db.user.create({ data: { username: `synthetic-readback-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role: dbRole(role) } });
     // Real database role decides evidence access, even with a misleading JWT role.
     tokens[role] = jwt.sign({ userId: user.id, role: 'ADMIN' }, process.env.JWT_SECRET);
   }
@@ -212,20 +213,16 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.deepEqual(prior.accountBalances.map(row => row.id), ['account-january']);
     assert.deepEqual(prior.generalLedgerEntries.map(row => row.id), ['ledger-january']);
     assert.deepEqual(prior.dataSources.map(row => row.id), ['source-january']);
-    const boss = await get('/finance/statements/2026/10', {}, 'BOSS');
-    for (const field of ['accountBalances', 'generalLedgerEntries', 'dataSources']) {
-      assert.equal(Object.hasOwn(boss, field), false, `BOSS must omit ${field}`);
-    }
-    assert.deepEqual(boss, Object.fromEntries(Object.entries(detail).filter(([key]) => !['accountBalances', 'generalLedgerEntries', 'dataSources'].includes(key))));
+    await get('/finance/statements/2026/10', {}, 'SALES', 403); // OD-8: SALES never sees finance
     for (const route of ['/finance/statements/evidence/summary', '/finance/statements/evidence/documents']) {
       await get(route);
-      await get(route, {}, 'BOSS', 403);
+      await get(route, {}, 'SALES', 403);
     }
     await get('/finance/statements/2027/3', {}, 'FINANCE', 404);
-    await get('/finance/statements/2027/3', {}, 'BOSS', 404);
     await get('/finance/statements/2026/10', {}, 'ANONYMOUS', 401);
     // Summary rows are retained as evidence and never added to the stored statement amounts.
-    const analytics = await get('/finance/statements/analytics', {}, 'BOSS');
+    await get('/finance/statements/analytics', {}, 'SALES', 403);
+    const analytics = await get('/finance/statements/analytics');
     assert.equal(analytics.trends[3].revenue, 12000);
     assert.equal(analytics.trends[3].cash, 90000);
     assert.equal(analytics.latestPeriod.incomeStatement.revenueYTD, 345678);
@@ -327,7 +324,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       { seller: 'Synthetic Under & Co Annex', totalInvoice: 50, invCount: 1 },
     ]);
     assert.deepEqual(await get('/bank-flow/reconciliation/full'), reconciliation);
-    assert.deepEqual(await get('/bank-flow/reconciliation/full', {}, 'BOSS'), reconciliation);
+    await get('/bank-flow/reconciliation/full', {}, 'SALES', 403);
     assert.deepEqual(snapshot(), before, 'full reconciliation must not relink sources or modify report/contract/payment amounts');
   });
   await t.test('current linked search values read source IDs, batch metadata and classifications without changing MATCHED or IGNORED links', async () => {
@@ -406,8 +403,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       assert.deepEqual(row._count, counts[row.id]);
     }
     assert.deepEqual(await linked(under), underSources);
-    assert.deepEqual(await linked(under, 'BOSS'), underSources);
-    assert.deepEqual(await linked(over, 'BOSS'), overSources);
+    assert.deepEqual(await linked(over), overSources);
     assert.deepEqual(await get('/bank-flow/reconciliation/full'), reconciliation);
     const after = snapshot();
     for (const table of ['bank_transactions', 'invoice_records']) {

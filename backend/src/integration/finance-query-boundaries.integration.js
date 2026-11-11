@@ -4,13 +4,14 @@
  * Pos: read-only finance HTTP integration coverage; never imports files or writes via the API
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { copyTemplate } = require('../testHelpers/sqlite-template');
 
-const ROLES = ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE', 'WAREHOUSE'];
+const ROLES = ['ADMIN', 'FINANCE', 'SALES']; // FINANCE persona is stored as ADMIN (OD-8)
 
 test('HTTP/SQLite: finance query filters, classifications and existing read boundaries', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-finance-queries-'));
@@ -34,7 +35,7 @@ test('HTTP/SQLite: finance query filters, classifications and existing read boun
   const config = require('../config');
   const tokens = {};
   for (const role of ROLES) {
-    const user = await db.user.create({ data: { username: `synthetic-finance-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-finance-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: dbRole(role) } });
     tokens[role] = jwt.sign({ userId: user.id }, config.jwt.secret);
   }
   for (const id of ['bank-a', 'bank-b', 'invoice-a', 'invoice-b']) {
@@ -150,9 +151,9 @@ test('HTTP/SQLite: finance query filters, classifications and existing read boun
       await checkInvoices(filters, rows);
     });
   }
-  await t.test('bank/invoice reads are ADMIN/FINANCE/BOSS only; evidence stays ADMIN/FINANCE', async () => {
+  await t.test('bank/invoice reads and evidence are ADMIN only (OD-8)', async () => {
     for (const role of ROLES) {
-      const readable = ['ADMIN', 'FINANCE', 'BOSS'].includes(role);
+      const readable = ['ADMIN', 'FINANCE'].includes(role);
       if (readable) {
         const list = await get('/bank-flow/transactions', { currency: 'USD' }, role);
         assert.equal(list.pagination.total, 2);

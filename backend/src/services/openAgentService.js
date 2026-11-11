@@ -392,8 +392,9 @@ const SECRET_CONFIG_REFUSAL = '密钥类配置为只写，助手不能读取或�
 const SELLER_CONFIG_REFUSAL = '卖方公司信息只能由管理员在「设置 > 公司信息」中维护，助手不能修改';
 
 // 读工具按 HTTP RBAC 收口：财务/事件账/审计/系统配置不对其他角色开放；未列出的工具保持全角色可读。
-const FINANCE_READ_ROLES = [ROLES.ADMIN, ROLES.FINANCE];
-const COMMERCIAL_READ_ROLES = [ROLES.ADMIN, ROLES.FINANCE, ROLES.PURCHASE, ROLES.SALES];
+const FINANCE_READ_ROLES = [ROLES.ADMIN];
+// OD-8: these tools return contract totals and paid amounts unredacted, so ADMIN only.
+const COMMERCIAL_READ_ROLES = [ROLES.ADMIN];
 const READ_TOOL_ROLES = {
   GetFinanceOverview: FINANCE_READ_ROLES,
   GetReceivablesByCustomer: FINANCE_READ_ROLES,
@@ -404,7 +405,6 @@ const READ_TOOL_ROLES = {
   GetRecentEvents: FINANCE_READ_ROLES,
   GetOpsOverview: FINANCE_READ_ROLES,
   GetExecutiveOverview: FINANCE_READ_ROLES,
-  // 合同金额/单价/已付未付：WAREHOUSE 只保留库存与物流类工具。
   ...Object.fromEntries([
     'GetPurchaseOverview', 'GetPurchaseContractDetail', 'GetSalesContractDetail',
     'DiagnoseSalesContractFlow', 'DiagnosePurchaseExecution', 'DiagnoseTradeComplianceReadiness',

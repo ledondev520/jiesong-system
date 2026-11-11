@@ -493,7 +493,7 @@ test('getConfigs: 旧 invoiceTitleInfo（可能含银行行）与 companyBankInf
     { key: 'companyName', value: JSON.stringify('X') },
   ];
   try {
-    for (const [role, visible] of [['ADMIN', true], ['FINANCE', true], ['SALES', false], ['PURCHASE', false], ['BOSS', false], [undefined, false]]) {
+    for (const [role, visible] of [['ADMIN', true], ['ADMIN', true], ['SALES', false], ['PURCHASE', false], ['SALES', false], [undefined, false]]) {
       const res = createMockRes();
       await configController.getConfigs({ user: role ? { role } : undefined }, res, (error) => { throw error; });
       assert.equal(Object.hasOwn(res.payload.data, 'invoiceTitleInfo'), visible, String(role));

@@ -398,8 +398,8 @@ describe("ContractsPage 交互逻辑", () => {
       expect(mockImportExcel).toHaveBeenCalledWith(file, { historical: true }),
     );
   });
-  it("采购员没有历史确认，正常导入不携带历史参数", async () => {
-    mockRole = "PURCHASE";
+  it("SALES 没有历史确认，正常导入不携带历史参数", async () => {
+    mockRole = "SALES";
     mockGetAll.mockResolvedValue({ data: { items: [] } });
     render(<ContractsPage />);
     await screen.findByRole("heading", { name: "采购合同" });

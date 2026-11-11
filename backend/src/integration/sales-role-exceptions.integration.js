@@ -28,8 +28,8 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
   const jwt = require('jsonwebtoken');
   const config = require('../config');
   const users = {};
-  for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE', 'BOSS', 'INACTIVE']) {
-    const user = await db.user.create({ data: { username: `synthetic-exceptions-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'SALES' : role, isActive: role !== 'INACTIVE' } });
+  for (const role of ['SALES', 'ADMIN', 'PURCHASE', 'WAREHOUSE', 'BOSS', 'INACTIVE']) {
+    const user = await db.user.create({ data: { username: `synthetic-exceptions-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'SALES' : role /* retired roles stored as-is (OD-8) */, isActive: role !== 'INACTIVE' } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id, role: 'ADMIN' }, config.jwt.secret) };
   }
   const product = await db.product.create({ data: { customsName: 'SYNTHETIC SALES EXCEPTION WIDGET', unit: '件' } });
@@ -59,15 +59,15 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
   const cargo = (quantity = 50, productId = product.id) => ({ productId, storeId: store.id, quantity, unit: '件', boxes: 5, grossWeight: 20000, netWeight: 19000, volume: 5, length: 1000, width: 1000, height: 1000, unitPrice: 3 });
 
   await t.test('permission denials use live user identity and leave business rows unchanged', async () => {
-    const purchaseResult = await call('POST', '/purchases', { supplierId: supplier.id, taxRate: 13, items: [{ productId: product.id, quantity: 100, unit: '件', unitPrice: 10 }] }, { role: 'PURCHASE', expected: 201 });
+    const purchaseResult = await call('POST', '/purchases', { supplierId: supplier.id, taxRate: 13, items: [{ productId: product.id, quantity: 100, unit: '件', unitPrice: 10 }] }, { role: 'SALES', expected: 201 });
     const purchase = purchaseResult.contract || purchaseResult;
     const before = await snapshot();
     for (const [method, url, body, role, expected] of [
       ['POST', '/sales', { exchangeRate: 7.2 }, null, 401],
       ['POST', '/sales', { exchangeRate: 7.2 }, 'INACTIVE', 401],
       ['POST', '/sales', { exchangeRate: 7.2 }, 'BOSS', 403],
-      ['POST', `/purchases/${purchase.id}/receipts`, { requestId: 'synthetic-denied-receipt', items: [{ purchaseItemId: purchase.items[0].id, arrivedQuantity: 100 }] }, 'SALES', 403],
-      ['POST', `/purchases/${purchase.id}/receipts/synthetic-receipt/inspection`, { requestId: 'synthetic-denied-inspection', items: [] }, 'SALES', 403],
+      ['POST', `/purchases/${purchase.id}/receipts`, { requestId: 'synthetic-denied-receipt', items: [{ purchaseItemId: purchase.items[0].id, arrivedQuantity: 100 }] }, 'WAREHOUSE', 403],
+      ['POST', `/purchases/${purchase.id}/receipts/synthetic-receipt/inspection`, { requestId: 'synthetic-denied-inspection', items: [] }, 'PURCHASE', 403],
       ['GET', '/finance/statements/evidence/documents', undefined, 'SALES', 403],
       ['GET', '/tax-refunds/workbench/synthetic-sale/preparation', undefined, 'SALES', 403],
       ['POST', '/auth/register', { username: 'synthetic-denied-admin' }, 'SALES', 403],
@@ -149,7 +149,7 @@ test('HTTP/SQLite: sales permissions, cancellations and forbidden lifecycle tran
     }
     assert.deepEqual((await snapshot()).inventory, before.inventory);
     // This records a synthetic internal receipt; no payment provider is contacted.
-    await call('POST', '/finance/payments', { type: 'RECEIVABLE_COLLECTION', salesContractId: a.id, amount: 180, currency: 'USD', paymentDate: '2026-10-01' }, { expected: 201 });
+    await call('POST', '/finance/payments', { type: 'RECEIVABLE_COLLECTION', salesContractId: a.id, amount: 180, currency: 'USD', paymentDate: '2026-10-01' }, { role: 'ADMIN', expected: 201 }); // OD-8: payments are ADMIN only
     assert.equal((await db.salesContract.findUnique({ where: { id: a.id } })).status, 'COMPLETED');
     before = await snapshot();
     assert.equal((await call('PUT', `/sales/${a.id}/status`, { status: 'COMPLETED' })).status, 'COMPLETED');

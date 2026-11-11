@@ -25,7 +25,7 @@ const list = async (req, res, next) => {
 
     const result = await salesService.getSalesContracts({ page, pageSize, status, storeId, customerId, keyword, shipped, shippedFrom, shippedTo, lite });
     // OD-3：WAREHOUSE 只看状态，列表不含合同总额/已收金额。
-    const contracts = req.user?.role === 'WAREHOUSE'
+    const contracts = req.user?.role !== 'ADMIN'
       ? result.contracts.map(({ totalAmount, receivedAmount, ...rest }) => rest)
       : result.contracts;
     paginated(res, contracts, result.total, page, pageSize);

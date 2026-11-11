@@ -2,6 +2,7 @@
  * Input: Real role fixture, committed migrations, ordinary HTTP routes and synthetic XLSX
  * Output: Six menu-document fixture contract checks (split from role-browser-server.test.js for parallel runs)
  * Pos: Backend HTTP/SQLite acceptance; no browser execution or production/provider access
+ * OD-8: document generation is ADMIN only, so these checks sign in as the FINANCE persona (role ADMIN).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -49,7 +50,7 @@ const binary = async (f, token, route) => {
 };
 test('menu documents HTTP: prerequisites and discarded previews leave migrated records unchanged', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
-  const token = await f.login('SALES');
+  const token = await f.login('FINANCE');
   assert.ok(f.read('SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL').length > 10);
   const before = documentSnapshot(f);
   const input = formsInput(f);
@@ -69,7 +70,7 @@ test('menu documents HTTP: prerequisites and discarded previews leave migrated r
 });
 test('menu documents HTTP: three forms generate linked drafts, read back and retain XLSX title/header/content', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
-  const token = await f.login('SALES');
+  const token = await f.login('FINANCE');
   const ids = await generated(f, token);
   const rows = documentSnapshot(f);
   assert.equal(rows.customs_declarations.length, 1);
@@ -111,7 +112,7 @@ test('menu documents HTTP: three forms generate linked drafts, read back and ret
 });
 test('menu documents HTTP: explicit repeated generation preserves existing append-version contract and exact export IDs', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
-  const token = await f.login('SALES');
+  const token = await f.login('FINANCE');
   const first = await generated(f, token);
   const second = await generated(f, token);
   assert.notEqual(second.customsDeclarationId, first.customsDeclarationId);
@@ -133,7 +134,7 @@ test('menu documents HTTP: explicit repeated generation preserves existing appen
 });
 test('menu documents HTTP: commercial preview validates metadata and cancel-equivalent remains read-only', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
-  const token = await f.login('SALES');
+  const token = await f.login('FINANCE');
   const before = documentSnapshot(f);
   const route = `/sales/${f.salesId}/export-packet/preview`;
   assert.equal((await f.call('POST', route, { ...packetInput, buyerName: '' }, token)).status, 400);
@@ -148,7 +149,7 @@ test('menu documents HTTP: commercial preview validates metadata and cancel-equi
 });
 test('menu documents HTTP: commercial generation archives private workbook and repeated download preserves bytes', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
-  const token = await f.login('SALES');
+  const token = await f.login('FINANCE');
   const result = await f.call('POST', `/sales/${f.salesId}/export-packet/generate`, packetInput, token);
   assert.equal(result.status, 201);
   const { file, packet } = result.body.data;
@@ -179,7 +180,7 @@ test('menu documents HTTP: commercial generation archives private workbook and r
 });
 test('menu documents HTTP: changed prerequisite causes genuine generation failure, explicit repair retries once', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'menu-export-documents');
-  const token = await f.login('SALES');
+  const token = await f.login('FINANCE');
   assert.equal((await f.call('POST', '/three-forms/preview', formsInput(f), token)).body.data.customsReady, true);
   const route = `/sales/${f.salesId}/packing-items/${f.exportDocuments.packingItemId}`;
   assert.equal((await f.call('PUT', route, { unitPrice: 0 }, token)).status, 200);

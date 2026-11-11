@@ -3,12 +3,12 @@ const prisma = require("../../../utils/prisma");
 const { createError } = require("../../../middleware/errorHandler");
 const { normalizeSupplierAliases } = require("./aliases");
 
-// Archive (isActive=false) is ADMIN/PURCHASE; restore (true) is ADMIN. Other fields stay open to all business roles.
+// Archive (isActive=false) is ADMIN/SALES; restore (true) is ADMIN. Other fields stay open to all business roles.
 // Callers without a user role (agents) are denied, matching the pre-existing restore rule.
 const assertActiveChangeAllowed = (role, isActive) => {
   if (typeof isActive !== "boolean") return;
   if (isActive === true && role !== "ADMIN") throw createError("仅管理员可恢复已归档供应商", 403);
-  if (isActive === false && !["ADMIN", "PURCHASE"].includes(role)) throw createError("仅管理员或采购可归档供应商", 403);
+  if (isActive === false && !["ADMIN", "SALES"].includes(role)) throw createError("仅管理员或销售可归档供应商", 403);
 };
 
 const updateSupplier = async ({ id, input, prismaClient = prisma } = {}) => {

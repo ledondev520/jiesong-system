@@ -1,5 +1,6 @@
 /** 采购与仓储 HTTP 回归：只创建临时合成 SQLite，不接触业务数据库。 */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -23,7 +24,7 @@ test('HTTP/SQLite：采购收验货闭环、库存查询与草稿删除后编号
   const config = require('../config');
   const users = {};
   for (const role of ['ADMIN', 'PURCHASE', 'WAREHOUSE', 'SALES', 'FINANCE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id }, config.jwt.secret) };
   }
   const supplier = await db.supplier.create({ data: { name: '合成供应商', taxId: 'SYNTHETIC-TAX-ID' } });

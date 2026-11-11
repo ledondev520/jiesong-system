@@ -14,7 +14,7 @@ const create = vi.fn();
 const inspect = vi.fn();
 const inspections = vi.fn();
 const uploadPhoto = vi.fn();
-let role = "PURCHASE";
+let role = "SALES";
 vi.mock("@/services/purchaseReceipt.service", () => ({
   purchaseReceiptService: {
     list: (...args: unknown[]) => list(...args),
@@ -93,7 +93,7 @@ const data: PurchaseReceiptList = {
   },
 };
 beforeEach(() => {
-  role = "PURCHASE";
+  role = "SALES";
   list.mockReset();
   create.mockReset();
   uploadPhoto.mockReset();
@@ -343,7 +343,8 @@ it("未填写验货说明不能提交，初始到货全部待验", async () => {
   fireEvent.submit(screen.getByText("保存验货").closest("form")!);
   expect(inspect).not.toHaveBeenCalled();
 });
-it.each(["BOSS", "FINANCE", "SALES"])(
+it.each(["BOSS", "FINANCE"])(
+  // retired roles (OD-8)
   "%s可看历史但无登记验货动作",
   async (value) => {
     role = value;

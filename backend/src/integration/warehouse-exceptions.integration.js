@@ -1,5 +1,6 @@
 /** 仓储异常 HTTP 回归：只使用临时合成 SQLite 与真实角色鉴权，不接触业务数据库。 */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -29,7 +30,7 @@ test('HTTP/SQLite：WAREHOUSE 异常出库、FIFO、分配边界与角色限制'
   const config = require('../config');
   const users = {};
   for (const role of ['PURCHASE', 'WAREHOUSE']) {
-    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id }, config.jwt.secret) };
   }
   const supplier = await db.supplier.create({ data: { name: '合成仓储供应商' } });
@@ -194,7 +195,7 @@ test('HTTP/SQLite：WAREHOUSE 异常出库、FIFO、分配边界与角色限制'
       ['PUT', `/users/${users.WAREHOUSE.id}`, { role: 'ADMIN' }],
       ['PUT', '/system/configs/synthetic-setting', { value: 'blocked' }],
     ]) await call(method, url, body, { expected: 403 });
-    assert.equal((await db.user.findUnique({ where: { id: users.WAREHOUSE.id } })).role, 'WAREHOUSE');
+    assert.equal((await db.user.findUnique({ where: { id: users.WAREHOUSE.id } })).role, dbRole('WAREHOUSE'));
     assert.equal(await db.taxRefund.count(), 0);
     assert.equal(await db.inventory.count({ where: { quantity: { lte: 0 } } }), 0);
     assert.equal(await db.systemConfig.count({ where: { key: 'synthetic-setting' } }), 0);

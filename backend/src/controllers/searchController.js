@@ -20,7 +20,7 @@ const search = async (req, res, next) => {
       query: req.query.q,
       types: rawTypes,
       limit: parsePositiveInt(req.query.limit, 10, 1, 20),
-      includeAmounts: req.user?.role !== 'WAREHOUSE', // OD-3
+      includeAmounts: req.user?.role === 'ADMIN', // OD-3
     });
 
     success(res, {
@@ -28,7 +28,7 @@ const search = async (req, res, next) => {
       types: rawTypes?.map((type) => String(type).trim()).filter(Boolean) || [],
       limit: parsePositiveInt(req.query.limit, 10, 1, 20),
       // OD-3：subtitle 内嵌合同金额文本，WAREHOUSE 只保留标题
-      items: req.user?.role === 'WAREHOUSE' ? items.map((item) => (item.type === 'sales' ? { ...item, subtitle: undefined } : item)) : items,
+      items: req.user?.role !== 'ADMIN' ? items.map((item) => (item.type === 'sales' ? { ...item, subtitle: undefined } : item)) : items,
     }, '获取成功');
   } catch (error) {
     next(error);

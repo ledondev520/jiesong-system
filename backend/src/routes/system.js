@@ -51,7 +51,7 @@ router.get('/logs/export/csv', roleAuth(ROLE_SETS.ADMIN), systemController.expor
 router.get('/notifications', withPaginationValidation, systemController.getNotifications);
 
 // PUT /api/v1/system/notifications/:id/read - 标记通知已读
-router.put('/notifications/:id/read', roleAuth(ROLE_SETS.EVERYONE), withAuditLog(
+router.put('/notifications/:id/read', roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'Notification', action: 'UPDATE', model: 'notification' },
   systemController.markNotificationRead
 ));
@@ -155,7 +155,7 @@ router.get('/import/records', roleAuth(ROLE_SETS.ADMIN), withPaginationValidatio
 
 
 // GET /api/v1/system/export/:type - 导出数据（需要管理员或业务主管权限，操作记入审计日志）
-router.get('/export/:type', roleAuth(ROLE_SETS.OPERATORS), paymentsExportGuard, withAuditLog(
+router.get('/export/:type', roleAuth(ROLE_SETS.ALL), paymentsExportGuard, withAuditLog(
   {
     entity: 'DataExport',
     action: 'EXPORT',
@@ -171,7 +171,7 @@ router.get('/export/:type', roleAuth(ROLE_SETS.OPERATORS), paymentsExportGuard, 
 ));
 
 // GET /api/v1/system/export/:type/pdf - 导出PDF报表（需要管理员或业务主管权限，操作记入审计日志）
-router.get('/export/:type/pdf', roleAuth(ROLE_SETS.OPERATORS), paymentsExportGuard, withAuditLog(
+router.get('/export/:type/pdf', roleAuth(ROLE_SETS.ALL), paymentsExportGuard, withAuditLog(
   {
     entity: 'DataExport',
     action: 'EXPORT',

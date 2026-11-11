@@ -2,6 +2,7 @@
  *  only fills empty fields, writes to it are refused, bank data (incl. legacy text) stays ADMIN/FINANCE-only, the 催票 text and the
  *  quotation/PI seller block read the same identity. Synthetic data only. */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -35,7 +36,7 @@ test('seller identity: canonical + legacy alias, role-scoped bank, refused legac
   const jwt = require('jsonwebtoken');
   const tokens = {};
   for (const role of ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-seller-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-seller-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     tokens[role] = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
   }
   const app = require('../app');

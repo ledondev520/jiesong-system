@@ -35,6 +35,7 @@ This file holds working rules only. Per-file security and business controls live
 - 自定义组件必须基于 shadcn/ui 的设计规范扩展.
 
 ## Security rules
+- Exactly two roles exist (OD-8, owner 2026-11-11): ADMIN sees everything; SALES does data and contract entry and never sees finance or sales-contract/payment totals. Do not reintroduce PURCHASE/FINANCE/WAREHOUSE/BOSS or widen SALES to a finance surface without a new owner decision; role-to-route mapping is in `SECURITY.md` "Two-role model (OD-8)".
 - Never commit secrets (API keys, tokens, passwords, private keys, DB credentials), including in `.env`, `.env.*`, `*.example`, scripts, logs, and tests.
 - 本地被 Git 忽略的运维笔记（如 `PLAN.md`）同样不得保存真实登录凭据；登录验证只记录结果，避免检查笔记时再次暴露凭据。
 - If temporary test credentials are introduced, mark them clearly as non-production and require environment-variable override before上线.

@@ -30,7 +30,7 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
   const config = require('../config');
   const users = {};
   for (const role of ['ADMIN', 'PURCHASE', 'WAREHOUSE', 'SALES', 'FINANCE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-import-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-import-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } }); // retired roles stored as-is (OD-8)
     users[role] = jwt.sign({ userId: user.id }, config.jwt.secret);
   }
   const supplier = await db.supplier.create({ data: { name: '合成导入供应商', taxId: 'SYNTHETIC-IMPORT-TAX-ID' } });
@@ -39,7 +39,7 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const url = `http://127.0.0.1:${server.address().port}/api/v1/batch-import/purchase`;
   const row = { supplierName: supplier.name, productName: product.customsName, quantity: '6', price: '80', unit: '件', deliveryDate: '2026-10-01' };
-  const importRows = async (data, { role = 'PURCHASE', expected = 200 } = {}) => {
+  const importRows = async (data, { role = 'SALES', expected = 200 } = {}) => {
     const response = await fetch(url, { method: 'POST', headers: { ...(role ? { authorization: `Bearer ${users[role]}` } : {}), 'Content-Type': 'application/json' }, body: JSON.stringify({ data }) });
     const body = await response.json();
     assert.equal(response.status, expected, body.message || 'Unexpected HTTP status');
@@ -120,9 +120,9 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
     }
   });
 
-  await t.test('采购与管理员之外的角色和未登录请求不能写入', async () => {
+  await t.test('已停用角色（OD-8）和未登录请求不能写入', async () => {
     const before = await db.purchaseContract.count();
-    for (const role of ['WAREHOUSE', 'SALES', 'FINANCE', 'BOSS']) {
+    for (const role of ['PURCHASE', 'WAREHOUSE', 'FINANCE', 'BOSS']) {
       await importRows([row], { role, expected: 403 });
     }
     await importRows([row], { role: null, expected: 401 });
@@ -225,7 +225,7 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
     const call = async (method, route, input) => {
       const response = await fetch(url.replace('/batch-import/purchase', route), {
         method,
-        headers: { authorization: `Bearer ${users.PURCHASE}`, 'Content-Type': 'application/json' },
+        headers: { authorization: `Bearer ${users.SALES}`, 'Content-Type': 'application/json' },
         ...(input === undefined ? {} : { body: JSON.stringify(input) }),
       });
       return { status: response.status, body: await response.json() };
@@ -250,8 +250,8 @@ test('HTTP/SQLite：JSON 采购导入并发、逐行原子性、显式编号与�
     const contract = retry.body.data.contract || retry.body.data;
     assert.equal(contract.contractNo, preview.body.data.contractNo);
     assert.equal(contract.items.length, 2);
-    assert.equal(contract.totalAmount, 56.5);
     const persisted = await db.purchaseContract.findUnique({ where: { id: contract.id }, include: { items: true } });
+    assert.equal(persisted.totalAmount, 56.5);
     assert.equal(persisted.items.length, 2);
     const after = await snapshot();
     assert.equal(after.contracts.length, before.contracts.length + 1);

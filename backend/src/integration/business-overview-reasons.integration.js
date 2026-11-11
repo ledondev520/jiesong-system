@@ -25,7 +25,7 @@ test("HTTP/SQLite: business overview names the missing input per shipment and co
   db = require("../utils/prisma");
   const jwt = require("jsonwebtoken");
   const config = require("../config");
-  const user = await db.user.create({ data: { username: "synthetic-overview-finance", password: "test-only-unused-hash", name: "Synthetic", role: "FINANCE" } });
+  const user = await db.user.create({ data: { username: "synthetic-overview-finance", password: "test-only-unused-hash", name: "Synthetic", role: "ADMIN" } });
   const token = jwt.sign({ userId: user.id }, config.jwt.secret);
   const app = require("../app");
   server = await new Promise((resolve) => { const listener = app.listen(0, "127.0.0.1", () => resolve(listener)); });

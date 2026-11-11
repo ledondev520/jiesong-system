@@ -72,8 +72,7 @@ export function ReceivingWorkbench() {
   const readOnly = useBusinessReadOnly();
   const role = useAuthStore((state) => state.user?.role);
   // 与 PurchaseReceiptPanel 的写入角色一致；其他角色只能查看，按钮不许诺能登记。
-  const canRegister =
-    !readOnly && ["ADMIN", "PURCHASE", "WAREHOUSE"].includes(role || "");
+  const canRegister = !readOnly && ["ADMIN", "SALES"].includes(role || "");
   const [contracts, setContracts] = useState<PurchaseContract[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

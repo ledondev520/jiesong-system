@@ -1,5 +1,6 @@
 /** 真实 HTTP/SQLite 销售发运货物保护回归；仅使用临时合成数据，不读取业务库。 */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -25,7 +26,7 @@ test('HTTP/SQLite：发运后不能通过销售入口篡改已出库货物', asy
   const config = require('../config');
   const users = {};
   for (const role of ['ADMIN', 'PURCHASE', 'WAREHOUSE', 'SALES', 'FINANCE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id }, config.jwt.secret) };
   }
   const supplier = await db.supplier.create({ data: { name: '合成供应商', taxId: 'SYNTHETIC-TAX-ID' } });

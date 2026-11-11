@@ -25,7 +25,7 @@ const leaks = (value) => {
 };
 
 test('redactWarehouseMoney: WAREHOUSE 无发票号/金额，状态与数量保留，不把金额显示成 0', () => {
-  const out = redactWarehouseMoney('WAREHOUSE', contract());
+  const out = redactWarehouseMoney('SALES', contract());
   assert.deepEqual(leaks(out), []);
   assert.equal(out.invoiceCount, 2);
   assert.equal(out.hasPaidAmount, true);
@@ -37,7 +37,7 @@ test('redactWarehouseMoney: WAREHOUSE 无发票号/金额，状态与数量保�
 });
 
 test('redactWarehouseMoney: 其他角色原样返回', () => {
-  for (const role of ['PURCHASE', 'ADMIN', 'FINANCE', 'SALES', 'BOSS']) {
+  for (const role of ['ADMIN']) { // OD-8: ADMIN is the only unredacted role
     const data = contract();
     assert.equal(redactWarehouseMoney(role, data), data);
   }
@@ -51,8 +51,8 @@ test('warehouseMoneyRedaction: 按 req.user 读取角色，res.json 出口剥离
     res.json({ data: contract() });
     return body;
   };
-  assert.deepEqual(leaks(run('WAREHOUSE')), []);
-  assert.ok(leaks(run('PURCHASE')).length > 0);
+  assert.deepEqual(leaks(run('SALES')), []);
+  assert.ok(leaks(run('ADMIN')).length > 0);
 });
 
 const withPrisma = async (patches, fn) => {
@@ -96,12 +96,12 @@ test('采购控制器：getById/list/invoice-preparation/price-history 对 WAREH
       ['getInvoicePreparation', { params: { id: 'pc-1' } }],
       ['getProductPriceHistory', { params: { productId: 'p-1' } }],
     ]) {
-      const w = await call(controller[name], { ...req, user: { role: 'WAREHOUSE' } });
+      const w = await call(controller[name], { ...req, user: { role: 'SALES' } });
       assert.deepEqual(leaks(w), [], `${name} WAREHOUSE`);
     }
-    const p = await call(controller.getById, { params: { id: 'pc-1' }, user: { role: 'PURCHASE' } });
+    const p = await call(controller.getById, { params: { id: 'pc-1' }, user: { role: 'ADMIN' } });
     assert.ok(JSON.stringify(p).includes(INV), 'PURCHASE keeps invoice numbers');
-    const prep = await call(controller.getInvoicePreparation, { params: { id: 'pc-1' }, user: { role: 'WAREHOUSE' } });
+    const prep = await call(controller.getInvoicePreparation, { params: { id: 'pc-1' }, user: { role: 'SALES' } });
     assert.equal(prep.data.invoiceNumberCount, 2);
     assert.equal(prep.data.complete, true);
     assert.ok(prep.data.request.lines.length > 0);
@@ -118,14 +118,11 @@ test('registerInvoiceNumbers: WAREHOUSE 只追加不覆盖已存号码；PURCHAS
       update: async ({ data }) => { stored = data.invoiceNo; return { id: 'pc-1', invoiceNo: stored, taxRate: 13, items: [], files: [file], supplier: {} }; },
     },
   }, async () => {
-    const w = await call(controller.registerInvoiceNumbers, { params: { id: 'pc-1' }, body: { invoiceNumbers: ['NEW-1'] }, user: { role: 'WAREHOUSE' } });
+    const w = await call(controller.registerInvoiceNumbers, { params: { id: 'pc-1' }, body: { invoiceNumbers: ['NEW-1'] }, user: { role: 'SALES' } });
     assert.equal(stored, `${INV}，SYNTH-INV-7732，NEW-1`);
     assert.deepEqual(leaks(w), []);
     assert.deepEqual(w.data.invoiceFiles, [], 'WAREHOUSE 不见 SUPPLIER_INVOICE 行（B112）');
-    const s = await call(controller.registerInvoiceNumbers, { params: { id: 'pc-1' }, body: { invoiceNumbers: ['ONLY-1'] }, user: { role: 'SALES' } });
-    assert.equal(stored, 'ONLY-1');
-    assert.deepEqual(s.data.invoiceFiles, []);
-    const p = await call(controller.registerInvoiceNumbers, { params: { id: 'pc-1' }, body: { invoiceNumbers: ['P-1'] }, user: { role: 'PURCHASE' } });
+    const p = await call(controller.registerInvoiceNumbers, { params: { id: 'pc-1' }, body: { invoiceNumbers: ['P-1'] }, user: { role: 'ADMIN' } });
     assert.equal(p.data.invoiceFiles.length, 1);
   });
 });
@@ -135,10 +132,10 @@ test('WAREHOUSE 草稿更正：未带价格的明细沿用库内单价，不清�
   await withPrisma({ purchaseItem: { findMany: async () => [{ id: 'i-1', productId: 'p-1', unitPrice: 1118 }, { id: 'i-2', productId: 'p-2', unitPrice: 7 }] } }, async () => {
     const req = (role) => ({ user: { role }, params: { id: 'pc-1' } });
     const input = { items: [{ productId: 'p-2', quantity: 1 }, { id: 'i-1', productId: 'p-1', quantity: 9, unitPrice: 0 }, { productId: 'p-3', quantity: 1, unitPrice: 5 }] };
-    const out = await keepStoredPricesForWarehouse(req('WAREHOUSE'), input);
+    const out = await keepStoredPricesForWarehouse(req('SALES'), input);
     assert.deepEqual(out.items.map((i) => i.unitPrice), [7, 1118, 5]);
     assert.equal(out.items[1].quantity, 9);
-    assert.equal(await keepStoredPricesForWarehouse(req('PURCHASE'), input), input);
+    assert.equal(await keepStoredPricesForWarehouse(req('ADMIN'), input), input);
   });
 });
 
@@ -150,7 +147,7 @@ test('采购创建：价格警告文案（含价格）不返回给 WAREHOUSE', a
   try {
     const controller = require('../controllers/purchaseController');
     await withPrisma({ purchaseItem: { findMany: async () => [{ unitPrice: 10 }] } }, async () => {
-      const body = await call(controller.create, { query: {}, body: { items: [{ productId: 'p-1', unitPrice: 100 }] }, user: { role: 'WAREHOUSE' } });
+      const body = await call(controller.create, { query: {}, body: { items: [{ productId: 'p-1', unitPrice: 100 }] }, user: { role: 'SALES' } });
       assert.deepEqual(leaks(body), []);
       assert.ok(!JSON.stringify(body).includes('历史均价'));
     });
@@ -189,10 +186,10 @@ test('/export/:type 与 /system/export/:type 同守卫：WAREHOUSE 导出 paymen
   assert.match(require('fs').readFileSync(require.resolve('../routes/dataExport'), 'utf8'), /withAuditLog\(\s*\{\s*entity: 'DataExport'/);
   const { paymentsExportGuard } = require('../middleware/paymentsExportGuard');
   let denied;
-  paymentsExportGuard({ params: { type: 'payments' }, user: { role: 'WAREHOUSE' } }, {}, (e) => { denied = e; });
+  paymentsExportGuard({ params: { type: 'payments' }, user: { role: 'SALES' } }, {}, (e) => { denied = e; });
   assert.equal(denied.statusCode, 403);
   let ok = 'unset';
-  paymentsExportGuard({ params: { type: 'payments' }, user: { role: 'FINANCE' } }, {}, (e) => { ok = e; });
+  paymentsExportGuard({ params: { type: 'payments' }, user: { role: 'ADMIN' } }, {}, (e) => { ok = e; });
   assert.equal(ok, undefined);
   const purchasesExport = require('../routes/purchases').stack.find((l) => l.route?.path === '/export').route;
   assert.ok(purchasesExport.stack.some((l) => l.handle.isRoleAuth), '/purchases/export 有角色校验');
@@ -200,7 +197,7 @@ test('/export/:type 与 /system/export/:type 同守卫：WAREHOUSE 导出 paymen
 
 test('OD-6：库存快照的 totalCost 与 averageCost 对 WAREHOUSE 保持可见，合同金额仍剥离', () => {
   const body = { byProduct: [{ productId: 'p1', totalCost: 4321, averageCost: 12.5 }], contract: { totalAmount: 99, totalCost: 7 } };
-  const out = redactWarehouseMoney('WAREHOUSE', body);
+  const out = redactWarehouseMoney('SALES', body);
   assert.deepEqual(out.byProduct[0], { productId: 'p1', totalCost: 4321, averageCost: 12.5 });
   assert.equal('totalAmount' in out.contract, false);
   assert.equal('totalCost' in out.contract, false);
@@ -209,12 +206,12 @@ test('OD-6：库存快照的 totalCost 与 averageCost 对 WAREHOUSE 保持可�
 test('A98 exemptions: customs keeps declared values, sales keeps USD line prices, other prefixes strip them', () => {
   const { warehouseExemptKeys } = require('./warehouseRedaction');
   const body = { totalAmount: 9, receivedAmount: 3, items: [{ unitPrice: 2, totalPrice: 4, purchaseCost: 1, invoiceNo: 'INV-1' }] };
-  const run = (path) => redactWarehouseMoney('WAREHOUSE', body, warehouseExemptKeys(path));
+  const run = (path) => redactWarehouseMoney('SALES', body, warehouseExemptKeys(path));
   assert.deepEqual(run('/customs-declarations/x'), { totalAmount: 9, items: [{ unitPrice: 2, totalPrice: 4, invoiceCount: 1 }] });
   assert.deepEqual(run('/sales/x'), { items: [{ unitPrice: 2, totalPrice: 4, invoiceCount: 1 }] });
   assert.deepEqual(run('/forex-verifications'), { items: [{ invoiceCount: 1 }] });
   assert.deepEqual(run('/salesx'), { items: [{ invoiceCount: 1 }] }, 'prefix match is per path segment');
   assert.equal(redactWarehouseMoney('ADMIN', body, warehouseExemptKeys('/forex-verifications')), body);
   const nested = { items: [{ unitPrice: 2, purchaseItem: { unitPrice: 7, totalPrice: 8, purchaseContract: { totalAmount: 9 } } }] };
-  assert.deepEqual(redactWarehouseMoney('WAREHOUSE', nested, warehouseExemptKeys('/sales/x')), { items: [{ unitPrice: 2, purchaseItem: { purchaseContract: {} } }] });
+  assert.deepEqual(redactWarehouseMoney('SALES', nested, warehouseExemptKeys('/sales/x')), { items: [{ unitPrice: 2, purchaseItem: { purchaseContract: {} } }] });
 });

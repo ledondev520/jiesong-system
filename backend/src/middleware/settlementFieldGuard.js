@@ -17,7 +17,7 @@ const hasKey = (body, key) => body && Object.prototype.hasOwnProperty.call(body,
  */
 const settlementFieldGuard = ({ safeStatuses, fields, model }) => async (req, res, next) => {
   try {
-    if (['ADMIN', 'FINANCE'].includes(req.user?.role)) return next();
+    if (req.user?.role === 'ADMIN') return next();
     const body = req.body || {};
     const badStatus = hasKey(body, 'status') && !safeStatuses.includes(body.status);
     if (badStatus || fields.some((field) => isSet(body, field))) {

@@ -130,7 +130,7 @@ test('uploadFile: 登记附件前收紧目录和文件权限，保持 201 响应
   try {
     await purchaseController.uploadFile({
       params: { id: 'purchase-1' },
-      user: { role: 'PURCHASE' },
+      user: { role: 'ADMIN' },
       body: { description: 'synthetic test attachment', category: 'SUPPLIER_INVOICE' },
       file: { path: filePath, originalname: 'synthetic.pdf', mimetype: 'application/pdf', size: fs.statSync(filePath).size },
     }, res, (error) => { throw error; });
@@ -179,7 +179,7 @@ test('downloadFile: 相对附件路径从 UPLOAD_DIR 解析，兼容已有绝对
   const res = { download(filePath, fileName, callback) { downloaded.push({ filePath, fileName }); callback(null); } };
   for (const filePath of [storedPath, absolutePath]) {
     storedPath = filePath;
-    await purchaseController.downloadFile({ params: { fileId: 'attachment-1' }, user: { role: 'PURCHASE' } }, res, (error) => { throw error; });
+    await purchaseController.downloadFile({ params: { fileId: 'attachment-1' }, user: { role: 'ADMIN' } }, res, (error) => { throw error; });
   }
   assert.equal(downloaded.length, 2);
   for (const file of downloaded) {
@@ -223,7 +223,7 @@ test('getProductPriceHistory: 比价采用不含税单价', async (t) => {
   const oldFind = prisma.purchaseItem.findMany; t.after(() => { prisma.purchaseItem.findMany = oldFind; });
   prisma.purchaseItem.findMany = async () => [{ quantity: 10, unitPrice: 100, totalPrice: 1130, purchaseContract: { contractNo: 'synthetic', createdAt: new Date(0) } }];
   const res = { status() { return this; }, json(value) { this.payload = value; } };
-  await purchaseController.getProductPriceHistory({ params: { productId: 'product-1' } }, res, (error) => { throw error; });
+  await purchaseController.getProductPriceHistory({ params: { productId: 'product-1' }, user: { role: 'ADMIN' } }, res, (error) => { throw error; });
   assert.equal(res.payload.data.averagePrice, 100);
   assert.equal(res.payload.data.history[0].price, 100);
 });
@@ -242,7 +242,7 @@ test('getProductPriceHistory: bySupplier 按供应商汇总，排除草稿/已�
     ];
   };
   const res = { status() { return this; }, json(value) { this.payload = value; } };
-  await purchaseController.getProductPriceHistory({ params: { productId: 'product-1' } }, res, (error) => { throw error; });
+  await purchaseController.getProductPriceHistory({ params: { productId: 'product-1' }, user: { role: 'ADMIN' } }, res, (error) => { throw error; });
   assert.deepEqual(where.purchaseContract.status.notIn.sort(), ['CANCELLED', 'DRAFT']);
   const { bySupplier } = res.payload.data;
   assert.deepEqual(bySupplier.map((s) => s.supplierId), ['s2', 's1']); // 最近价低者在前，停用的 s3 不出现
@@ -260,18 +260,18 @@ test('getProductPriceHistory: 无有效历史时 bySupplier 为空数组', async
   const oldFind = prisma.purchaseItem.findMany; t.after(() => { prisma.purchaseItem.findMany = oldFind; });
   prisma.purchaseItem.findMany = async () => [];
   const res = { status() { return this; }, json(value) { this.payload = value; } };
-  await purchaseController.getProductPriceHistory({ params: { productId: 'product-1' } }, res, (error) => { throw error; });
+  await purchaseController.getProductPriceHistory({ params: { productId: 'product-1' }, user: { role: 'ADMIN' } }, res, (error) => { throw error; });
   assert.deepEqual(res.payload.data.bySupplier, []);
 });
 
-test('price-history 路由: 角色清单不变，未登录401、无权限角色403', () => {
+test('price-history 路由: OD-8 两角色，未登录401、无权限角色403', () => {
   const layer = require('../routes/purchases').stack.find((l) => l.route?.path === '/price-history/:productId' && l.route.methods.get);
   const guard = layer.route.stack.map((l) => l.handle).find((h) => h.isRoleAuth);
-  assert.deepEqual(guard.allowedRoles, ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']);
+  assert.deepEqual(guard.allowedRoles, ['ADMIN', 'SALES']);
   const run = (user) => { let err; guard({ user }, {}, (e) => { err = e; }); return err; };
   assert.equal(run(undefined).statusCode, 401);
   assert.equal(run({ role: 'GUEST' }).statusCode, 403);
-  assert.equal(run({ role: 'PURCHASE' }), undefined);
+  assert.equal(run({ role: 'ADMIN' }), undefined);
 });
 
 test('updateStatus: 仅未履行合同允许取消，已付款或已发货不得借取消回滚', async (t) => {
@@ -328,7 +328,7 @@ test('addItem: 与共享草稿更正一致，已签约/发货/完成/付款/归�
 });
 
 
-test('getById/getFiles: SALES/WAREHOUSE 看不到采购合同文书附件，读角色仍可见（R3 P1-2）', async () => {
+test('getById/getFiles: SALES 看不到采购合同文书附件，ADMIN 可见（OD-8）（R3 P1-2）', async () => {
   const files = ['SIGNED_CONTRACT', 'SUPPLIER_INVOICE', 'SYSTEM_GENERATED_PDF', 'SYSTEM_GENERATED_WORD', 'PRODUCTION_PHOTO', 'OTHER']
     .map((category) => ({ id: category, purchaseContractId: 'pc-1', category, fileName: `${category}.pdf` }));
   const originals = { findUnique: prisma.purchaseContract.findUnique, items: prisma.purchaseItem.findMany, groupBy: prisma.purchaseReceiptItem.groupBy, files: prisma.contractFile.findMany };
@@ -344,8 +344,8 @@ test('getById/getFiles: SALES/WAREHOUSE 看不到采购合同文书附件，读�
   };
   try {
     for (const handler of ['getById', 'getFiles']) {
-      for (const role of ['SALES', 'WAREHOUSE']) assert.deepEqual(await call(handler, role), ['PRODUCTION_PHOTO', 'OTHER'], `${handler} ${role}`);
-      for (const role of ['ADMIN', 'PURCHASE', 'FINANCE', 'BOSS']) assert.equal((await call(handler, role)).length, 6, `${handler} ${role}`);
+      assert.deepEqual(await call(handler, 'SALES'), ['PRODUCTION_PHOTO', 'OTHER'], `${handler} SALES`);
+      for (const role of ['ADMIN']) assert.equal((await call(handler, role)).length, 6, `${handler} ${role}`);
     }
   } finally {
     prisma.purchaseContract.findUnique = originals.findUnique;

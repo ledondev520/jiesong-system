@@ -427,9 +427,9 @@ describe("supplier editor interrupted sessions (synthetic fixtures)", () => {
 describe("supplier catalog identity and deletion sessions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Archiving is ADMIN/PURCHASE only (server enforces the same).
+    // Archiving is ADMIN/SALES (OD-8; server enforces the same).
     useAuthStore.setState({
-      user: { id: "synthetic-purchase", role: Role.PURCHASE } as never,
+      user: { id: "synthetic-sales", role: Role.SALES } as never,
     });
     mockGetAll
       .mockReset()
@@ -439,7 +439,8 @@ describe("supplier catalog identity and deletion sessions", () => {
     mockDelete.mockReset();
   });
 
-  it.each([Role.SALES, Role.FINANCE, Role.WAREHOUSE])(
+  // Retired roles (OD-8) are refused by the server and never see archive.
+  it.each(["FINANCE", "WAREHOUSE"])(
     "%s does not see the archive button",
     async (role) => {
       useAuthStore.setState({ user: { id: "synthetic", role } as never });
@@ -451,7 +452,7 @@ describe("supplier catalog identity and deletion sessions", () => {
     },
   );
 
-  it.each([Role.PURCHASE, Role.SALES, Role.FINANCE, Role.WAREHOUSE])(
+  it.each([Role.SALES])(
     "%s does not see the permanent delete button",
     async (role) => {
       useAuthStore.setState({ user: { id: "synthetic", role } as never });

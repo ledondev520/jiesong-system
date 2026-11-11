@@ -4,6 +4,7 @@
  * Pos: Financial library source acceptance; distinct from monthly workbook upload/import
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -31,7 +32,7 @@ test('HTTP/SQLite: financial library ingests existing synthetic sources and pres
   db = require('../utils/prisma');
   const tokens = {};
   for (const role of ['ADMIN', 'FINANCE', 'BOSS', 'PURCHASE', 'SALES', 'WAREHOUSE', 'INACTIVE']) {
-    const user = await db.user.create({ data: { username: `synthetic-library-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role: role === 'INACTIVE' ? 'FINANCE' : role, isActive: role !== 'INACTIVE' } });
+    const user = await db.user.create({ data: { username: `synthetic-library-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role: role === 'INACTIVE' ? 'ADMIN' : dbRole(role), isActive: role !== 'INACTIVE' } });
     tokens[role] = require('jsonwebtoken').sign({ userId: user.id, role: 'ADMIN' }, process.env.JWT_SECRET);
   }
   const period = await db.financialPeriod.create({ data: { year: 2026, month: 10, periodLabel: 'Synthetic 2026-10', reportDate: new Date('2026-10-31T00:00:00Z') } });

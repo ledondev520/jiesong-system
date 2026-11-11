@@ -15,7 +15,7 @@ const { createError } = require('../middleware/errorHandler');
 const exportExcel = async (req, res, next) => {
   try {
     const { status, supplierId, dateFrom, dateTo } = req.query;
-    const result = await exportPurchasesExcel({ status, supplierId, dateFrom, dateTo }, { includeMoney: req.user?.role !== 'WAREHOUSE' });
+    const result = await exportPurchasesExcel({ status, supplierId, dateFrom, dateTo }, { includeMoney: req.user?.role === 'ADMIN' });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(result.filename)}"`);

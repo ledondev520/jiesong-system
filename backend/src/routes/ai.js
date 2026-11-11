@@ -33,37 +33,37 @@ router.post('/anthropic/v1/messages/count_tokens', authenticateOpenAgentRuntime,
 router.use(authenticate);
 
 // POST /api/v1/ai/chat - 智能问答（支持图片）
-router.post('/chat', roleAuth(ROLE_SETS.OPERATORS), [
+router.post('/chat', roleAuth(ROLE_SETS.ALL), [
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.chat);
 
 // POST /api/v1/ai/chat/stream - 流式智能问答（SSE）
-router.post('/chat/stream', roleAuth(ROLE_SETS.OPERATORS), [
+router.post('/chat/stream', roleAuth(ROLE_SETS.ALL), [
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.chatStream);
 
 // POST /api/v1/ai/parse - 解析输入内容（辅助录入，支持图片）
-router.post('/parse', roleAuth(ROLE_SETS.OPERATORS), [
+router.post('/parse', roleAuth(ROLE_SETS.ALL), [
   body('type').notEmpty().withMessage('解析类型不能为空'),
 ], handleValidation, aiController.parseInput);
 
 // POST /api/v1/ai/agents/prompt - 运行预置业务 Agent（agentType 可选，默认 unified）
-router.post('/agents/prompt', roleAuth(ROLE_SETS.OPERATORS), [
+router.post('/agents/prompt', roleAuth(ROLE_SETS.ALL), [
   body('agentType').optional().isIn(SUPPORTED_AGENT_TYPES).withMessage('agentType 不合法'),
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.agentPrompt);
 
 // GET /api/v1/ai/agents/tools - 获取 Agent 工具注册表
-router.get('/agents/tools', roleAuth(ROLE_SETS.OPERATORS), aiController.agentToolRegistry);
+router.get('/agents/tools', roleAuth(ROLE_SETS.ALL), aiController.agentToolRegistry);
 
 // POST /api/v1/ai/agents/prompt-stream - SSE 流式运行预置业务 Agent
-router.post('/agents/prompt-stream', roleAuth(ROLE_SETS.OPERATORS), [
+router.post('/agents/prompt-stream', roleAuth(ROLE_SETS.ALL), [
   body('agentType').optional().isIn(SUPPORTED_AGENT_TYPES).withMessage('agentType 不合法'),
   body('message').notEmpty().withMessage('消息不能为空'),
 ], handleValidation, aiController.agentPromptStream);
 
 // POST /api/v1/ai/agents/execute-action - 执行用户确认后的 Agent 写操作
-router.post('/agents/execute-action', roleAuth(ROLE_SETS.OPERATORS), [
+router.post('/agents/execute-action', roleAuth(ROLE_SETS.ALL), [
   body('actionId').notEmpty().withMessage('actionId 不能为空'),
 ], handleValidation, withAuditLog(
   {
@@ -77,7 +77,7 @@ router.post('/agents/execute-action', roleAuth(ROLE_SETS.OPERATORS), [
 ));
 
 // POST /api/v1/ai/agents/cancel-action - 取消一个待确认的 Agent 写操作
-router.post('/agents/cancel-action', roleAuth(ROLE_SETS.OPERATORS), [
+router.post('/agents/cancel-action', roleAuth(ROLE_SETS.ALL), [
   body('actionId').notEmpty().withMessage('actionId 不能为空'),
 ], handleValidation, aiController.cancelAgentAction);
 
@@ -91,7 +91,7 @@ router.get('/sessions', aiController.getSessions);
 router.get('/standalone-token-usage', aiController.getStandaloneTokenUsage);
 
 // DELETE /api/v1/ai/sessions/:sessionId - 删除会话
-router.delete('/sessions/:sessionId', roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
+router.delete('/sessions/:sessionId', roleAuth(ROLE_SETS.ALL), withAuditLog(
   {
     entity: 'ChatSession',
     action: 'DELETE',

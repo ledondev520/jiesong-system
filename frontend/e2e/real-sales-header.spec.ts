@@ -37,11 +37,12 @@ test.afterEach(async () => {
  */
 async function enterHeader(page: Page) {
   const token = await loginAs(page, fixture, "SALES");
-  await page.getByRole("link", { name: "出口订单", exact: true }).first().click();
-  await expect(page).toHaveURL(/\/dashboard\/orders$/);
   await page
-    .getByRole("link", { name: fixture.salesNo!, exact: true })
+    .getByRole("link", { name: "出口订单", exact: true })
+    .first()
     .click();
+  await expect(page).toHaveURL(/\/dashboard\/orders$/);
+  await page.getByRole("link", { name: fixture.salesNo!, exact: true }).click();
   await expect(page).toHaveURL(`/dashboard/orders/${fixture.salesId}`);
   await page.getByRole("tab", { name: "明细", exact: true }).click();
   return token;
@@ -51,8 +52,7 @@ async function enterHeader(page: Page) {
  * @param page 当前合同详情验收页面
  * @returns 合同信息 tabpanel 定位器
  */
-const panelFor = (page: Page) =>
-  page.getByRole("tabpanel", { name: "明细" });
+const panelFor = (page: Page) => page.getByRole("tabpanel", { name: "明细" });
 const savedValues = {
   rate: "7.2",
   signedAt: "2026-10-01",
@@ -331,13 +331,14 @@ test("SALES header saved supplement survives authenticated readback, page reload
     signedAt: "2026-10-03T00:00:00.000Z",
     estimatedArrival: "2026-11-03T00:00:00.000Z",
     portId: fixture.salesHeader!.nextPortId,
-    totalAmount: 20,
-    receivedAmount: 5,
     totalBoxes: 2,
     grossWeight: 20,
     netWeight: 18,
     volume: 0.2,
   });
+  // OD-7/OD-8: SALES never reads back contract totals or received amounts.
+  expect(readback.body.data).not.toHaveProperty("totalAmount");
+  expect(readback.body.data).not.toHaveProperty("receivedAmount");
   expect(readback.body.data.packingItems[0].id).toBe(
     before.packing_items[0].id,
   );

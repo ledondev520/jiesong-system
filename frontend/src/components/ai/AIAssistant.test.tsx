@@ -488,8 +488,8 @@ describe("AIAssistant", () => {
     expect(mockExecuteAgentAction).toHaveBeenCalledTimes(1);
   });
 
-  it("老板只读角色看不到确认执行按钮", async () => {
-    useAuthStore.setState({ user: { role: Role.BOSS } as User });
+  it("停用角色（OD-8，如 BOSS）只读，看不到确认执行按钮", async () => {
+    useAuthStore.setState({ user: { role: "BOSS" } as unknown as User });
     const reader = pendingActionStream();
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,

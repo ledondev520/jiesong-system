@@ -115,29 +115,26 @@ test('authenticate: 旧 Agent (jsa_) token 已无认证入口，一律401', asyn
   }
 });
 
-test('BOSS以数据库角色判定：拒绝业务/AI/MCP写及生成文件GET，允许明确汇总GET', async () => {
+test('OD-8：已停用角色（PURCHASE/FINANCE/WAREHOUSE/BOSS）按数据库角色在每个入口 403，ADMIN/SALES 通过', async () => {
   const config = require('../config');
   const { clearAuthCache } = require('./auth');
   const original = prisma.user.findUnique;
-  const id = 'boss-synthetic-role-test';
+  const id = 'retired-synthetic-role-test';
   const token = jwt.sign({ userId: id, role: 'ADMIN' }, config.jwt.secret);
-  prisma.user.findUnique = async () => ({ id, role: 'BOSS', isActive: true, sessionVersion: 0 });
+  let role;
+  prisma.user.findUnique = async () => ({ id, role, isActive: true, sessionVersion: 0 });
   try {
-    for (const [method, path, allowed] of [
-      ['GET', '/api/v1/reports/business-overview', true], ['GET', '/api/v1/finance/stats', true],
-      ['GET', '/api/v1/sales/record/finance-summary', true], ['GET', '/api/v1/sales/record/loading-plan?containerType=40HQ', true], ['GET', '/api/v1/purchases/record/receipts', true],
-      ['GET', '/api/v1/purchases/record/receipts/batch/inspections', true],
-      ['POST', '/api/v1/finance/payments', false], ['PUT', '/api/v1/purchases/record', false],
-      ['POST', '/api/v1/ai/agents/execute-action', false], ['POST', '/mcp', false],
-      ['GET', '/api/v1/sales/record/export-excel', false], ['GET', '/api/v1/purchases/export', false],
-      ['GET', '/api/v1/contract-doc/pdf/record', true], ['POST', '/api/v1/contract-doc/generate/record', false], ['GET', '/api/v1/system/configs', false],
-      ['GET', '/api/v1/users', false], ['GET', '/api/v1/finance/statements/evidence/documents', false],
-      ['POST', '/api/v1/auth/change-password', true], ['POST', '/api/v1/notifications/read-all', true],
-      ['PUT', '/api/v1/system/notifications/record/read', true], ['POST', '/api/v1/notifications/generate', false],
-    ]) {
+    for (role of ['PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS', 'ADMIN', 'SALES']) {
+      for (const [method, path] of [['GET', '/api/v1/purchases'], ['GET', '/api/v1/reports/business-overview'], ['POST', '/api/v1/auth/change-password']]) {
+        const { next, capture } = createNextCapture();
+        await authenticate({ headers: { authorization: `Bearer ${token}` }, method, originalUrl: path }, {}, next);
+        const retired = !['ADMIN', 'SALES'].includes(role);
+        assert.equal(capture.error?.statusCode ?? 200, retired ? 403 : 200, `${role} ${method} ${path}`);
+      }
       const { next, capture } = createNextCapture();
-      await authenticate({ headers: { authorization: `Bearer ${token}` }, method, originalUrl: path }, {}, next);
-      assert.equal(capture.error?.statusCode ?? 200, allowed ? 200 : 403, `${method} ${path}`);
+      await authenticate({ headers: { authorization: `Bearer ${token}` }, method: 'POST', originalUrl: '/api/v1/auth/logout' }, {}, next);
+      assert.equal(capture.error?.statusCode ?? 200, 200, `${role} can still log out`);
+      clearAuthCache(id);
     }
   } finally { prisma.user.findUnique = original; clearAuthCache(id); }
 });

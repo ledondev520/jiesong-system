@@ -118,6 +118,7 @@ vi.mock("@/lib/hooks/useBusinessReadOnly", () => ({
 describe("PurchaseFlowPanel supplier invoice flow", () => {
   beforeEach(() => {
     mockReadOnly = false;
+    useAuthStore.setState({ user: { id: "u1", role: "ADMIN" } as never });
     mockIsMobile.mockReturnValue(false);
     vi.clearAllMocks();
     mockGetPreparation.mockResolvedValue({ data: preparation });
@@ -291,10 +292,7 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
   // P3-6：没有上传权限的角色不应看到一个点了没反应的按钮
   it.each([
     ["ADMIN", true],
-    ["PURCHASE", true],
-    ["FINANCE", true],
     ["SALES", false],
-    ["WAREHOUSE", false],
   ])("%s 的「上传发票原件」按钮可见性为 %s", async (role, visible) => {
     useAuthStore.setState({ user: { id: "u1", role } as never });
     const user = userEvent.setup();
@@ -308,7 +306,7 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
       expect(screen.getByLabelText("上传供应商发票原件")).toBeDisabled();
   });
 
-  describe("WAREHOUSE：服务端已剥离发票号与金额（OD-2/OD-3）", () => {
+  describe("SALES：服务端已剥离发票号与金额（OD-2/OD-3/OD-8）", () => {
     const warehouseContract = {
       ...contract,
       invoiceNo: undefined,
@@ -347,7 +345,7 @@ describe("PurchaseFlowPanel supplier invoice flow", () => {
     };
 
     beforeEach(() => {
-      useAuthStore.setState({ user: { id: "u1", role: "WAREHOUSE" } as never });
+      useAuthStore.setState({ user: { id: "u1", role: "SALES" } as never });
       mockGetPreparation.mockResolvedValue({ data: warehousePreparation });
     });
 

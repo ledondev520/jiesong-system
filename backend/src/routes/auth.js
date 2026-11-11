@@ -119,7 +119,7 @@ router.post(
   '/change-password',
   authenticate,
   validateChangePassword, handleValidation,
-  roleAuth(ROLE_SETS.EVERYONE),
+  roleAuth(ROLE_SETS.ALL),
   withAuditLog(
     {
       entity: 'User',

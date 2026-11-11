@@ -42,7 +42,7 @@ test('financial library hosted fixture: real ADMIN/FINANCE login reads the actua
     assert.equal(login.status, 200);
     const identity = (await login.json()).data;
     assert.equal(identity.user.id, fixture.users[role].id);
-    assert.equal(identity.user.role, role);
+    assert.equal(identity.user.role, fixture.users[role].role);
     const before = readDatabase(directory);
     const response = await fetch(`${fixture.baseURL}/api/v1/finance/statements/evidence/documents/${fixture.documents.GENERAL_LEDGER}`, { headers: { authorization: `Bearer ${identity.token}` } });
     assert.equal(response.status, 200);

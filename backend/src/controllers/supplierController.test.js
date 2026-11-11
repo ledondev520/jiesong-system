@@ -12,14 +12,14 @@ test('supplierController: 模块可正常加载并导出', () => {
   assert.ok(mod !== undefined);
 });
 
-test('markQualityIssue: SALES/WAREHOUSE never receive supplier bank fields (R2 P1-1)', async () => {
+test('markQualityIssue: SALES never receives supplier bank fields (R2 P1-1)', async () => {
   const prisma = require('../utils/prisma');
   const { markQualityIssue } = require('./supplierController');
   const row = { id: 's1', name: 'Synthetic Co', hasQualityIssue: true, bankAccountName: 'n', bankName: 'b', bankBranch: 'br', bankCode: 'c', bankAccount: '0000' };
   const original = prisma.supplier.update;
   prisma.supplier.update = async () => ({ ...row });
   try {
-    for (const [role, expectBank] of [['SALES', false], ['WAREHOUSE', false], ['PURCHASE', true]]) {
+    for (const [role, expectBank] of [['SALES', false], ['ADMIN', true]]) {
       let body;
       await markQualityIssue({ params: { id: 's1' }, body: { hasQualityIssue: true }, user: { role } },
         { json: (b) => { body = b; }, status() { return this; } }, (e) => { throw e; });

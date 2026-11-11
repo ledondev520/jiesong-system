@@ -175,8 +175,8 @@ function OrdersList() {
     void load();
   }, [load]);
 
-  // OD-3：WAREHOUSE 只看状态，后端不返回金额，列表也不显示金额列。
-  const showAmounts = useAuthStore((state) => state.user?.role) !== "WAREHOUSE";
+  // OD-7：非 ADMIN 只看状态，后端不返回金额，列表也不显示金额列。
+  const showAmounts = useAuthStore((state) => state.user?.role) === "ADMIN";
   const columns: DataTableColumn<OrderRow>[] = [
     {
       key: "contractNo",

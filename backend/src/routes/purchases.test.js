@@ -53,13 +53,13 @@ test('purchases route exposes one invoice preparation/read-write flow under the 
 });
 
 
-test('分批到货/验货写入限真实采购/仓库用户，完整验货证据可分页读取', () => {
+test('分批到货/验货写入限 ADMIN/SALES 人类用户（OD-8），完整验货证据可分页读取', () => {
   for (const path of ['/:id/receipts', '/:id/receipts/:receiptId/inspection']) {
     const route = purchasesRouter.stack.find(layer => layer.route?.path === path && layer.route.methods.post).route;
     const gate = route.stack.find(layer => layer.handle.isRoleAuth)?.handle;
-    assert.deepEqual(gate.allowedRoles, ['ADMIN', 'PURCHASE', 'WAREHOUSE']);
+    assert.deepEqual(gate.allowedRoles, ['ADMIN', 'SALES']);
     let denied;
-    gate({ user: { role: 'BOSS' } }, {}, error => { denied = error; });
+    gate({ user: { role: 'WAREHOUSE' } }, {}, error => { denied = error; });
     assert.equal(denied.statusCode, 403);
   }
   assert.notEqual(getRouteIndex(purchasesRouter, '/:id/receipts', 'get'), -1);

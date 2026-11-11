@@ -85,8 +85,8 @@ export default function BankFlowPage() {
   const [amountMin, setAmountMin] = useState("");
   const [amountMax, setAmountMax] = useState("");
   const [stats, setStats] = useState<BankFlowStats | null>(null);
-  const canSeeSourceFile = useAuthStore((state) =>
-    ["ADMIN", "FINANCE"].includes(state.user?.role ?? ""),
+  const canSeeSourceFile = useAuthStore(
+    (state) => state.user?.role === "ADMIN",
   );
   const [batches, setBatches] = useState<FinanceDataBatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -315,7 +315,7 @@ export default function BankFlowPage() {
                 key={b.id}
                 className="inline-flex max-w-full min-w-0 flex-wrap items-center gap-1 mr-3"
               >
-                {/* 来源文件名属 Confidential 财务资料，仅 ADMIN/FINANCE 可见 */}
+                {/* 来源文件名属 Confidential 财务资料，仅 ADMIN 可见 */}
                 <Badge
                   variant="outline"
                   className="max-w-full whitespace-normal break-all text-xs"

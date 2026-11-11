@@ -55,7 +55,7 @@ async function fixtureFor(t, scenario, temporaryRoot = os.tmpdir()) {
     const response = await call('POST', '/auth/login', { username: metadata.users[role].username, password });
     assert.equal(response.status, 200);
     assert.equal(response.limit, '10'); // Existing login limiter is active, without a test bypass.
-    assert.equal(response.body.data.user.role, role);
+    assert.equal(response.body.data.user.role, metadata.users[role].role);
     assert.equal(response.body.data.user.id, metadata.users[role].id);
     return response.body.data.token;
   };

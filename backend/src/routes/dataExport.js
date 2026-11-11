@@ -20,7 +20,7 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/v1/export/:type - 导出数据（权限与 /system/export/:type 对齐，防止 RBAC 旁路）
-router.get('/:type', roleAuth(ROLE_SETS.OPERATORS), paymentsExportGuard, withAuditLog(
+router.get('/:type', roleAuth(ROLE_SETS.ALL), paymentsExportGuard, withAuditLog(
   {
     entity: 'DataExport',
     action: 'EXPORT',

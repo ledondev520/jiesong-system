@@ -34,7 +34,7 @@ router.get('/product/:productId', inventoryController.getByProduct);
 router.get('/contract/:contractId', inventoryController.getByContract);
 
 // PUT /api/v1/inventory/batch-status - 批量更新库存状态（静态路由优先）
-router.put('/batch-status', roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
+router.put('/batch-status', roleAuth(ROLE_SETS.ALL), withAuditLog(
   {
     entity: 'Inventory',
     action: 'BATCH_UPDATE',
@@ -53,13 +53,13 @@ router.put('/batch-status', roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
 router.get('/:id', withIdValidation, inventoryController.getById);
 
 // PUT /api/v1/inventory/:id/status - 更新库存状态
-router.put('/:id/status', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
+router.put('/:id/status', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'Inventory', action: 'UPDATE', model: 'inventory' },
   inventoryController.updateStatus
 ));
 
 // POST /api/v1/inventory/:id/location - 登记/修改批次号与库位（A83；仅仓储相关角色）
-router.post('/:id/location', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'WAREHOUSE'), withAuditLog(
+router.post('/:id/location', withIdValidation, roleAuth('ADMIN', 'SALES'), withAuditLog(
   { entity: 'Inventory', action: 'UPDATE_LOCATION', model: 'inventory', captureBefore: true, captureAfter: true },
   inventoryController.updateLocation
 ));

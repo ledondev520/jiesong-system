@@ -7,7 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 
-test('customers writes: anonymous 401, non ADMIN/SALES 403, and no DELETE route exists', async (t) => {
+test('customers writes: anonymous 401, retired roles 403, and no DELETE route exists', async (t) => {
   const auth = require('../middleware/auth');
   t.mock.method(auth, 'authenticate', (req, res, next) => {
     if (req.get('x-synthetic-role')) req.user = { id: 'synthetic-user', role: req.get('x-synthetic-role') };
@@ -25,19 +25,10 @@ test('customers writes: anonymous 401, non ADMIN/SALES 403, and no DELETE route 
   })).status;
   for (const [method, url] of [['POST', '/customers'], ['PUT', '/customers/c1']]) {
     assert.equal(await send(method, url), 401, `${method} anonymous`);
-    for (const role of ['BOSS', 'PURCHASE', 'WAREHOUSE', 'FINANCE']) assert.equal(await send(method, url, role), 403, `${method} ${role}`);
+    for (const role of ['PURCHASE', 'WAREHOUSE', 'BOSS', 'GUEST']) assert.equal(await send(method, url, role), 403, `${method} ${role}`);
   }
   assert.equal(await send('DELETE', '/customers/c1', 'ADMIN'), 404);
   assert.equal(await send('PATCH', '/customers/c1', 'ADMIN'), 404);
-});
-
-test('BOSS may read customers and their stores but cannot write', () => {
-  const { enforceBossReadOnly } = require('../middleware/bossReadOnly');
-  const run = (method, url) => () => enforceBossReadOnly({ user: { role: 'BOSS' }, method, originalUrl: `/api/v1${url}` });
-  for (const url of ['/customers', '/customers?keyword=a', '/customers/c1', '/customers/c1/stores']) assert.doesNotThrow(run('GET', url), url);
-  for (const [method, url] of [['POST', '/customers'], ['PUT', '/customers/c1'], ['DELETE', '/customers/c1'], ['GET', '/customers/c1/other'], ['POST', '/customers/c1/stores']]) {
-    assert.throws(run(method, url), /老板角色仅可查看业务/, `${method} ${url}`);
-  }
 });
 
 test('customer validation: USD only, incoterm list, country, email, store code', async () => {

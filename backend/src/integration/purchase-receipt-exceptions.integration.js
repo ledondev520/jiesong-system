@@ -32,8 +32,8 @@ test('HTTP/SQLite：采购并发到货、累计复验、整批回滚及采购角
   const jwt = require('jsonwebtoken');
   const config = require('../config');
   const users = {};
-  for (const role of ['PURCHASE', 'WAREHOUSE', 'SALES', 'FINANCE']) {
-    const user = await db.user.create({ data: { username: `synthetic-exception-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+  for (const role of ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE']) {
+    const user = await db.user.create({ data: { username: `synthetic-exception-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } }); // retired roles stored as-is (OD-8)
     users[role] = { ...user, token: jwt.sign({ userId: user.id }, config.jwt.secret) };
   }
   const supplier = await db.supplier.create({ data: { name: '合成异常供应商', taxId: 'SYNTHETIC-EXCEPTION-TAX-ID' } });
@@ -41,11 +41,11 @@ test('HTTP/SQLite：采购并发到货、累计复验、整批回滚及采购角
   const app = require('../app');
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
-  const request = async (method, url, body, role = 'PURCHASE', serverBase = base) => {
+  const request = async (method, url, body, role = 'SALES', serverBase = base) => {
     const response = await fetch(serverBase + url, { method, headers: { authorization: `Bearer ${users[role].token}`, 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     return { status: response.status, body: await response.json() };
   };
-  const call = async (method, url, body, expected = 200, role = 'PURCHASE', serverBase = base) => {
+  const call = async (method, url, body, expected = 200, role = 'SALES', serverBase = base) => {
     const result = await request(method, url, body, role, serverBase);
     assert.equal(result.status, expected, `${method} ${url}: ${result.body.message || result.body.error || ''}`);
     return result.body.data;
@@ -72,14 +72,14 @@ test('HTTP/SQLite：采购并发到货、累计复验、整批回滚及采购角
 
   await t.test('相同请求并发到货只落一批，内容冲突返回409且不能多记数量', async () => {
     const contract = await create();
-    const input = { ...arrival(contract, 'parallel-arrival'), createdById: users.SALES.id };
+    const input = { ...arrival(contract, 'parallel-arrival'), createdById: users.ADMIN.id };
     const results = await Promise.all(Array.from({ length: 3 }, () => request('POST', receiptUrl(contract), input)));
     assert.deepEqual(results.map(result => result.status), [200, 200, 200]);
     assert.equal(results.filter(result => result.body.data.idempotentReplay === false).length, 1);
     assert.equal(new Set(results.map(result => result.body.data.receipt.id)).size, 1);
     const before = await snapshot(contract);
     assert.equal(before.receipts.length, 1);
-    assert.equal(before.receipts[0].createdById, users.PURCHASE.id);
+    assert.equal(before.receipts[0].createdById, users.SALES.id);
     assert.equal(before.items[0].arrivedQuantity, 10);
     assert.equal(before.inventory.length, 0);
     await call('POST', receiptUrl(contract), arrival(contract, 'parallel-arrival', [9]), 409);
@@ -125,14 +125,14 @@ test('HTTP/SQLite：采购并发到货、累计复验、整批回滚及采购角
   await t.test('并发重复验货只生成合格增量；复验为累计量，完成后仍可重放', async () => {
     const contract = await create();
     const { receipt } = await call('POST', receiptUrl(contract), arrival(contract, 'inspection-arrival'));
-    const input = { ...inspection(receipt, 'parallel-inspect', 6, 4), inspectedById: users.SALES.id };
+    const input = { ...inspection(receipt, 'parallel-inspect', 6, 4), inspectedById: users.ADMIN.id };
     const results = await Promise.all(Array.from({ length: 3 }, () => request('POST', inspectionUrl(contract, receipt), input)));
     assert.deepEqual(results.map(result => result.status), [200, 200, 200]);
     assert.equal(results.filter(result => result.body.data.idempotentReplay === false).length, 1);
     let saved = await snapshot(contract);
     assert.equal(saved.inspections.length, 1);
     assert.equal(saved.inspections[0].acceptedIncrement, 6);
-    assert.equal(saved.inspections[0].inspectedById, users.PURCHASE.id);
+    assert.equal(saved.inspections[0].inspectedById, users.SALES.id);
     assert.equal(saved.inventory.length, 1);
     assert.equal(saved.inventory[0].quantity, 6);
     assert.equal(saved.contract.status, 'SHIPPED');
@@ -183,12 +183,12 @@ test('HTTP/SQLite：采购并发到货、累计复验、整批回滚及采购角
     });
     const contract = await create();
     const arrived = arrival(contract, 'two-process-arrival');
-    const arrivals = await Promise.all([base, secondBase].map(serverBase => request('POST', receiptUrl(contract), arrived, 'PURCHASE', serverBase)));
+    const arrivals = await Promise.all([base, secondBase].map(serverBase => request('POST', receiptUrl(contract), arrived, 'SALES', serverBase)));
     assert.deepEqual(arrivals.map(result => result.status), [200, 200]);
     assert.equal(arrivals.filter(result => result.body.data.idempotentReplay === false).length, 1);
     const receipt = arrivals[0].body.data.receipt;
     const inspected = inspection(receipt, 'two-process-inspection', 10);
-    const inspections = await Promise.all([base, secondBase].map(serverBase => request('POST', inspectionUrl(contract, receipt), inspected, 'PURCHASE', serverBase)));
+    const inspections = await Promise.all([base, secondBase].map(serverBase => request('POST', inspectionUrl(contract, receipt), inspected, 'SALES', serverBase)));
     assert.deepEqual(inspections.map(result => result.status), [200, 200]);
     assert.equal(inspections.filter(result => result.body.data.idempotentReplay === false).length, 1);
     const saved = await snapshot(contract);
@@ -258,17 +258,17 @@ test('HTTP/SQLite：采购并发到货、累计复验、整批回滚及采购角
     ];
     const before = { payment: await db.payment.count(), taxRefund: await db.taxRefund.count(), forex: await db.forexVerification.count(), users: await db.user.count() };
     // 独立进程仍执行完整认证/RBAC，避免本文件正常高密度请求触达单进程100次限流。
-    for (const [method, url] of calls) await call(method, url, {}, 403, 'PURCHASE', secondBase);
+    for (const [method, url] of calls) await call(method, url, {}, 403, 'SALES', secondBase);
     assert.deepEqual({ payment: await db.payment.count(), taxRefund: await db.taxRefund.count(), forex: await db.forexVerification.count(), users: await db.user.count() }, before);
     const contract = await create();
     const input = arrival(contract, 'forbidden-receipt');
-    for (const role of ['SALES', 'FINANCE']) await call('POST', receiptUrl(contract), input, 403, role);
+    for (const role of ['PURCHASE', 'FINANCE']) await call('POST', receiptUrl(contract), input, 403, role); // retired (OD-8)
     const saved = await snapshot(contract);
     assert.equal(saved.receipts.length, 0);
     assert.equal(saved.inventory.length, 0);
-    const { receipt } = await call('POST', receiptUrl(contract), input, 200, 'PURCHASE', secondBase);
+    const { receipt } = await call('POST', receiptUrl(contract), input, 200, 'SALES', secondBase);
     const beforeInspection = await snapshot(contract);
-    for (const role of ['SALES', 'FINANCE']) await call('POST', inspectionUrl(contract, receipt), inspection(receipt, 'forbidden-inspection', 10), 403, role, secondBase);
+    for (const role of ['PURCHASE', 'FINANCE']) await call('POST', inspectionUrl(contract, receipt), inspection(receipt, 'forbidden-inspection', 10), 403, role, secondBase);
     assert.deepEqual(await snapshot(contract), beforeInspection);
   });
 });

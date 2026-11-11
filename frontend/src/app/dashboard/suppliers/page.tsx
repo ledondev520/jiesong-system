@@ -275,9 +275,9 @@ export default function SuppliersPage() {
 
   const counts = countSuppliers(suppliers);
   const isAdmin = useAuthStore((state) => state.user?.role === "ADMIN");
-  // Archive (DELETE /suppliers/:id) is ADMIN/PURCHASE only on the server.
+  // Archive (DELETE /suppliers/:id) is ADMIN/SALES on the server (OD-8).
   const canArchive = useAuthStore((state) =>
-    ["ADMIN", "PURCHASE"].includes(state.user?.role ?? ""),
+    ["ADMIN", "SALES"].includes(state.user?.role ?? ""),
   );
   const [hardDeletePreview, setHardDeletePreview] =
     useState<SupplierHardDeletePreview | null>(null);

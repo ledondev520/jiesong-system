@@ -8,7 +8,14 @@ const jwt = require('jsonwebtoken');
 const browserSessions = require('../services/browserSessionService');
 const config = require('../config');
 const { createError } = require('./errorHandler');
-const { enforceBossReadOnly } = require('./bossReadOnly');
+const { ROLES } = require('../config/constants');
+
+// OD-8 (owner, 2026-11-11): accounts still holding a retired role (PURCHASE/FINANCE/WAREHOUSE/BOSS) are refused until an admin reassigns them.
+// Logout stays open so such an account can still end its own session.
+const assertActiveRole = (req) => {
+  if (req.method === 'POST' && String(req.originalUrl || '').split('?')[0] === '/api/v1/auth/logout') return;
+  if (!Object.values(ROLES).includes(req.user?.role)) throw createError('该账号的角色已停用，请联系管理员重新分配角色', 403);
+};
 const { roleAuth, adminOnly } = require('./roleAuth');
 const prisma = require('../utils/prisma');
 
@@ -43,7 +50,7 @@ const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader) {
       attachUserActor(req, await browserSessions.authenticate(req));
-      enforceBossReadOnly(req);
+      assertActiveRole(req);
       return next();
     }
     // An explicit malformed/expired bearer must never fall back to another identity.
@@ -78,7 +85,7 @@ const authenticate = async (req, res, next) => {
 
     // 4. 附加用户信息
     attachUserActor(req, publicUser);
-    enforceBossReadOnly(req);
+    assertActiveRole(req);
     next();
   } catch (error) {
     next(error);

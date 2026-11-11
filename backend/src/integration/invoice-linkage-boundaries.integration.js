@@ -4,6 +4,7 @@
  * Pos: internal invoice regression; no real files, providers, submissions or ledger adjustments
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -45,7 +46,7 @@ test('HTTP/SQLite: invoice linkage preserves source facts and current match stat
   const jwt = require('jsonwebtoken');
   const tokens = {};
   for (const role of ['ADMIN', 'FINANCE', 'SALES', 'PURCHASE', 'WAREHOUSE', 'BOSS', 'INACTIVE']) {
-    const user = await db.user.create({ data: { username: `synthetic-invoice-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role: role === 'INACTIVE' ? 'FINANCE' : role, isActive: role !== 'INACTIVE' } });
+    const user = await db.user.create({ data: { username: `synthetic-invoice-${role}`, name: `Synthetic ${role}`, password: 'test-only-unused-hash', role: role === 'INACTIVE' ? 'ADMIN' : dbRole(role), isActive: role !== 'INACTIVE' } });
     // Authentication must use the database role, not this misleading JWT claim.
     tokens[role] = jwt.sign({ userId: user.id, role: 'ADMIN' }, process.env.JWT_SECRET);
   }

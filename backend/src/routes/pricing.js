@@ -11,6 +11,6 @@ const router = Router();
 
 router.use(authenticate);
 
-router.post('/preview', roleAuth('ADMIN', 'SALES', 'PURCHASE'), previewLines);
+router.post('/preview', roleAuth('ADMIN', 'SALES'), previewLines);
 
 module.exports = router;

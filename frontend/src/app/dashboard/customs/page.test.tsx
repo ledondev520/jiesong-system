@@ -18,7 +18,7 @@ const mockSearchParamGet = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockCustomsGetAll = vi.fn();
-let mockRole = "FINANCE";
+let mockRole = "ADMIN";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -86,7 +86,7 @@ describe("TaxRefundsDashboardPage 交互逻辑", () => {
   beforeEach(() => {
     mockPush.mockReset();
     mockReplace.mockReset();
-    mockRole = "FINANCE";
+    mockRole = "ADMIN";
     mockCustomsGetAll.mockReset();
     mockCustomsGetAll.mockResolvedValue({
       data: { items: [], pagination: { total: 0 } },
@@ -261,7 +261,10 @@ describe("TaxRefundsDashboardPage 交互逻辑", () => {
     });
   });
 
-  it("财务默认进入退税工作台：单一页面标题，操作入口齐全，URL 写入 view", async () => {
+  it("ADMIN 用 view=workbench 进入退税工作台：单一页面标题，操作入口齐全", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "view" ? "workbench" : null,
+    );
     renderTaxRefundsPage();
     expect(
       await screen.findByRole("button", { name: "导入进项发票" }),
@@ -291,7 +294,7 @@ describe("TaxRefundsDashboardPage 交互逻辑", () => {
     );
   });
 
-  it("非财务角色默认进入报关单，页签顺序为 报关单 · 退税工作台 · 退税记录", async () => {
+  it("SALES 默认进入报关单，没有退税工作台页签（OD-8：工作台仅 ADMIN）", async () => {
     mockRole = "SALES";
     renderTaxRefundsPage();
     expect(
@@ -299,7 +302,6 @@ describe("TaxRefundsDashboardPage 交互逻辑", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "报关单",
-      "退税工作台",
       "退税记录",
     ]);
     expect(screen.getByRole("tab", { name: "报关单" })).toHaveAttribute(

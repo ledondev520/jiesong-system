@@ -109,20 +109,13 @@ export default function UsersPage() {
   // ── 用户操作 ──
   const getRoleBadge = (role: Role) => {
     switch (role) {
-      case Role.BOSS:
-        return <SemanticBadge tone="info">老板（只读）</SemanticBadge>;
       case Role.ADMIN:
         return <SemanticBadge tone="danger">管理员</SemanticBadge>;
-      case Role.PURCHASE:
-        return <SemanticBadge tone="info">采购</SemanticBadge>;
       case Role.SALES:
         return <SemanticBadge tone="success">销售</SemanticBadge>;
-      case Role.FINANCE:
-        return <SemanticBadge tone="warning">财务</SemanticBadge>;
-      case Role.WAREHOUSE:
-        return <SemanticBadge tone="secondary">仓库</SemanticBadge>;
       default:
-        return <SemanticBadge tone="secondary">{role}</SemanticBadge>;
+        // OD-8：停用角色（PURCHASE/FINANCE/WAREHOUSE/BOSS）无法登录，需管理员重新分配
+        return <SemanticBadge tone="secondary">{role}（已停用）</SemanticBadge>;
     }
   };
 

@@ -28,7 +28,7 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
   const jwt = require('jsonwebtoken');
   const config = require('../config');
   const users = {};
-  for (const role of ['PURCHASE', 'WAREHOUSE']) {
+  for (const role of ['ADMIN', 'SALES']) {
     const user = await db.user.create({ data: { username: `synthetic-received-edits-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
     users[role] = { id: user.id, token: jwt.sign({ userId: user.id }, config.jwt.secret) };
   }
@@ -37,7 +37,7 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
   const app = require('../app');
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
-  const call = async (method, url, body, expected = 200, role = 'PURCHASE') => {
+  const call = async (method, url, body, expected = 200, role = 'ADMIN') => {
     const response = await fetch(base + url, { method, headers: { authorization: `Bearer ${users[role].token}`, 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     const result = await response.json();
     assert.equal(response.status, expected, `${method} ${url}: ${result.message || result.error || ''}`);
@@ -70,8 +70,8 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
     receipts: value.receipts, receiptItems: value.receiptItems, inspections: value.inspections,
     inventory: value.inventory, payments: value.payments, packingItems: value.packingItems,
   });
-  const arrival = async (requestId, quantities) => (await call('POST', `${url}/receipts`, { requestId, arrivedAt: '2026-10-01', note: '合成到货原始证据', items: quantities.map(([index, arrivedQuantity]) => ({ purchaseItemId: items[index].id, arrivedQuantity })) }, 200, 'WAREHOUSE')).receipt;
-  const inspect = (receipt, requestId, quantities) => call('POST', `${url}/receipts/${receipt.id}/inspection`, { requestId, note: '合成验货原始证据', items: quantities.map(([index, acceptedQuantity, reinspectionQuantity = 0]) => ({ receiptItemId: receipt.items.find(row => row.purchaseItemId === items[index].id).id, acceptedQuantity, reinspectionQuantity })) }, 200, 'WAREHOUSE');
+  const arrival = async (requestId, quantities) => (await call('POST', `${url}/receipts`, { requestId, arrivedAt: '2026-10-01', note: '合成到货原始证据', items: quantities.map(([index, arrivedQuantity]) => ({ purchaseItemId: items[index].id, arrivedQuantity })) }, 200, 'SALES')).receipt;
+  const inspect = (receipt, requestId, quantities) => call('POST', `${url}/receipts/${receipt.id}/inspection`, { requestId, note: '合成验货原始证据', items: quantities.map(([index, acceptedQuantity, reinspectionQuantity = 0]) => ({ receiptItemId: receipt.items.find(row => row.purchaseItemId === items[index].id).id, acceptedQuantity, reinspectionQuantity })) }, 200, 'SALES');
   const verify = async (label, role, incomplete) => t.test(label, async () => {
     const before = await snapshot();
     const edits = [
@@ -86,8 +86,8 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
       ['删除整个合同', 'DELETE', url, undefined],
     ];
     for (const [description, method, endpoint, input] of edits) {
-      // DELETE is ADMIN/PURCHASE only and refuses with 409 once receipts exist (AUDIT-JS-2).
-      await call(method, endpoint, input, method === 'DELETE' ? (['ADMIN', 'PURCHASE'].includes(role) ? 409 : 403) : 400, role);
+      // DELETE (ADMIN/SALES, OD-8) refuses with 409 once receipts exist (AUDIT-JS-2).
+      await call(method, endpoint, input, method === 'DELETE' ? 409 : 400, role);
       assert.deepEqual(await snapshot(), before, `${description}不能改写来源、证据、库存、分配或付款义务`);
     }
     for (const status of ['CANCELLED', 'DRAFT', incomplete ? 'RECEIVED' : 'COMPLETED']) {
@@ -97,7 +97,7 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
     // 发货后补录生产资料和发票号码是现有专用接口的合法行为，不应一并禁止。
     await call('PUT', `${url}/production-details`, { items: production.map(item => ({ ...item, specification: `合成补录-${label}` })) }, 200, role);
     const invoice = await call('PUT', `${url}/invoice-numbers`, { invoiceNumbers: ['SYNTHETIC-INVOICE-1', 'SYNTHETIC-INVOICE-2'] }, 200, role);
-    if (role === 'WAREHOUSE') { // OD-2：WAREHOUSE 只得到号码个数，不得到号码本身
+    if (role !== 'ADMIN') { // OD-2 / OD-8：非 ADMIN 只得到号码个数，不得到号码本身
       assert.equal(invoice.invoiceNumbers, undefined);
       assert.equal(invoice.invoiceNumberCount, 2);
     } else assert.deepEqual(invoice.invoiceNumbers, ['SYNTHETIC-INVOICE-1', 'SYNTHETIC-INVOICE-2']);
@@ -113,28 +113,28 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
     await call('PUT', url, { note: '合成不应覆盖原采购的备注' }, 400);
     assert.deepEqual(await snapshot(), before, '仅改备注也不能改变收货后的采购记录、证据、库存或义务');
   });
-  await verify('部分到货未验货', 'PURCHASE', true);
+  await verify('部分到货未验货', 'ADMIN', true);
   assert.equal((await snapshot()).inventory.length, 0);
   await inspect(first, 'received-edit-initial-inspection', [[0, 2, 1]]);
-  await verify('部分验货含待验与待复验', 'WAREHOUSE', true);
+  await verify('部分验货含待验与待复验', 'SALES', true);
   await inspect(first, 'received-edit-reinspection', [[0, 3, 0]]);
-  await verify('复验后仍未全量合格', 'PURCHASE', true);
+  await verify('复验后仍未全量合格', 'ADMIN', true);
   const second = await arrival('received-edit-remainder', [[0, 6], [1, 5]]);
   await inspect(first, 'received-edit-first-complete', [[0, 4, 0]]);
   await inspect(second, 'received-edit-second-complete', [[0, 6, 0], [1, 5, 0]]);
-  await verify('全量验货合格库存未分配', 'WAREHOUSE', false);
+  await verify('全量验货合格库存未分配', 'SALES', false);
 
-  const sale = await call('POST', '/sales', { exchangeRate: 7.2 }, 201, 'WAREHOUSE');
-  await call('POST', `/sales/${sale.id}/import-purchase-items`, { items: [{ purchaseItemId: items[0].id, boxes: 4 }] }, 201, 'WAREHOUSE');
-  await verify('合格库存已关联销售装箱分配', 'PURCHASE', false);
-  await call('PUT', `/sales/${sale.id}/status`, { status: 'CONFIRMED' }, 200, 'WAREHOUSE');
-  await call('PUT', `/sales/${sale.id}/status`, { status: 'SHIPPED' }, 200, 'WAREHOUSE');
-  await verify('来源库存已部分出库', 'WAREHOUSE', false);
+  const sale = await call('POST', '/sales', { exchangeRate: 7.2 }, 201, 'SALES');
+  await call('POST', `/sales/${sale.id}/import-purchase-items`, { items: [{ purchaseItemId: items[0].id, boxes: 4 }] }, 201, 'SALES');
+  await verify('合格库存已关联销售装箱分配', 'ADMIN', false);
+  await call('PUT', `/sales/${sale.id}/status`, { status: 'CONFIRMED' }, 200, 'SALES');
+  await call('PUT', `/sales/${sale.id}/status`, { status: 'SHIPPED' }, 200, 'SALES');
+  await verify('来源库存已部分出库', 'SALES', false);
   const outbound = await snapshot();
   assert.equal(outbound.inventory.filter(row => row.status === 'OUTBOUND').reduce((sum, row) => sum + row.quantity, 0), 4);
   assert.ok(outbound.inventory.every(row => row.receiptInspectionId));
   assert.equal(outbound.contract.status, 'RECEIVED', '存在未付尾款仍保留收货未结清状态');
-  const summary = await call('GET', `${url}/receipts`, undefined, 200, 'WAREHOUSE');
+  const summary = await call('GET', `${url}/receipts`, undefined, 200, 'SALES');
   assert.equal(summary.summary.complete, true);
   assert.equal(summary.summary.items.find(row => row.purchaseItemId === items[0].id).acceptedQuantity, 10);
   assert.equal(summary.summary.items.find(row => row.purchaseItemId === items[1].id).acceptedQuantity, 5);

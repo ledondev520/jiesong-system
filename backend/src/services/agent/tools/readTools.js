@@ -55,7 +55,7 @@ module.exports = ({
         query: input?.query,
         types: input?.types,
         limit: input?.limit,
-        includeAmounts: userRole !== 'WAREHOUSE', // OD-3
+        includeAmounts: userRole === 'ADMIN', // OD-3
       });
       return toJson({
         total: result.length,
@@ -154,7 +154,7 @@ module.exports = ({
         contracts: (result.contracts || []).slice(0, limit).map((contract) => ({
           contractNo: contract.contractNo,
           status: contract.status,
-          ...(userRole === 'WAREHOUSE' ? {} : { totalAmount: contract.totalAmount, receivedAmount: contract.receivedAmount }), // OD-3
+          ...(userRole !== 'ADMIN' ? {} : { totalAmount: contract.totalAmount, receivedAmount: contract.receivedAmount }), // OD-3
           stores: contract.stores,
           hasThirdPartyCargo: contract.hasThirdPartyCargo,
           sourceParties: contract.sourceParties,

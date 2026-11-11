@@ -44,15 +44,15 @@ const normalizeCategory = (value) => (
 
 // 已确认清单含财务核验行；所有附件入口复用现有 ADMIN/FINANCE 边界。
 // 采购合同文书（含供应商银行信息的生成件、签章合同、供应商发票）与 B96 的 contract-doc 角色一致：
-// 读 ADMIN/PURCHASE/FINANCE/BOSS，写/删 ADMIN/PURCHASE/FINANCE；其余附件类别沿用原权限。
+// OD-8：读写删仅 ADMIN；其余附件类别沿用原权限。
 const RESTRICTED_PURCHASE_FILE_CATEGORIES = new Set([
   CONTRACT_FILE_CATEGORY.SYSTEM_GENERATED_WORD,
   CONTRACT_FILE_CATEGORY.SYSTEM_GENERATED_PDF,
   CONTRACT_FILE_CATEGORY.SIGNED_CONTRACT,
   CONTRACT_FILE_CATEGORY.SUPPLIER_INVOICE,
 ]);
-const PURCHASE_ARTIFACT_READ_ROLES = ['ADMIN', 'PURCHASE', 'FINANCE', 'BOSS'];
-const PURCHASE_ARTIFACT_WRITE_ROLES = ['ADMIN', 'PURCHASE', 'FINANCE'];
+const PURCHASE_ARTIFACT_READ_ROLES = ['ADMIN'];
+const PURCHASE_ARTIFACT_WRITE_ROLES = ['ADMIN'];
 const isRestrictedPurchaseFile = (file) => (
   (file?.contractType === CONTRACT_TYPE.PURCHASE || Boolean(file?.purchaseContractId))
   && RESTRICTED_PURCHASE_FILE_CATEGORIES.has(file?.category)
@@ -67,22 +67,22 @@ const assertFileAccess = (file, user, { action = 'read' } = {}) => {
     if (!roles.includes(user.role)) throw createError('无权访问采购合同文书附件', 403);
   }
   if (String(file?.description || '').startsWith('退税出货清单确认:')
-    && !['ADMIN', 'FINANCE'].includes(user?.role)) {
-    throw createError('仅管理员或财务可访问已确认退税清单', 403);
+    && user?.role !== 'ADMIN') {
+    throw createError('仅管理员可访问已确认退税清单', 403);
   }
-  // R3 P1-3：出口三单归档工作簿由 ADMIN/SALES/FINANCE 生成，仓库角色不得下载/删除（描述前缀见 exportPacketService）。
+  // R3 P1-3 / OD-8：出口三单归档工作簿含结汇/退税金额，仅 ADMIN 可下载/删除（描述前缀见 exportPacketService）。
   if (String(file?.description || '').startsWith('出口三单生成版本')
-    && user.role === 'WAREHOUSE') {
-    throw createError('仓库角色无权访问出口三单归档文件', 403);
+    && user.role !== 'ADMIN') {
+    throw createError('无权访问出口三单归档文件', 403);
   }
 };
 
 // 到货照片是 Confidential 到货证据：仅采购合同、且仅能登记到货的人类角色可写/删。
-const RECEIPT_PHOTO_ROLES = ['ADMIN', 'PURCHASE', 'WAREHOUSE'];
+const RECEIPT_PHOTO_ROLES = ['ADMIN', 'SALES'];
 const assertReceiptPhotoAccess = (contractType, category, user) => {
   if (category === CONTRACT_FILE_CATEGORY.RECEIPT_PHOTO
     && (contractType !== CONTRACT_TYPE.PURCHASE || !RECEIPT_PHOTO_ROLES.includes(user?.role))) {
-    throw createError('仅管理员、采购或仓库可在采购合同上登记或删除到货照片', 403);
+    throw createError('仅管理员或销售可在采购合同上登记或删除到货照片', 403);
   }
 };
 

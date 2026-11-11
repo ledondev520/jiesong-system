@@ -1,5 +1,6 @@
 /** A81: SalesContract (the container) blNo round-trip over real HTTP/SQLite, WAREHOUSE read, additive-only migration; synthetic data only. */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -51,7 +52,7 @@ test('HTTP/SQLite: blNo update/get/list, WAREHOUSE can read it, bad values rejec
   const jwt = require('jsonwebtoken');
   const tokens = {};
   for (const role of ['ADMIN', 'SALES', 'WAREHOUSE']) {
-    const user = await db.user.create({ data: { username: `synthetic-blno-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-blno-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     tokens[role] = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
   }
   const port = await db.port.create({ data: { name: '合成提单港口', code: 'QA-BL' } });

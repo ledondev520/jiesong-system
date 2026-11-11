@@ -1,12 +1,13 @@
 /** Real HTTP/RBAC/SQLite coverage for 公司信息 (companyName / companyAddress / companyPhone / companyTaxId / companyBankInfo): ADMIN-only writes, validated, role-scoped reads, audit never carries the bank text. */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-test('HTTP/SQLite: company settings are empty by default, ADMIN-written and validated, bank text is ADMIN/FINANCE-only on read and absent from audit values', async (t) => {
+test('HTTP/SQLite: company settings are empty by default, ADMIN-written and validated, bank text is ADMIN-only on read (OD-8) and absent from audit values', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-company-settings-'));
   fs.chmodSync(directory, 0o700);
   const database = path.join(directory, 'synthetic.db');
@@ -29,8 +30,8 @@ test('HTTP/SQLite: company settings are empty by default, ADMIN-written and vali
   db = require('../utils/prisma');
   const jwt = require('jsonwebtoken');
   const tokens = {};
-  for (const role of ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-company-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+  for (const role of ['ADMIN', 'SALES']) {
+    const user = await db.user.create({ data: { username: `synthetic-company-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     tokens[role] = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
   }
   const app = require('../app');
@@ -55,13 +56,9 @@ test('HTTP/SQLite: company settings are empty by default, ADMIN-written and vali
     for (const key of ['companyName', 'companyAddress', 'companyBankInfo']) assert.equal(Object.hasOwn(flat.data, key), false, `${role} ${key}`);
   }
 
-  // BOSS is read-only and /system/configs is not on its allowlist: denied, not widened for this feature.
-  const bossFlat = await call('GET', '/configs', undefined, 'BOSS');
-  assert.equal(bossFlat.status, 403);
-  assert.equal(bossFlat.data ?? null, null);
 
   // Writes: ADMIN only.
-  for (const role of ['SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) assert.equal((await put('companyName', 'Nope', role)).status, 403, role);
+  for (const role of ['SALES']) assert.equal((await put('companyName', 'Nope', role)).status, 403, role);
   assert.equal((await put('companyName', 'Nope', 'ANONYMOUS')).status, 401);
 
   // Validation: bad values change nothing.
@@ -87,16 +84,14 @@ test('HTTP/SQLite: company settings are empty by default, ADMIN-written and vali
   assert.equal(JSON.parse((await db.systemConfig.findUnique({ where: { key: 'companyName' } })).value), 'Synthetic Export Co');
   assert.equal(JSON.parse((await db.systemConfig.findUnique({ where: { key: 'companyAddress' } })).value), '1 Synthetic Road\nCity');
 
-  // Reads through the flat list: name/address for every role allowed to read configs, the bank text only for ADMIN and FINANCE.
-  // BOSS has no access to the settings list at all (not on the read whitelist).
-  assert.equal((await call('GET', '/configs', undefined, 'BOSS')).status, 403);
-  for (const role of ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE']) {
+  // Reads through the flat list: name/address for every role allowed to read configs, the bank text only for ADMIN.
+  for (const role of ['ADMIN', 'SALES']) {
     const response = await call('GET', '/configs', undefined, role);
     assert.equal(response.status, 200, role);
     const flat = response.data;
     assert.equal(flat.companyName, 'Synthetic Export Co', role);
     assert.equal(flat.companyAddress, '1 Synthetic Road\nCity', role);
-    if (['ADMIN', 'FINANCE'].includes(role)) assert.equal(flat.companyBankInfo, BANK, role);
+    if (role === 'ADMIN') assert.equal(flat.companyBankInfo, BANK, role);
     else assert.equal(Object.hasOwn(flat, 'companyBankInfo'), false, role);
   }
 

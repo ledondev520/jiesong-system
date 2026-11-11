@@ -17,25 +17,25 @@ router.use(authenticate);
 router.get('/', withPaginationValidation, customsDeclarationController.list);
 router.post(
   '/auto-drafts',
-  roleAuth('ADMIN', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth('ADMIN', 'SALES'),
   customsDeclarationController.generateCustomsDeclarationDrafts,
 );
 router.get('/:id', withIdValidation, customsDeclarationController.getById);
 router.post(
   '/',
-  roleAuth('ADMIN', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth('ADMIN', 'SALES'),
   withAuditLog({ entity: 'CustomsDeclaration', action: 'CREATE', model: 'customsDeclaration' }, customsDeclarationController.create),
 );
 router.put(
   '/:id',
   withIdValidation,
-  roleAuth('ADMIN', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth('ADMIN', 'SALES'),
   withAuditLog({ entity: 'CustomsDeclaration', action: 'UPDATE', model: 'customsDeclaration' }, customsDeclarationController.update),
 );
 router.delete(
   '/:id',
   withIdValidation,
-  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  roleAuth('ADMIN', 'SALES'),
   withAuditLog({ entity: 'CustomsDeclaration', action: 'DELETE', model: 'customsDeclaration' }, customsDeclarationController.remove),
 );
 

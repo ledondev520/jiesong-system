@@ -13,7 +13,10 @@ export interface LibraryFixture {
   server: ChildProcess;
   directory: string;
   baseURL: string;
-  users: Record<"ADMIN" | "FINANCE", { id: string; username: string }>;
+  users: Record<
+    "ADMIN" | "FINANCE",
+    { id: string; username: string; role: string }
+  >;
   documents: Record<"GENERAL_LEDGER" | "PAYROLL", string>;
 }
 
@@ -161,6 +164,6 @@ export async function loginLibrary(
   expect(response.status()).toBe(200);
   const data = (await response.json()).data;
   expect(data.user.id).toBe(fixture.users[role].id);
-  expect(data.user.role).toBe(role);
+  expect(data.user.role).toBe(fixture.users[role].role); // OD-8: FINANCE persona = ADMIN
   await expect(page).toHaveURL(/\/dashboard$/);
 }

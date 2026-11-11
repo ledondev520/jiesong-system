@@ -86,7 +86,7 @@ model User {
   password    String
   sessionVersion Int    @default(0)
   name        String
-  role        String    @default("SALES") // ADMIN, BOSS(业务只读), PURCHASE, SALES, FINANCE, WAREHOUSE
+  role        String    @default("SALES") // ADMIN, SALES (OD-8 2026-11-11; PURCHASE/FINANCE/WAREHOUSE/BOSS retired)
   email       String?
   phone       String?
   avatar      String?

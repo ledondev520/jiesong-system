@@ -38,7 +38,7 @@ const run = (handler, req) => new Promise((resolve) => {
 
 test('update: 角色变更递增 sessionVersion 并撤销该用户全部浏览器会话', async (t) => {
   const calls = mockTx(t, { role: 'SALES', isActive: true });
-  const { error } = await run(controller.update, { params: { id: 'u1' }, body: { role: 'FINANCE' }, user: { id: 'admin' } });
+  const { error } = await run(controller.update, { params: { id: 'u1' }, body: { role: 'ADMIN' }, user: { id: 'admin' } });
   assert.equal(error, undefined);
   assert.deepEqual(calls.updates[0].sessionVersion, { increment: 1 });
   assert.deepEqual(calls.revoked, [{ userId: 'u1' }]);

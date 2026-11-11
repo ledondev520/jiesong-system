@@ -216,21 +216,19 @@ export function MobileTabBar({
             </nav>
           )}
 
-          {/* AI 助手：不设菜单项，从此处进入（BOSS 无权限） */}
-          {user?.role !== Role.BOSS && (
-            <div className="px-4 pb-1">
-              <button
-                onClick={() => {
-                  setMoreOpen(false);
-                  useAiPanelStore.getState().setOpen(true);
-                }}
-                className="flex min-h-[52px] w-full touch-manipulation items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted"
-              >
-                <Bot className="h-5 w-5 shrink-0" />
-                <span>AI 助手</span>
-              </button>
-            </div>
-          )}
+          {/* AI 助手：不设菜单项，从此处进入 */}
+          <div className="px-4 pb-1">
+            <button
+              onClick={() => {
+                setMoreOpen(false);
+                useAiPanelStore.getState().setOpen(true);
+              }}
+              className="flex min-h-[52px] w-full touch-manipulation items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <Bot className="h-5 w-5 shrink-0" />
+              <span>AI 助手</span>
+            </button>
+          </div>
 
           {/* 用户信息 + 退出 */}
           <div className="mx-4 mt-1 space-y-2 rounded-xl border bg-muted/40 p-3">

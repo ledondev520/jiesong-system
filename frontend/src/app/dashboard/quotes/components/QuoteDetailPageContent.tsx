@@ -47,12 +47,7 @@ import { QuoteEditor } from "./QuoteEditor";
 import { QUOTE_WRITE_ROLES } from "./quoteRoles";
 import { QuoteStatusBadge } from "./QuoteStatusBadge";
 
-const EXPORT_ROLES: Role[] = [
-  Role.ADMIN,
-  Role.SALES,
-  Role.PURCHASE,
-  Role.FINANCE,
-];
+const EXPORT_ROLES: Role[] = [Role.ADMIN, Role.SALES];
 const message = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 

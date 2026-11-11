@@ -41,7 +41,7 @@ test('CSV/PDF 导出控制器：WAREHOUSE 传 includeMoney:false，其他角色 
   exportService.exportData = async (_t, _q, opts) => { seen.push(['csv', opts.includeMoney]); return { contentType: 'text/csv', filename: 'a.csv', data: Buffer.from('x') }; };
   pdf.exportSystemDataPdf = async (_t, _q, opts) => { seen.push(['pdf', opts.includeMoney]); return { contentType: 'application/pdf', filename: 'a.pdf', data: Buffer.from('x') }; };
   t.after(() => { exportService.exportData = o1; pdf.exportSystemDataPdf = o2; });
-  for (const [role, expected] of [['WAREHOUSE', false], ['ADMIN', true]]) {
+  for (const [role, expected] of [['SALES', false], ['ADMIN', true]]) {
     seen.length = 0;
     await ctrl.exportData({ params: { type: 'purchases' }, query: {}, user: { role } }, createRes(), next);
     await ctrl.exportDataPdf({ params: { type: 'purchases' }, query: {}, user: { role } }, createRes(), next);
@@ -57,14 +57,14 @@ test('采购 Excel 导出控制器：WAREHOUSE 传 includeMoney:false', async (t
   t.after(() => { svc.exportPurchasesExcel = original; });
   delete require.cache[require.resolve('../controllers/purchaseImportExportController')];
   const ctrl = require('../controllers/purchaseImportExportController');
-  await ctrl.exportExcel({ query: {}, user: { role: 'WAREHOUSE' } }, createRes(), next);
-  await ctrl.exportExcel({ query: {}, user: { role: 'PURCHASE' } }, createRes(), next);
+  await ctrl.exportExcel({ query: {}, user: { role: 'SALES' } }, createRes(), next);
+  await ctrl.exportExcel({ query: {}, user: { role: 'ADMIN' } }, createRes(), next);
   assert.deepEqual(seen, [false, true]);
 });
 
 test('GET /search：WAREHOUSE 传 includeAmounts:false', async () => {
   const ctrl = require('../controllers/searchController');
-  for (const [role, expected] of [['WAREHOUSE', false], ['SALES', true]]) {
+  for (const [role, expected] of [['SALES', false], ['ADMIN', true]]) {
     await ctrl.search({ query: { q: 'x' }, user: { role } }, createRes(), next);
     assert.equal(searchArgs.includeAmounts, expected, role);
   }
@@ -76,9 +76,9 @@ test('PUT /purchases/:id：WAREHOUSE 的草稿更正沿用库内单价，其他�
   t.after(() => { prisma.purchaseItem.findMany = original; });
   const ctrl = require('../controllers/purchaseController');
   const body = () => ({ items: [{ id: 'i1', productId: 'p1', quantity: 2 }] });
-  await ctrl.update({ params: { id: 'pc-1' }, body: body(), user: { role: 'WAREHOUSE' } }, createRes(), next);
+  await ctrl.update({ params: { id: 'pc-1' }, body: body(), user: { role: 'SALES' } }, createRes(), next);
   assert.equal(updateInput.items[0].unitPrice, 7.5);
-  await ctrl.update({ params: { id: 'pc-1' }, body: body(), user: { role: 'PURCHASE' } }, createRes(), next);
+  await ctrl.update({ params: { id: 'pc-1' }, body: body(), user: { role: 'ADMIN' } }, createRes(), next);
   assert.equal(updateInput.items[0].unitPrice, undefined);
 });
 
@@ -93,9 +93,9 @@ test('AI 对话上下文：WAREHOUSE 不含采购/销售/财务金额', async (t
   t.after(() => restore.forEach((r) => r()));
   const { getDbContext } = require('../services/ai/contextService');
   const message = '采购合同 PO-77 销售合同 EX-77 应付 应收 财务';
-  const wh = await getDbContext(message, { role: 'WAREHOUSE' });
+  const wh = await getDbContext(message, { role: 'SALES' });
   assert.doesNotMatch(wh, /4242|5151|财务概况|金额:|已收:/);
-  const sales = await getDbContext(message, { role: 'SALES' });
+  const sales = await getDbContext(message, { role: 'ADMIN' });
   assert.match(sales, /5151|4242|财务概况/);
 });
 
@@ -114,12 +114,12 @@ test('销售装箱明细：WAREHOUSE 响应无供应商发票号与采购成本'
   const ctrl = require('../controllers/salesController');
   const req = (role) => ({ params: { id: 'c1', itemId: 'pk1' }, body: { items: [] }, user: { id: 'u', role }, headers: {}, ip: '127.0.0.1' });
   for (const handler of ['addPackingItem', 'updatePackingItem', 'importPurchasePackingItems', 'getById']) {
-    const wh = createRes(); await ctrl[handler](req('WAREHOUSE'), wh, next);
+    const wh = createRes(); await ctrl[handler](req('SALES'), wh, next);
     const whText = JSON.stringify(wh.payload);
     assert.doesNotMatch(whText, /INV-PACK-1|321\.5/, handler);
     assert.match(whText, /pk1/, handler);
     assert.match(whText, /"unitPrice":2/, `${handler}: USD 行价保留`);
-    const other = createRes(); await ctrl[handler](req('SALES'), other, next);
-    assert.match(JSON.stringify(other.payload), /INV-PACK-1/, `${handler} SALES`);
+    const other = createRes(); await ctrl[handler](req('ADMIN'), other, next);
+    assert.match(JSON.stringify(other.payload), /INV-PACK-1/, `${handler} ADMIN`);
   }
 });

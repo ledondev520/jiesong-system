@@ -26,10 +26,10 @@ const getSortedValues = (enumObject) => {
   return Object.values(enumObject).slice().sort();
 };
 
-test('ROLES: 包含管理员/老板只读/采购/销售/财务/仓库角色', () => {
+test('ROLES: OD-8 只剩管理员与销售', () => {
   const values = getSortedValues(ROLES);
 
-  assert.deepStrictEqual(values, ['ADMIN', 'BOSS', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'].sort());
+  assert.deepStrictEqual(values, ['ADMIN', 'SALES']);
 });
 
 test('INVENTORY_STATUS: 与PRD状态机一致', () => {

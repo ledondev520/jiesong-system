@@ -44,11 +44,13 @@ c.close()`, database], { timeout: 10000, stdio: 'ignore' });
   const db = require('../utils/prisma');
   const hash = await require('bcrypt').hash('test-only-hs-browser-password-never-production', 4);
   const users = {};
-  for (const role of ['ADMIN', 'PURCHASE', 'FINANCE', 'SALES', 'WAREHOUSE', 'BOSS']) {
+  // OD-8 (2026-11-11): personas keep their old job names; each holds one of the two live roles.
+  const personaRoles = { ADMIN: 'ADMIN', PURCHASE: 'SALES', FINANCE: 'ADMIN', SALES: 'SALES' };
+  for (const [persona, role] of Object.entries(personaRoles)) {
     const user = await db.user.create({ data: {
-      username: `synthetic-hs-${role.toLowerCase()}`, name: `合成HS${role}`, role, password: hash,
+      username: `synthetic-hs-${persona.toLowerCase()}`, name: `合成HS${persona}`, role, password: hash,
     } });
-    users[role] = { id: user.id, username: user.username };
+    users[persona] = { id: user.id, username: user.username, role };
   }
   const app = require('../app'); // Import does not start scheduled/provider jobs.
   const server = app.listen(0, '127.0.0.1', () => process.send({

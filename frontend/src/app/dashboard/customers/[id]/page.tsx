@@ -34,13 +34,7 @@ import { CustomerDialog } from "../components/CustomerDialog";
 import { StoreDialog } from "../components/StoreDialog";
 
 const CUSTOMER_WRITE_ROLES: Role[] = [Role.ADMIN, Role.SALES];
-const STORE_WRITE_ROLES: Role[] = [
-  Role.ADMIN,
-  Role.PURCHASE,
-  Role.SALES,
-  Role.FINANCE,
-  Role.WAREHOUSE,
-];
+const STORE_WRITE_ROLES: Role[] = [Role.ADMIN, Role.SALES];
 const STATUS_MAP = {
   ACTIVE: { label: "正常", tone: "success" },
   ARCHIVED: { label: "已停用", tone: "neutral" },

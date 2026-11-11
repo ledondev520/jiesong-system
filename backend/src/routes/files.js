@@ -13,7 +13,7 @@ const { withAuditLog } = require('../middleware/auditLog');
 const { param, handleValidation } = require('../utils/validators');
 
 const router = Router();
-const WRITE_ROLES = ROLE_SETS.OPERATORS;
+const WRITE_ROLES = ROLE_SETS.ALL;
 const withContractIdValidation = [
   param('contractId').notEmpty().withMessage('合同ID不能为空').isString().withMessage('合同ID格式无效'),
   handleValidation,

@@ -85,11 +85,11 @@ export function TaxRefundListPageContent() {
     useBrowserQuery(searchParams.toString()),
   );
   const role = useAuthStore((state) => state.user?.role);
-  // 默认页签按角色：仅财务进退税工作台；管理员和其余角色（销售、单证）进报关单。
-  const defaultView = role === "FINANCE" ? "workbench" : "customs";
+  // 默认进报关单；退税工作台（GET /tax-refunds/workbench）仅 ADMIN（OD-8）。
+  const defaultView = "customs";
   const requestedView = browserQuery.get("view");
   const activeView =
-    requestedView === "workbench" ||
+    (requestedView === "workbench" && role === "ADMIN") ||
     requestedView === "customs" ||
     requestedView === "refunds"
       ? requestedView
@@ -322,9 +322,11 @@ export function TaxRefundListPageContent() {
           <TabsTrigger value="customs" variant="line">
             报关单
           </TabsTrigger>
-          <TabsTrigger value="workbench" variant="line">
-            退税工作台
-          </TabsTrigger>
+          {role === "ADMIN" && (
+            <TabsTrigger value="workbench" variant="line">
+              退税工作台
+            </TabsTrigger>
+          )}
           <TabsTrigger value="refunds" variant="line">
             退税记录
           </TabsTrigger>

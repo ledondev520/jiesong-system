@@ -33,12 +33,12 @@ test('financeController: 付款列表/创建响应按角色剔除供应商银行
     for (const replay of [false, true]) {
       reused = replay;
       for (const fn of [listPayments, createPayment]) {
-        for (const role of ['SALES', 'WAREHOUSE']) {
+        for (const role of ['SALES']) {
           const text = await call(fn, role);
           assert.ok(text.includes('Synth Supplier'), `${role} keeps supplier name`);
           assert.ok(!/SYNTH-(NAME|BANK|BRANCH|CODE|0000)/.test(text), `${fn.name} ${role} reused=${replay} must not carry bank fields`);
         }
-        for (const role of ['ADMIN', 'FINANCE', 'PURCHASE', 'BOSS']) {
+        for (const role of ['ADMIN']) { // OD-8: supplier bank fields are ADMIN only
           assert.ok((await call(fn, role)).includes('SYNTH-0000'), `${fn.name} ${role} reused=${replay} keeps bank fields`);
         }
       }

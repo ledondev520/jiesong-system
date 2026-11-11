@@ -97,7 +97,7 @@ vi.mock("sonner", () => ({
 // 默认页签按角色：财务进工作台，保持下面各用例原有的起点。
 vi.mock("@/store/auth.store", () => ({
   useAuthStore: (selector: (state: { user: { role: string } }) => unknown) =>
-    selector({ user: { role: "FINANCE" } }),
+    selector({ user: { role: "ADMIN" } }),
 }));
 vi.mock("./TaxRefundWorkbench", () => ({
   TaxRefundWorkbench: () => <h2>合成工作台</h2>,

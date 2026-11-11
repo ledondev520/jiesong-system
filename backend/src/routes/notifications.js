@@ -12,7 +12,7 @@ const { roleAuth } = require('../middleware/roleAuth');
 const { ROLE_SETS } = require('../middleware/roleAuth');
 
 router.use(authenticate);
-router.use(roleAuth(ROLE_SETS.EVERYONE));
+router.use(roleAuth(ROLE_SETS.ALL));
 
 // GET /api/v1/notifications - 获取通知列表
 router.get('/', notificationController.list);

@@ -29,9 +29,11 @@ async function start() {
   const db = require('../utils/prisma');
   const hash = await require('bcrypt').hash(password, 4);
   const users = {};
-  for (const role of ['ADMIN', 'FINANCE', 'BOSS', 'PURCHASE', 'SALES', 'WAREHOUSE', 'INACTIVE']) {
-    const user = await db.user.create({ data: { username: `synthetic-library-${role.toLowerCase()}`, name: `合成${role}`, password: hash, role: role === 'INACTIVE' ? 'FINANCE' : role, isActive: role !== 'INACTIVE' } });
-    users[role] = { id: user.id, username: user.username };
+  // OD-8 (2026-11-11): personas keep their old job names; each holds one of the two live roles.
+  const personaRoles = { ADMIN: 'ADMIN', FINANCE: 'ADMIN', PURCHASE: 'SALES', SALES: 'SALES', INACTIVE: 'ADMIN' };
+  for (const [persona, role] of Object.entries(personaRoles)) {
+    const user = await db.user.create({ data: { username: `synthetic-library-${persona.toLowerCase()}`, name: `合成${persona}`, password: hash, role, isActive: persona !== 'INACTIVE' } });
+    users[persona] = { id: user.id, username: user.username, role };
   }
   await db.financialPeriod.create({ data: { year: 2026, month: 10, periodLabel: '合成2026-10', reportDate: new Date('2026-10-31T00:00:00Z') } });
   createSources(directory);

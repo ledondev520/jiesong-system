@@ -20,10 +20,10 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/v1/purchases/export - 导出采购合同 Excel
-router.get('/export', roleAuth(ROLE_SETS.EVERYONE), purchaseImportExportController.exportExcel);
+router.get('/export', roleAuth(ROLE_SETS.ALL), purchaseImportExportController.exportExcel);
 
 // POST /api/v1/purchases/import - 批量导入采购合同 Excel
-router.post('/import', roleAuth(ROLE_SETS.OPERATORS), purchaseExcelUpload.single('file'), purchaseImportExportController.importExcel);
+router.post('/import', roleAuth(ROLE_SETS.ALL), purchaseExcelUpload.single('file'), purchaseImportExportController.importExcel);
 
 // GET /api/v1/purchases - 获取采购合同列表
 router.get('/', withPaginationValidation, purchaseController.list);
@@ -38,7 +38,7 @@ router.get('/:id/invoice-preparation', withIdValidation, purchaseController.getI
 router.put(
   '/:id/invoice-numbers',
   withIdValidation,
-  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth(ROLE_SETS.ALL),
   withAuditLog({
     entity: 'PurchaseContract',
     action: 'REGISTER_SUPPLIER_INVOICE',
@@ -55,13 +55,13 @@ router.put(
 // 到货与验货是独立业务证据；普通审计日志仅保留动作形状，不复制数量、备注或操作结果正文。
 router.get('/:id/receipts', withIdValidation, withPaginationValidation, purchaseReceiptController.list);
 router.get('/:id/receipts/:receiptId/inspections', withIdValidation, withPaginationValidation, purchaseReceiptController.listInspections);
-router.post('/:id/receipts', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'WAREHOUSE'), withAuditLog({
+router.post('/:id/receipts', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog({
   entity: 'PurchaseReceipt', action: 'RECEIVE_BATCH', model: 'purchaseReceipt', captureBefore: false, captureAfter: false,
   getEntityId: ({ responseData }) => responseData?.receipt?.id,
   shouldLog: ({ responseData }) => responseData?.idempotentReplay !== true,
   getNewValue: ({ responseData }) => ({ receiptId: responseData?.receipt?.id, itemCount: responseData?.receipt?.items?.length || 0, idempotentReplay: responseData?.idempotentReplay === true }),
 }, purchaseReceiptController.create));
-router.post('/:id/receipts/:receiptId/inspection', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'WAREHOUSE'), withAuditLog({
+router.post('/:id/receipts/:receiptId/inspection', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog({
   entity: 'PurchaseReceipt', action: 'INSPECT_BATCH', model: 'purchaseReceipt', captureBefore: false, captureAfter: false,
   getEntityId: ({ responseData }) => responseData?.receipt?.id,
   shouldLog: ({ responseData }) => responseData?.idempotentReplay !== true,
@@ -74,7 +74,7 @@ router.get('/:id', withIdValidation, purchaseController.getById);
 // POST /api/v1/purchases - 创建采购合同
 router.post('/', [
   body('supplierId').notEmpty().withMessage('供应商ID不能为空'),
-], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+], roleAuth(ROLE_SETS.ALL), handleValidation, withAuditLog(
   {
     entity: 'PurchaseContract',
     action: 'CREATE',
@@ -85,34 +85,34 @@ router.post('/', [
 ));
 
 // PUT /api/v1/purchases/:id - 更新采购合同
-router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'PurchaseContract', action: 'UPDATE', model: 'purchaseContract' },
   purchaseController.update
 ));
 
 // DELETE /api/v1/purchases/:id - 删除采购合同
-router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE'), withAuditLog(
+router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'PurchaseContract', action: 'DELETE', model: 'purchaseContract' },
   purchaseController.remove
 ));
 
 // POST /api/v1/purchases/:id/items - 添加采购明细
-router.post('/:id/items', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
+router.post('/:id/items', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'PurchaseItem', action: 'CREATE', model: 'purchaseItem' },
   purchaseController.addItem
 ));
 
 // PUT /api/v1/purchases/:id/production-details - 批量保存生产规格、箱数、重量、体积与箱体尺寸
-router.put('/:id/production-details', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseController.updateProductionDetails);
+router.put('/:id/production-details', withIdValidation, roleAuth(ROLE_SETS.ALL), purchaseController.updateProductionDetails);
 
 // PUT /api/v1/purchases/:id/status - 更新合同状态
-router.put('/:id/status', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
+router.put('/:id/status', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'PurchaseContract', action: 'UPDATE', model: 'purchaseContract' },
   purchaseController.updateStatus
 ));
 
 // POST /api/v1/purchases/:id/files - 上传合同文件
-router.post('/:id/files', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), upload.single('file'), withAuditLog(
+router.post('/:id/files', withIdValidation, roleAuth(ROLE_SETS.ALL), upload.single('file'), withAuditLog(
   { entity: 'ContractFile', action: 'CREATE', model: 'contractFile' },
   purchaseController.uploadFile
 ));
@@ -121,7 +121,7 @@ router.post('/:id/files', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), uploa
 router.get('/:id/files', withIdValidation, purchaseController.getFiles);
 
 // DELETE /api/v1/purchases/files/:fileId - 删除合同文件
-router.delete('/files/:fileId', roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
+router.delete('/files/:fileId', roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'ContractFile', action: 'DELETE', model: 'contractFile', idParam: 'fileId' },
   purchaseController.deleteFile
 ));
@@ -130,9 +130,9 @@ router.delete('/files/:fileId', roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
 router.get('/files/:fileId/download', purchaseController.downloadFile);
 
 // GET /api/v1/purchases/price-history/:productId - 获取商品历史采购价格统计
-router.get('/price-history/:productId', roleAuth(ROLE_SETS.EVERYONE), purchaseController.getProductPriceHistory);
+router.get('/price-history/:productId', roleAuth(ROLE_SETS.ALL), purchaseController.getProductPriceHistory);
 
 // POST /api/v1/purchases/suppliers-by-products - 根据商品获取曾供应过的供应商
-router.post('/suppliers-by-products', roleAuth(ROLE_SETS.OPERATORS), purchaseController.getSuppliersByProducts);
+router.post('/suppliers-by-products', roleAuth(ROLE_SETS.ALL), purchaseController.getSuppliersByProducts);
 
 module.exports = router;

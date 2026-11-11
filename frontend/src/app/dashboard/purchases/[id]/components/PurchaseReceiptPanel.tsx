@@ -142,7 +142,7 @@ export function PurchaseReceiptPanel({
   const [historyError, setHistoryError] = useState(false);
   const canWrite =
     !readOnly &&
-    ["ADMIN", "PURCHASE", "WAREHOUSE"].includes(role || "") &&
+    ["ADMIN", "SALES"].includes(role || "") &&
     !!data &&
     data.status === "SHIPPED" &&
     data.summary.canReceive &&

@@ -89,7 +89,7 @@ test('validateRegister: 角色无效', async () => {
   assert.match(capture.error.message, /角色无效/);
 });
 
-test('validateRegister: 新角色 FINANCE 可通过', async () => {
+test('validateRegister: OD-8 已停用角色 FINANCE 被拒绝', async () => {
   const req = createRequest({
     body: { username: 'user2', password: 'test-only-password', name: '李四', role: 'FINANCE' },
   });
@@ -99,7 +99,7 @@ test('validateRegister: 新角色 FINANCE 可通过', async () => {
   handleValidation(req, {}, next);
 
   assert.equal(capture.called, true);
-  assert.equal(capture.error, undefined);
+  assert.equal(capture.error?.statusCode, 400);
 });
 
 test('validateRegister: 用户名长度不足', async () => {

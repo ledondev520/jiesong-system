@@ -183,8 +183,8 @@ describe("Sidebar", () => {
     expect(queryByText("设置")).not.toBeInTheDocument();
   });
 
-  it("PURCHASE 仍可从资料看到商品", () => {
-    mockUser.role = Role.PURCHASE;
+  it("SALES 仍可从资料看到商品", () => {
+    mockUser.role = Role.SALES;
     const { getByText } = render(<Sidebar />);
     expect(getByText("商品").closest("a")).toHaveAttribute(
       "href",

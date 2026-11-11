@@ -9,7 +9,7 @@ vi.mock("@/services/purchase.service", () => ({
   purchaseService: { getAll: (...args: unknown[]) => getAll(...args) },
 }));
 let readOnly = false;
-let role = "WAREHOUSE";
+let role = "SALES";
 vi.mock("@/store/auth.store", () => ({
   useAuthStore: (select: (state: { user: { role: string } }) => unknown) =>
     select({ user: { role } }),
@@ -67,7 +67,7 @@ beforeEach(() => {
   getAll.mockReset();
   panel.mockReset();
   readOnly = false;
-  role = "WAREHOUSE";
+  role = "SALES";
 });
 
 describe("stageOf", () => {
@@ -187,8 +187,8 @@ describe("ReceivingWorkbench", () => {
     ).toBeInTheDocument();
   });
 
-  it("没有写入权限的角色（如 SALES）按钮是「查看到货」，不许诺能登记", async () => {
-    role = "SALES";
+  it("没有写入权限的角色（OD-8 停用的 FINANCE）按钮是「查看到货」，不许诺能登记", async () => {
+    role = "FINANCE";
     getAll.mockResolvedValue(reply([contract("1", "NONE")]));
     render(<ReceivingWorkbench />);
     await screen.findAllByText("PC-1");

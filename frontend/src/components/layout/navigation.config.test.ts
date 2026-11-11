@@ -16,15 +16,13 @@ const keys = (items: { key: string }[]) => items.map((item) => item.key);
 const ALL_ROLES = Object.values(Role);
 
 describe("navigation.config helpers", () => {
-  it("每个角色都有菜单；只有 ADMIN 看到设置，BOSS 看不到 AI", () => {
+  it("每个角色都有菜单；只有 ADMIN 看到设置，两个角色都有 AI", () => {
     for (const role of ALL_ROLES) {
       expect(getMenuNavItems(role).length).toBeGreaterThan(0);
       expect(keys(getMenuNavItems(role)).includes("admin")).toBe(
         role === Role.ADMIN,
       );
-      expect(keys(getVisibleModuleNavItems(role)).includes("ai")).toBe(
-        role !== Role.BOSS,
-      );
+      expect(keys(getVisibleModuleNavItems(role))).toContain("ai");
     }
   });
 
@@ -62,18 +60,16 @@ describe("navigation.config helpers", () => {
     );
   });
 
-  it("报价菜单仅限报价读取角色（WAREHOUSE 不可见）", () => {
+  it("报价菜单对两个角色都可见", () => {
     for (const role of ALL_ROLES) {
-      expect(keys(getMenuNavItems(role)).includes("quotes")).toBe(
-        role !== Role.WAREHOUSE,
-      );
+      expect(keys(getMenuNavItems(role))).toContain("quotes");
     }
   });
 
-  it("PURCHASE 保留商品入口，商品路径归属 products，设置仅管理员", () => {
+  it("SALES 保留商品入口，商品路径归属 products，设置仅管理员", () => {
     expect(getModuleByPath("/dashboard/products")?.key).toBe("products");
-    expect(keys(getMenuNavItems(Role.PURCHASE))).toContain("products");
-    expect(keys(getMenuNavItems(Role.PURCHASE))).not.toContain("admin");
+    expect(keys(getMenuNavItems(Role.SALES))).toContain("products");
+    expect(keys(getMenuNavItems(Role.SALES))).not.toContain("admin");
   });
 
   it("菜单指向现有 URL，不改动任何路由", () => {
@@ -219,16 +215,14 @@ describe("navigation.config helpers", () => {
     }
   });
 
-  it("财务：WAREHOUSE 看不到该模块；SALES/PURCHASE 不见账务读受限的页签", () => {
+  it("财务（OD-8）：SALES 看不到该模块；ADMIN 看到全部页签", () => {
     const financeChildren = (role: Role) =>
       getVisibleModuleNavItems(role)
         .find((item) => item.key === "finance")
         ?.children.map((child) => child.label);
-    expect(financeChildren(Role.WAREHOUSE)).toBeUndefined();
-    for (const role of [Role.SALES, Role.PURCHASE]) {
-      expect(financeChildren(role)).toEqual(["财务概览", "应收", "应付"]);
-    }
-    expect(financeChildren(Role.FINANCE)).toContain("银行流水");
-    expect(financeChildren(Role.BOSS)).toContain("财务报表");
+    expect(financeChildren(Role.SALES)).toBeUndefined();
+    expect(financeChildren(Role.ADMIN)).toEqual(
+      expect.arrayContaining(["银行流水", "财务报表"]),
+    );
   });
 });

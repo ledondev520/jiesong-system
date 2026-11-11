@@ -1,10 +1,7 @@
+// OD-8 (owner, 2026-11-11): two roles only; PURCHASE/FINANCE/WAREHOUSE/BOSS are retired and refused by the backend.
 export enum Role {
   ADMIN = "ADMIN",
-  BOSS = "BOSS",
-  PURCHASE = "PURCHASE",
   SALES = "SALES",
-  FINANCE = "FINANCE",
-  WAREHOUSE = "WAREHOUSE",
 }
 
 export interface User {

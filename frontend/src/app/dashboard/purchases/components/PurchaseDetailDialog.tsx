@@ -40,8 +40,8 @@ export function PurchaseDetailDialog({
   detail,
   onClose,
 }: PurchaseDetailDialogProps) {
-  // OD-2/OD-3：WAREHOUSE 响应不含金额，显示「无权查看」而不是崩溃或 ¥0
-  const moneyHidden = useAuthStore((state) => state.user?.role === "WAREHOUSE");
+  // OD-2/OD-3/OD-8：非 ADMIN 响应不含金额，显示「无权查看」而不是崩溃或 ¥0
+  const moneyHidden = useAuthStore((state) => state.user?.role !== "ADMIN");
   const money = (value: number | undefined) =>
     moneyHidden ? HIDDEN_MONEY : `¥${(value ?? 0).toLocaleString()}`;
   return (

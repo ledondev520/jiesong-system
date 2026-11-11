@@ -1,5 +1,6 @@
 /** Real HTTP/SQLite coverage for A85 server-side sorting of the purchase-contract and inventory lists; synthetic data only. */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -30,7 +31,7 @@ test('HTTP/SQLite: sortBy/sortDir sort before pagination, compose with filters a
   const jwt = require('jsonwebtoken');
   const tokens = {};
   for (const role of ['ADMIN', 'WAREHOUSE']) {
-    const user = await db.user.create({ data: { username: `synthetic-sort-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-sort-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role: dbRole(role) } });
     tokens[role] = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
   }
   const supplier = await db.supplier.create({ data: { name: '合成供应商' } });

@@ -241,8 +241,8 @@ export function OrderOverviewTab({
   const currentStepIndex = STATUS_ORDER[contract.status] ?? 0;
   const total = contract.totalAmount || 0;
   const received = contract.receivedAmount || 0;
-  // OD-3：WAREHOUSE 的详情不含金额（后端已剔除），不显示金额卡片
-  const showAmounts = useAuthStore((state) => state.user?.role) !== "WAREHOUSE";
+  // OD-7：非 ADMIN 的详情不含金额（后端已剔除），不显示金额卡片
+  const showAmounts = useAuthStore((state) => state.user?.role) === "ADMIN";
 
   return (
     <div className="space-y-4">

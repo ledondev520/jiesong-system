@@ -1,8 +1,7 @@
 /**
  * Input: quote controller
  * Output: /api/v1/quotes routes (list, detail, create, update/transition); no DELETE (quotes are cancelled, never deleted)
- * Pos: roles per docs/redesign/DATA-MODEL-2026.md §4.4 — read ADMIN/SALES/PURCHASE/FINANCE/BOSS, write ADMIN/SALES;
- *      WAREHOUSE has no access. export.xlsx / print: ADMIN/SALES/PURCHASE/FINANCE, not BOSS (generated documents), streamed, never stored.
+ * Pos: OD-8 two roles — read, write, export.xlsx and print: ADMIN/SALES; exports are streamed, never stored.
  */
 const { Router } = require('express');
 const quoteController = require('../controllers/quoteController');
@@ -16,13 +15,13 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'BOSS'), withPaginationValidation, quoteController.list);
+router.get('/', roleAuth('ADMIN', 'SALES'), withPaginationValidation, quoteController.list);
 
-router.get('/:id', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'BOSS'), withIdValidation, quoteController.getById);
+router.get('/:id', roleAuth('ADMIN', 'SALES'), withIdValidation, quoteController.getById);
 
-router.get('/:id/export.xlsx', roleAuth(ROLE_SETS.COMMERCIAL), withIdValidation, quoteExportController.exportXlsx);
+router.get('/:id/export.xlsx', roleAuth(ROLE_SETS.ALL), withIdValidation, quoteExportController.exportXlsx);
 
-router.get('/:id/print', roleAuth(ROLE_SETS.COMMERCIAL), withIdValidation, quoteExportController.printView);
+router.get('/:id/print', roleAuth(ROLE_SETS.ALL), withIdValidation, quoteExportController.printView);
 
 router.post('/', roleAuth('ADMIN', 'SALES'), withAuditLog(
   { entity: 'Quote', action: 'CREATE', model: 'quote' },

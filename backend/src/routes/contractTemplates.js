@@ -22,7 +22,7 @@ router.get('/', contractTemplateController.list);
 router.post('/', [
   body('name').notEmpty().withMessage('模板名称不能为空'),
   body('type').notEmpty().withMessage('模板类型不能为空'),
-], roleAuth(ROLE_SETS.OPERATORS), handleValidation, withAuditLog(
+], roleAuth(ROLE_SETS.ALL), handleValidation, withAuditLog(
   { entity: 'ContractTemplate', action: 'CREATE', model: 'contractTemplate' },
   contractTemplateController.create
 ));
@@ -31,7 +31,7 @@ router.post('/', [
 router.get('/:id', withIdValidation, contractTemplateController.getById);
 
 // DELETE /api/v1/contract-templates/:id - 删除模板
-router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
+router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'ContractTemplate', action: 'DELETE', model: 'contractTemplate' },
   contractTemplateController.remove
 ));

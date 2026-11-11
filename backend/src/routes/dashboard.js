@@ -27,7 +27,7 @@ router.get('/todos', dashboardController.getTodos);
 router.get('/track-product', dashboardController.trackProduct);
 
 // GET /api/v1/dashboard/analytics - 数据看板详细分析
-router.get('/analytics', roleAuth('ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'), dashboardController.getAnalytics);
+router.get('/analytics', roleAuth('ADMIN'), dashboardController.getAnalytics);
 
 // GET /api/v1/dashboard/trade-workflows - 出口专项单主线路与下一动作
 router.get('/trade-workflows', dashboardController.getTradeWorkflows);

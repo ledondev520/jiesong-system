@@ -9,15 +9,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 
-export type HsRole =
-  "ADMIN" | "PURCHASE" | "FINANCE" | "SALES" | "WAREHOUSE" | "BOSS";
+// OD-8: personas keep old job names; each user holds ADMIN or SALES.
+export type HsRole = "ADMIN" | "PURCHASE" | "FINANCE" | "SALES";
 export interface HsFixture {
   server: ChildProcess;
   directory: string;
   baseURL: string;
   hsCode: string;
   productName: string;
-  users: Record<HsRole, { id: string; username: string }>;
+  users: Record<HsRole, { id: string; username: string; role: string }>;
 }
 export type HsSnapshot = Record<
   string,
@@ -181,7 +181,10 @@ export async function loginHsAs(page: Page, fixture: HsFixture, role: HsRole) {
   const response = await login;
   expect(response.status()).toBe(200);
   const data = (await response.json()).data;
-  expect(data.user).toMatchObject({ id: fixture.users[role].id, role });
+  expect(data.user).toMatchObject({
+    id: fixture.users[role].id,
+    role: fixture.users[role].role,
+  });
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(
     page.getByRole("button", { name: "用户菜单" }).first(),

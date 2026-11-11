@@ -40,21 +40,23 @@ test('HTTP/SQLite: supplier write roles, purchase/supplier delete guards', async
     const response = await fetch(origin + '/api/v1' + url, { method, headers: { authorization: `Bearer ${users[role].token}`, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     return { status: response.status, json: await response.json().catch(() => null) };
   };
+  // OD-8: ADMIN and SALES are live; the retired roles are stored as-is and must be refused everywhere.
   const ALL = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS'];
+  const RETIRED = ['PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS'];
 
-  await t.test('supplier create: BOSS denied, the five business roles allowed', async () => {
+  await t.test('supplier create: ADMIN/SALES allowed, retired roles denied', async () => {
     for (const role of ALL) {
       const rest = await send('POST', '/suppliers', role, { name: `rest-${role}` });
-      assert.equal(rest.status === 403, role === 'BOSS', `${role}: REST ${rest.status}`);
+      assert.equal(rest.status === 403, RETIRED.includes(role), `${role}: REST ${rest.status}`);
     }
     assert.equal(await db.supplier.count({ where: { name: 'rest-BOSS' } }), 0);
     assert.equal((await send('POST', '/purchases', 'BOSS', {})).status, 403);
   });
 
-  await t.test('purchase delete: ADMIN/PURCHASE only, refused with 409 once payments, receipts, or invoice records exist', async () => {
+  await t.test('purchase delete: ADMIN/SALES only, refused with 409 once payments, receipts, or invoice records exist', async () => {
     const supplier = await db.supplier.create({ data: { name: 'Synthetic delete supplier' } });
     const make = async data => db.purchaseContract.create({ data: { contractNo: `MCP-${Math.random().toString(36).slice(2, 9)}`, supplierId: supplier.id, ...data } });
-    for (const role of ['SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
+    for (const role of RETIRED) {
       const c = await make({});
       assert.equal((await send('DELETE', `/purchases/${c.id}`, role)).status, 403, role);
       assert.ok(await db.purchaseContract.findUnique({ where: { id: c.id } }));
@@ -78,13 +80,13 @@ test('HTTP/SQLite: supplier write roles, purchase/supplier delete guards', async
     assert.equal((await db.packingItem.findUnique({ where: { id: packing.id } })).purchaseItemId, packedItem.id);
     assert.equal(await db.bankTransaction.count({ where: { matchedContractId: banked.id } }), 1);
     for (const c of [paid, invoiced, matched]) {
-      assert.equal((await send('DELETE', `/purchases/${c.id}`, 'PURCHASE')).status, 409);
+      assert.equal((await send('DELETE', `/purchases/${c.id}`, 'SALES')).status, 409);
       assert.ok(await db.purchaseContract.findUnique({ where: { id: c.id } }));
     }
     assert.equal((await send('DELETE', `/purchases/${received.id}`, 'ADMIN')).status, 409);
     assert.equal(await db.payment.count({ where: { purchaseContractId: paid.id } }), 1);
     const clean = await make({});
-    assert.equal((await send('DELETE', `/purchases/${clean.id}`, 'PURCHASE')).status, 200);
+    assert.equal((await send('DELETE', `/purchases/${clean.id}`, 'SALES')).status, 200);
     assert.equal((await send('DELETE', `/purchases/${clean.id}`, 'ADMIN')).status, 404);
   });
 
@@ -92,26 +94,31 @@ test('HTTP/SQLite: supplier write roles, purchase/supplier delete guards', async
     const used = await db.supplier.create({ data: { name: 'Synthetic used supplier' } });
     await db.purchaseContract.create({ data: { contractNo: 'MCP-USED-1', supplierId: used.id } });
     const unused = await db.supplier.create({ data: { name: 'Synthetic unused supplier' } });
-    for (const role of ['SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']) assert.equal((await send('DELETE', `/suppliers/${unused.id}`, role)).status, 403, role);
-    assert.equal((await send('DELETE', `/suppliers/${used.id}`, 'PURCHASE')).status, 200);
+    for (const role of RETIRED) assert.equal((await send('DELETE', `/suppliers/${unused.id}`, role)).status, 403, role);
+    assert.equal((await send('DELETE', `/suppliers/${used.id}`, 'SALES')).status, 200);
     assert.equal((await db.supplier.findUnique({ where: { id: used.id } })).isActive, false);
     assert.ok(await db.purchaseContract.findUnique({ where: { contractNo: 'MCP-USED-1' } }), 'archive keeps history');
-    assert.equal((await send('DELETE', `/suppliers/${unused.id}`, 'PURCHASE')).status, 200);
+    assert.equal((await send('DELETE', `/suppliers/${unused.id}`, 'SALES')).status, 200);
     assert.equal((await db.supplier.findUnique({ where: { id: unused.id } })).isActive, false);
     assert.equal((await send('DELETE', '/suppliers/does-not-exist', 'ADMIN')).status, 404);
 
     // isActive changes (archive/restore) cannot bypass the DELETE role limit via PUT; other fields stay open.
     const target = await db.supplier.create({ data: { name: 'Synthetic active-toggle supplier' } });
-    for (const role of ['SALES', 'FINANCE', 'WAREHOUSE']) {
+    for (const role of RETIRED) {
       assert.equal((await send('PUT', `/suppliers/${target.id}`, role, { isActive: false })).status, 403, role);
-      assert.equal((await send('PUT', `/suppliers/${target.id}`, role, { note: 'x', shortName: `s-${role}` })).status, 200, role);
+      assert.equal((await send('PUT', `/suppliers/${target.id}`, role, { note: 'x', shortName: `s-${role}` })).status, 403, role);
     }
+    assert.equal((await send('PUT', `/suppliers/${target.id}`, 'SALES', { note: 'x', shortName: 's-SALES' })).status, 200);
     assert.equal((await db.supplier.findUnique({ where: { id: target.id } })).isActive, true);
-    const upd = await db.operationLog.findFirst({ where: { entity: 'Supplier', action: 'UPDATE', userId: users.SALES.id, entityId: target.id }, orderBy: { createdAt: 'desc' } });
+    let upd;
+    for (let i = 0; i < 50 && !upd; i++) { // the audit row is written after the response
+      upd = await db.operationLog.findFirst({ where: { entity: 'Supplier', action: 'UPDATE', userId: users.SALES.id, entityId: target.id }, orderBy: { createdAt: 'desc' } });
+      if (!upd) await new Promise((resolve) => setTimeout(resolve, 20));
+    }
     assert.ok(upd && upd.oldValue, 'update records oldValue');
-    assert.equal((await send('PUT', `/suppliers/${target.id}`, 'PURCHASE', { isActive: false })).status, 200);
+    assert.equal((await send('PUT', `/suppliers/${target.id}`, 'SALES', { isActive: false })).status, 200);
     assert.equal((await db.supplier.findUnique({ where: { id: target.id } })).isActive, false);
-    assert.equal((await send('PUT', `/suppliers/${target.id}`, 'PURCHASE', { isActive: true })).status, 403);
+    assert.equal((await send('PUT', `/suppliers/${target.id}`, 'SALES', { isActive: true })).status, 403);
     assert.equal((await send('PUT', `/suppliers/${target.id}`, 'ADMIN', { isActive: true })).status, 200);
 
   });

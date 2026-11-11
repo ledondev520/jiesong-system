@@ -268,7 +268,7 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   expect(readDomain(fixture)).toEqual(before);
   await page.reload();
   await expect(ship).toBeEnabled();
-  // Positive control for the BOSS hidden-controls check: a writable role sees the import button on 货柜.
+  // A writable role sees the import button on 货柜.
   await page.getByRole("tab", { name: "货柜" }).click();
   await expect(page.getByText("装箱明细", { exact: true })).toBeVisible();
   await expect(
@@ -348,80 +348,6 @@ test("SALES shipping rejects pending stock, then atomically ships only accepted 
   const rows = page.getByRole("row").filter({ hasText: productName });
   await expect(rows.filter({ hasText: "已出库" })).toHaveCount(outbound.length);
   await expect(rows.filter({ hasText: "已入库" })).toContainText("10 件");
-});
-
-test("BOSS reads purchase and sales UI, hides write controls and cannot mutate real state", async ({
-  page,
-}) => {
-  fixture = await startRoleFixture("boss");
-  await forwardRealApi(page, fixture);
-  const token = await loginAs(page, fixture, "BOSS");
-  await expect(
-    page.getByRole("link", { name: "AI 助手", exact: true }),
-  ).toHaveCount(0);
-  // 分批到货与验货面板在「收货验货」页签（B52），非激活页签不渲染
-  await page.goto(`/dashboard/purchases/${fixture.purchaseId}?tab=receiving`);
-  await expect(
-    page.getByText("本批到货 100 · 合格 30 · 待验 0 · 待复验 70"),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "登记分批到货" })).toHaveCount(
-    0,
-  );
-  // 头部：老板只读，主操作和「更多」菜单不出现；OD-4：「单证」菜单只有「查看合同」下载入口
-  for (const name of ["更多", "登记完工资料", "确认供应商已发货"]) {
-    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
-      0,
-    );
-  }
-  await page.getByRole("button", { name: "单证", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: /查看合同/ })).toBeVisible();
-  await expect(
-    page.getByRole("menuitem", { name: /生成购销合同/ }),
-  ).toHaveCount(0);
-  await expect(page.getByRole("menuitem", { name: /在线盖章/ })).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(
-    page.getByRole("button", { name: "登记验货", exact: true }),
-  ).toHaveCount(0);
-  await page.goto(`/dashboard/sales/${fixture.salesId}`);
-  await expect(
-    page.getByRole("heading", { name: fixture.salesNo, exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "登记发运", exact: true }),
-  ).toHaveCount(0);
-  // The import/add controls live in the 货柜 tab; assert it is mounted before checking absence.
-  await page.getByRole("tab", { name: "货柜" }).click();
-  await expect(page.getByText("装箱明细", { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "从已完工采购导入" }),
-  ).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "手动添加商品" })).toHaveCount(
-    0,
-  );
-  const before = readDomain(fixture);
-  const denied = await page.evaluate(
-    async ({ salesId, token }) => {
-      const response = await fetch(`/api/v1/sales/${salesId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: "SHIPPED" }),
-      });
-      return { status: response.status, body: await response.json() };
-    },
-    { salesId: fixture.salesId, token },
-  );
-  expect(denied.status).toBe(403);
-  expect(denied.body.message).toContain("老板角色仅可查看业务");
-  expect(readDomain(fixture)).toEqual(before);
-  await page.reload();
-  await expect(
-    page.getByRole("button", { name: "登记发运", exact: true }),
-  ).toHaveCount(0);
-  expect(readDomain(fixture)).toEqual(before);
 });
 
 // Six bounded internal-record scenarios. Draft status throughout; no filing,
@@ -506,10 +432,8 @@ for (const kind of ["customs", "refunds"] as const) {
   const createPath = kind === "customs" ? "/new" : "/create";
   const numberLabel = kind === "customs" ? "报关单号" : "退税单号";
   const editLabel = kind === "customs" ? "编辑报关单" : "编辑退税单";
-  const listURL =
-    kind === "customs"
-      ? /\/dashboard\/customs\?view=customs$/
-      : /\/dashboard\/customs(\?view=workbench)?$/;
+  // OD-8: the FINANCE persona is ADMIN, whose default tab is 报关单 for both forms.
+  const listURL = /\/dashboard\/customs\?view=customs$/;
 
   test(`FINANCE ${kind} unsaved create return cancels with zero record or audit writes`, async ({
     page,

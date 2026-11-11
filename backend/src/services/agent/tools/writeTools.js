@@ -25,7 +25,7 @@ module.exports = ({
     domain: 'finance',
     access: 'write',
     confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.FINANCE],
+    allowedRoles: [ROLES.ADMIN],
     description: '将待分配收款挂到指定出口合同（需用户确认后执行）。调用前请先用 GetFinanceOverview 获取待分配收款列表。',
     inputSchema: {
       type: 'object',
@@ -94,7 +94,7 @@ module.exports = ({
     domain: 'finance',
     access: 'write',
     confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.FINANCE],
+    allowedRoles: [ROLES.ADMIN],
     description: '创建一条收/付款记录（需用户确认后执行）',
     inputSchema: {
       type: 'object',
@@ -178,7 +178,7 @@ module.exports = ({
     domain: 'procurement',
     access: 'write',
     confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
+    allowedRoles: [ROLES.ADMIN, ROLES.SALES],
     description: '创建供应商记录（需用户确认后执行）',
     inputSchema: {
       type: 'object',
@@ -209,7 +209,7 @@ module.exports = ({
     domain: 'procurement',
     access: 'write',
     confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
+    allowedRoles: [ROLES.ADMIN, ROLES.SALES],
     description: '更新供应商记录（需用户确认后执行）',
     inputSchema: {
       type: 'object',
@@ -247,7 +247,7 @@ module.exports = ({
     domain: 'procurement',
     access: 'write',
     confirmationRequired: false,
-    allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
+    allowedRoles: [ROLES.ADMIN, ROLES.SALES],
     description: '按用户请求直接创建内部采购草稿及明细，不签约或付款；先查询已有草稿，避免跨轮重复创建',
     inputSchema: {
       type: 'object',
@@ -289,7 +289,7 @@ module.exports = ({
     domain: 'procurement',
     access: 'write',
     confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.PURCHASE],
+    allowedRoles: [ROLES.ADMIN, ROLES.SALES],
     description: '更新采购合同头信息（需用户确认后执行）',
     inputSchema: {
       type: 'object',
@@ -327,7 +327,7 @@ module.exports = ({
     domain: 'inventory',
     access: 'write',
     confirmationRequired: true,
-    allowedRoles: [ROLES.ADMIN, ROLES.WAREHOUSE],
+    allowedRoles: [ROLES.ADMIN, ROLES.SALES],
     description: '更新单条库存状态（需用户确认后执行）',
     inputSchema: {
       type: 'object',
@@ -359,7 +359,7 @@ module.exports = ({
     domain: 'trade-compliance',
     access: 'write',
     confirmationRequired: false,
-    allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE, ROLES.WAREHOUSE],
+    allowedRoles: [ROLES.ADMIN, ROLES.SALES],
     description: '按用户请求直接创建内部报关草稿，不进行正式报关',
     inputSchema: {
       type: 'object',
@@ -400,7 +400,7 @@ module.exports = ({
     domain: 'trade-compliance',
     access: 'write',
     confirmationRequired: false,
-    allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE],
+    allowedRoles: [ROLES.ADMIN],
     description: '按用户请求直接创建内部收汇核销草稿，不代表银行或官方已核销',
     inputSchema: {
       type: 'object',
@@ -441,7 +441,7 @@ module.exports = ({
     domain: 'trade-compliance',
     access: 'write',
     confirmationRequired: false,
-    allowedRoles: [ROLES.ADMIN, ROLES.SALES, ROLES.FINANCE],
+    allowedRoles: [ROLES.ADMIN],
     description: '按用户请求直接创建内部退税草稿，不提交税局',
     inputSchema: {
       type: 'object',

@@ -4,6 +4,7 @@
  * Pos: sales lifecycle concurrency regression; never reads existing business databases
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -32,8 +33,8 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
     await db.$disconnect(); fs.rmSync(directory, { recursive: true, force: true });
   });
   const users = {};
-  for (const role of ['SALES', 'WAREHOUSE']) {
-    const user = await db.user.create({ data: { username: `synthetic-sales-race-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role } });
+  for (const role of ['SALES', 'WAREHOUSE', 'ADMIN']) {
+    const user = await db.user.create({ data: { username: `synthetic-sales-race-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: dbRole(role) } });
     users[role] = jwt.sign({ userId: user.id }, secret);
   }
   for (let n = 0; n < 2; n += 1) {
@@ -63,7 +64,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
       : { status: action.status };
     const response = await fetch(worker.base + url, {
       method: action.kind === 'payment' ? 'POST' : 'PUT',
-      headers: { authorization: `Bearer ${users[action.role || 'SALES']}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${users[action.role || (action.kind === 'payment' ? 'ADMIN' : 'SALES')]}`, 'content-type': 'application/json' },
       body: JSON.stringify(body), signal: AbortSignal.timeout(15000),
     });
     const result = await response.json();
@@ -157,7 +158,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
       const arrival = status('ARRIVED', 'sales', 'WAREHOUSE');
-      const payment = { kind: 'payment', role: 'SALES' };
+      const payment = { kind: 'payment', role: 'ADMIN' }; // OD-8: payments are ADMIN only
       const actions = firstKind === 'arrival' ? [arrival, payment] : [payment, arrival];
       const { results } = await race(sale, actions);
       assert.deepEqual(results.map(result => result.status), firstKind === 'arrival' ? [200, 201] : [201, 200]);

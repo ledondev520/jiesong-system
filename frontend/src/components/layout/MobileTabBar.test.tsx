@@ -84,13 +84,4 @@ describe("MobileTabBar", () => {
     expect(useAiPanelStore.getState().open).toBe(true);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
-
-  it("BOSS 的更多面板没有 AI 助手入口", () => {
-    mockRole = Role.BOSS;
-    renderBar();
-    fireEvent.click(screen.getByText("更多"));
-    expect(
-      within(screen.getByRole("dialog")).queryByText("AI 助手"),
-    ).not.toBeInTheDocument();
-  });
 });

@@ -52,7 +52,7 @@ export function ForexVerificationPanel({
   salesContractId: string;
 }) {
   const role = useAuthStore((state) => state.user?.role);
-  const canEdit = ["ADMIN", "FINANCE", "SALES"].includes(role || "");
+  const canEdit = role === "ADMIN"; // OD-8: forex writes are ADMIN only
   const [items, setItems] = useState<ForexVerification[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -214,7 +214,7 @@ export function ForexVerificationPanel({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {record.bankName || "未登记银行"} · 到账 {record.currency}{" "}
-                  {/* WAREHOUSE responses omit receivedAmount (A98) */}
+                  {/* non-ADMIN responses omit receivedAmount (A98/OD-9) */}
                   {record.receivedAmount?.toLocaleString() ?? "无权查看"} · 结汇{" "}
                   {record.settledAmount ?? "未登记"} · 汇率{" "}
                   {record.exchangeRate ?? "未登记"}

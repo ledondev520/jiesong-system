@@ -18,7 +18,7 @@ test('role browser fixture: custom temporary root starts with private SQLite and
   await t.test('child preserves the selected temporary root', async child => {
     const f = await fixtureFor(child, 'purchase', temporaryRoot);
     await f.login('PURCHASE');
-    assert.deepEqual(f.read('SELECT COUNT(*) count FROM users'), [{ count: 5 }]);
+    assert.deepEqual(f.read('SELECT COUNT(*) count FROM users'), [{ count: 4 }]); // OD-8: four personas, two live roles
   });
 });
 
@@ -75,7 +75,8 @@ test('role browser fixture: WAREHOUSE inspection persists operator, held quantit
 test('role browser fixture: SALES guard rolls back, warehouse releases stock and shipping is idempotent', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'sales');
   const sales = await f.login('SALES');
-  assert.equal((await f.call('POST', `/purchases/${f.purchaseId}/receipts`, {}, sales)).status, 403);
+  // OD-8: SALES now registers receipts, so an empty body reaches validation (400) instead of the role gate.
+  assert.equal((await f.call('POST', `/purchases/${f.purchaseId}/receipts`, {}, sales)).status, 400);
   const rejected = await f.call('PUT', `/sales/${f.salesId}/status`, { status: 'SHIPPED' }, sales);
   assert.equal(rejected.status, 400);
   assert.match(rejected.body.message, /库存不足/);
@@ -94,19 +95,6 @@ test('role browser fixture: SALES guard rolls back, warehouse releases stock and
   assert.ok(sources.every(row => row.receiptInspectionId && row.receiptInspectionId === row.inspectionId));
   assert.equal((await f.call('PUT', `/sales/${f.salesId}/status`, { status: 'SHIPPED' }, sales)).status, 200);
   assert.deepEqual(f.read('SELECT status,SUM(quantity) quantity FROM inventories GROUP BY status ORDER BY status'), rows);
-});
-
-test('role browser fixture: BOSS permitted reads succeed and attempted mutation preserves DB', { timeout: 60000 }, async t => {
-  const f = await fixtureFor(t, 'boss');
-  const boss = await f.login('BOSS');
-  for (const route of [`/purchases/${f.purchaseId}`, `/purchases/${f.purchaseId}/receipts`, `/sales/${f.salesId}`, `/contracts/${f.salesId}/files?contractType=SALES`]) {
-    assert.equal((await f.call('GET', route, undefined, boss)).status, 200);
-  }
-  const before = f.read('SELECT status,shippedAt FROM sales_contracts');
-  const denied = await f.call('PUT', `/sales/${f.salesId}/status`, { status: 'SHIPPED' }, boss);
-  assert.equal(denied.status, 403);
-  assert.match(denied.body.message, /老板角色仅可查看业务/);
-  assert.deepEqual(f.read('SELECT status,shippedAt FROM sales_contracts'), before);
 });
 
 const readPool = f => ({
@@ -168,21 +156,20 @@ test('role browser fixture: FINANCE rejected CNY retries preserve both source an
   }
 });
 
-test('role browser fixture: BOSS reads receipt balances but allocation and automatch are forbidden', { timeout: 60000 }, async t => {
+test('role browser fixture: SALES cannot read receipt balances, allocate or automatch (OD-8)', { timeout: 60000 }, async t => {
   const f = await fixtureFor(t, 'receipt-pool');
-  const boss = await f.login('BOSS');
+  const sales = await f.login('SALES');
   const { usdReceiptId, contracts: [contract] } = f.receiptPool;
   const before = readPool(f);
-  for (const route of ['/finance/unallocated-payments', '/finance/receivables', `/sales/${contract.id}`]) {
-    assert.equal((await f.call('GET', route, undefined, boss)).status, 200);
+  for (const route of ['/finance/unallocated-payments', '/finance/receivables']) {
+    assert.equal((await f.call('GET', route, undefined, sales)).status, 403);
   }
+  assert.equal((await f.call('GET', `/sales/${contract.id}`, undefined, sales)).status, 200);
   for (const [route, data] of [
     [`/finance/payments/${usdReceiptId}/allocate`, { allocations: [{ salesContractId: contract.id, amount: 100 }] }],
     ['/finance/payments/auto-match', {}],
   ]) {
-    const denied = await f.call('POST', route, data, boss);
-    assert.equal(denied.status, 403);
-    assert.match(denied.body.message, /老板角色仅可查看业务/);
+    assert.equal((await f.call('POST', route, data, sales)).status, 403);
     assert.deepEqual(readPool(f), before);
   }
 });

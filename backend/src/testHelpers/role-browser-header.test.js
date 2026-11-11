@@ -156,8 +156,9 @@ test('sales header HTTP: ordinary supplement preserves cargo/amount facts and in
     assert.equal(response.body.data.signedAt, '2026-10-03T00:00:00.000Z');
     assert.equal(response.body.data.estimatedArrival, '2026-11-03T00:00:00.000Z');
     assert.equal(response.body.data.packingItems[0].id, before.packing_items[0].id);
-    assert.equal(response.body.data.totalAmount, 20);
-    assert.equal(response.body.data.receivedAmount, 5);
+    // OD-7/OD-8: the SALES reader gets no contract total or received amount; the snapshot below keeps 20/5 unchanged.
+    assert.equal('totalAmount' in response.body.data, false);
+    assert.equal('receivedAmount' in response.body.data, false);
     assert.deepEqual(f.snapshot(), after);
   }
 });

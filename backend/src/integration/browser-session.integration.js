@@ -98,7 +98,8 @@ test('fixed-expiry opt-in browser sessions and CSRF boundaries', async (t) => {
     assert.equal((await request('/api/v1/auth/session', a)).status, 401); assert.equal((await request('/api/v1/auth/session', b)).status, 200);
     assert.equal((await request('/api/v1/auth/me', { headers: { authorization: `Bearer ${bearer}` } })).status, 200);
     await db.user.update({ where: { id: user.id }, data: { role: 'BOSS' } });
-    assert.equal((await request('/api/v1/auth/session', b)).status, 200); assert.equal((await request('/api/v1/auth/logout', { method: 'POST', ...b, headers: { origin } })).status, 200);
+    // OD-8: a retired role is refused everywhere except logout.
+    assert.equal((await request('/api/v1/auth/session', b)).status, 403); assert.equal((await request('/api/v1/auth/logout', { method: 'POST', ...b, headers: { origin } })).status, 200);
     await db.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } });
   });
   await t.test('logout proof supports bearer/cookie coexistence and disabled-session revocation without auth bypass', async () => {

@@ -137,7 +137,7 @@ function DeclarationCell({
 export function TaxRefundWorkbench() {
   const router = useRouter();
   const role = useAuthStore((state) => state.user?.role);
-  const canExport = role === "ADMIN" || role === "FINANCE";
+  const canExport = role === "ADMIN";
   const [data, setData] = useState<WorkbenchData | null>(null);
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState("");

@@ -18,20 +18,20 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/workbench', taxRefundController.getWorkbench);
-router.get('/workbench/monthly-export', roleAuth(ROLE_SETS.FINANCE), taxRefundController.exportMonthlyPreparations);
-router.get('/workbench/:salesContractId/preparation', roleAuth(ROLE_SETS.FINANCE), taxRefundController.getShipmentPreparation);
-router.get('/workbench/:salesContractId/preparation-export', roleAuth(ROLE_SETS.FINANCE), taxRefundController.exportShipmentPreparation);
-router.post('/workbench/:salesContractId/confirm', roleAuth(ROLE_SETS.FINANCE), taxRefundController.confirmShipmentPreparation);
-router.get('/workbench/:salesContractId/invoice-verification', roleAuth(ROLE_SETS.FINANCE), taxRefundController.getInvoiceVerification);
+router.get('/workbench/monthly-export', roleAuth(ROLE_SETS.ADMIN), taxRefundController.exportMonthlyPreparations);
+router.get('/workbench/:salesContractId/preparation', roleAuth(ROLE_SETS.ADMIN), taxRefundController.getShipmentPreparation);
+router.get('/workbench/:salesContractId/preparation-export', roleAuth(ROLE_SETS.ADMIN), taxRefundController.exportShipmentPreparation);
+router.post('/workbench/:salesContractId/confirm', roleAuth(ROLE_SETS.ADMIN), taxRefundController.confirmShipmentPreparation);
+router.get('/workbench/:salesContractId/invoice-verification', roleAuth(ROLE_SETS.ADMIN), taxRefundController.getInvoiceVerification);
 router.get('/', withPaginationValidation, taxRefundController.list);
 router.post(
   '/auto-drafts',
-  roleAuth(ROLE_SETS.FINANCE),
+  roleAuth(ROLE_SETS.ADMIN),
   taxRefundController.generateTaxRefundDrafts,
 );
 router.post(
   '/export',
-  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  roleAuth(ROLE_SETS.ADMIN),
   taxRefundController.exportTaxRefunds,
 );
 router.get('/:id', withIdValidation, taxRefundController.getById);
@@ -42,21 +42,21 @@ const refundFieldGuard = settlementFieldGuard({
 });
 router.post(
   '/',
-  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  roleAuth(ROLE_SETS.ADMIN),
   refundFieldGuard,
   withAuditLog({ entity: 'TaxRefund', action: 'CREATE', model: 'taxRefund' }, taxRefundController.create),
 );
 router.put(
   '/:id',
   withIdValidation,
-  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  roleAuth(ROLE_SETS.ADMIN),
   refundFieldGuard,
   withAuditLog({ entity: 'TaxRefund', action: 'UPDATE', model: 'taxRefund' }, taxRefundController.update),
 );
 router.delete(
   '/:id',
   withIdValidation,
-  roleAuth(ROLE_SETS.FINANCE),
+  roleAuth(ROLE_SETS.ADMIN),
   withAuditLog({ entity: 'TaxRefund', action: 'DELETE', model: 'taxRefund' }, taxRefundController.remove),
 );
 

@@ -26,7 +26,7 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
   const jwt = require('jsonwebtoken');
   const config = require('../config');
   const users = {};
-  for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE', 'BOSS', 'FINANCE', 'ADMIN', 'INACTIVE']) {
+  for (const role of ['SALES', 'ADMIN', 'INACTIVE']) {
     const user = await db.user.create({ data: { username: `synthetic-attachment-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: role === 'INACTIVE' ? 'SALES' : role, isActive: role !== 'INACTIVE' } });
     // Claimed role deliberately differs; actual database role remains authoritative.
     users[role] = jwt.sign({ userId: user.id, role: 'ADMIN' }, config.jwt.secret);
@@ -59,9 +59,9 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
   let purchaseFile, salesFile;
 
   await t.test('upload and same-name new version remain distinct; canonical and legacy lists/downloads agree', async () => {
-    purchaseFile = await call('POST', `/contracts/${purchase.id}/files`, form(), { role: 'PURCHASE', expected: 201 });
+    purchaseFile = await call('POST', `/contracts/${purchase.id}/files`, form(), { role: 'ADMIN', expected: 201 });
     salesFile = await call('POST', `/sales/${sales.id}/files`, form({ contractType: 'SALES' }), { expected: 201 });
-    const newVersion = await call('POST', `/contracts/${purchase.id}/files`, form({ bytes: Buffer.from('%PDF-1.4\n% Synthetic replacement version\n%%EOF') }), { role: 'PURCHASE', expected: 201 });
+    const newVersion = await call('POST', `/contracts/${purchase.id}/files`, form({ bytes: Buffer.from('%PDF-1.4\n% Synthetic replacement version\n%%EOF') }), { role: 'ADMIN', expected: 201 });
     assert.notEqual(newVersion.id, purchaseFile.id);
     assert.notEqual(newVersion.filePath, purchaseFile.filePath);
     assert.equal(newVersion.fileName, purchaseFile.fileName);
@@ -70,10 +70,10 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
       assert.equal(fs.statSync(absolute).mode & 0o777, 0o600);
       assert.equal(fs.statSync(path.dirname(absolute)).mode & 0o777, 0o700);
     }
-    for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE', 'BOSS', 'FINANCE']) {
+    for (const role of ['SALES', 'ADMIN']) {
       for (const [record, file, type, legacy] of [[purchase, purchaseFile, 'PURCHASE', 'purchases'], [sales, salesFile, 'SALES', 'sales']]) {
-        // B112: signed purchase contracts are readable only by ADMIN/PURCHASE/FINANCE/BOSS; SALES/WAREHOUSE get no row and 403.
-        const blocked = type === 'PURCHASE' && ['SALES', 'WAREHOUSE'].includes(role);
+        // B112 / OD-8: signed purchase contracts are readable only by ADMIN; SALES gets no row and 403.
+        const blocked = type === 'PURCHASE' && role === 'SALES';
         const files = await call('GET', `/contracts/${record.id}/files?contractType=${type}`, undefined, { role });
         assert.equal(files.some(item => item.id === file.id && item.contractType === type), !blocked);
         for (const url of [`/files/${file.id}/download`, `/${legacy}/files/${file.id}/download`]) {
@@ -84,12 +84,12 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
         }
       }
     }
-    const legacyList = await call('GET', `/purchases/${purchase.id}/files`, undefined, { role: 'BOSS' });
+    const legacyList = await call('GET', `/purchases/${purchase.id}/files`, undefined, { role: 'ADMIN' });
     assert.deepEqual(new Set(legacyList.map(file => file.id)), new Set([newVersion.id, purchaseFile.id]));
   });
 
   await t.test('explicit write roles can upload and remove their disposable attachment through either route family', async () => {
-    for (const [index, role] of ['SALES', 'PURCHASE', 'WAREHOUSE', 'FINANCE'].entries()) {
+    for (const [index, role] of ['SALES', 'ADMIN'].entries()) {
       const file = await call('POST', `/contracts/${sales.id}/files`, form({ contractType: 'SALES' }), { role, expected: 201 });
       await call('DELETE', index % 2 ? `/files/${file.id}` : `/sales/files/${file.id}`, undefined, { role });
       assert.equal(await db.salesContractFile.findUnique({ where: { id: file.id } }), null);
@@ -97,15 +97,13 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
     }
   });
 
-  await t.test('BOSS, inactive and unauthenticated actions leave both rows and storage unchanged', async () => {
+  await t.test('SALES on purchase-contract documents, inactive and unauthenticated actions leave both rows and storage unchanged', async () => {
     const before = await snapshot();
     for (const [method, url, body, role, expected] of [
-      ['POST', `/contracts/${purchase.id}/files`, form(), 'BOSS', 403],
-      ['POST', `/purchases/${purchase.id}/files`, form(), 'BOSS', 403],
-      ['POST', `/sales/${sales.id}/files`, form({ contractType: 'SALES' }), 'BOSS', 403],
-      ['DELETE', `/files/${purchaseFile.id}`, undefined, 'BOSS', 403],
-      ['DELETE', `/purchases/files/${purchaseFile.id}`, undefined, 'BOSS', 403],
-      ['DELETE', `/sales/files/${salesFile.id}`, undefined, 'BOSS', 403],
+      ['POST', `/contracts/${purchase.id}/files`, form(), 'SALES', 403],
+      ['POST', `/purchases/${purchase.id}/files`, form(), 'SALES', 403],
+      ['DELETE', `/files/${purchaseFile.id}`, undefined, 'SALES', 403],
+      ['DELETE', `/purchases/files/${purchaseFile.id}`, undefined, 'SALES', 403],
       ['GET', `/files/${purchaseFile.id}/download`, undefined, null, 401],
       ['POST', `/contracts/${purchase.id}/files`, form(), 'INACTIVE', 401],
     ]) await call(method, url, body, { role, expected });
@@ -117,7 +115,7 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
       const before = await snapshot();
       await sub.test(url, async () => {
         let statusError;
-        try { await call('POST', url, form({ contractType }), { role: contractType === 'PURCHASE' ? 'PURCHASE' : 'SALES', expected: 404 }); } catch (error) { statusError = error; }
+        try { await call('POST', url, form({ contractType }), { role: contractType === 'PURCHASE' ? 'ADMIN' : 'SALES', expected: 404 }); } catch (error) { statusError = error; }
         assert.deepEqual(await snapshot(), before, 'rejected upload must not leave its new payload');
         if (statusError) throw statusError;
       });
@@ -152,15 +150,15 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
     const fileService = require('../services/fileService');
     const protectedFile = await fileService.archiveGeneratedFile({ contractId: sales.id, contractType: 'SALES', buffer: protectedBytes, fileName: 'synthetic-confirmation.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', category: 'SYSTEM_GENERATED_XLSX', description: '退税出货清单确认:synthetic:version' });
     const before = await snapshot();
-    for (const role of ['SALES', 'PURCHASE', 'WAREHOUSE', 'BOSS']) {
+    for (const role of ['SALES']) {
       for (const url of [`/files/${protectedFile.id}/download`, `/sales/files/${protectedFile.id}/download`]) await call('GET', url, undefined, { role, expected: 403 });
       for (const url of [`/files/${protectedFile.id}`, `/sales/files/${protectedFile.id}`]) await call('DELETE', url, undefined, { role, expected: 403 });
     }
     assert.deepEqual(await snapshot(), before);
-    for (const role of ['FINANCE', 'ADMIN']) {
+    for (const role of ['ADMIN']) {
       for (const url of [`/files/${protectedFile.id}/download`, `/sales/files/${protectedFile.id}/download`]) assert.deepEqual((await call('GET', url, undefined, { role, binary: true })).bytes, protectedBytes);
     }
-    await call('DELETE', `/sales/files/${protectedFile.id}`, undefined, { role: 'FINANCE' });
+    await call('DELETE', `/sales/files/${protectedFile.id}`, undefined, { role: 'ADMIN' });
     assert.equal(fs.existsSync(path.join(config.upload.dir, protectedFile.filePath)), false);
     const purchaseProtected = await fileService.archiveGeneratedFile({ contractId: purchase.id, buffer: protectedBytes, fileName: 'synthetic-confirmation.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', category: 'SYSTEM_GENERATED_XLSX', description: '退税出货清单确认:synthetic:version' });
     const unchanged = await snapshot();
@@ -174,18 +172,18 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
     const carrier = await call('POST', `/contracts/${sales.id}/files`, form({ contractType: 'SALES', category: 'CARRIER_DOCUMENT' }), { expected: 201 });
     await db.packingListCheck.create({ data: { salesContractId: sales.id, salesContractFileId: carrier.id, automaticStatus: 'NEEDS_MANUAL_REVIEW', status: 'NEEDS_MANUAL_REVIEW', summaryJson: '{}', resultJson: '{}' } });
     const before = await snapshot();
-    for (const url of [`/files/${carrier.id}`, `/sales/files/${carrier.id}`]) await call('DELETE', url, undefined, { role: 'WAREHOUSE', expected: 409 });
+    for (const url of [`/files/${carrier.id}`, `/sales/files/${carrier.id}`]) await call('DELETE', url, undefined, { role: 'SALES', expected: 409 });
     assert.deepEqual(await snapshot(), before);
-    assert.deepEqual((await call('GET', `/files/${carrier.id}/download`, undefined, { role: 'BOSS', binary: true })).bytes, generatedPdf);
+    assert.deepEqual((await call('GET', `/files/${carrier.id}/download`, undefined, { role: 'SALES', binary: true })).bytes, generatedPdf);
   });
 
   await t.test('legacy procurement deletion preserves existing physical archive retention; repeat delete is 404', async () => {
-    const file = await call('POST', `/purchases/${purchase.id}/files`, form(), { role: 'PURCHASE', expected: 201 });
-    await call('DELETE', `/purchases/files/${file.id}`, undefined, { role: 'PURCHASE' });
+    const file = await call('POST', `/purchases/${purchase.id}/files`, form(), { role: 'ADMIN', expected: 201 });
+    await call('DELETE', `/purchases/files/${file.id}`, undefined, { role: 'ADMIN' });
     assert.equal(await db.contractFile.findUnique({ where: { id: file.id } }), null);
     // Existing legacy retention is intentional; failed new uploads are separately cleaned.
     assert.equal(fs.existsSync(path.join(config.upload.dir, file.filePath)), true);
-    await call('DELETE', `/files/${file.id}`, undefined, { role: 'PURCHASE', expected: 404 });
+    await call('DELETE', `/files/${file.id}`, undefined, { role: 'ADMIN', expected: 404 });
   });
 
   await t.test('missing record, lost disk bytes and cross-type legacy downloads return 404 without changes', async () => {
@@ -194,11 +192,11 @@ test('HTTP/SQLite: contract attachments retain bytes, roles and evidence through
     const staticResponse = await fetch(base.replace(/\/api\/v1$/, '') + '/uploads/' + salesFile.filePath);
     assert.equal(staticResponse.status, 404);
     await call('GET', `/contracts/${purchase.id}/files?contractType=TYPO`, undefined, { expected: 400 });
-    for (const url of ['/files/synthetic-missing/download', `/purchases/files/${salesFile.id}/download`, `/sales/files/${purchaseFile.id}/download`]) await call('GET', url, undefined, { role: 'PURCHASE', expected: 404 });
+    for (const url of ['/files/synthetic-missing/download', `/purchases/files/${salesFile.id}/download`, `/sales/files/${purchaseFile.id}/download`]) await call('GET', url, undefined, { role: 'ADMIN', expected: 404 });
     // Removing only this worker's generated disposable payload simulates lost storage.
     fs.unlinkSync(path.join(config.upload.dir, purchaseFile.filePath));
     const before = await snapshot();
-    for (const url of [`/files/${purchaseFile.id}/download`, `/purchases/files/${purchaseFile.id}/download`]) await call('GET', url, undefined, { role: 'PURCHASE', expected: 404 });
+    for (const url of [`/files/${purchaseFile.id}/download`, `/purchases/files/${purchaseFile.id}/download`]) await call('GET', url, undefined, { role: 'ADMIN', expected: 404 });
     assert.deepEqual(await snapshot(), before);
   });
   assert.ok(requestCount <= 100, 'real global limiter budget must not be bypassed by the fixture');

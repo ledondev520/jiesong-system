@@ -36,16 +36,12 @@ const roleAuth = (...roles) => {
 const adminOnly = roleAuth('ADMIN');
 
 /**
- * A98: the named role sets, in canonical order ADMIN, PURCHASE, SALES, FINANCE, WAREHOUSE, BOSS.
- * Routes use roleAuth(ROLE_SETS.X); a route that needs a different set lists its roles literally.
+ * OD-8 (owner, 2026-11-11): two roles only. ADMIN sees everything; SALES does data, contract and
+ * purchase entry and never sees finance (payments, bank flow, statements, forex, tax refunds).
  */
 const ROLE_SETS = Object.freeze({
-  ADMIN: Object.freeze(['ADMIN']),
-  FINANCE: Object.freeze(['ADMIN', 'FINANCE']), // accounting writes and Restricted finance reads
-  FINANCE_READ: Object.freeze(['ADMIN', 'FINANCE', 'BOSS']), // accounting reads incl. the read-only BOSS
-  COMMERCIAL: Object.freeze(['ADMIN', 'PURCHASE', 'SALES', 'FINANCE']), // money-seeing operators, no WAREHOUSE (OD-3)
-  OPERATORS: Object.freeze(['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE']), // every business writer; BOSS stays read-only
-  EVERYONE: Object.freeze(['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']),
+  ADMIN: Object.freeze(['ADMIN']), // finance surfaces and administration
+  ALL: Object.freeze(['ADMIN', 'SALES']), // every business data-entry route
 });
 
 module.exports = {

@@ -13,9 +13,9 @@ const { OFFICIAL_RULES } = require('./taxRefundPreparationService');
 const TAX_REFUND_REMINDER_DAY = 5;
 
 // 退税提醒接收角色：管理员 + 财务
-const TAX_REFUND_NOTIFY_ROLES = [ROLES.ADMIN, ROLES.FINANCE];
+const TAX_REFUND_NOTIFY_ROLES = [ROLES.ADMIN];
 // 缺发票提醒接收角色：管理员 + 财务 + 采购
-const INVOICE_NOTIFY_ROLES = [ROLES.ADMIN, ROLES.FINANCE, ROLES.PURCHASE];
+const INVOICE_NOTIFY_ROLES = [ROLES.ADMIN];
 
 /**
  * 职责：查询指定角色的活跃用户 id 列表

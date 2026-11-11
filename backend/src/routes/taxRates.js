@@ -19,19 +19,19 @@ router.get('/', withPaginationValidation, taxRateController.list);
 router.get('/:id', withIdValidation, taxRateController.getById);
 router.post(
   '/',
-  roleAuth(ROLE_SETS.COMMERCIAL),
+  roleAuth(ROLE_SETS.ALL),
   withAuditLog({ entity: 'TaxRate', action: 'CREATE', model: 'taxRate' }, taxRateController.create),
 );
 router.put(
   '/:id',
   withIdValidation,
-  roleAuth(ROLE_SETS.COMMERCIAL),
+  roleAuth(ROLE_SETS.ALL),
   withAuditLog({ entity: 'TaxRate', action: 'UPDATE', model: 'taxRate' }, taxRateController.update),
 );
 router.delete(
   '/:id',
   withIdValidation,
-  roleAuth(ROLE_SETS.FINANCE),
+  roleAuth(ROLE_SETS.ADMIN),
   withAuditLog({ entity: 'TaxRate', action: 'DELETE', model: 'taxRate' }, taxRateController.remove),
 );
 

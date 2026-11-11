@@ -23,10 +23,9 @@ export type OrderDocAction =
   | "exportWorkbook"
   | "threeForms";
 
-// 与后端 R3 P1-3 一致：WAREHOUSE 仅报关草稿/装箱核对；PURCHASE 无出口单证生成、报关草稿与三表（其余角色全部）。
+// 与后端一致（OD-8）：SALES 仅报关草稿/装箱核对；出口单证、导出工作簿与三表仅 ADMIN。
 const ROLE_ACTIONS: Record<string, OrderDocAction[]> = {
-  WAREHOUSE: ["customsDraft", "packingCheck"],
-  PURCHASE: ["packingCheck", "exportWorkbook"],
+  SALES: ["customsDraft", "packingCheck"],
 };
 
 export function OrderDocsMenu({

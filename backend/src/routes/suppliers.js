@@ -25,19 +25,19 @@ router.get('/:id', withIdValidation, supplierController.getById);
 // POST /api/v1/suppliers - 创建供应商
 router.post('/', [
   body('name').notEmpty().withMessage('供应商名称不能为空'),
-], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+], roleAuth(ROLE_SETS.ALL), handleValidation, withAuditLog(
   { entity: 'Supplier', action: 'CREATE', model: 'supplier' },
   supplierController.create
 ));
 
 // PUT /api/v1/suppliers/:id - 更新供应商
-router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'Supplier', action: 'UPDATE', model: 'supplier' },
   supplierController.update
 ));
 
 // DELETE /api/v1/suppliers/:id - 归档供应商（软停用，非物理删除）
-router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE'), withAuditLog(
+router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'Supplier', action: 'DELETE', model: 'supplier' },
   supplierController.remove
 ));
@@ -49,13 +49,13 @@ router.get('/:id/hard-delete-preview', withIdValidation, roleAuth(ROLE_SETS.ADMI
 router.post('/:id/hard-delete', withIdValidation, roleAuth(ROLE_SETS.ADMIN), supplierController.hardDelete);
 
 // POST /api/v1/suppliers/:id/aliases - 添加供应商昵称
-router.post('/:id/aliases', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
+router.post('/:id/aliases', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'SupplierAlias', action: 'CREATE', model: 'supplierAlias' },
   supplierController.addAlias
 ));
 
 // POST /api/v1/suppliers/:id/quality-issue - 标记质量问题
-router.post('/:id/quality-issue', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
+router.post('/:id/quality-issue', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'Supplier', action: 'UPDATE', model: 'supplier' },
   supplierController.markQualityIssue
 ));

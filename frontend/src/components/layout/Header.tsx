@@ -97,20 +97,18 @@ export function Header() {
       <div className="flex shrink-0 items-center gap-1 md:gap-2">
         <ThemeToggle />
         <HeaderNotifications />
-        {/* AI 助手面板开关（Ctrl/⌘+J）：BOSS 无权限 */}
-        {user?.role !== Role.BOSS && (
-          <Button
-            variant={aiOpen ? "secondary" : "ghost"}
-            size="icon"
-            className="h-11 w-11 rounded-md md:h-9 md:w-9"
-            onClick={toggleAiPanel}
-            aria-label="AI 助手"
-            aria-pressed={aiOpen}
-            title="AI 助手 (Ctrl/⌘+J)"
-          >
-            <Bot className="h-4 w-4" />
-          </Button>
-        )}
+        {/* AI 助手面板开关（Ctrl/⌘+J） */}
+        <Button
+          variant={aiOpen ? "secondary" : "ghost"}
+          size="icon"
+          className="h-11 w-11 rounded-md md:h-9 md:w-9"
+          onClick={toggleAiPanel}
+          aria-label="AI 助手"
+          aria-pressed={aiOpen}
+          title="AI 助手 (Ctrl/⌘+J)"
+        >
+          <Bot className="h-4 w-4" />
+        </Button>
         {/* 用户菜单：桌面端保留，移动端通过底部TabBar"更多"入口访问 */}
         <HeaderUserMenu
           displayName={user?.name}

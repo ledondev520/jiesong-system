@@ -4,6 +4,7 @@
  * Pos: private synthetic Excel-import regression; no browser, providers or real records
  */
 const test = require('node:test');
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -40,7 +41,7 @@ test('HTTP/SQLite: active purchase Excel import preserves rows and rejects inval
   const jwt = require('jsonwebtoken');
   const tokens = {};
   for (const role of ['ADMIN', 'PURCHASE']) {
-    const user = await db.user.create({ data: { username: `synthetic-excel-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-excel-${role}`, password: 'test-only-unused-hash', name: `Synthetic ${role}`, role: dbRole(role) } });
     tokens[role] = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
   }
   const supplier = await db.supplier.create({ data: { name: '合成 Excel 供应商', taxId: 'SYNTHETIC-EXCEL-TAX-ID' } });

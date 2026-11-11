@@ -18,7 +18,7 @@ test.after(() => {
   if (previousUploadDir === undefined) delete process.env.UPLOAD_DIR; else process.env.UPLOAD_DIR = previousUploadDir;
 });
 
-test('退税确认附件：拒绝非财务下载或删除，管理员可下载；普通三单不受影响', async () => {
+test('退税确认附件：拒绝非财务下载或删除，管理员可下载；三单归档仅 ADMIN（OD-8）', async () => {
   const originalFind = files.findFileById;
   const originalDelete = files.deleteFileRecord;
   let deletions = 0;
@@ -38,7 +38,7 @@ test('退税确认附件：拒绝非财务下载或删除，管理员可下载�
     await controller.downloadFile({ params: { fileId: 'file-test' }, user: { role: 'ADMIN' } }, res, error => { throw error; });
     assert.equal(downloads, 1);
     record = { ...record, description: '出口三单生成版本' };
-    await controller.downloadFile({ params: { fileId: 'file-test' }, user: { role: 'SALES' } }, res, error => { throw error; });
+    await controller.downloadFile({ params: { fileId: 'file-test' }, user: { role: 'ADMIN' } }, res, error => { throw error; });
     assert.equal(downloads, 2);
   } finally { files.findFileById = originalFind; files.deleteFileRecord = originalDelete; }
 });
@@ -52,10 +52,11 @@ test('到货照片：非到货角色不能通过通用入口删除', async () =>
   const res = { status() { return this; }, json() {} };
   try {
     let error;
-    await controller.deleteFile({ params: { fileId: 'photo-1' }, user: { role: 'SALES' } }, res, value => { error = value; });
+    // OD-8: a retired role (still in old accounts) is refused; SALES registers arrivals.
+    await controller.deleteFile({ params: { fileId: 'photo-1' }, user: { role: 'PURCHASE' } }, res, value => { error = value; });
     assert.equal(error?.statusCode, 403);
     assert.equal(deletions, 0);
-    await controller.deleteFile({ params: { fileId: 'photo-1' }, user: { role: 'WAREHOUSE' } }, res, value => { throw value; });
+    await controller.deleteFile({ params: { fileId: 'photo-1' }, user: { role: 'SALES' } }, res, value => { throw value; });
     assert.equal(deletions, 1);
   } finally { files.findFileById = originalFind; files.deleteFileRecord = originalDelete; }
 });

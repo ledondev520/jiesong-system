@@ -27,7 +27,7 @@ test('HTTP/SQLite: SALES creates the first store and uses it on a contract witho
   const config = require('../config');
   const tokens = {};
   for (const role of ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS']) {
-    const user = await db.user.create({ data: { username: `synthetic-store-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } });
+    const user = await db.user.create({ data: { username: `synthetic-store-${role}`, password: 'test-only-unused-hash', name: `合成${role}`, role } }); // retired roles stored as-is (OD-8)
     tokens[role] = jwt.sign({ userId: user.id }, config.jwt.secret);
   }
   const port = await db.port.create({ data: { name: '合成有效港口', code: 'QA-STORE' } });
@@ -68,8 +68,7 @@ test('HTTP/SQLite: SALES creates the first store and uses it on a contract witho
   const sale = await call('POST', '/sales', { exchangeRate: 7.2, items: [{ storeId: store.id, productId: product.id, quantity: 2, costPrice: 10, sellingPrice: 2, unit: '件' }] }, 'SALES', 201);
   assert.equal(sale.items.length, 1, 'the first store is accepted by atomic contract creation');
   assert.equal((await db.salesItem.findFirst({ where: { salesContractId: sale.id } })).storeId, store.id);
-  for (const role of ['ADMIN', 'PURCHASE', 'FINANCE', 'WAREHOUSE']) {
-    await call('POST', '/stores', { name: `合成${role}门店`, portId: port.id }, role, 201);
-  }
-  assert.equal(await db.store.count(), 5, 'only the existing five write roles remain authorized');
+  await call('POST', '/stores', { name: '合成ADMIN门店', portId: port.id }, 'ADMIN', 201);
+  for (const role of ['PURCHASE', 'FINANCE', 'WAREHOUSE']) await call('POST', '/stores', { name: `合成${role}门店`, portId: port.id }, role, 403);
+  assert.equal(await db.store.count(), 2, 'only ADMIN and SALES write stores (OD-8)');
 });

@@ -1,5 +1,5 @@
 /**
- * Input: 真实挂载的路由模块、真实 authenticate/roleAuth/bossReadOnly 中间件（仅 prisma 用户读取被桩替换）
+ * Input: 真实挂载的路由模块、真实 authenticate/roleAuth 中间件（仅 prisma 用户读取被桩替换）
  * Output: Restricted/Confidential 前缀的读/写最大角色集合的实际 HTTP 结果矩阵（ANTI-PLAN P2-5）
  * Pos: 后端路由权限测试；补足 rbac-write-routes.test.js 只检查 "roleAuth(" 子串的缺口
  *
@@ -16,11 +16,10 @@ const config = require('../config');
 const prisma = require('../utils/prisma');
 const { errorHandler } = require('../middleware/errorHandler');
 
-const ROLES = ['ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE', 'BOSS'];
-const ALL = ROLES;
+// OD-8 (owner, 2026-11-11): two live roles. The retired ones stay in the list so every route proves it refuses them.
+const ROLES = ['ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS'];
+const ALL = ['ADMIN', 'SALES'];
 const ADMIN = ['ADMIN'];
-const AF = ['ADMIN', 'FINANCE'];
-const AFB = ['ADMIN', 'FINANCE', 'BOSS'];
 
 // 前缀 → 路由模块（与 routes/index.js 的挂载一致）
 const MODULES = {
@@ -38,42 +37,24 @@ const MODULES = {
 };
 
 // 策略表：自上而下首个匹配生效。read=GET，write=POST/PUT/PATCH/DELETE。
+// Finance surfaces (OD-8: SALES cannot see finance) and documents that carry contract totals or bank details are ADMIN only.
 const POLICY = [
-  { re: /^\/bank-flow(\/|$)/, read: AFB, write: AF },
-  { re: /^\/finance\/statements(\/|$)/, read: AFB, write: AF },
-  { re: /^\/finance\/unmatched$/, read: AFB, write: AF },
-  { re: /^\/finance\/receivable-reconciliation$/, read: AFB, write: AF },
-  { re: /^\/finance\/(match|unmatch|ignore|auto-match)$/, read: AF, write: AF },
-  // 账务读不含 WAREHOUSE；写入不含 WAREHOUSE（付款按类型再收紧，销售/采购各自只能写本类）
-  { re: /^\/finance(\/|$)/, read: ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'], write: ['ADMIN', 'FINANCE', 'SALES', 'PURCHASE'] },
-  { re: /^\/tax-refunds\/workbench\/[^/]+\/invoice-verification$/, read: AF, write: AF },
-  { re: /^\/tax-refunds\/workbench\/(monthly-export|[^/]+\/preparation(-export)?|[^/]+\/confirm)$/, read: AF, write: AF },
-  { re: /^\/tax-refunds\/(auto-drafts)$/, read: AF, write: AF },
-  { re: /^\/tax-refunds(\/|$)/, read: ALL, write: ['ADMIN', 'SALES', 'FINANCE'] },
-  { re: /^\/three-forms\/(forex-verification|tax-refund|generate|customs-declaration)$/, read: ['ADMIN', 'SALES', 'FINANCE'], write: ['ADMIN', 'SALES', 'FINANCE'] },
-  { re: /^\/three-forms(\/|$)/, read: ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'], write: ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'] },
-  { re: /^\/forex-verifications(\/|$)/, read: ALL, write: ['ADMIN', 'SALES', 'FINANCE'] },
+  { re: /^\/tax-refunds\/(workbench\/(monthly-export|[^/]+\/(preparation(-export)?|confirm|invoice-verification))|auto-drafts)$/, read: ADMIN, write: ADMIN },
+  // OD-9: SALES may read refund / forex records; settledAmount, refundableAmount and refundedAmount are stripped by warehouseMoneyRedaction.
+  { re: /^\/(tax-refunds|forex-verifications)(\/|$)/, read: ALL, write: ADMIN },
+  { re: /^\/(bank-flow|finance|three-forms|reports)(\/|$)/, read: ADMIN, write: ADMIN },
   { re: /^\/suppliers\/[^/]+\/hard-delete(-preview)?$/, read: ADMIN, write: ADMIN },
-  { re: /^\/suppliers(\/|$)/, read: ALL, write: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'] },
+  { re: /^\/suppliers(\/|$)/, read: ALL, write: ALL },
   { re: /^\/users(\/|$)/, read: ADMIN, write: ADMIN },
   { re: /^\/system\/(configs|notifications|seller-identity|exchange-rate|ports|categories|customs-brokers)$/, read: ALL, write: ADMIN },
-  { re: /^\/system\/notifications\/[^/]+\/read$/, read: ALL, write: ['ADMIN', 'BOSS', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'] },
-  { re: /^\/system\/export\//, read: ['ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'], write: ADMIN },
+  { re: /^\/system\/notifications\/[^/]+\/read$/, read: ALL, write: ALL },
+  { re: /^\/system\/export\//, read: ALL, write: ADMIN },
   { re: /^\/system(\/|$)/, read: ADMIN, write: ADMIN },
-  { re: /^\/reports(\/|$)/, read: AFB, write: ADMIN },
-  // 单柜账务/退税清单不含 WAREHOUSE（R2 P1-2）；其余 /sales 路由各自收紧，此处只兜底 BOSS 写入与 Agent
-  { re: /^\/sales\/[^/]+\/export-packet\/(preview|generate)$/, read: ['ADMIN', 'SALES', 'FINANCE'], write: ['ADMIN', 'SALES', 'FINANCE'] },
-  { re: /^\/sales\/[^/]+\/export-(excel|pdf)$/, read: ['ADMIN', 'SALES', 'FINANCE', 'PURCHASE'], write: ALL },
-  { re: /^\/sales\/[^/]+\/(finance-summary|tax-refund-preparation(\/export)?)$/, read: ['ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE'], write: ALL },
+  { re: /^\/sales\/[^/]+\/(export-packet\/(preview|generate)|export-(excel|pdf)|finance-summary|tax-refund-preparation(\/export)?)$/, read: ADMIN, write: ADMIN },
   { re: /^\/sales(\/|$)/, read: ALL, write: ALL },
-  // R2-Q1：合同文档生成/下载按 B60 读模型，SALES/WAREHOUSE 403；OD-4：BOSS 仅可下载 PDF（只读白名单），生成仍 403
-  { re: /^\/contract-doc\/pdf\/[^/]+$/, read: ['ADMIN', 'PURCHASE', 'FINANCE', 'BOSS'], write: ['ADMIN', 'PURCHASE', 'FINANCE'] },
-  { re: /^\/contract-doc\/generate\/[^/]+$/, read: ['ADMIN', 'PURCHASE', 'FINANCE'], write: ['ADMIN', 'PURCHASE', 'FINANCE'] },
-  { re: /^\/contract-doc(\/|$)/, read: ['ADMIN', 'FINANCE', 'PURCHASE', 'SALES', 'WAREHOUSE'], write: ADMIN },
+  { re: /^\/contract-doc\/(pdf|generate)\/[^/]+$/, read: ADMIN, write: ADMIN },
+  { re: /^\/contract-doc(\/|$)/, read: ALL, write: ADMIN },
 ];
-
-// bossReadOnly.js 的自身写入例外：BOSS 只能写这些
-const BOSS_SELF_WRITES = [/^\/system\/notifications\/[^/]+\/read$/];
 
 const policyFor = (path) => POLICY.find((p) => p.re.test(path));
 const fill = (p) => p.replace(/:year/g, '2026').replace(/:month/g, '7').replace(/:[A-Za-z]+/g, 'x1');
@@ -167,18 +148,6 @@ test('人类角色：不在最大允许集合内的角色在每条路由上得�
   assert.deepEqual(failures, [], `\n${failures.join('\n')}`);
 });
 
-test('BOSS：除自身写入例外外，所有写路由 403（不论路由角色表是否列出 BOSS）', async (t) => {
-  stubAuth(t);
-  const base = await startApp(t);
-  const failures = [];
-  for (const route of enumerateRoutes().filter((r) => isWrite(r.method))) {
-    if (BOSS_SELF_WRITES.some((re) => re.test(route.path))) continue;
-    const status = await call(base, route, humanToken('BOSS'));
-    if (status !== 403) failures.push(`BOSS ${route.method} ${route.declared} -> ${status}`);
-  }
-  assert.deepEqual(failures, [], `\n${failures.join('\n')}`);
-});
-
 test('旧 Agent (jsa_) 令牌在每条路由上得到 401', async (t) => {
   stubAuth(t);
   const base = await startApp(t);
@@ -190,7 +159,7 @@ test('旧 Agent (jsa_) 令牌在每条路由上得到 401', async (t) => {
   assert.deepEqual(failures, [], `\n${failures.join('\n')}`);
 });
 
-test('WAREHOUSE 不能经通用导出读取付款流水；无银行权限的角色拿不到供应商银行字段', async (t) => {
+test('OD-8：SALES 不能经通用导出读取付款流水，也拿不到供应商银行字段', async (t) => {
   stubAuth(t);
   const bank = { bankAccount: 'SYN-ACCT-0001', bankName: 'SYN BANK', bankAccountName: 'SYN', bankBranch: 'SYN', bankCode: 'SYN' };
   const supplier = { id: 'sup-1', name: 'SYN SUPPLIER', shortName: null, aliases: [], ...bank };
@@ -205,10 +174,10 @@ test('WAREHOUSE 不能经通用导出读取付款流水；无银行权限的角�
     return { status: res.status, text: await res.text() };
   };
   for (const path of ['/system/export/payments', '/system/export/payments/pdf']) {
-    assert.equal((await get(path, 'WAREHOUSE')).status, 403, path);
-    assert.notEqual((await get(path, 'SALES')).status, 403, path);
+    assert.equal((await get(path, 'SALES')).status, 403, path);
+    assert.notEqual((await get(path, 'ADMIN')).status, 403, path);
   }
-  for (const role of ['SALES', 'WAREHOUSE']) {
+  for (const role of ['SALES']) {
     const csv = await get('/system/export/suppliers', role);
     assert.equal(csv.status, 200);
     assert.ok(!csv.text.includes('SYN-ACCT-0001') && !csv.text.includes('银行账户'), `${role} export leaks bank`);
@@ -216,10 +185,10 @@ test('WAREHOUSE 不能经通用导出读取付款流水；无银行权限的角�
     assert.equal(detail.status, 200, detail.text);
     assert.ok(!detail.text.includes('SYN-ACCT-0001') && !detail.text.includes('bankName'), `${role} purchase detail leaks bank`);
   }
-  assert.ok((await get('/system/export/suppliers', 'PURCHASE')).text.includes('SYN-ACCT-0001'));
+  assert.ok((await get('/system/export/suppliers', 'ADMIN')).text.includes('SYN-ACCT-0001'));
 });
 
-test('SALES/WAREHOUSE 的 PUT /purchases/:id 响应不含 supplier 银行字段，PURCHASE 保留', async (t) => {
+test('SALES 的 PUT /purchases/:id 响应不含 supplier 银行字段，ADMIN 保留', async (t) => {
   stubAuth(t);
   const supplier = { id: 'sup-1', name: 'SYN SUPPLIER', bankAccount: 'SYN-ACCT-0001', bankName: 'SYN BANK' };
   const tx = {
@@ -238,10 +207,10 @@ test('SALES/WAREHOUSE 的 PUT /purchases/:id 响应不含 supplier 银行字段�
     });
     return { status: res.status, text: await res.text() };
   };
-  for (const role of ['SALES', 'WAREHOUSE']) {
+  for (const role of ['SALES']) {
     const out = await put(role);
     assert.equal(out.status, 200, out.text);
     assert.ok(!out.text.includes('SYN-ACCT-0001') && !out.text.includes('bankName'), `${role} PUT leaks bank`);
   }
-  assert.ok((await put('PURCHASE')).text.includes('SYN-ACCT-0001'));
+  assert.ok((await put('ADMIN')).text.includes('SYN-ACCT-0001'));
 });

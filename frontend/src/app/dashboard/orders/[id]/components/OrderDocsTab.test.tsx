@@ -49,16 +49,16 @@ describe("OrderDocsTab 未匹配 HS", () => {
   });
 });
 
-describe("OrderDocsTab 处理未匹配 HS 按钮（R3 P1-3）", () => {
+describe("OrderDocsTab 处理未匹配 HS 按钮（OD-8：仅 ADMIN）", () => {
   const button = () =>
     screen.getByRole("button", { name: "处理未匹配 HS 编码" });
 
-  it.each(["WAREHOUSE", "PURCHASE"])("%s 不可用", (role) => {
+  it.each(["SALES"])("%s 不可用", (role) => {
     renderTab(["水杯"], role);
     expect(button()).toBeDisabled();
   });
 
-  it.each(["ADMIN", "SALES", "FINANCE"])("%s 可用", (role) => {
+  it.each(["ADMIN"])("%s 可用", (role) => {
     renderTab(["水杯"], role);
     expect(button()).toBeEnabled();
   });

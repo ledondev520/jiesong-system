@@ -103,15 +103,13 @@ import { PurchaseDetailDialog } from "./PurchaseDetailDialog";
 
 export default function ContractsPageContent() {
   const readOnly = useBusinessReadOnly();
-  // OD-2/OD-3：WAREHOUSE 响应不含合同金额，列表显示「无权查看」而不是 ¥0 / 未录入
-  const moneyHidden = useAuthStore((state) => state.user?.role === "WAREHOUSE");
+  // OD-2/OD-3/OD-8：非 ADMIN 响应不含合同金额，列表显示「无权查看」而不是 ¥0 / 未录入
+  const moneyHidden = useAuthStore((state) => state.user?.role !== "ADMIN");
   const canImportHistory = useAuthStore(
     (state) => state.user?.role === "ADMIN",
   );
-  // 合同文档含供应商银行信息：SALES/WAREHOUSE 后端 403，不展示入口
-  const canGenerateDoc = useAuthStore((state) =>
-    ["ADMIN", "PURCHASE", "FINANCE"].includes(state.user?.role ?? ""),
-  );
+  // 合同文档含供应商银行信息：仅 ADMIN（OD-8），SALES 后端 403，不展示入口
+  const canGenerateDoc = useAuthStore((state) => state.user?.role === "ADMIN");
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFromUrl = searchParams.get("status") || "ALL";

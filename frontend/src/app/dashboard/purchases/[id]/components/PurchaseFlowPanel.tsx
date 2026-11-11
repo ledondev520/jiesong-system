@@ -128,12 +128,10 @@ export function PurchaseFlowPanel({
   const isMobile = useMobile();
   const readOnly = useBusinessReadOnly();
   const userRole = useAuthStore((state) => state.user?.role);
-  // 与后端一致：供应商发票原件仅 ADMIN/PURCHASE/FINANCE 可上传
-  const canUploadInvoiceFile = ["ADMIN", "PURCHASE", "FINANCE"].includes(
-    userRole || "",
-  );
-  // OD-2/OD-3：WAREHOUSE 服务端不返回发票号与金额；本面板只显示状态，不显示数字、不预填号码
-  const moneyHidden = userRole === "WAREHOUSE";
+  // 与后端一致：供应商发票原件仅 ADMIN 可上传（OD-8）
+  const canUploadInvoiceFile = userRole === "ADMIN";
+  // OD-2/OD-3/OD-8：非 ADMIN 服务端不返回发票号与金额；本面板只显示状态，不显示数字、不预填号码
+  const moneyHidden = userRole !== "ADMIN";
   const invoiceFileInputRef = useRef<HTMLInputElement>(null);
   const [remitOpen, setRemitOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);

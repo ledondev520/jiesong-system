@@ -222,9 +222,9 @@ it("B55: 计数请求失败时 chip 显示「—」而不是 0，列表仍可用
   expect(screen.queryByRole("button", { name: "待装柜0" })).toBeNull();
 });
 
-describe("WAREHOUSE 只看状态（OD-3）", () => {
+describe("SALES 只看状态（OD-7/OD-8）", () => {
   it("不显示金额列和卡片金额", async () => {
-    useAuthStore.setState({ user: { id: "w", role: "WAREHOUSE" } as never });
+    useAuthStore.setState({ user: { id: "w", role: "SALES" } as never });
     const {
       totalAmount: _t,
       receivedAmount: _r,
@@ -239,8 +239,8 @@ describe("WAREHOUSE 只看状态（OD-3）", () => {
     expect(screen.queryByText(/\$/)).toBeNull();
   });
 
-  it("其他角色仍显示金额列", async () => {
-    useAuthStore.setState({ user: { id: "s", role: "SALES" } as never });
+  it("ADMIN 显示金额列", async () => {
+    useAuthStore.setState({ user: { id: "s", role: "ADMIN" } as never });
     mocks.getAll.mockResolvedValue(reply("SC-S"));
     render(<OrdersPage />);
     expect((await screen.findAllByText("SC-S")).length).toBeGreaterThan(0);

@@ -1,5 +1,6 @@
 /** Real HTTP/SQLite: order-level customer rules (DATA-MODEL §2.4) and store archive/restore; synthetic fixtures only. */
 const test = require("node:test");
+const { dbRole } = require('../testHelpers/od8Personas');
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -44,7 +45,7 @@ test("HTTP/SQLite: orders take the single active customer and its terms, custome
   const tokens = {};
   for (const role of ["ADMIN", "SALES", "PURCHASE"]) {
     const user = await db.user.create({
-      data: { username: `synthetic-order-customer-${role}`, password: "test-only-unused-hash", name: `Synthetic ${role}`, role },
+      data: { username: `synthetic-order-customer-${role}`, password: "test-only-unused-hash", name: `Synthetic ${role}`, role: dbRole(role) },
     });
     tokens[role] = jwt.sign({ userId: user.id }, config.jwt.secret);
   }

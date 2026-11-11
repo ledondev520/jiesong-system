@@ -67,7 +67,7 @@ const CONFIG_DOMAIN_MAP = {
 // 汇率/加价只来自报价配置（config/pricing.json，经 /system/pricing-config）；普通 SystemConfig 不能再保存这两项。
 const PRICING_CONFIG_KEYS = ['exchangeRate', 'profitRate'];
 // Restricted company bank details are returned only to the roles that may already read bank evidence.
-const BANK_CONFIG_READ_ROLES = ['ADMIN', 'FINANCE'];
+const BANK_CONFIG_READ_ROLES = ['ADMIN'];
 // 旧 invoiceTitleInfo 文本可能含开户行及账号，按同一受限口径处理。
 const RESTRICTED_CONFIG_KEYS = ['companyBankInfo', 'invoiceTitleInfo'];
 

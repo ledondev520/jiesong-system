@@ -310,9 +310,9 @@ describe("ContractFiles", () => {
     download();
     await waitFor(() => expect(clickAnchor).toHaveBeenCalledTimes(1));
   });
-  it("老板保留原有阅读权限，不新增上传/删除动作", async () => {
+  it("停用角色（OD-8，如 BOSS）只读：没有上传/删除动作", async () => {
     useAuthStore.setState({
-      user: { id: "synthetic-boss", role: Role.BOSS } as never,
+      user: { id: "synthetic-boss", role: "BOSS" } as never,
     });
     render(fixture());
     expect(

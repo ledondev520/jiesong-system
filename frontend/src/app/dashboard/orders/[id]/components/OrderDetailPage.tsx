@@ -104,16 +104,10 @@ const ForexVerificationPanel = lazy(() =>
   })),
 );
 
-// 后端 POST /sales/:id/purchase-drafts 仅允许 ADMIN/PURCHASE
-const PURCHASE_DRAFT_ROLES: string[] = [Role.ADMIN, Role.PURCHASE];
-// 与后端 POST /sales/:id/items/:itemId/reprice 一致；WAREHOUSE 看不到金额（OD-3），BOSS 只读。
-const LINE_EDIT_ROLES: string[] = [
-  Role.ADMIN,
-  Role.PURCHASE,
-  Role.SALES,
-  Role.FINANCE,
-];
-// 仓库角色无账务读权限（后端 403），不展示收款/退税页签。
+// OD-8：生成采购单与改单行价格均为 ADMIN/SALES（与后端一致）
+const PURCHASE_DRAFT_ROLES: string[] = [Role.ADMIN, Role.SALES];
+const LINE_EDIT_ROLES: string[] = [Role.ADMIN, Role.SALES];
+// OD-8：SALES 无账务读权限（后端 403），不展示收款/退税页签。
 const FINANCE_TABS: string[] = ["receipts", "refund"];
 
 // Shared Axios rejects HTTP response DTOs; Error-only checks hide stock/RBAC guards.
@@ -134,7 +128,7 @@ export function OrderDetailPage({ id }: { id: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const role = useAuthStore((state) => state.user?.role);
-  const canViewFinance = role !== Role.WAREHOUSE;
+  const canViewFinance = role === Role.ADMIN;
   const [contract, setContract] = useState<SalesContract | null>(null);
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);

@@ -32,7 +32,7 @@ test('HTTP/SQLite: no WAREHOUSE JSON response on any GET route carries a forbidd
   fs.chmodSync(database, 0o600);
   db = require('../utils/prisma');
   const jwt = require('jsonwebtoken');
-  const user = await db.user.create({ data: { username: 'synthetic-wh-walk', password: 'test-only-unused-hash', name: '合成仓库', role: 'WAREHOUSE' } });
+  const user = await db.user.create({ data: { username: 'synthetic-wh-walk', password: 'test-only-unused-hash', name: '合成仓库', role: 'SALES' } });
   const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
 
   // Synthetic money-bearing rows (odd figures so a leak is unambiguous).

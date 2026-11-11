@@ -40,8 +40,10 @@ async function start() {
   const db = require('../utils/prisma');
   const users = {};
   const hash = await require('bcrypt').hash(password, 4);
-  for (const role of ['PURCHASE', 'WAREHOUSE', 'SALES', 'BOSS', 'FINANCE']) {
-    users[role] = await db.user.create({ data: { username: `synthetic-role-${role.toLowerCase()}`, name: `合成${role}`, role, password: hash } });
+  // OD-8 (2026-11-11): personas keep the old job names the browser specs use; each signs in with one of the two live roles.
+  const personaRoles = { PURCHASE: 'SALES', WAREHOUSE: 'SALES', SALES: 'SALES', FINANCE: 'ADMIN' };
+  for (const [persona, role] of Object.entries(personaRoles)) {
+    users[persona] = await db.user.create({ data: { username: `synthetic-role-${persona.toLowerCase()}`, name: `合成${persona}`, role, password: hash } });
   }
   if (scenario === 'notification-state') {
     // Only this scenario's signed-in user's existing rows; nullable links keep
@@ -176,7 +178,7 @@ async function start() {
     purchaseId: purchase.id, purchaseItemId: purchaseItem.id, productId: product.id,
     receiptId: receipt?.id, receiptItemId: receipt?.items[0].id, salesId: sale?.id, salesNo: sale?.contractNo,
     receiptPool, taxRecords, exportDocuments, salesHeader, dashboardSources,
-    users: Object.fromEntries(Object.entries(users).map(([role, user]) => [role, { id: user.id, username: user.username }])),
+    users: Object.fromEntries(Object.entries(users).map(([persona, user]) => [persona, { id: user.id, username: user.username, role: user.role }])),
   }));
   let closing = false;
   const close = async () => {

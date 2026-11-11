@@ -30,11 +30,11 @@ const cases = [
 ];
 
 for (const [label, target, name, service, method] of cases) {
-  test(`A59 OD-7：${label} 对 WAREHOUSE 去掉总额/已收/收款记录，保留状态`, async (t) => {
-    const wh = await call(t, target, name, service, method, 'WAREHOUSE');
+  test(`A59 OD-7：${label} 对 SALES（非 ADMIN）去掉总额/已收/收款记录，保留状态`, async (t) => {
+    const wh = await call(t, target, name, service, method, 'SALES');
     for (const key of ['totalAmount', 'receivedAmount', 'payments']) assert.equal(key in wh, false, key);
     assert.equal(wh.status, 'CONFIRMED');
-    const sa = await call(t, target, name, service, method, 'SALES');
+    const sa = await call(t, target, name, service, method, 'ADMIN');
     assert.equal(sa.totalAmount, 1234);
     assert.equal(sa.receivedAmount, 321);
     assert.equal(sa.payments.length, 1);

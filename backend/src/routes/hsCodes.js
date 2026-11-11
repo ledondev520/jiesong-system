@@ -151,7 +151,7 @@ router.get('/hsciq-usage', async (req, res, next) => {
  */
 router.put(
   '/:code',
-  roleAuth('ADMIN', 'PURCHASE', 'FINANCE'),
+  roleAuth('ADMIN', 'SALES'),
   withAuditLog(
     {
       entity: 'HsCode',
@@ -205,7 +205,7 @@ router.get('/:code', async (req, res, next) => {
  */
 router.post(
   '/:code/fill-declaration',
-  roleAuth(ROLE_SETS.OPERATORS),
+  roleAuth(ROLE_SETS.ALL),
   async (req, res, next) => {
     try {
       const { productDescription, productName } = req.body;
@@ -320,7 +320,7 @@ router.post(
  * Body: { productNames: string[] }
  * 思路：开放给 SALES/PURCHASE/FINANCE 等角色，一键生成三张表时无需 ADMIN
  */
-router.post('/batch-match', roleAuth(ROLE_SETS.OPERATORS), async (req, res, next) => {
+router.post('/batch-match', roleAuth(ROLE_SETS.ALL), async (req, res, next) => {
   try {
     const { productNames } = req.body;
 
@@ -350,7 +350,7 @@ router.post('/batch-match', roleAuth(ROLE_SETS.OPERATORS), async (req, res, next
  */
 router.post(
   '/ai-recommend',
-  roleAuth(ROLE_SETS.OPERATORS),
+  roleAuth(ROLE_SETS.ALL),
   async (req, res, next) => {
   try {
     const { productDescription } = req.body;

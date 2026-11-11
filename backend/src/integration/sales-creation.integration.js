@@ -60,7 +60,8 @@ test('HTTP/SQLite：销售表头明细原子创建，同一请求重试不产生
   }
   const created = await call('POST', '/sales', payload, { key: 'synthetic-retry' });
   assert.equal(created.items.length, 2);
-  assert.equal(created.totalAmount, 18);
+  assert.equal('totalAmount' in created, false, 'OD-7: SALES never sees the contract total');
+  assert.equal((await db.salesContract.findUnique({ where: { id: created.id } })).totalAmount, 18);
   assert.equal(created.idempotentReplay, false);
   const committed = await counts();
   // 丢失成功响应后重放相同请求，直接返回同一合同及原子创建的明细。
@@ -91,7 +92,7 @@ test('HTTP/SQLite：销售表头明细原子创建，同一请求重试不产生
   await db.contractTemplate.update({ where: { id: template.id }, data: { items: JSON.stringify([item]) } });
   const fromTemplate = await call('POST', `/sales?templateId=${template.id}`, { exchangeRate: 7.2 }, { key: 'synthetic-template' });
   assert.equal(fromTemplate.items.length, 1);
-  assert.equal(fromTemplate.totalAmount, 6);
+  assert.equal((await db.salesContract.findUnique({ where: { id: fromTemplate.id } })).totalAmount, 6);
   for (const contractId of [created.id, concurrent[0].id]) {
     assert.equal(await db.operationLog.count({ where: { entity: 'SalesContract', entityId: contractId, action: 'CREATE' } }), 1,
       '相同请求的串行或并发重放不能重复记录业务新建成功');

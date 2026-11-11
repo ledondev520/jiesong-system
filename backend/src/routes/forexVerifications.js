@@ -27,21 +27,21 @@ router.get('/', withPaginationValidation, forexVerificationController.list);
 router.get('/:id', withIdValidation, forexVerificationController.getById);
 router.post(
   '/',
-  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  roleAuth(ROLE_SETS.ADMIN),
   forexFieldGuard,
   withAuditLog({ entity: 'ForexVerification', action: 'CREATE', model: 'forexVerification' }, forexVerificationController.create),
 );
 router.put(
   '/:id',
   withIdValidation,
-  roleAuth('ADMIN', 'SALES', 'FINANCE'),
+  roleAuth(ROLE_SETS.ADMIN),
   forexFieldGuard,
   withAuditLog({ entity: 'ForexVerification', action: 'UPDATE', model: 'forexVerification' }, forexVerificationController.update),
 );
 router.delete(
   '/:id',
   withIdValidation,
-  roleAuth(ROLE_SETS.FINANCE),
+  roleAuth(ROLE_SETS.ADMIN),
   withAuditLog({ entity: 'ForexVerification', action: 'DELETE', model: 'forexVerification' }, forexVerificationController.remove),
 );
 

@@ -105,10 +105,10 @@ describe("OrderOverviewTab 发运信息", () => {
   });
 });
 
-describe("OrderOverviewTab 金额（OD-3）", () => {
-  it("WAREHOUSE 不显示合同金额/已收款/未收款卡片，其他角色显示", async () => {
+describe("OrderOverviewTab 金额（OD-7）", () => {
+  it("SALES 不显示合同金额/已收款/未收款卡片，ADMIN 显示", async () => {
     const { useAuthStore } = await import("@/store/auth.store");
-    useAuthStore.setState({ user: { id: "w", role: "WAREHOUSE" } as never });
+    useAuthStore.setState({ user: { id: "s", role: "SALES" } as never });
     const { unmount } = render(
       <OrderOverviewTab
         contract={contract({
@@ -121,7 +121,7 @@ describe("OrderOverviewTab 金额（OD-3）", () => {
     expect(screen.queryByText("合同金额")).toBeNull();
     expect(screen.queryByText("已收款")).toBeNull();
     unmount();
-    useAuthStore.setState({ user: { id: "s", role: "SALES" } as never });
+    useAuthStore.setState({ user: { id: "a", role: "ADMIN" } as never });
     render(<OrderOverviewTab contract={contract({})} readiness={readiness} />);
     expect(screen.getByText("合同金额")).toBeInTheDocument();
   });
