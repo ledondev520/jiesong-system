@@ -12,6 +12,7 @@ const MONEY_KEYS = new Set([
 ]);
 
 const NO_KEEP = new Set();
+const PURCHASE_NESTS = new Set(['purchaseItem', 'purchaseItems', 'purchaseContract', 'purchaseContracts']);
 // A98 default-on: the OD-6 route exemptions that keep some money keys visible to WAREHOUSE (path relative to /api/v1).
 const WAREHOUSE_EXEMPTIONS = [
   ['/customs-declarations', ['totalAmount', 'unitPrice', 'totalPrice']], // OD-6: customs declared values
@@ -35,6 +36,8 @@ const walk = (node, keep = NO_KEEP) => {
   const inventoryCost = 'totalCost' in node && 'averageCost' in node;
   Object.keys(node).forEach((key) => {
     if (keep.has(key)) { copy[key] = walk(node[key], keep); return; }
+    // A98: an exemption never reaches into nested purchase records (CNY purchase prices, OD-2)
+    if (PURCHASE_NESTS.has(key)) { copy[key] = walk(node[key]); return; }
     if (MONEY_KEYS.has(key) && !(inventoryCost && key === 'totalCost')) return;
     if (key === 'invoiceNo') { copy.invoiceCount = countInvoices(node[key]); return; }
     if (key === 'invoiceNumbers') { copy.invoiceNumberCount = countInvoices(node[key]); return; }

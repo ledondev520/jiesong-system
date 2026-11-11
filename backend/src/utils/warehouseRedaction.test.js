@@ -215,4 +215,6 @@ test('A98 exemptions: customs keeps declared values, sales keeps USD line prices
   assert.deepEqual(run('/forex-verifications'), { items: [{ invoiceCount: 1 }] });
   assert.deepEqual(run('/salesx'), { items: [{ invoiceCount: 1 }] }, 'prefix match is per path segment');
   assert.equal(redactWarehouseMoney('ADMIN', body, warehouseExemptKeys('/forex-verifications')), body);
+  const nested = { items: [{ unitPrice: 2, purchaseItem: { unitPrice: 7, totalPrice: 8, purchaseContract: { totalAmount: 9 } } }] };
+  assert.deepEqual(redactWarehouseMoney('WAREHOUSE', nested, warehouseExemptKeys('/sales/x')), { items: [{ unitPrice: 2, purchaseItem: { purchaseContract: {} } }] });
 });
