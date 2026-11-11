@@ -97,7 +97,7 @@ test('真实SQLite：分批验货幂等、并发限量、故障回滚与老板�
   for (const [method, url, expected] of [
     ['GET', `/api/v1/purchases/${contract.id}/receipts`, 200], ['GET', '/api/v1/finance/stats', 200],
     ['POST', `/api/v1/purchases/${contract.id}/receipts`, 403], ['POST', '/api/v1/finance/payments', 403],
-    ['POST', '/api/v1/ai/chat', 403], ['POST', '/mcp', 403], ['GET', '/api/v1/purchases/export', 403],
+    ['POST', '/api/v1/ai/chat', 403], ['GET', '/api/v1/purchases/export', 403],
     ['GET', '/api/v1/finance/statements/evidence/documents', 403], ['GET', '/api/v1/auth/users', 403],
   ]) {
     const response = await fetch(`${base}${url}`, { method, headers: { authorization, 'Content-Type': 'application/json' }, ...(method === 'POST' ? { body: '{}' } : {}) });

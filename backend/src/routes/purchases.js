@@ -10,7 +10,6 @@ const { Router } = require('express');
 const purchaseController = require('../controllers/purchaseController');
 const purchaseReceiptController = require('../controllers/purchaseReceiptController');
 const { authenticate, roleAuth } = require('../middleware/auth');
-const { accessAuth } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { upload } = require('../utils/upload');
 const { purchaseExcelUpload } = require('../utils/purchaseExcelUpload');
@@ -40,10 +39,7 @@ router.get('/:id/invoice-preparation', withIdValidation, purchaseController.getI
 router.put(
   '/:id/invoice-numbers',
   withIdValidation,
-  accessAuth({
-    roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'],
-    capabilities: ['purchase.update'],
-  }),
+  roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
   withAuditLog({
     entity: 'PurchaseContract',
     action: 'REGISTER_SUPPLIER_INVOICE',
@@ -79,7 +75,7 @@ router.get('/:id', withIdValidation, purchaseController.getById);
 // POST /api/v1/purchases - 创建采购合同
 router.post('/', [
   body('supplierId').notEmpty().withMessage('供应商ID不能为空'),
-], accessAuth({ roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'], capabilities: ['purchase.create'] }), handleValidation, withAuditLog(
+], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
   {
     entity: 'PurchaseContract',
     action: 'CREATE',
@@ -90,7 +86,7 @@ router.post('/', [
 ));
 
 // PUT /api/v1/purchases/:id - 更新采购合同
-router.put('/:id', withIdValidation, accessAuth({ roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'], capabilities: ['purchase.update'] }), withAuditLog(
+router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
   { entity: 'PurchaseContract', action: 'UPDATE', model: 'purchaseContract' },
   purchaseController.update
 ));
@@ -108,10 +104,7 @@ router.post('/:id/items', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES
 ));
 
 // PUT /api/v1/purchases/:id/production-details - 批量保存生产规格、箱数、重量、体积与箱体尺寸
-router.put('/:id/production-details', withIdValidation, accessAuth({
-  roles: ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'],
-  capabilities: ['purchase.update'],
-}), purchaseController.updateProductionDetails);
+router.put('/:id/production-details', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseController.updateProductionDetails);
 
 // PUT /api/v1/purchases/:id/status - 更新合同状态
 router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(

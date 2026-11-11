@@ -20,7 +20,6 @@ test.describe("settings sections", () => {
       ["报价规则", "/dashboard/settings"],
       ["账号管理", "/dashboard/settings/users"],
       ["公司信息", "/dashboard/settings/company"],
-      ["AI 接入", "/dashboard/settings/ai-access"],
       ["AI 用量", "/dashboard/settings/ai-usage"],
       ["系统日志", "/dashboard/settings/logs"],
     ]) {
@@ -35,7 +34,7 @@ test.describe("settings sections", () => {
     ["/dashboard/users", "/dashboard/settings/users"],
     ["/dashboard/system/logs", "/dashboard/settings/logs"],
     ["/dashboard/system/notifications", "/dashboard/notifications"],
-    ["/dashboard/about", "/dashboard/settings/ai-access"],
+    ["/dashboard/about", "/dashboard/settings/ai-usage"],
     ["/dashboard/ai/sessions", "/dashboard/settings/ai-usage"],
   ]) {
     test(`${oldPath} redirects to ${newPath}`, async ({ page }) => {

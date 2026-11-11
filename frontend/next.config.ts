@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
       { source: '/dashboard/system', destination: '/dashboard/settings', permanent: true },
       { source: '/dashboard/system/logs', destination: '/dashboard/settings/logs', permanent: true },
       { source: '/dashboard/system/notifications', destination: '/dashboard/notifications', permanent: true },
-      { source: '/dashboard/about', destination: '/dashboard/settings/ai-access', permanent: true },
+      { source: '/dashboard/about', destination: '/dashboard/settings/ai-usage', permanent: true },
       { source: '/dashboard/ai/sessions', destination: '/dashboard/settings/ai-usage', permanent: true },
     ];
   },

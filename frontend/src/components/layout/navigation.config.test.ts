@@ -114,7 +114,6 @@ describe("navigation.config helpers", () => {
       "/dashboard/settings/ai-usage": "admin",
       "/dashboard/settings/users": "admin",
       "/dashboard/settings/logs": "admin",
-      "/dashboard/settings/ai-access": "admin",
     };
     for (const [path, key] of Object.entries(owner))
       expect(getModuleByPath(path)?.key, path).toBe(key);

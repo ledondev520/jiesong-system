@@ -39,7 +39,6 @@ export const routes = [
   "/dashboard/settings/logs",
   "/dashboard/notifications",
   "/dashboard/settings/ai-usage",
-  "/dashboard/settings/ai-access",
   "/dashboard/settings/ports",
   "/dashboard/settings/categories",
   "/dashboard/settings/customs-brokers",
