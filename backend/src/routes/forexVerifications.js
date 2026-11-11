@@ -7,6 +7,7 @@
 const { Router } = require('express');
 const forexVerificationController = require('../controllers/forexVerificationController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -40,7 +41,7 @@ router.put(
 router.delete(
   '/:id',
   withIdValidation,
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.FINANCE),
   withAuditLog({ entity: 'ForexVerification', action: 'DELETE', model: 'forexVerification' }, forexVerificationController.remove),
 );
 

@@ -8,6 +8,7 @@ const { Router } = require('express');
 const purchaseController = require('../controllers/purchaseController');
 const purchaseReceiptController = require('../controllers/purchaseReceiptController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { upload } = require('../utils/upload');
 const { purchaseExcelUpload } = require('../utils/purchaseExcelUpload');
@@ -19,10 +20,10 @@ const router = Router();
 router.use(authenticate);
 
 // GET /api/v1/purchases/export - 导出采购合同 Excel
-router.get('/export', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS'), purchaseImportExportController.exportExcel);
+router.get('/export', roleAuth(ROLE_SETS.EVERYONE), purchaseImportExportController.exportExcel);
 
 // POST /api/v1/purchases/import - 批量导入采购合同 Excel
-router.post('/import', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseExcelUpload.single('file'), purchaseImportExportController.importExcel);
+router.post('/import', roleAuth(ROLE_SETS.OPERATORS), purchaseExcelUpload.single('file'), purchaseImportExportController.importExcel);
 
 // GET /api/v1/purchases - 获取采购合同列表
 router.get('/', withPaginationValidation, purchaseController.list);
@@ -96,7 +97,7 @@ router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE'), withAudit
 ));
 
 // POST /api/v1/purchases/:id/items - 添加采购明细
-router.post('/:id/items', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.post('/:id/items', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'PurchaseItem', action: 'CREATE', model: 'purchaseItem' },
   purchaseController.addItem
 ));
@@ -105,13 +106,13 @@ router.post('/:id/items', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES
 router.put('/:id/production-details', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseController.updateProductionDetails);
 
 // PUT /api/v1/purchases/:id/status - 更新合同状态
-router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id/status', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'PurchaseContract', action: 'UPDATE', model: 'purchaseContract' },
   purchaseController.updateStatus
 ));
 
 // POST /api/v1/purchases/:id/files - 上传合同文件
-router.post('/:id/files', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), upload.single('file'), withAuditLog(
+router.post('/:id/files', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), upload.single('file'), withAuditLog(
   { entity: 'ContractFile', action: 'CREATE', model: 'contractFile' },
   purchaseController.uploadFile
 ));
@@ -120,7 +121,7 @@ router.post('/:id/files', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES
 router.get('/:id/files', withIdValidation, purchaseController.getFiles);
 
 // DELETE /api/v1/purchases/files/:fileId - 删除合同文件
-router.delete('/files/:fileId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.delete('/files/:fileId', roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'ContractFile', action: 'DELETE', model: 'contractFile', idParam: 'fileId' },
   purchaseController.deleteFile
 ));
@@ -129,9 +130,9 @@ router.delete('/files/:fileId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE'
 router.get('/files/:fileId/download', purchaseController.downloadFile);
 
 // GET /api/v1/purchases/price-history/:productId - 获取商品历史采购价格统计
-router.get('/price-history/:productId', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE', 'BOSS'), purchaseController.getProductPriceHistory);
+router.get('/price-history/:productId', roleAuth(ROLE_SETS.EVERYONE), purchaseController.getProductPriceHistory);
 
 // POST /api/v1/purchases/suppliers-by-products - 根据商品获取曾供应过的供应商
-router.post('/suppliers-by-products', roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), purchaseController.getSuppliersByProducts);
+router.post('/suppliers-by-products', roleAuth(ROLE_SETS.OPERATORS), purchaseController.getSuppliersByProducts);
 
 module.exports = router;

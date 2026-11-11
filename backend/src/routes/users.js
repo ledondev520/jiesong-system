@@ -7,6 +7,7 @@
 const { Router } = require('express');
 const userController = require('../controllers/userController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, passwordRule, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -14,7 +15,7 @@ const router = Router();
 
 // 所有用户路由需要认证且仅管理员可访问
 router.use(authenticate);
-router.use(roleAuth('ADMIN'));
+router.use(roleAuth(ROLE_SETS.ADMIN));
 
 // GET /api/v1/users - 获取用户列表
 router.get('/', withPaginationValidation, userController.list);

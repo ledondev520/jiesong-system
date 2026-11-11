@@ -11,6 +11,7 @@ const financialStatementsController = require('../controllers/financialStatement
 const financialEvidenceController = require('../controllers/financialEvidenceController');
 const financeMatchController = require('../controllers/financeMatchController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 const { createError } = require('../middleware/errorHandler');
@@ -49,7 +50,7 @@ const router = Router();
 // 收款池分配/自动匹配保留 SALES（既有且有回归测试的业务流程）；PURCHASE/WAREHOUSE 移除
 // WAREHOUSE 无任何账务读权限；账期报表（含工资汇总）与 /unmatched（含银行流水）仅 ADMIN/FINANCE/BOSS
 const financeRead = roleAuth('ADMIN', 'FINANCE', 'BOSS', 'SALES', 'PURCHASE');
-const statementsRead = roleAuth('ADMIN', 'FINANCE', 'BOSS');
+const statementsRead = roleAuth(ROLE_SETS.FINANCE_READ);
 // 付款登记：财务/管理员不限；采购只能登记应付付款，销售只能登记应收收款
 const PAYABLE_TYPES = ['PAYABLE', 'PAYABLE_PAYMENT'];
 const RECEIVABLE_TYPES = ['RECEIVABLE', 'RECEIVABLE_RECEIPT', 'RECEIVABLE_RECEIPT_ALLOCATED', 'RECEIVABLE_COLLECTION'];
@@ -72,7 +73,7 @@ router.post('/payments', [
   body('amount').custom((v) => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(Number(v)) && Number(v) > 0)
     .withMessage('金额必须是大于 0 的有效数字'),
   body('paymentDate').notEmpty().withMessage('付款日期不能为空'),
-], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE'), paymentTypeByRole, handleValidation, withAuditLog(
+], roleAuth(ROLE_SETS.COMMERCIAL), paymentTypeByRole, handleValidation, withAuditLog(
   { entity: 'Payment', action: 'CREATE', model: 'payment' },
   financeController.createPayment
 ));
@@ -89,7 +90,7 @@ router.get('/stats', financeRead, financeController.getStats);
 // GET /api/v1/finance/receivable-reconciliation - 美元经营应收与会计应收差异桥接
 router.get(
   '/receivable-reconciliation',
-  roleAuth('ADMIN', 'FINANCE', 'BOSS'),
+  roleAuth(ROLE_SETS.FINANCE_READ),
   financeController.getReceivableReconciliation,
 );
 
@@ -122,14 +123,14 @@ router.post(
 router.get('/statements/analytics', statementsRead, financialStatementsController.getAnalytics);
 
 // 财务资料库包含工资、社保和税务结构化行，只允许财务角色下钻。
-router.get('/statements/evidence/summary', roleAuth('ADMIN', 'FINANCE'), financialEvidenceController.getSummary);
-router.get('/statements/evidence/documents', roleAuth('ADMIN', 'FINANCE'), financialEvidenceController.listDocuments);
-router.get('/statements/evidence/documents/:id', roleAuth('ADMIN', 'FINANCE'), financialEvidenceController.getDocument);
+router.get('/statements/evidence/summary', roleAuth(ROLE_SETS.FINANCE), financialEvidenceController.getSummary);
+router.get('/statements/evidence/documents', roleAuth(ROLE_SETS.FINANCE), financialEvidenceController.listDocuments);
+router.get('/statements/evidence/documents/:id', roleAuth(ROLE_SETS.FINANCE), financialEvidenceController.getDocument);
 
 // POST /api/v1/finance/statements/import-file/preview - 只读解析，不写数据库
 router.post(
   '/statements/import-file/preview',
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.FINANCE),
   excelUpload.single('file'),
   financialStatementsController.previewFile,
 );
@@ -137,7 +138,7 @@ router.post(
 // POST /api/v1/finance/statements/import-file/confirm - 携预览凭证确认写入
 router.post(
   '/statements/import-file/confirm',
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.FINANCE),
   excelUpload.single('file'),
   financialStatementsController.confirmFile,
 );
@@ -145,7 +146,7 @@ router.post(
 // POST /api/v1/finance/statements/import-bundle/preview - 三类来源只读解析
 router.post(
   '/statements/import-bundle/preview',
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.FINANCE),
   financialBundleUpload.fields(bundleFields),
   financialStatementsController.previewBundle,
 );
@@ -153,7 +154,7 @@ router.post(
 // POST /api/v1/finance/statements/import-bundle/confirm - 三类来源单事务确认写入
 router.post(
   '/statements/import-bundle/confirm',
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.FINANCE),
   financialBundleUpload.fields(bundleFields),
   financialStatementsController.confirmBundle,
 );
@@ -169,7 +170,7 @@ router.get('/statements/:year/:month', statementsRead, financialStatementsContro
 // POST /api/v1/finance/auto-match - 触发自动匹配
 router.post(
   '/auto-match',
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.FINANCE),
   financeMatchController.autoMatch
 );
 
@@ -182,21 +183,21 @@ router.get('/contracts-for-match', financeRead, financeMatchController.listContr
 // POST /api/v1/finance/match - 人工确认关联
 router.post(
   '/match',
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.FINANCE),
   financeMatchController.manualMatch
 );
 
 // POST /api/v1/finance/unmatch - 解除关联
 router.post(
   '/unmatch',
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.FINANCE),
   financeMatchController.unmatch
 );
 
 // POST /api/v1/finance/ignore - 忽略该项
 router.post(
   '/ignore',
-  roleAuth('ADMIN', 'FINANCE'),
+  roleAuth(ROLE_SETS.FINANCE),
   financeMatchController.ignore
 );
 

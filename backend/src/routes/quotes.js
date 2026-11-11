@@ -8,6 +8,7 @@ const { Router } = require('express');
 const quoteController = require('../controllers/quoteController');
 const quoteExportController = require('../controllers/quoteExportController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -19,9 +20,9 @@ router.get('/', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'BOSS'), withP
 
 router.get('/:id', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE', 'BOSS'), withIdValidation, quoteController.getById);
 
-router.get('/:id/export.xlsx', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE'), withIdValidation, quoteExportController.exportXlsx);
+router.get('/:id/export.xlsx', roleAuth(ROLE_SETS.COMMERCIAL), withIdValidation, quoteExportController.exportXlsx);
 
-router.get('/:id/print', roleAuth('ADMIN', 'SALES', 'PURCHASE', 'FINANCE'), withIdValidation, quoteExportController.printView);
+router.get('/:id/print', roleAuth(ROLE_SETS.COMMERCIAL), withIdValidation, quoteExportController.printView);
 
 router.post('/', roleAuth('ADMIN', 'SALES'), withAuditLog(
   { entity: 'Quote', action: 'CREATE', model: 'quote' },

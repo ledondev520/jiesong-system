@@ -7,12 +7,13 @@
 const { Router } = require('express');
 const fileController = require('../controllers/fileController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { contractUpload } = require('../utils/upload');
 const { withAuditLog } = require('../middleware/auditLog');
 const { param, handleValidation } = require('../utils/validators');
 
 const router = Router();
-const WRITE_ROLES = ['ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'];
+const WRITE_ROLES = ROLE_SETS.OPERATORS;
 const withContractIdValidation = [
   param('contractId').notEmpty().withMessage('合同ID不能为空').isString().withMessage('合同ID格式无效'),
   handleValidation,

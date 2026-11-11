@@ -214,7 +214,8 @@ export function ForexVerificationPanel({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {record.bankName || "未登记银行"} · 到账 {record.currency}{" "}
-                  {record.receivedAmount.toLocaleString()} · 结汇{" "}
+                  {/* WAREHOUSE responses omit receivedAmount (A98) */}
+                  {record.receivedAmount?.toLocaleString() ?? "无权查看"} · 结汇{" "}
                   {record.settledAmount ?? "未登记"} · 汇率{" "}
                   {record.exchangeRate ?? "未登记"}
                 </p>

@@ -7,6 +7,7 @@
 const { Router } = require('express');
 const contractTemplateController = require('../controllers/contractTemplateController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -21,7 +22,7 @@ router.get('/', contractTemplateController.list);
 router.post('/', [
   body('name').notEmpty().withMessage('模板名称不能为空'),
   body('type').notEmpty().withMessage('模板类型不能为空'),
-], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+], roleAuth(ROLE_SETS.OPERATORS), handleValidation, withAuditLog(
   { entity: 'ContractTemplate', action: 'CREATE', model: 'contractTemplate' },
   contractTemplateController.create
 ));
@@ -30,7 +31,7 @@ router.post('/', [
 router.get('/:id', withIdValidation, contractTemplateController.getById);
 
 // DELETE /api/v1/contract-templates/:id - 删除模板
-router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'ContractTemplate', action: 'DELETE', model: 'contractTemplate' },
   contractTemplateController.remove
 ));

@@ -7,7 +7,7 @@ export interface ForexVerification {
   customsDeclarationId?: string | null;
   bankName?: string | null;
   currency: string;
-  receivedAmount: number;
+  receivedAmount?: number; // omitted for WAREHOUSE (A98)
   settledAmount?: number | null;
   exchangeRate?: number | null;
   verifiedAt?: string | null;

@@ -8,6 +8,7 @@ const { Router } = require('express');
 const authController = require('../controllers/authController');
 const { validateLogin, validateRegister, validateResetPassword, validateChangePassword, passwordRule, emailRule, handleValidation } = require('../utils/validators');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withAuditLog } = require('../middleware/auditLog');
 const { strictRateLimit } = require('../middleware/rateLimit');
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
@@ -93,7 +94,7 @@ router.post('/reset-password',
 router.post(
   '/register',
   authenticate,
-  roleAuth('ADMIN'),
+  roleAuth(ROLE_SETS.ADMIN),
   validateRegister,
   handleValidation,
   withAuditLog(
@@ -118,7 +119,7 @@ router.post(
   '/change-password',
   authenticate,
   validateChangePassword, handleValidation,
-  roleAuth('ADMIN', 'BOSS', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'),
+  roleAuth(ROLE_SETS.EVERYONE),
   withAuditLog(
     {
       entity: 'User',
@@ -134,13 +135,13 @@ router.post(
 );
 
 // GET /api/v1/auth/users - 获取用户列表（仅管理员）
-router.get('/users', authenticate, roleAuth('ADMIN'), authController.getUsers);
+router.get('/users', authenticate, roleAuth(ROLE_SETS.ADMIN), authController.getUsers);
 
 // PUT /api/v1/auth/users/:id - 更新用户（仅管理员）
 router.put(
   '/users/:id',
   authenticate,
-  roleAuth('ADMIN'),
+  roleAuth(ROLE_SETS.ADMIN),
   withAuditLog(
     { entity: 'User', action: 'UPDATE', model: 'user' },
     authController.updateUser

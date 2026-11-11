@@ -7,6 +7,7 @@
 const { Router } = require('express');
 const productController = require('../controllers/productController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -23,19 +24,19 @@ router.get('/:id', withIdValidation, productController.getById);
 // POST /api/v1/products - 创建商品
 router.post('/', [
   body('customsName').notEmpty().withMessage('报关名不能为空'),
-], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+], roleAuth(ROLE_SETS.OPERATORS), handleValidation, withAuditLog(
   { entity: 'Product', action: 'CREATE', model: 'product' },
   productController.create
 ));
 
 // PUT /api/v1/products/:id - 更新商品
-router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'Product', action: 'UPDATE', model: 'product' },
   productController.update
 ));
 
 // DELETE /api/v1/products/:id - 删除商品
-router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'Product', action: 'DELETE', model: 'product' },
   productController.remove
 ));
@@ -44,7 +45,7 @@ router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', '
 router.get('/:id/suppliers', withIdValidation, productController.getSuppliers);
 
 // POST /api/v1/products/:id/suppliers - 关联供应商
-router.post('/:id/suppliers', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.post('/:id/suppliers', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'ProductSupplier', action: 'CREATE', model: 'productSupplier' },
   productController.addSupplier
 ));
@@ -59,7 +60,7 @@ router.get('/:id/price-history', withIdValidation, productController.getPriceHis
 router.post('/:id/price-history', [
   withIdValidation,
   body('price').isFloat({ min: 0 }).withMessage('价格必须为正数'),
-], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+], roleAuth(ROLE_SETS.OPERATORS), handleValidation, withAuditLog(
   { entity: 'PriceHistory', action: 'CREATE', model: 'priceHistory' },
   productController.recordPrice
 ));

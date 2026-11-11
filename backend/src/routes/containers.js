@@ -7,6 +7,7 @@
 const { Router } = require('express');
 const containerController = require('../controllers/containerController');
 const { authenticate, roleAuth } = require('../middleware/auth');
+const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
@@ -26,19 +27,19 @@ router.get('/:id', withIdValidation, containerController.getById);
 // POST /api/v1/containers - 创建货柜
 router.post('/', [
   body('portId').notEmpty().withMessage('港口ID不能为空'),
-], roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), handleValidation, withAuditLog(
+], roleAuth(ROLE_SETS.OPERATORS), handleValidation, withAuditLog(
   { entity: 'Container', action: 'CREATE', model: 'salesContract' },
   containerController.create
 ));
 
 // PUT /api/v1/containers/:id - 更新货柜
-router.put('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'Container', action: 'UPDATE', model: 'salesContract' },
   containerController.update
 ));
 
 // DELETE /api/v1/containers/:id - 删除货柜
-router.delete('/:id', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'Container', action: 'DELETE', model: 'salesContract' },
   containerController.remove
 ));
@@ -50,25 +51,25 @@ router.get('/:id/items', withIdValidation, containerController.listItems);
 router.get('/:id/items/summary', withIdValidation, containerController.getItemsSummary);
 
 // POST /api/v1/containers/:id/items - 添加装箱明细
-router.post('/:id/items', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.post('/:id/items', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'ContainerItem', action: 'CREATE', model: 'packingItem' },
   containerController.addItem
 ));
 
 // PUT /api/v1/containers/:id/items/:itemId - 更新装箱明细
-router.put('/:id/items/:itemId', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id/items/:itemId', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'ContainerItem', action: 'UPDATE', model: 'packingItem', idParam: 'itemId' },
   containerController.updateItem
 ));
 
 // DELETE /api/v1/containers/:id/items/:itemId - 删除装箱明细
-router.delete('/:id/items/:itemId', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.delete('/:id/items/:itemId', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'ContainerItem', action: 'DELETE', model: 'packingItem', idParam: 'itemId' },
   containerController.removeItem
 ));
 
 // PUT /api/v1/containers/:id/status - 更新货柜状态
-router.put('/:id/status', withIdValidation, roleAuth('ADMIN', 'PURCHASE', 'SALES', 'FINANCE', 'WAREHOUSE'), withAuditLog(
+router.put('/:id/status', withIdValidation, roleAuth(ROLE_SETS.OPERATORS), withAuditLog(
   { entity: 'Container', action: 'UPDATE', model: 'salesContract' },
   containerController.updateStatus
 ));
