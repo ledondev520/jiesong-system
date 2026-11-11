@@ -33,7 +33,7 @@ const pageCases: PageCase[] = [
   { name: "采购创建", path: "/dashboard/purchases/new", minClicks: 0 },
   { name: "采购详情", path: "/dashboard/purchases/pc-001", minClicks: 0 },
   { name: "出口订单", path: "/dashboard/orders" },
-  { name: "出口创建", path: "/dashboard/sales/create", minClicks: 0 },
+  { name: "出口创建", path: "/dashboard/orders/new", minClicks: 0 },
   { name: "商品档案", path: "/dashboard/products" },
   { name: "库存", path: "/dashboard/inventory", minClicks: 0 },
   { name: "设置", path: "/dashboard/settings", minClicks: 0 },

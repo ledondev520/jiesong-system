@@ -18,7 +18,7 @@ export const routes = [
   "/dashboard/products",
   "/dashboard/inventory",
   "/dashboard/sales",
-  "/dashboard/sales/create",
+  "/dashboard/orders/new",
   "/dashboard/sales/sc-001",
   "/dashboard/customs",
   "/dashboard/customs?view=customs",

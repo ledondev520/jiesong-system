@@ -21,7 +21,6 @@ const pricingPreviewRoutes = require('./pricing');
 const productRoutes = require('./products');
 const purchaseRoutes = require('./purchases');
 const salesRoutes = require('./sales');
-const containerRoutes = require('./containers');
 // 注意：Container 已合并到 SalesContract，不再单独使用
 const inventoryRoutes = require('./inventory');
 const financeRoutes = require('./finance');
@@ -69,7 +68,6 @@ router.use('/pricing', pricingPreviewRoutes);
 router.use('/products', productRoutes);
 router.use('/purchases', purchaseRoutes);
 router.use('/sales', salesRoutes); // 出口合同管理（含货柜/装箱功能）
-router.use('/containers', containerRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/finance', financeRoutes);
 router.use('/system', systemRoutes);

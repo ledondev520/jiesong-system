@@ -94,10 +94,6 @@
       "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
     },
     {
-      "key": "backend/src/routes/auth.js PUT /users/:id",
-      "reason": "认证、会话及公开验证码入口，需保留限流与身份撤销专用测试后再迁移"
-    },
-    {
       "key": "backend/src/routes/bankFlow.js POST /import/preview",
       "reason": "银行资料为受限数据，需用脱敏导入夹具覆盖事务与读回"
     },
@@ -120,26 +116,6 @@
     {
       "key": "backend/src/routes/batchImport.routes.js POST /purchase",
       "reason": "batchImport.routes存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/containers.js POST /",
-      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/containers.js PUT /:id",
-      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/containers.js POST /:id/items",
-      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/containers.js PUT /:id/items/:itemId",
-      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/containers.js PUT /:id/status",
-      "reason": "containers存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
     },
     {
       "key": "backend/src/routes/contractDoc.js POST /template",

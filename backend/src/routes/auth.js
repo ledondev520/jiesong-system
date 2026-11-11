@@ -138,15 +138,4 @@ router.post(
 // GET /api/v1/auth/users - 获取用户列表（仅管理员）
 router.get('/users', authenticate, roleAuth('ADMIN'), authController.getUsers);
 
-// PUT /api/v1/auth/users/:id - 更新用户（仅管理员）
-router.put(
-  '/users/:id',
-  authenticate,
-  roleAuth('ADMIN'),
-  withAuditLog(
-    { entity: 'User', action: 'UPDATE', model: 'user' },
-    authController.updateUser
-  )
-);
-
 module.exports = router;

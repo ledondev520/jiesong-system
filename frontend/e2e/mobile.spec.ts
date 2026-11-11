@@ -93,42 +93,6 @@ test.describe("手机核心操作", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  test("出口两步表单、日期选择、必填校验与装箱编辑", async ({ page }) => {
-    await signInAsAdmin(page, "/dashboard/sales/create");
-    await page.getByRole("button", { name: "签订日期", exact: true }).click();
-    await expect(page.locator('[data-slot="popover-content"]')).toBeVisible();
-    await expectFitsViewport(page);
-    await page.keyboard.press("Escape");
-    await page
-      .getByRole("button", { name: "下一步：出口明细", exact: true })
-      .click();
-    await expect(
-      page.getByRole("button", { name: "创建合同", exact: true }),
-    ).toBeVisible();
-    await expectFitsViewport(page);
-    await page.getByRole("button", { name: "创建合同", exact: true }).click();
-    await expect(
-      page.getByText("请选择商品", { exact: true }).last(),
-    ).toBeVisible();
-    await page.goto("/dashboard/sales/sc-001?tab=container");
-    await page
-      .getByRole("button", { name: "编辑 不锈钢门", exact: true })
-      .click();
-    const dialog = page.getByRole("dialog");
-    await expect(
-      dialog.getByRole("button", { name: "保存", exact: true }),
-    ).toBeVisible();
-    await dialog
-      .getByRole("button", { name: "保存", exact: true })
-      .scrollIntoViewIfNeeded();
-    await expectFitsViewport(page);
-    await dialog.getByRole("button", { name: "取消", exact: true }).click();
-    for (const name of ["明细", "单证", "收款", "货柜"]) {
-      await page.getByRole("tab", { name, exact: true }).click();
-      await expectFitsViewport(page);
-    }
-  });
-
   test("采购供应商选择与手机档案定位", async ({ page }) => {
     await signInAsAdmin(page, "/dashboard/purchases/new");
     await page.getByRole("combobox", { name: "商品 *", exact: true }).click();

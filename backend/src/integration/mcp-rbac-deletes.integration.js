@@ -240,7 +240,7 @@ test('HTTP/SQLite: MCP write roles, actor attribution, purchase/supplier delete 
     const matched = await make();
     const batch = await db.financeDataBatch.create({ data: { type: 'BANK_FLOW', fileName: 'synthetic-dg.csv', recordCount: 1 } });
     await db.bankTransaction.create({ data: { batchId: batch.id, txnTime: '2026-01-01 10:00:00', txnDate: '2026-01-01', amount: 1, direction: 'IN', matchedContractId: matched.id, matchedContractType: 'SALES' } });
-    for (const base of ['/sales', '/containers']) {
+    for (const base of ['/sales']) {
       for (const c of [paid, matched]) assert.equal((await send('DELETE', `${base}/${c.id}`, 'ADMIN')).status, 409, `${base} ${c.id}`);
     }
     assert.equal((await db.payment.findUnique({ where: { id: pay.id } })).salesContractId, paid.id);

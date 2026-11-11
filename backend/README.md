@@ -103,7 +103,6 @@ Authorization: Bearer <token>
 | 商品 | `/api/v1/products` | 商品 CRUD + 分类 |
 | 采购 | `/api/v1/purchases` | 采购合同管理 |
 | 销售 | `/api/v1/sales` | 出口合同管理 |
-| 货柜 | `/api/v1/containers` | 货柜管理 |
 | 库存 | `/api/v1/inventory` | 库存查询和状态变更 |
 | 财务 | `/api/v1/finance` | 付款记录和账款查询 |
 | 系统 | `/api/v1/system` | 系统配置/日志/通知 |

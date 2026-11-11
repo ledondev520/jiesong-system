@@ -57,10 +57,10 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
   }
   const call = async (worker, sale, action) => {
     const url = action.kind === 'payment' ? '/finance/payments'
-      : `/${action.root || 'sales'}/${sale.id}${action.kind === 'header' ? '' : '/status'}`;
+      : `/${action.root || 'sales'}/${sale.id}/status`;
     const body = action.kind === 'payment'
       ? { type: 'RECEIVABLE_COLLECTION', salesContractId: sale.id, amount: 180, currency: 'USD', paymentDate: '2026-10-01' }
-      : { status: action.status, ...(action.kind === 'header' ? { note: 'synthetic stale metadata' } : {}) };
+      : { status: action.status };
     const response = await fetch(worker.base + url, {
       method: action.kind === 'payment' ? 'POST' : 'PUT',
       headers: { authorization: `Bearer ${users[action.role || 'SALES']}`, 'content-type': 'application/json' },
@@ -121,7 +121,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
   for (const [first, second] of [['CANCELLED', 'SHIPPED'], ['SHIPPED', 'CANCELLED']]) {
     await t.test(`${first} queued against ${second}: first valid terminal decision wins`, async () => {
       const sale = await fixture();
-      const { results, reads } = await race(sale, [status(first, 'sales'), status(second, 'containers', 'WAREHOUSE')]);
+      const { results, reads } = await race(sale, [status(first, 'sales'), status(second, 'sales', 'WAREHOUSE')]);
       assert.deepEqual(results.map(result => result.status), [200, 400]);
       assert.deepEqual(reads.map(read => read.status), ['PACKING', first]);
       await assertState(sale, first);
@@ -135,7 +135,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
   ]) {
     await t.test(`packing: ${first} versus ${second} cannot skip lifecycle evidence`, async () => {
       const sale = await fixture();
-      const { results } = await race(sale, [status(first, 'containers', 'WAREHOUSE'), status(second)]);
+      const { results } = await race(sale, [status(first, 'sales', 'WAREHOUSE'), status(second)]);
       assert.deepEqual(results.map(result => result.status), codes);
       await assertState(sale, expected, results.find(result => result.data?.shippedAt)?.data.shippedAt);
     });
@@ -147,7 +147,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
     await t.test(`shipped: ${first} versus ${second} keeps one allocation and timestamp`, async () => {
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
-      const { results } = await race(sale, [status(first), status(second, 'containers', 'WAREHOUSE')]);
+      const { results } = await race(sale, [status(first), status(second, 'sales', 'WAREHOUSE')]);
       assert.deepEqual(results.map(result => result.status), codes);
       await assertState(sale, 'ARRIVED', timestamp);
     });
@@ -156,7 +156,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
     await t.test(`${firstKind} first: arrival and synthetic settlement converge without losing ledger`, async () => {
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
-      const arrival = status('ARRIVED', 'containers', 'WAREHOUSE');
+      const arrival = status('ARRIVED', 'sales', 'WAREHOUSE');
       const payment = { kind: 'payment', role: 'SALES' };
       const actions = firstKind === 'arrival' ? [arrival, payment] : [payment, arrival];
       const { results } = await race(sale, actions);
@@ -168,7 +168,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
     await t.test(`${firstKind} first: shipment replay and settlement preserve pending arrival`, async () => {
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
-      const shipment = status('SHIPPED', 'containers', 'WAREHOUSE');
+      const shipment = status('SHIPPED', 'sales', 'WAREHOUSE');
       const payment = { kind: 'payment' };
       const actions = firstKind === 'shipment' ? [shipment, payment] : [payment, shipment];
       const { results } = await race(sale, actions);
@@ -181,7 +181,7 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
       assert.equal((await call(workers[0], sale, status('ARRIVED'))).status, 200);
-      const arrival = status('ARRIVED', 'containers', 'WAREHOUSE');
+      const arrival = status('ARRIVED', 'sales', 'WAREHOUSE');
       const payment = { kind: 'payment' };
       const actions = firstKind === 'arrival' ? [arrival, payment] : [payment, arrival];
       const { results } = await race(sale, actions);
@@ -197,12 +197,12 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
       assert.equal((await call(workers[0], sale, { kind: 'payment' })).status, 201);
-      const { results } = await race(sale, [status(first, 'containers', 'WAREHOUSE'), status(second)]);
+      const { results } = await race(sale, [status(first, 'sales', 'WAREHOUSE'), status(second)]);
       assert.deepEqual(results.map(result => result.status), codes);
       await assertState(sale, 'COMPLETED', timestamp, 1);
     });
   }
-  for (const root of ['sales', 'containers']) {
+  for (const root of ['sales']) {
     await t.test(`stale ${root} PACKING request queued behind arrival cannot reverse shipment`, async () => {
       const sale = await fixture();
       const timestamp = await prepareShipped(sale);
@@ -212,12 +212,4 @@ test('HTTP/SQLite: different concurrent sales lifecycle actions preserve invaria
       await assertState(sale, 'ARRIVED', timestamp);
     });
   }
-  await t.test('stale full legacy header queued behind shipment rejects all fields atomically', async () => {
-    const sale = await fixture();
-    const { results, reads } = await race(sale, [status('SHIPPED'), { kind: 'header', root: 'containers', status: 'PACKING', role: 'WAREHOUSE' }]);
-    assert.deepEqual(results.map(result => result.status), [200, 400]);
-    assert.deepEqual(reads.map(read => read.status), ['PACKING', 'SHIPPED']);
-    const contract = await assertState(sale, 'SHIPPED', results[0].data.shippedAt);
-    assert.equal(contract.note, null);
-  });
 });
