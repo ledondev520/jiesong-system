@@ -159,3 +159,21 @@ describe("Excel 出三单", () => {
     expect(saveBlob).not.toHaveBeenCalled();
   });
 });
+
+it("原生拖放支持单个xlsx，拒绝多文件和错误格式", async () => {
+  previewExcel.mockReset().mockResolvedValue({ data: result() });
+  generateExcel.mockReset().mockResolvedValue(new Blob(["xlsx"]));
+  render(<ExportPacketExcelDialog open onOpenChange={vi.fn()} />);
+  const dropArea = screen.getByText("拖入 Excel，或点击选择文件");
+  fireEvent.drop(dropArea, { dataTransfer: { files: [file(), file()] } });
+  expect(previewExcel).not.toHaveBeenCalled();
+  expect(
+    screen.getByText("请上传一个不超过10MB的 .xlsx 文件"),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("上传出货汇总Excel"), {
+    target: { files: [new File(["bad"], "bad.csv")] },
+  });
+  expect(previewExcel).not.toHaveBeenCalled();
+  fireEvent.drop(dropArea, { dataTransfer: { files: [file()] } });
+  await waitFor(() => expect(previewExcel).toHaveBeenCalledTimes(1));
+});

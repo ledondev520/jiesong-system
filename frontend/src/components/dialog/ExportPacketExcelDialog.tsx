@@ -6,7 +6,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useDropzone } from "react-dropzone";
 import { FileSpreadsheet, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -152,19 +151,19 @@ export function ExportPacketExcelDialog({
     setDirty(false);
     void read(source, {}, true);
   };
-  const dropzone = useDropzone({
-    accept: {
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
-        ".xlsx",
-      ],
-    },
-    maxFiles: 1,
-    maxSize: 10 * 1024 * 1024,
-    onDropAccepted: (files) => {
-      if (files[0]) onFile(files[0]);
-    },
-    onDropRejected: () => setError("请上传一个不超过10MB的 .xlsx 文件"),
-  });
+  const acceptFiles = (files: FileList | null) => {
+    const source = files?.[0];
+    if (
+      !source ||
+      files?.length !== 1 ||
+      !/\.xlsx$/i.test(source.name) ||
+      source.size > 10 * 1024 * 1024
+    ) {
+      setError("请上传一个不超过10MB的 .xlsx 文件");
+      return;
+    }
+    onFile(source);
+  };
   const update = (key: keyof ExcelPacketInput, value: string | number) => {
     setInput((current) => ({ ...current, [key]: value }));
     setDirty(true);
@@ -220,12 +219,26 @@ export function ExportPacketExcelDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-          <div
-            {...dropzone.getRootProps()}
-            className="cursor-pointer rounded-lg border-2 border-dashed p-6 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          <label
+            htmlFor="excel-packet-file"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={(event) => {
+              event.preventDefault();
+              acceptFiles(event.dataTransfer.files);
+            }}
+            className="block cursor-pointer rounded-lg border-2 border-dashed p-6 text-center focus-within:outline focus-within:outline-2 focus-within:outline-ring"
           >
             <input
-              {...dropzone.getInputProps({ "aria-label": "上传出货汇总Excel" })}
+              id="excel-packet-file"
+              name="shipmentWorkbook"
+              type="file"
+              accept=".xlsx"
+              className="sr-only"
+              aria-label="上传出货汇总Excel"
+              onChange={(event) => {
+                acceptFiles(event.target.files);
+                event.target.value = "";
+              }}
             />
             <Upload className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
             <p className="text-sm">
@@ -234,7 +247,7 @@ export function ExportPacketExcelDialog({
             <p className="mt-1 text-xs text-muted-foreground">
               .xlsx，最大10MB
             </p>
-          </div>
+          </label>
           {busy && (
             <p role="status" className="flex items-center gap-2 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />

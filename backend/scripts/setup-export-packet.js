@@ -3,6 +3,8 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 process.chdir(path.resolve(__dirname, '..'));
+const { resolveWpsUploadRoot } = require('./wps-upload-dir');
+process.env.UPLOAD_DIR = resolveWpsUploadRoot({ backendDir: process.cwd() });
 const { loadWorkbook, readCell, templateSheets, installProfile, loadProfile, todayInShanghai } = require('../src/services/exportPacketExcelService');
 
 const readDbf = (buffer) => {

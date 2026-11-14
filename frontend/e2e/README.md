@@ -75,3 +75,5 @@ home-todos.spec.ts：首页待办卡片（合成只读 API，390/1440px），无
 - E2E-PREP 对齐（无浏览器执行，仅静态核对）：`helpers.ts` 合成路由补 `GET /sales/:id/loading-plan`（订单详情的货柜页签与发运门槛 fail-closed，缺它会显示「装柜计划加载失败」）；`real-export-3d.spec.ts` 在 <768px 断言 2D 装柜图（无 canvas）、1440px 回到 520px 高的 3D 画布，页签返回用「明细」；`quote-to-order`/`order-editor` 的落点是 `/dashboard/orders/:id`，订单合计按整美元向上取整为 $20,000.00；`dashboard-return-context` 的经营分析地址是 `/dashboard/finance/analysis`，发运销售明细经 `/dashboard/sales` 重定向落在 `/dashboard/orders`。浏览器结果仍以 hosted CI 为准。
 
 - `landing.spec.ts`：公开落地页 `/`（匿名访客不再被转去登录；CTA 去 `/login`、`/register`；已登录会话转去 `/dashboard`；320/390/1440px 无横向滚动）。
+
+出口定价验收按2026-11-14确认的分档就近取整：订单建议价样例为2000美元，商业三单低价样例为2美元；原有人工价及已保存单据仍保持原值。Excel入口使用原生文件选择/拖放，覆盖扩展名、多文件和大小边界。
