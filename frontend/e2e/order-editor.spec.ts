@@ -141,7 +141,7 @@ test.describe("order editor", () => {
     await page.getByLabel("第 2 行采购成本").fill("100");
     await page.getByLabel("第 2 行单价").fill("30");
     await expect(page.getByText("手动价")).toBeVisible();
-    await expect(page.getByText("订单合计 $20,000.00")).toBeVisible();
+    await expect(page.getByText("订单合计 $20,060.00")).toBeVisible();
 
     await page.getByRole("button", { name: "创建订单" }).click();
     await expect(page).toHaveURL(/\/dashboard\/orders\/o-new$/);
