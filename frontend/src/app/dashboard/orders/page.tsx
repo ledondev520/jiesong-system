@@ -8,7 +8,8 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { FileSpreadsheet, Plus } from "lucide-react";
+import { ExportPacketExcelDialog } from "@/components/dialog/ExportPacketExcelDialog";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AmountText } from "@/components/ui/amount-text";
 import { Button } from "@/components/ui/button";
@@ -176,6 +177,7 @@ function OrdersList() {
   }, [load]);
 
   // OD-7：非 ADMIN 只看状态，后端不返回金额，列表也不显示金额列。
+  const [excelOpen, setExcelOpen] = useState(false);
   const showAmounts = useAuthStore((state) => state.user?.role) === "ADMIN";
   const columns: DataTableColumn<OrderRow>[] = [
     {
@@ -269,11 +271,20 @@ function OrdersList() {
 
   return (
     <div className="space-y-5">
+      {showAmounts && (
+        <ExportPacketExcelDialog open={excelOpen} onOpenChange={setExcelOpen} />
+      )}
       <PageHeader
         title="出口订单"
         description="管理客户出口订单、装柜发运进度与单证归档"
         actions={
           <BusinessWrite>
+            {showAmounts && (
+              <Button variant="outline" onClick={() => setExcelOpen(true)}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Excel 出三单
+              </Button>
+            )}
             <Button
               className="h-10 rounded-xl"
               onClick={() => router.push("/dashboard/orders/new")}

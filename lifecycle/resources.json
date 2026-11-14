@@ -75,6 +75,20 @@
       }
     },
     {
+      "id": "excel-packet-preview",
+      "kind": "action",
+      "routeFile": "backend/src/routes/sales.js",
+      "routes": ["POST /export-packet/excel/preview"],
+      "test": "backend/src/routes/sales.test.js"
+    },
+    {
+      "id": "excel-packet-generate",
+      "kind": "action",
+      "routeFile": "backend/src/routes/sales.js",
+      "routes": ["POST /export-packet/excel/generate"],
+      "test": "backend/src/routes/sales.test.js"
+    },
+    {
       "id": "sales-purchase-drafts",
       "kind": "action",
       "routeFile": "backend/src/routes/sales.js",

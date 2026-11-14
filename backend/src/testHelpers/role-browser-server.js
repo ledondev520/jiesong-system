@@ -15,7 +15,7 @@ const password = 'test-only-role-browser-password-never-production';
 if (process.env.NODE_ENV !== 'test' || !process.send
   || !directory?.startsWith(path.join(os.tmpdir(), 'jiesong-role-browser-e2e-'))
   || fs.realpathSync(directory) !== directory
-  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state', 'tax-record-forms', 'menu-export-documents', 'sales-header', 'dashboard-sources'].includes(scenario)
+  || !['purchase', 'warehouse', 'sales', 'boss', 'receipt-pool', 'notification-state', 'tax-record-forms', 'menu-export-documents', 'excel-export', 'sales-header', 'dashboard-sources'].includes(scenario)
   || fs.existsSync(path.resolve(__dirname, '../../.env'))) process.exit(2);
 process.umask(0o077);
 fs.chmodSync(directory, 0o700);
@@ -29,7 +29,7 @@ process.env.JWT_SECRET = 'test-only-role-browser-jwt-secret-never-production';
  * @throws 迁移、合成资料构建或服务启动失败
  */
 async function start() {
-  if (['tax-record-forms', 'menu-export-documents', 'sales-header', 'dashboard-sources'].includes(scenario)) {
+  if (['tax-record-forms', 'menu-export-documents', 'excel-export', 'sales-header', 'dashboard-sources'].includes(scenario)) {
     // These form/document/dashboard scenarios use committed migrations, never db push or
     // client generation: a copy of the once-built migrated template (sqlite-template.js).
     copyTemplate('deploy', path.join(directory, 'synthetic.db'));
@@ -67,6 +67,25 @@ async function start() {
       specification: '合成箱', boxes: 10, grossWeight: 40000, netWeight: 38000, volume: 10, length: 1000, width: 1000, height: 1000 } },
   }, include: { items: true } });
   const purchaseItem = purchase.items[0];
+  if (scenario === 'excel-export') {
+    // Only the external quote is deterministic; upload, parsing, pricing and XLSX HTTP remain real.
+    require('../controllers/system/configController').fetchUsdCnyRate = async () => 6.8;
+    const { installProfile, todayInShanghai } = require('../services/exportPacketExcelService');
+    require('../services/exportPacketExcelService').fetchCurrentRefundVersion = async () => 'TEST';
+    const ExcelJS = require('exceljs'); const template = new ExcelJS.Workbook();
+    for (const name of ['合同', '发票', '箱单']) {
+      const sheet = template.addWorksheet(name);
+      sheet.getCell('A1').value = 'SYNTHETIC EXPORTER'; sheet.getCell('A8').value = 'Item';
+      sheet.getCell('B5').value = '合成卖方'; sheet.getCell('B6').value = 'Synthetic Buyer';
+      sheet.getCell('A26').value = name === '箱单' ? 'SELLER:' : 'Synthetic delivery terms';
+      sheet.getCell('A28').value = 'Trade term: FOB'; sheet.getCell('A30').value = 'Packing: To be packed in CARTON.';
+      sheet.pageSetup = { paperSize: 9, orientation: 'portrait', printArea: name === '箱单' ? 'A1:H27' : 'A1:F44' };
+    }
+    await installProfile({ version: 1, defaults: { sellerName: '合成卖方', buyerName: 'Synthetic Buyer', tradeTerm: 'FOB', packageKind: 'CARTON' },
+      goods: [{ name: '合成铺饭机', hsCode: '9999999999', declaration: '0|0|食品加工|无品牌|TEST|||', origin: '合成货源地' }], quotes: [],
+      refundLibrary: { version: 'TEST', checkedAt: todayInShanghai(), records: [{ code: '99999999', rate: 13, startDate: '20200101', endDate: '21001231' }] },
+      templateBase64: Buffer.from(await template.xlsx.writeBuffer()).toString('base64') });
+  }
   const dashboardSources = scenario === 'dashboard-sources'
     ? require('./dashboard-source-seed').seedDashboardSources(path.join(directory, 'synthetic.db'), {
         productId: product.id, supplierId: supplier.id, portId: port.id,

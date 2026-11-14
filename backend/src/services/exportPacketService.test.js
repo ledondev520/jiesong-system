@@ -228,3 +228,25 @@ test('persistExportPacket 已锁定：不写 packingItem/合同，工作簿总�
   await workbook.xlsx.load(await buildExportPacketWorkbook(result.packet));
   assert.equal(workbook.getWorksheet('商业发票').getCell(10 + 1, 8).value, 990);
 });
+
+
+test('两种利润率分别按成本和收入作为分母', () => {
+  const packet = evaluateExportPacket(contract(), readiness(), [], options());
+  assert.equal(packet.summary.revenueCny, 8580);
+  assert.equal(packet.summary.grossProfitCny, 1980);
+  assert.equal(packet.summary.costMarkupRate, 0.3);
+  assert.equal(packet.summary.salesGrossMarginRate, 1980 / 8580);
+});
+
+
+test('同品名同规格的人工历史价优先按门店匹配，未区分的冲突历史不猜价', () => {
+  const base = { productId: 'product-1', productName: '测试商品', specification: '100*200*300', contractNo: 'EXP990003', date: '2026-11-14', confirmed: true };
+  const quotes = [{ ...base, storeName: '门店甲', unitPriceUsd: 125 }, { ...base, storeName: '门店乙', unitPriceUsd: 90 }];
+  const c = contract(); c.packingItems[0].store.name = '门店乙';
+  const result = evaluateExportPacket(c, readiness(), quotes, options());
+  assert.equal(result.lines[0].unitPriceUsd, 90);
+  assert.equal(result.lines[0].pricingSource, 'history');
+  assert(result.issues.some((issue) => issue.code === 'CONFIRMED_PRICE_OUTSIDE_POLICY'));
+  const ambiguous = evaluateExportPacket(c, readiness(), quotes.map(({ storeName, ...quote }) => quote), options());
+  assert.equal(ambiguous.lines[0].pricingSource, 'formula');
+});
