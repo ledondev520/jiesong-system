@@ -73,11 +73,15 @@ const loadWorkbook = async (buffer) => {
     if (entries.length > 2000 || entries.reduce((sum, entry) => sum + entry.header.size, 0) > 60 * 1024 * 1024) {
       throw createError('Excel 解压后超过允许的大小', 400);
     }
-    for (const entry of entries.filter((item) => /^xl\/worksheets\/[^/]+\.xml$/.test(item.entryName))) {
+    for (const entry of entries.filter((item) => item.entryName === 'xl/workbook.xml' || /^xl\/worksheets\/[^/]+\.xml$/.test(item.entryName))) {
       const parser = new SaxesParser();
       parser.on('doctype', () => { throw createError('Excel 不支持DTD', 400); });
       parser.on('opentag', ({ name, attributes }) => {
         const tag = name.split(':').pop();
+        if (entry.entryName === 'xl/workbook.xml') {
+          if (tag === 'sheet' && (!/^\d+$/.test(attributes.sheetId || '') || Number(attributes.sheetId) < 1 || Number(attributes.sheetId) > 65535)) throw createError('Excel 工作表编号超出限制', 400);
+          return;
+        }
         const range = tag === 'mergeCell' || tag === 'dimension' ? attributes.ref : tag === 'c' ? attributes.r : null;
         if (range) assertSafeWorksheetRange({ '!ref': range }, { maxRows: 5001, maxCols: 100, maxCells: 500100 });
         if (tag === 'row' && Number(attributes.r) > 5001 || tag === 'col' && Number(attributes.max) > 16384) throw createError('Excel 超出行列限制', 400);

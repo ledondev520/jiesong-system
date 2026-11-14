@@ -151,3 +151,17 @@ test('稀疏超限坐标在Excel模型分配前拒绝', async () => {
   zip.updateFile('xl/worksheets/sheet1.xml', Buffer.from(xml));
   await assert.rejects(() => parseShipmentWorkbook(zip.toBuffer()), /范围|限制/);
 });
+
+
+test('异常工作表编号在分配Excel模型前拒绝，解析不能挂起', async () => {
+  const { spawnSync } = require('node:child_process'); const path = require('node:path');
+  const AdmZip = require('adm-zip'); const zip = new AdmZip(await workbook([row()]));
+  zip.updateFile('xl/workbook.xml', Buffer.from(zip.readAsText('xl/workbook.xml').replace('sheetId="1"', 'sheetId="2147483647"')));
+  const child = spawnSync(process.execPath, ['--max-old-space-size=128', '-e', `
+    require('./src/services/exportPacketExcelService').loadWorkbook(require('fs').readFileSync(0))
+      .then(() => process.exit(1))
+      .catch(error => { require('node:assert/strict').match(error.message, /工作表编号超出限制/); });
+  `], { cwd: path.resolve(__dirname, '../..'), input: zip.toBuffer(), timeout: 5000, env: { ...process.env, NODE_ENV: 'test', JWT_SECRET: 'test-only-workbook-boundary-never-production' } });
+  assert.equal(child.error, undefined, '解析必须在超时前明确拒绝');
+  assert.equal(child.status, 0);
+});
