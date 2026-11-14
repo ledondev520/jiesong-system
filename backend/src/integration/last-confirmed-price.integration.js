@@ -48,20 +48,20 @@ test('last confirmed price pre-fills repeat products; new products use the formu
     lines: [repeat, draftOnly, brandNew].map((p) => ({ productId: p.id, costCny: 10000 })), ...extra,
   })).results.map((r) => [r.unitPriceUsd, r.source]);
 
-  // A manual price on a DRAFT quote does not count yet; the formula applies (13000 / 6.52 = 1993.87 → 1994).
+  // A manual price on a DRAFT quote does not count yet; the formula applies (13000 / 6.52 = 1993.87 → 2000).
   await ok('POST', '/quotes', { items: [line({ productId: draftOnly.id, isManualPrice: true, unitPrice: 3000 })] });
-  assert.deepEqual(await preview(), [[1994, 'RULE'], [1994, 'RULE'], [1994, 'RULE']]);
+  assert.deepEqual(await preview(), [[2000, 'RULE'], [2000, 'RULE'], [2000, 'RULE']]);
 
   // Once the quote is SENT its manual price becomes the next pre-fill; the formula price stays beside it, and the line is not "manual".
   const sentQuote = await ok('POST', '/quotes', { items: [line({ isManualPrice: true, unitPrice: 2500.5 })] });
   await ok('PUT', `/quotes/${sentQuote.id}`, { status: 'SENT' });
-  assert.deepEqual(await preview(), [[2500.5, 'LAST_CONFIRMED'], [1994, 'RULE'], [1994, 'RULE']]);
+  assert.deepEqual(await preview(), [[2500.5, 'LAST_CONFIRMED'], [2000, 'RULE'], [2000, 'RULE']]);
   const detail = (await ok('POST', '/pricing/preview', { lines: [{ productId: repeat.id, costCny: 10000 }] })).results[0];
-  assert.deepEqual([detail.formulaPriceUsd, detail.status], [1994, 'OK']);
+  assert.deepEqual([detail.formulaPriceUsd, detail.status], [2000, 'OK']);
   const next = (await ok('POST', '/quotes', { items: [line(), line({ productId: brandNew.id }), line({ isManualPrice: true, unitPrice: 1 })] })).items;
-  assert.deepEqual(next.map((i) => [i.unitPrice, i.formulaPrice, i.isManualPrice]), [[2500.5, 1994, false], [1994, 1994, false], [1, 1994, true]]);
+  assert.deepEqual(next.map((i) => [i.unitPrice, i.formulaPrice, i.isManualPrice]), [[2500.5, 2000, false], [2000, 2000, false], [1, 2000, true]]);
   // The document being edited is excluded from its own pre-fill.
-  assert.deepEqual((await preview({ excludeQuoteId: sentQuote.id }))[0], [1994, 'RULE']);
+  assert.deepEqual((await preview({ excludeQuoteId: sentQuote.id }))[0], [2000, 'RULE']);
 
   // An order that left DRAFT and is newer than the quote wins; DRAFT orders never count.
   const order = async (status, price) => db.salesContract.create({ data: {
@@ -92,5 +92,5 @@ test('last confirmed price pre-fills repeat products; new products use the formu
     { productId: brandNew.id, storeId: storeA.id, quantity: 1, costPrice: 10000, unit: 'PCS' },
     { productId: brandNew.id, storeId: storeA.id, quantity: 1, costPrice: 10000, unit: 'PCS', sellingPrice: 77 },
   ] });
-  assert.deepEqual(created.items.map((i) => i.sellingPrice).sort((a, b) => a - b), [77, 1994, 2600]);
+  assert.deepEqual(created.items.map((i) => i.sellingPrice).sort((a, b) => a - b), [77, 2000, 2600]);
 });

@@ -245,7 +245,7 @@ function AdminPricingConfigCard() {
         <CardTitle>报价规则</CardTitle>
         <CardDescription>
           单价 = 采购成本(¥) × (1 + 加价) ÷ (现汇 +
-          调整)，向上取整到整美元（1993.87→1994，6.50→7）。老商品默认取上次确认价，只有新商品才用此公式。普通商品用默认加价，分类可单独设置（含其子分类）。已保存的订单和报价不会被重新计算。
+          调整)，按原始美元单价分档就近取整：＜10步长0.5，10–100步长5，100–5000步长50，≥5000步长1000。中点向上，最低正单价0.5美元；偏离目标加价超过5个百分点时提示。老商品默认取上次确认价，只有新商品才用此公式。普通商品用默认加价，分类可单独设置（含其子分类）。已保存的订单和报价不会被重新计算。
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -389,6 +389,16 @@ function AdminPricingConfigCard() {
                   aria-label="报价预览"
                 >
                   <p>成本 ¥100（普通） → {fmt(preview.normal?.unitPriceUsd)}</p>
+                  {preview.normal?.roundingWarning && (
+                    <p role="status" className="text-amber-700">
+                      {preview.normal.roundingWarning}
+                    </p>
+                  )}
+                  {preview.tile?.roundingWarning && (
+                    <p role="status" className="text-amber-700">
+                      {preview.tile.roundingWarning}
+                    </p>
+                  )}
                   {sample && (
                     <p>
                       成本 ¥100（{sample.categoryName || "分类"}） →{" "}

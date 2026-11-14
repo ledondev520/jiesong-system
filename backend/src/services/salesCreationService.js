@@ -70,7 +70,7 @@ const normalizeCreation = (data) => {
   };
 };
 
-/** 未给售价的明细：老商品取上次确认价，新商品按唯一报价规则（分类加价、现汇 + 调整、向上取整）定价；规则无法定价时拒绝。 */
+/** 未给售价的明细：老商品取上次确认价，新商品按唯一报价规则（分类加价、现汇 + 调整、分档就近取整）定价；规则无法定价时拒绝。 */
 const withRulePrices = async (input, db) => {
   if (!input.items.some(item => item.sellingPrice === undefined)) return input.items;
   const unpriced = input.items.filter(item => item.sellingPrice === undefined).map(item => item.productId);

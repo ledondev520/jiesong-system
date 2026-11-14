@@ -17,9 +17,9 @@ test('旧 tiered 取可退税加价为默认加价，multiplier 取 乘数-1，�
   assert.equal(convertPricingConfig({ ...oldTiered, mode: 'multiplier', multiplier: 1.4 }, 7).defaultMarkup, 0.4);
 });
 
-test('转换结果满足负责人例子：成本 10000 @ 现汇 6.72 → 1994（只向上取整，不再取 5 的倍数）', () => {
+test('转换结果满足负责人例子：成本 10000 @ 现汇 6.72 → 2000（按50美元步长就近取整）', () => {
   const converted = convertPricingConfig(oldTiered, 6.72);
-  assert.equal(priceFor({ costCny: 10000, spotRate: 6.72 }, converted).unitPriceUsd, 1994);
+  assert.equal(priceFor({ costCny: 10000, spotRate: 6.72 }, converted).unitPriceUsd, 2000);
   assert.equal(converted.roundUpTo, undefined);
 });
 

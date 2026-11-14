@@ -223,3 +223,24 @@ describe("OrderEditor pricing (R1-2)", () => {
     expect(screen.getByRole("option", { name: "Store B" })).toBeInTheDocument();
   });
 });
+
+it("取整偏离只显示提示，允许提交；人工改价后撤下自动价提示", async () => {
+  const warning = "取整后成本加价率 50%，偏离目标 30% 超过5个百分点，请复核";
+  mocks.preview.mockResolvedValue({
+    data: {
+      spotRate: 6.72,
+      results: [
+        { unitPriceUsd: 1994, source: "RULE", roundingWarning: warning },
+      ],
+    },
+  });
+  render(<OrderEditor />);
+  await fillLine();
+  expect(screen.getByText(warning)).toBeInTheDocument();
+  submit();
+  await waitFor(() => expect(mocks.createWithItems).toHaveBeenCalledTimes(1));
+  fireEvent.change(screen.getByLabelText("第 1 行单价"), {
+    target: { value: "2600" },
+  });
+  expect(screen.queryByText(warning)).not.toBeInTheDocument();
+});

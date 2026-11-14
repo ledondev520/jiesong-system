@@ -1,7 +1,7 @@
 /**
  * Input: 报价配置与成本/分类/现汇
  * Output: priceFor 唯一规则的取整、浮点保护、缺成本、分类加价与负责人示例
- * Pos: 报价规则契约测试（UX 规范 §7.2；负责人 2026-11-01 PRICING-LASTPRICE：只向上取整到整美元，不再取 5 的倍数）
+ * Pos: 报价规则契约测试（UX 规范 §7.2；2026-11-14 确认：分档就近取整及非阻断利润提示）
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -14,60 +14,39 @@ const spec = {
   categoryMarkups: [{ categoryId: 'tile', categoryName: '瓷砖', markup: 0.1 }],
 };
 
-test('规范示例：普通 ×1.3、瓷砖 ×1.1，整美元向上取整', () => {
-  assert.equal(priceFor({ costCny: 100 }, spec).unitPriceUsd, 19); // 130/7.2=18.0556
-  assert.equal(priceFor({ costCny: 100, categoryIds: ['tile'] }, spec).unitPriceUsd, 16); // 110.00000000000001/7.2=15.2778
-  assert.equal(priceFor({ costCny: 55.38 }, spec).unitPriceUsd, 10); // 71.994/7.2=9.9992
+test('分档就近取整：档位边界、中点向上、浮点保护和最低正报价', () => {
+  for (const [raw, expected] of [
+    [0, 0], [-1, 0], [NaN, 0], [0.0001, 0.5], [0.2, 0.5], [1.25, 1.5], [1.707, 1.5], [2.63, 2.5],
+    [9.74, 9.5], [9.75, 10], [10, 10], [12.5, 15], [25.11, 25], [40.77, 40], [63.45, 65],
+    [99.99, 100], [100, 100], [125, 150], [191.53, 200], [888, 900], [999.99, 1000], [1000, 1000],
+    [1253, 1250], [1993.87, 2000], [4999.99, 5000], [5000, 5000], [5500, 6000], [7032, 7000], [9574, 10000],
+    [2.749999999999, 3], [100.0000000001, 100],
+  ]) assert.equal(roundUnitPrice(raw), expected, `raw ${raw}`);
 });
 
-test('浮点保护：恰好为整数的结果不被误进位', () => {
-  // 72×1.3=93.60000000000001，÷7.2=13.000000000000002，保护后仍为 13
-  assert.equal(priceFor({ costCny: 72 }, spec).unitPriceUsd, 13);
-  assert.equal(roundUnitPrice(19.0000001, 1), 19);
-  assert.equal(roundUnitPrice(19.000001, 1), 20);
-  assert.equal(roundUnitPrice(19, 1), 19);
-  assert.equal(roundUnitPrice(4.0000001, 5), 4); // 噪声不进位
-  assert.equal(roundUnitPrice(5.0000001, 5), 5); // 噪声不把 5.00 当成 6
+test('priceFor共用分档规则，偏离分类目标超过5个百分点只提示', () => {
+  const normal = priceFor({ costCny: 100 }, spec);
+  assert.equal(normal.unitPriceUsd, 20);
+  assert.match(normal.roundingWarning, /取整.*加价.*目标/);
+  const tile = priceFor({ costCny: 100, categoryIds: ['tile'] }, spec);
+  assert.equal(tile.unitPriceUsd, 15);
+  assert.equal(tile.roundingWarning, null);
+  const owner = priceFor({ costCny: 10000 }, { ...spec, exchangeRate: 6.72, exchangeAdjustment: -0.2 });
+  assert.equal(owner.unitPriceUsd, 2000);
+  assert.equal(owner.effectiveRate, 6.52);
+  assert.ok(Math.abs(owner.rawUnitPriceUsd - 1993.865) < 0.001);
+  assert.equal(owner.roundingWarning, null);
+  assert.equal(priceFor({ costCny: 100 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 20);
 });
 
-test('缺成本不给建议价：空、0、负数、非数字', () => {
+test('缺成本或汇率无效时仍不给建议价', () => {
   for (const costCny of [undefined, null, '', 0, -5, 'abc', NaN]) {
     const result = priceFor({ costCny }, spec);
     assert.equal(result.status, 'MISSING_COST');
     assert.equal(result.unitPriceUsd, null);
   }
-});
-
-test('现汇缺失或调整后非正数时拒绝报价，传入订单现汇时用订单现汇', () => {
-  assert.equal(priceFor({ costCny: 100, spotRate: 0 }, spec).status, 'INVALID_RATE');
-  assert.equal(priceFor({ costCny: 100, spotRate: 'x' }, spec).status, 'INVALID_RATE');
-  assert.equal(priceFor({ costCny: 100, spotRate: 3.6 }, spec).unitPriceUsd, 37); // 130/3.6=36.11
-});
-
-test('负责人示例：成本 10000 ¥、现汇 6.72、调整 -0.2 → 13000/6.52=1993.865', () => {
-  const owner = { ...spec, exchangeRate: 6.72, exchangeAdjustment: -0.2 };
-  const result = priceFor({ costCny: 10000 }, owner);
-  assert.equal(result.effectiveRate, 6.52);
-  assert.ok(Math.abs(result.rawUnitPriceUsd - 1993.865) < 0.001);
-  assert.equal(result.unitPriceUsd, 1994); // 只向上取整到整美元，不再取 5 的倍数
-});
-
-test('单价只向上取整到整美元：6.50→7，0.20→1，整数不变，浮点尾巴 19.0000000001→19', () => {
-  for (const [raw, expected] of [
-    [0.2, 1], [0.0001, 1], [1, 1], [4.01, 5], [5, 5], [5.01, 6], [6.5, 7], [7.4, 8], [19.0000000001, 19], [19.000001, 20],
-    [1993.87, 1994], [1994, 1994], [1995, 1995], [1996, 1996], [1998.2, 1999], [2000, 2000],
-  ]) assert.equal(roundUnitPrice(raw), expected, `raw ${raw}`);
-  assert.equal(roundUnitPrice(13000 / 6.52), 1994);
-  assert.equal(roundUnitPrice(11000 / 6.52), 1688);
-  assert.equal(roundUnitPrice(0), 0);
-});
-
-test('priceFor 经同一规则取整；旧 roundUpTo 键被忽略（线上旧文件仍带 5）', () => {
-  assert.equal(priceFor({ costCny: 100 }, spec).unitPriceUsd, 19);
-  assert.equal(priceFor({ costCny: 100 }, { ...spec, roundUpTo: 5 }).unitPriceUsd, 19);
-  assert.equal(priceFor({ costCny: 72 }, spec).unitPriceUsd, 13); // 浮点噪声 13.000000000000002 → 13
-  assert.equal(priceFor({ costCny: 0.2 * 7.2 / 1.3 }, spec).unitPriceUsd, 1);
-  assert.equal(Object.hasOwn(require('../../../config/pricing.json'), 'roundUpTo'), false);
+  for (const spotRate of [0, 'x']) assert.equal(priceFor({ costCny: 100, spotRate }, spec).status, 'INVALID_RATE');
+  assert.equal(priceFor({ costCny: 100, spotRate: 3.6 }, spec).unitPriceUsd, 35);
 });
 
 test('分类加价取最近已配置的祖先，否则默认加价', () => {

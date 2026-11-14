@@ -357,7 +357,7 @@ test('singleton update cannot bypass validated complete replacement', (t) => {
 });
 
 const actionEntry = (f) => {
-  const resource = f.registry.resources.find((r) => r.kind === 'action');
+  const resource = f.registry.resources.find((r) => r.id === 'sales-purchase-drafts');
   assert.ok(resource, 'an action resource must be registered');
   return resource;
 };

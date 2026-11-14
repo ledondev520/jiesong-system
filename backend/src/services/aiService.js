@@ -777,7 +777,7 @@ const generateLocalResponse = async (message) => {
       const cost = parseFloat(numbers[0]);
       const priced = priceFor({ costCny: cost });
       if (priced.status !== 'OK') return '请提供大于0的单位采购成本（人民币），我来帮您按报价规则计算售价。';
-      return `成本${cost}元，按报价规则（加价${Math.round(priced.markup * 100)}%、报价汇率${priced.effectiveRate}，单价向上取整）计算，推荐售价为 $${priced.unitPriceUsd}`;
+      return `成本${cost}元，按报价规则（加价${Math.round(priced.markup * 100)}%、报价汇率${priced.effectiveRate}，单价分档就近取整）计算，推荐售价为 $${priced.unitPriceUsd}${priced.roundingWarning ? `。${priced.roundingWarning}` : ''}`;
     }
     return '请告诉我成本价，我来帮您计算推荐售价。';
   }

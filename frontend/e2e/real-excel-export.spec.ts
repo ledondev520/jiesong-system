@@ -20,7 +20,7 @@ test.afterAll(async () => {
   if (fixture) await stopRoleFixture(fixture);
 });
 
-const excel = (multiple = false) =>
+const excel = (multiple = false, automatic = false) =>
   execFileSync(
     process.execPath,
     [
@@ -28,7 +28,7 @@ const excel = (multiple = false) =>
       `
 const ExcelJS=require('exceljs');(async()=>{const w=new ExcelJS.Workbook();const s=w.addWorksheet('出货总清单');
 s.addRow(['报关名','商品补充信息','数量','单位','规格','箱数','毛重','净重','体积','合同号','报关公司','采购金额','出口单价(USD)']);
-s.addRow(['合成铺饭机','两种设备及附件保持一条',4,'台','600*400*700',14,256,240,1.47,'EXP990001','捷淞',10000,600]);
+s.addRow(['合成铺饭机','两种设备及附件保持一条',4,'台',${automatic ? "'800*400*700'" : "'600*400*700'"},14,256,240,1.47,'EXP990001','捷淞',${automatic ? 2640 : 10000},${automatic ? "null" : 600}]);
 s.addRow(['合成他方货物','',2,'件','100*100*100',2,20,18,0.2,'EXP990001','其他厂家报关',100,10]);
 if(${multiple})s.addRow(['合成铺饭机','',4,'台','600*400*700',14,256,240,1.47,'EXP990002','捷淞',10000,600]);
 process.stdout.write(Buffer.from(await w.xlsx.writeBuffer()));})().catch(()=>process.exit(1));`,
@@ -177,4 +177,25 @@ test("多票选择后才生成；无登录和销售角色不能上传制单", as
     },
   );
   expect(forbidden.status()).toBe(403);
+});
+
+test("自动报价按分档就近取整，利润偏离提示不阻止下载", async ({ page }) => {
+  await forwardRealApi(page, fixture);
+  await loginAs(page, fixture, "FINANCE");
+  await page.goto("/dashboard/orders");
+  await page.getByRole("button", { name: "Excel 出三单", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Excel 出三单" });
+  const downloading = page.waitForEvent("download");
+  await dialog.getByLabel("上传出货汇总Excel").setInputFiles({
+    name: "automatic.xlsx",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    buffer: excel(false, true),
+  });
+  expect(await readDownload(await downloading)).toMatchObject({
+    total: 600,
+    invoice: 600,
+  });
+  await expect(dialog.getByText(/取整后成本加价率 50%/)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "下载三单" })).toBeEnabled();
 });

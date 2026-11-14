@@ -165,3 +165,14 @@ describe("报价规则卡片", () => {
     expect(await screen.findByLabelText("默认加价 (%)")).toBeInTheDocument();
   });
 });
+
+it("分档取整说明和服务端利润偏离提示可见，仍可保存", async () => {
+  const warning = "取整后成本加价率 40%，偏离目标 30% 超过5个百分点，请复核";
+  mocks.preview.mockResolvedValue(
+    ok({ status: "OK", unitPriceUsd: 20, roundingWarning: warning }),
+  );
+  render(<PricingConfigCard />);
+  expect(await screen.findByText(warning)).toBeInTheDocument();
+  expect(screen.getByText(/100–5000步长50/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "保存报价配置" })).toBeEnabled();
+});

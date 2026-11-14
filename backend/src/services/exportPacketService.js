@@ -148,14 +148,14 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
           totalUsd: round(formulaResult.unitPriceUsd * quantity, 4),
           rawUnitPriceUsd: formulaResult.rawUnitPriceUsd,
           rawTotalUsd: formulaResult.rawUnitPriceUsd * quantity,
-          roundingMethod: 'round_up_unit',
+          roundingMethod: 'tiered_nearest_unit',
         }
       : null;
 
     let unitPriceUsd = formula?.unitPriceUsd || 0;
     let totalUsd = formula?.totalUsd || 0;
     let pricingSource = 'formula';
-    let pricingReference = `目标加价 ${round(targetMarkup * 100, 6)}%，单价向上取整到整美元（老商品默认取上次确认价）`;
+    let pricingReference = `目标加价 ${round(targetMarkup * 100, 6)}%，单价按价位分档就近取整（老商品默认取上次确认价）`;
     let roundingMethod = formula?.roundingMethod || '';
     if (historical && (historical.confirmed || historicalCheck?.allowed)) {
       unitPriceUsd = historical.unitPriceUsd;
@@ -190,6 +190,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       pricingReference = '本票人工确认单价';
       roundingMethod = 'manual_confirmation';
     }
+    if (pricingSource === 'formula' && formulaResult?.roundingWarning) lineIssues.push(makeIssue('ROUNDING_MARKUP_DEVIATION', 'warning', formulaResult.roundingWarning, item.id, productName));
     const markup = effectiveRate > 0 && purchaseCostCny > 0
       ? realizedMarkup(unitPriceUsd, quantity, effectiveRate, purchaseCostCny)
       : null;

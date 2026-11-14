@@ -1,6 +1,6 @@
 /**
  * Input: POST /pricing/preview 的 lines（costCny + productId 或 categoryId）与可选订单现汇 spotRate
- * Output: 每行的建议单价：老商品取上次确认价（source LAST_CONFIRMED），否则 priceFor 公式（RULE，向上取整到整美元）；formulaPriceUsd 恒为公式价
+ * Output: 每行的建议单价：老商品取上次确认价（source LAST_CONFIRMED），否则 priceFor 公式（RULE，按价位分档就近取整）；formulaPriceUsd 恒为公式价
  * Pos: 订单编辑器的实时报价预览；只读计算，不写库、不暴露 pricing.json 内容，仅 ADMIN/SALES/PURCHASE
  */
 const prisma = require('../utils/prisma');
@@ -40,7 +40,7 @@ const previewLines = async (req, res, next) => {
       }, config);
       const confirmed = last.get(line.productId);
       return { index, status: confirmed ? 'OK' : priced.status, unitPriceUsd: confirmed ? confirmed.price : priced.unitPriceUsd,
-        formulaPriceUsd: priced.unitPriceUsd, source: confirmed ? 'LAST_CONFIRMED' : 'RULE', markup: priced.markup ?? null, effectiveRate: priced.effectiveRate ?? null };
+        roundingWarning: confirmed ? null : priced.roundingWarning ?? null, formulaPriceUsd: priced.unitPriceUsd, source: confirmed ? 'LAST_CONFIRMED' : 'RULE', markup: priced.markup ?? null, effectiveRate: priced.effectiveRate ?? null };
     });
     res.set('Cache-Control', 'no-store');
     // spotRate = 实际使用的现汇（未指定时为规则文件里的现汇），订单编辑器据此预填订单现汇

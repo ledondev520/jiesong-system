@@ -281,7 +281,7 @@ const appendContextLines = (context, byName, salesKeyword, showMoney = true) => 
 
   if (byName.exchange) {
     const rates = byName.exchange;
-    context.push(`【汇率配置】现汇${rates.spotRate}, 调整${rates.adjustment}, 报价汇率${rates.effectiveRate}, 默认加价${rates.defaultMarkup}, 单价向上取整到整美元（老商品默认取上次确认价）`);
+    context.push(`【汇率配置】现汇${rates.spotRate}, 调整${rates.adjustment}, 报价汇率${rates.effectiveRate}, 默认加价${rates.defaultMarkup}, 单价按价位分档就近取整（老商品默认取上次确认价）`);
   }
 
   if (showMoney && Array.isArray(byName.finance) && byName.finance.length === 2) {
