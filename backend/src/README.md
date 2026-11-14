@@ -8,6 +8,8 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 
 ## 目的
 
+`services/exportPacketExcelService.js` 与 `controllers/exportPacketExcelController.js` 接收出货汇总，按EXP精确筛选、保留一行一项、补齐已保存商品证据并生成原模板三单；`services/exportPacketService.js` 共用自动定价、人工价优先和两种利润率。新入口只下载，不更新业务记录。一次性私有配置见 `backend/scripts/setup-export-packet.js` 和 `docs/出口清单快速制单SOP.md`。
+
 存放后端 API 所有源代码文件，实现进销存系统的完整业务逻辑。
 
 `integration/application-audit-readback.integration.js` 以真实 Express/认证角色、已提交迁移的私有合成 SQLite 与独立 SQL 字面资料/只读全表快照，验证日志关键词/IP、日期/分页、完整记录与12列 CSV 内容，以及现有 ADMIN-only 边界和真实分类生成审计的重复读取。`controllers/system/notificationController.js` 的共享筛选仅使用 SQLite 支持的 `contains`，不传 PostgreSQL 的 `mode`；保留日期、过滤、导出上限与现有权限。只验收应用合成记录，不访问生产、OS日志或真实执行历史；页面没有独立详情路由，此套不声称浏览器通过。由 `npm run test:db` 执行。
@@ -195,7 +197,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 原子替换、版本冲突及无参数值日志由真实文件/HTTP测试验证；保存时核对分类 ID 存在。
 `routes/pricingConfig.test.js` 的认证身份为合成桩，角色中间件与文件写入为真实实现。
 
-`services/exportPricing.js` 是唯一报价规则 `priceFor()`（向上取整到整美元、浮点保护、分类/祖先加价、缺成本）；`lastConfirmedPrice.js` 给老商品取上次确认价（报价/建单预填），
+`services/exportPricing.js` 是唯一报价规则 `priceFor()`（按价位分档就近取整、浮点保护、分类/祖先加价、缺成本）；`lastConfirmedPrice.js` 给老商品取上次确认价（报价/建单预填），
 `productCategoryChain.js` 给明细附分类链。`exportPricing.test.js` 覆盖规范示例和负责人示例。
 `scripts/convert-pricing-config.js` 把旧结构 pricing.json 转成新结构（dry-run 默认，--confirm 先备份）。
 `routes/pricingConfig.auth.test.js` 另以真实应用认证、合成 JWT 和临时迁移 SQLite

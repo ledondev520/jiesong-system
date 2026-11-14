@@ -22,6 +22,7 @@ export interface PricingSnapshot {
 export interface PricingPreview {
   status: "OK" | "MISSING_COST" | "INVALID_RATE";
   unitPriceUsd: number | null;
+  roundingWarning?: string | null;
 }
 
 export const pricingService = {

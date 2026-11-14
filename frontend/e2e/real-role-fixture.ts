@@ -20,6 +20,7 @@ type Scenario =
   | "notification-state"
   | "tax-record-forms"
   | "menu-export-documents"
+  | "excel-export"
   | "sales-header"
   | "dashboard-sources";
 export const testPassword = "test-only-role-browser-password-never-production";

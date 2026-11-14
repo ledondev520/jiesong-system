@@ -171,6 +171,7 @@ const evaluateExportReadiness = (contract = {}, {
     const formula = purchaseCostCny && exchangeRate && quantity
       ? priceFor({ costCny: purchaseCostCny / quantity, categoryIds, ...orderRateInput(contract) }, config)
       : null;
+    if (formula?.roundingWarning) issues.push(makeIssue('ROUNDING_MARKUP_DEVIATION', 'warning', 'customs', formula.roundingWarning));
     if (refundRate === null) {
       issues.push(makeIssue('MISSING_REFUND_RATE', 'error', 'tax_refund', '当前税则未提供出口退税率'));
     } else if (refundRate === 0) {
@@ -236,7 +237,7 @@ const evaluateExportReadiness = (contract = {}, {
       totalPriceUsd: calculatedTotalPriceUsd || 0,
       storedTotalPriceUsd: storedTotalPriceUsd || 0,
       recommendedUnitPriceUsd: formula?.status === 'OK' ? formula.unitPriceUsd : null,
-      pricingFormula: `单位采购成本¥ × ${round(1 + targetMarkup, 6)} ÷ 报价汇率（现汇${config.exchangeAdjustment}），单价向上取整到整美元（老商品默认取上次确认价）`,
+      pricingFormula: `单位采购成本¥ × ${round(1 + targetMarkup, 6)} ÷ 报价汇率（现汇${config.exchangeAdjustment}），单价按价位分档就近取整（老商品默认取上次确认价）`,
       pricingProfitRate: 1 + targetMarkup,
       effectiveExchangeRate,
       exchangeRate: exchangeRate || 0,

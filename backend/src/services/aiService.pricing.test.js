@@ -30,9 +30,9 @@ test('汇率问答来自报价配置，不读 SystemConfig', async () => {
   }
 });
 
-test('售价问答使用唯一规则：¥10000 → 1994，而不是旧的 6.6/×1.3 口径', async () => {
+test('售价问答使用唯一规则：¥10000 → 2000，而不是旧的 6.6/×1.3 口径', async () => {
   const answer = await generateLocalResponse('成本10000的价格是多少');
-  assert.match(answer, /\$1994/);
+  assert.match(answer, /\$2000/);
   assert.doesNotMatch(answer, /6\.6/);
   assert.match(await generateLocalResponse('成本0的价格'), /大于0/);
 });

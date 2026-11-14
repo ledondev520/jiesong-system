@@ -37,14 +37,17 @@ const makeIssue = (code, severity, message, packingItemId = null, productName = 
   code, severity, message, packingItemId, productName,
 });
 
-const findHistoricalQuote = (historicalQuotes, item, productName) => (
-  historicalQuotes.find((quote) => (
-    quote.productId === item.productId
+const findHistoricalQuote = (historicalQuotes, item, productName) => {
+  const matching = historicalQuotes.filter((quote) => quote.productId === item.productId
     && normalizeText(quote.productName) === normalizeText(productName)
     && normalizeText(quote.specification) === normalizeText(item.specification)
-    && normalizeText(item.specification)
-  )) || null
-);
+    && normalizeText(item.specification));
+  const storeMatches = matching.filter((quote) => quote.storeName && normalizeText(quote.storeName) === normalizeText(item.store?.name));
+  const candidates = storeMatches.length ? storeMatches : matching.filter((quote) => !quote.storeName);
+  const newest = candidates[0];
+  if (newest?.confirmed && new Set(candidates.filter((quote) => quote.date === newest.date && quote.contractNo === newest.contractNo).map((quote) => quote.unitPriceUsd)).size > 1) return null;
+  return newest || null;
+};
 
 /** 纯函数：用同一组输入形成页面预览和生成器消费的冻结快照。 */
 const evaluateExportPacket = (contract, readiness, historicalQuotes = [], options = {}, config = loadPricingConfig()) => {
@@ -145,21 +148,22 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
           totalUsd: round(formulaResult.unitPriceUsd * quantity, 4),
           rawUnitPriceUsd: formulaResult.rawUnitPriceUsd,
           rawTotalUsd: formulaResult.rawUnitPriceUsd * quantity,
-          roundingMethod: 'round_up_unit',
+          roundingMethod: 'tiered_nearest_unit',
         }
       : null;
 
     let unitPriceUsd = formula?.unitPriceUsd || 0;
     let totalUsd = formula?.totalUsd || 0;
     let pricingSource = 'formula';
-    let pricingReference = `目标加价 ${round(targetMarkup * 100, 6)}%，单价向上取整到整美元（老商品默认取上次确认价）`;
+    let pricingReference = `目标加价 ${round(targetMarkup * 100, 6)}%，单价按价位分档就近取整（老商品默认取上次确认价）`;
     let roundingMethod = formula?.roundingMethod || '';
-    if (historical && historicalCheck?.allowed) {
+    if (historical && (historical.confirmed || historicalCheck?.allowed)) {
       unitPriceUsd = historical.unitPriceUsd;
       totalUsd = round(unitPriceUsd * quantity, 4);
       pricingSource = 'history';
       pricingReference = `参考 ${historical.contractNo} 同品名同规格报价`;
       roundingMethod = 'historical_quote';
+      if (historical.confirmed && !historicalCheck?.allowed) lineIssues.push(makeIssue('CONFIRMED_PRICE_OUTSIDE_POLICY', 'warning', '保留上次确认单价；按当前成本和汇率复算已偏离加价目标，请复核', item.id, productName));
     }
     if (orderPrice > 0) {
       // 订单已确认的成交单价优先于历史价和公式价；仅本票人工确认可覆盖
@@ -186,6 +190,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       pricingReference = '本票人工确认单价';
       roundingMethod = 'manual_confirmation';
     }
+    if (pricingSource === 'formula' && formulaResult?.roundingWarning) lineIssues.push(makeIssue('ROUNDING_MARKUP_DEVIATION', 'warning', formulaResult.roundingWarning, item.id, productName));
     const markup = effectiveRate > 0 && purchaseCostCny > 0
       ? realizedMarkup(unitPriceUsd, quantity, effectiveRate, purchaseCostCny)
       : null;
@@ -222,7 +227,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       pricingSource,
       pricingReference,
       roundingMethod,
-      rejectedHistoricalQuote: historical && !historicalCheck?.allowed ? {
+      rejectedHistoricalQuote: historical && !historical.confirmed && !historicalCheck?.allowed ? {
         contractNo: historical.contractNo,
         unitPriceUsd: historical.unitPriceUsd,
         realizedMarkup: round(historicalCheck?.markup, 6),
@@ -240,6 +245,10 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     totalUsd: round(lines.reduce((sum, line) => sum + line.totalUsd, 0), 2),
     purchaseCostCny: round(lines.reduce((sum, line) => sum + line.purchaseCostCny, 0), 2),
   };
+  sums.revenueCny = round(sums.totalUsd * effectiveRate, 2);
+  sums.grossProfitCny = round(sums.revenueCny - sums.purchaseCostCny, 2);
+  sums.costMarkupRate = sums.purchaseCostCny > 0 ? sums.grossProfitCny / sums.purchaseCostCny : null;
+  sums.salesGrossMarginRate = sums.revenueCny > 0 ? sums.grossProfitCny / sums.revenueCny : null;
   const headerChecks = [
     ['totalBoxes', 'HEADER_BOXES_MISMATCH', '合同件数与明细合计不一致', sums.boxes],
     ['grossWeight', 'HEADER_GROSS_MISMATCH', '合同毛重与明细合计不一致', sums.grossWeight],

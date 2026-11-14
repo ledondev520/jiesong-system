@@ -85,8 +85,9 @@ test('完整资料形成可生成快照，展示调整汇率、实际加价和�
   assert.equal(packet.ready, true);
   assert.equal(packet.pricingPolicy.effectiveRate, 6.6);
   assert.equal(packet.lines[0].pricingSource, 'formula');
-  assert.equal(packet.lines[0].unitPriceUsd, 130);
-  assert.ok(Math.abs(packet.lines[0].realizedMarkup - 0.3) <= 0.01);
+  assert.equal(packet.lines[0].unitPriceUsd, 150);
+  assert.equal(packet.lines[0].realizedMarkup, 0.5);
+  assert(packet.issues.some((issue) => issue.code === 'ROUNDING_MARKUP_DEVIATION' && issue.severity === 'warning'));
   assert.equal(packet.summary.boxes, 2);
 });
 
@@ -121,15 +122,15 @@ test('工作簿只生成外销合同、商业发票、装箱单三张表且合�
   assert.equal(workbook.getWorksheet('装箱单').getCell('H11').value, packet.summary.netWeight);
 });
 
-test('分类加价沿祖先链取最近一项：瓷砖 10%，单价取整到整美元', () => {
+test('分类加价沿祖先链取最近一项：瓷砖 10%，单价分档就近取整', () => {
   const tile = contract({
     packingItems: [{ ...contract().packingItems[0], product: { ...contract().packingItems[0].product, categoryIds: ['tile-sub', 'tile'] } }],
   });
   const config = { ...require('../../../config/pricing.json'), categoryMarkups: [{ categoryId: 'tile', categoryName: '瓷砖', markup: 0.1 }] };
   const packet = evaluateExportPacket(tile, readiness(), [], options(), config);
   assert.equal(packet.lines[0].targetMarkup, 0.1);
-  assert.equal(packet.lines[0].unitPriceUsd, 110);
-  assert.equal(packet.lines[0].roundingMethod, 'round_up_unit');
+  assert.equal(packet.lines[0].unitPriceUsd, 100);
+  assert.equal(packet.lines[0].roundingMethod, 'tiered_nearest_unit');
 });
 
 
@@ -227,4 +228,26 @@ test('persistExportPacket 已锁定：不写 packingItem/合同，工作簿总�
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await buildExportPacketWorkbook(result.packet));
   assert.equal(workbook.getWorksheet('商业发票').getCell(10 + 1, 8).value, 990);
+});
+
+
+test('两种利润率分别按成本和收入作为分母', () => {
+  const packet = evaluateExportPacket(contract(), readiness(), [], options({ priceOverrides: [{ packingItemId: 'packing-1', unitPriceUsd: 130 }] }));
+  assert.equal(packet.summary.revenueCny, 8580);
+  assert.equal(packet.summary.grossProfitCny, 1980);
+  assert.equal(packet.summary.costMarkupRate, 0.3);
+  assert.equal(packet.summary.salesGrossMarginRate, 1980 / 8580);
+});
+
+
+test('同品名同规格的人工历史价优先按门店匹配，未区分的冲突历史不猜价', () => {
+  const base = { productId: 'product-1', productName: '测试商品', specification: '100*200*300', contractNo: 'EXP990003', date: '2026-11-14', confirmed: true };
+  const quotes = [{ ...base, storeName: '门店甲', unitPriceUsd: 125 }, { ...base, storeName: '门店乙', unitPriceUsd: 90 }];
+  const c = contract(); c.packingItems[0].store.name = '门店乙';
+  const result = evaluateExportPacket(c, readiness(), quotes, options());
+  assert.equal(result.lines[0].unitPriceUsd, 90);
+  assert.equal(result.lines[0].pricingSource, 'history');
+  assert(result.issues.some((issue) => issue.code === 'CONFIRMED_PRICE_OUTSIDE_POLICY'));
+  const ambiguous = evaluateExportPacket(c, readiness(), quotes.map(({ storeName, ...quote }) => quote), options());
+  assert.equal(ambiguous.lines[0].pricingSource, 'formula');
 });

@@ -7,12 +7,12 @@
 有效汇率   = 现汇 + exchangeAdjustment            // 现汇：已有订单用该订单保存的现汇，否则 pricing.exchangeRate
 加价       = 商品分类、其最近祖先分类在 categoryMarkups 中的加价，否则 defaultMarkup
 原始单价   = 单位采购成本¥ × (1 + 加价) ÷ 有效汇率
-单价(USD)  = roundUnitPrice(原始单价)                           // 唯一取整函数：向上取整到整美元，不再取 5 的倍数
+单价(USD)  = roundUnitPrice(原始单价)                           // 唯一取整函数：按美元价位分档就近取整
              浮点保护：先 toFixed(6)，19.0000000001 仍按 19 处理
 ```
 
-负责人 2026-11-01 00:28 SGT 终版（PRICING-LASTPRICE，取代此前所有“向上取整/取最近的 5 的倍数”决定）：先按 CNY 加价（普通 ×1.3，瓷砖 ×1.1），再按「现汇 − 0.2」换算，
-**按单价向上取整到整美元，从不按行合计取整**。例：6.50→7；0.20→1；成本 ¥10000 @ 现汇 6.72：13000 ÷ 6.52 = 1993.87 → **1994**；瓷砖 11000 ÷ 6.52 = 1687.12 → 1688。
+负责人 2026-11-14 确认（取代此前整美元向上取整规则）：先按 CNY 加价（普通 ×1.3，瓷砖 ×1.1），再按「现汇 − 0.2」换算，
+**按原始美元单价分档就近取整**：＜10步长0.5，10–100步长5，100–5000步长50，≥5000步长1000；下界含、上界不含，中点向上、正数最低0.5。例6.50→6.5，1993.87→2000，1687.12→1700。取整后的成本加价偏离目标超过5个百分点时只提示，不阻止采用；人工价和上次确认价保留。
 
 **老商品默认取上次确认价**（`backend/src/services/lastConfirmedPrice.js`）：同一商品（只看 productId，跨客户）最近一次已确认的单价预填；没有才用上面的成本公式。
 “已确认”= 订单 status ≠ DRAFT 的 `SalesItem.sellingPrice`，或报价 status ∈ SENT/ACCEPTED/CONVERTED 的 `QuoteItem.unitPrice`；取更新时间最新者，同刻订单优先，价格须 > 0；
@@ -77,10 +77,10 @@ node backend/scripts/convert-pricing-config.js --file config/pricing.json --spot
 # 2. 确认后转换：先把原文件备份到 0700 目录（0600 文件），再原子替换并用后端校验器核对
 node backend/scripts/convert-pricing-config.js --file config/pricing.json --spot-rate <现汇> --confirm --backup-dir <私有备份目录>
 # 3. 立刻部署新版本；登录后在 设置 > 报价规则 添加「瓷砖 10%」等分类加价
-# 4. 验证（ADMIN 登录后）：现汇 6.72 时成本 ¥10000 必须得到 1994
-#    GET /api/v1/system/pricing-config/preview?costCny=10000   →  unitPriceUsd: 1994
-#    （13000 ÷ 6.52 = 1993.865 → 向上取整 1994；若得到 1995 说明仍在跑旧的取 5 规则，立即回滚）
-#    再抽查 costCny=12700（12700×1.3÷6.52=2532.2 → 2533）与小单价 costCny=10（13÷6.52=1.99 → 2）
+# 4. 验证（ADMIN 登录后）：现汇 6.72 时成本 ¥10000 必须得到 2000
+#    GET /api/v1/system/pricing-config/preview?costCny=10000   →  unitPriceUsd: 2000
+#    （13000 ÷ 6.52 = 1993.865 → 步长50就近取整 2000；返回1994/1995表示仍是旧版本）
+#    再抽查 costCny=12700（12700×1.3÷6.52=2532.2 → 2550）与小单价 costCny=10（13÷6.52=1.99 → 2）
 ```
 
 回滚：把备份文件复制回 `config/pricing.json` **并且部署回旧版本**；只重启不够，因为旧代码读不了新结构的文件（反之亦然）。

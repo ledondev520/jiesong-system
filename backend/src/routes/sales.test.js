@@ -67,6 +67,11 @@ test('sales route includes persistent packing-list check history and review endp
   assert.notEqual(getRouteIndex(salesRouter, '/:id/packing-list-checks/:checkId/review', 'put'), -1);
 });
 
+test('sales route exposes Excel three-document preview and generation', () => {
+  assert.notEqual(getRouteIndex(salesRouter, '/export-packet/excel/preview', 'post'), -1);
+  assert.notEqual(getRouteIndex(salesRouter, '/export-packet/excel/generate', 'post'), -1);
+});
+
 test('sales route includes tax-refund preparation checklist and Excel export endpoints', () => {
   assert.notEqual(getRouteIndex(salesRouter, '/:id/tax-refund-preparation', 'get'), -1);
   assert.notEqual(getRouteIndex(salesRouter, '/:id/tax-refund-preparation/export', 'get'), -1);
@@ -112,4 +117,15 @@ test('loading-plan 路由：显式角色白名单 ADMIN/SALES（OD-8），拒绝
   // authenticate 对 Agent 凭据只设置 req.agent/authActor、不设置 req.user，即便 grants 为空也不得进入控制器。
   assert.equal(statusFor({ agent: { grants: [] }, authActor: { actorType: 'AGENT' } }), 401, '无授权 Agent');
   assert.equal(statusFor({ user: { role: 'INTERN' } }), 403, '未知角色');
+});
+
+
+test('Excel三单成本和下载仅ADMIN可读写，在读取上传前拒绝SALES及Agent', () => {
+  for (const action of ['preview', 'generate']) {
+    const guard = getRouteHandlers(salesRouter, `/export-packet/excel/${action}`, 'post')[0].handle;
+    assert.deepEqual([...guard.allowedRoles], ['ADMIN']);
+    for (const [req, expected] of [[{ user: { role: 'ADMIN' } }, 200], [{ user: { role: 'SALES' } }, 403], [{}, 401], [{ agent: {} }, 401]]) {
+      let status; guard(req, {}, (error) => { status = error?.statusCode || 200; }); assert.equal(status, expected);
+    }
+  }
 });

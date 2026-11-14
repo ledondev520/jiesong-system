@@ -90,8 +90,8 @@ test('缺 HS 或出口售价时禁止生成完整单证，但给出基于采购�
 
   assert.equal(result.customsReady, false);
   assert.equal(result.taxRefundReady, false);
-  assert.equal(result.lines[0].recommendedUnitPriceUsd, 21); // 向上取整到整美元（负责人 2026-11-01 规则，不再取 5 的倍数）
-  assert.equal(result.lines[0].pricingFormula, '单位采购成本¥ × 1.3 ÷ 报价汇率（现汇-0.2），单价向上取整到整美元（老商品默认取上次确认价）');
+  assert.equal(result.lines[0].recommendedUnitPriceUsd, 20); // 按价位分档就近取整（负责人 2026-11-01 规则，不再取 5 的倍数）
+  assert.equal(result.lines[0].pricingFormula, '单位采购成本¥ × 1.3 ÷ 报价汇率（现汇-0.2），单价按价位分档就近取整（老商品默认取上次确认价）');
   assert.deepEqual(
     result.lines[0].issues.filter((issue) => issue.severity === 'error').map((issue) => issue.code),
     ['MISSING_HS_CODE', 'MISSING_EXPORT_PRICE', 'MISSING_DECLARATION_ELEMENTS', 'MISSING_REFUND_RATE'],
@@ -155,5 +155,5 @@ test('评审 R1-1：报价转换的订单 exchangeRate 已是计价汇率，建�
   assert.equal(manual.lines[0].recommendedUnitPriceUsd, 200); // 1000 × 1.3 ÷ 6.52 = 199.39 → 200
   assert.equal(converted.lines[0].recommendedUnitPriceUsd, 200);
   // Without the quote link the same 6.52 would be treated as spot (6.32) — the double adjustment the review found.
-  assert.equal(priced({ exchangeRate: 6.52 }).lines[0].recommendedUnitPriceUsd, 206); // 205.70 → 206
+  assert.equal(priced({ exchangeRate: 6.52 }).lines[0].recommendedUnitPriceUsd, 200); // 205.70 → 206
 });

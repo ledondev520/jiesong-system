@@ -94,8 +94,40 @@ export interface ExportPacketPreview {
     noRefundLineCount: number;
     errorCount: number;
     warningCount: number;
+    revenueCny: number;
+    grossProfitCny: number;
+    costMarkupRate: number | null;
+    salesGrossMarginRate: number | null;
   };
 }
+
+export interface ExcelPacketInput extends Partial<ExportPacketInput> {
+  contractNo?: string;
+  sourceVersion?: string;
+  packetVersion?: string;
+}
+
+export interface ExcelPacketPreview {
+  contracts: Array<{ contractNo: string; rowCount: number }>;
+  selectedContractNo: string | null;
+  sourceVersion: string;
+  packetVersion?: string;
+  excludedRows: Array<{
+    sourceRow: number;
+    productName: string;
+    broker: string;
+  }>;
+  taxVersion: string;
+  input: ExportPacketInput;
+  packet: ExportPacketPreview | null;
+}
+
+const excelFormData = (file: File, input: ExcelPacketInput) => {
+  const data = new FormData();
+  data.append("file", file);
+  data.append("options", JSON.stringify(input));
+  return data;
+};
 
 export interface GeneratedExportPacket {
   packet: ExportPacketPreview;
@@ -108,6 +140,59 @@ export interface GeneratedExportPacket {
 }
 
 export const exportPacketService = {
+  previewExcel: async (
+    file: File,
+    input: ExcelPacketInput,
+    signal?: AbortSignal,
+  ) =>
+    api.post<
+      ApiResponse<ExcelPacketPreview>,
+      ApiResponse<ExcelPacketPreview>,
+      FormData
+    >("/sales/export-packet/excel/preview", excelFormData(file, input), {
+      signal,
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+
+  generateExcel: async (
+    file: File,
+    input: ExcelPacketInput,
+    signal?: AbortSignal,
+  ) => {
+    try {
+      const blob = await api.post<Blob, Blob, FormData>(
+        "/sales/export-packet/excel/generate",
+        excelFormData(file, input),
+        {
+          responseType: "blob",
+          signal,
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
+      if (!(blob instanceof Blob) || blob.size === 0 || /json/i.test(blob.type))
+        throw new Error("三单文件内容不可用，请重新生成");
+      return blob;
+    } catch (error: unknown) {
+      const data =
+        error instanceof Blob
+          ? error
+          : error && typeof error === "object" && "response" in error
+            ? (error as { response?: { data?: unknown } }).response?.data
+            : undefined;
+      if (data instanceof Blob && data.size <= 4096) {
+        const body = await data.text();
+        try {
+          const parsed = JSON.parse(body);
+          if (typeof parsed.message === "string")
+            throw new Error(parsed.message);
+        } catch (parsedError) {
+          if (!(parsedError instanceof SyntaxError)) throw parsedError;
+        }
+      }
+      throw error;
+    }
+  },
+
   preview: async (salesContractId: string, input: ExportPacketInput) =>
     api.post<
       ApiResponse<ExportPacketPreview>,

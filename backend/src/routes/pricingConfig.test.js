@@ -79,12 +79,12 @@ test('HTTP pricing settings require ADMIN, persist a real file, reject invalid/s
   const ok = await preview('ADMIN', { costCny: '100', spotRate: '7.2' });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.data.status, 'OK');
-  assert.equal(ok.body.data.unitPriceUsd, Math.ceil(Number(((100 * 1.4) / (7.2 - 0.2)).toFixed(6))));
+  assert.equal(ok.body.data.unitPriceUsd, 20);
   assert.equal((await preview('ADMIN', { costCny: '0' })).body.data.status, 'MISSING_COST');
   const draft = await preview('ADMIN', { costCny: '100', spotRate: '7.2', config: JSON.stringify({ ...defaults, defaultMarkup: 0.5 }) });
-  assert.equal(draft.body.data.unitPriceUsd, 22); // 草稿：加价 50% → 150/7=21.43 → 22
+  assert.equal(draft.body.data.unitPriceUsd, 20); // 草稿：加价 50% → 150/7=21.43 → 20
   const saved30 = await preview('ADMIN', { costCny: '100', spotRate: '7.2', config: JSON.stringify(defaults) });
-  assert.equal(saved30.body.data.unitPriceUsd, 19); // 加价 30%：130/7=18.57 → 19（只向上取整）
+  assert.equal(saved30.body.data.unitPriceUsd, 20); // 加价 30%：130/7=18.57 → 20（就近取整）
   assert.equal((await preview('ADMIN', { costCny: '100', config: '{bad' })).status, 400);
   assert.equal((await preview('ADMIN', { costCny: '100', config: JSON.stringify({ ...defaults, roundUpTo: 0 }) })).status, 400);
   assert.equal(fs.readFileSync(target, 'utf8'), before);

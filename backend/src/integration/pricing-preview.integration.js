@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
-test('HTTP/SQLite: pricing preview applies the locked rule (×1.3 / tiles ×1.1, spot−0.2, ceil to whole USD) and guards roles/input', async (t) => {
+test('HTTP/SQLite: pricing preview applies the locked rule (×1.3 / tiles ×1.1, spot−0.2, tiered nearest USD) and guards roles/input', async (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-pricing-preview-'));
   fs.chmodSync(directory, 0o700);
   const database = path.join(directory, 'synthetic.db');
@@ -62,21 +62,25 @@ test('HTTP/SQLite: pricing preview applies the locked rule (×1.3 / tiles ×1.1,
   assert.equal((await post({ lines: [{ costCny: 1 }] }, 'ANONYMOUS')).status, 401);
   for (const role of ['PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS']) assert.equal((await post({ lines: [{ costCny: 1 }] }, role)).status, 403, role);
 
-  // Owner example: ¥10,000 × 1.3 = ¥13,000 ÷ (6.72 − 0.2) = 1993.87 → 1994.
+  // Owner example: ¥10,000 × 1.3 = ¥13,000 ÷ (6.72 − 0.2) = 1993.87 → 2000.
   const owner = await post({ lines: [{ costCny: 10000 }] }, 'SALES');
   assert.equal(owner.status, 200);
   assert.equal(owner.data.results[0].status, 'OK');
-  assert.equal(owner.data.results[0].unitPriceUsd, 1994);
+  assert.equal(owner.data.results[0].unitPriceUsd, 2000);
   assert.equal(owner.data.results[0].effectiveRate, 6.52);
   assert.equal(owner.data.spotRate, 6.72, 'the configured spot rate is returned when none is sent');
   assert.equal((await post({ spotRate: 7.2, lines: [{ costCny: 1 }] })).data.spotRate, 7.2);
 
   // Category markup is found through the product; a stated spot rate overrides the configured one.
   const mixed = await post({ lines: [{ productId: plainProduct.id, costCny: 1000 }, { productId: tileProduct.id, costCny: 1000 }, { categoryId: tiles.id, costCny: 1000 }] }, 'ADMIN');
-  assert.deepEqual(mixed.data.results.map((row) => row.unitPriceUsd), [200, 169, 169]); // 199.39→200, 168.71→169
+  assert.deepEqual(mixed.data.results.map((row) => row.unitPriceUsd), [200, 150, 150]); // 199.39→200, 168.71→169
   assert.deepEqual(mixed.data.results.map((row) => row.markup), [0.3, 0.1, 0.1]);
   const spot = await post({ spotRate: 7.2, lines: [{ costCny: 100 }] });
-  assert.equal(spot.data.results[0].unitPriceUsd, 19); // 130 / 7.0 = 18.57 → 19
+  assert.equal(spot.data.results[0].unitPriceUsd, 20); // 130 / 7.0 = 18.57 → 19
+
+  const deviation = await post({ spotRate: 7.2, lines: [{ costCny: 100 }] });
+  assert.match(deviation.data.results[0].roundingWarning, /取整后成本加价率/);
+  assert.equal(deviation.data.results[0].status, 'OK');
 
   // Missing/zero cost has no price; invalid input is rejected without computing.
   const missing = await post({ lines: [{ costCny: 0 }, {}, { costCny: '' }] });

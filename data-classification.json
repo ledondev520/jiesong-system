@@ -26,7 +26,8 @@
         "carrier packing-list originals and persistent packing-list review records",
         "email verification code hashes and Alibaba Cloud mail credentials",
         "password reset code hashes, bound recovery email and persistent requester HMAC digests",
-        "opaque browser session credentials, SHA-256 session digests and session-bound CSRF proofs"
+        "opaque browser session credentials, SHA-256 session digests and session-bound CSRF proofs",
+        "Reusable export-packet company template with bank clauses, confirmed product evidence and quotation history"
       ],
       "controls": {
         "storage": [
@@ -86,7 +87,9 @@
         "backend/src/services/passwordResetService.js",
         "backend/prisma/migrations/20261002113919_email_password_recovery/",
         "backend/src/services/browserSessionService.js",
-        "backend/prisma/migrations/20261005070032_browser_sessions/"
+        "backend/prisma/migrations/20261005070032_browser_sessions/",
+        "backend/uploads/export-packet/",
+        "uploads/export-packet/"
       ]
     },
     {

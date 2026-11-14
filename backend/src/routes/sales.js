@@ -1,6 +1,6 @@
 /**
  * Input: 销售控制器、exportService
- * Output: 出口合同管理路由（幂等创建重放不重复记新建审计，含装箱、出口三单、单证核对、退税准备与单柜财务结算）
+ * Output: 出口合同管理与受认证的 Excel 三单生成路由（上传制单不改业务数据）
  * Pos: 销售路由，处理出口合同CRUD操作
  * 
  * 2026-01-20 重构：合并货柜功能，EXP号即货柜号
@@ -19,6 +19,9 @@ const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, param, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 const { upload, pdfCheckUpload } = require('../utils/upload');
+const multer = require('multer');
+const { createError } = require('../middleware/errorHandler');
+const exportPacketExcelController = require('../controllers/exportPacketExcelController');
 
 const router = Router();
 const WRITE_ROLES = ROLE_SETS.ALL;
@@ -30,6 +33,17 @@ const EXPORT_PACKET_ROLES = ROLE_SETS.ADMIN;
 const FINANCE_VIEW_ROLES = ROLE_SETS.ADMIN; // OD-8: SALES never sees finance
 
 router.use(authenticate);
+
+const packetExcelUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 1, fieldSize: 64 * 1024 },
+  fileFilter: (req, file, done) => {
+    if (/\.xlsx$/i.test(file.originalname) && ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/octet-stream'].includes(file.mimetype)) done(null, true);
+    else done(createError('三单生成仅支持 .xlsx 文件', 400));
+  },
+});
+router.post('/export-packet/excel/preview', roleAuth(...EXPORT_PACKET_ROLES), packetExcelUpload.single('file'), exportPacketExcelController.preview);
+router.post('/export-packet/excel/generate', roleAuth(...EXPORT_PACKET_ROLES), packetExcelUpload.single('file'), exportPacketExcelController.generate);
 
 // ==================== 出口合同 CRUD ====================
 

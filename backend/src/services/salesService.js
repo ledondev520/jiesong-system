@@ -469,7 +469,7 @@ const getNextContractNo = async () => {
   return generateNextContractNo({ prisma, year });
 };
 
-// 推荐售价 = 唯一报价规则（加价、现汇 − 调整、向上取整到整美元见 exportPricing.roundUnitPrice）。profitRate 不再由调用方传入。
+// 推荐售价 = 唯一报价规则（加价、现汇 − 调整、按价位分档就近取整见 exportPricing.roundUnitPrice）。profitRate 不再由调用方传入。
 const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate, categoryIds } = {}) => {
   if (profitRate !== undefined) throw createError('利润率由报价规则统一配置，不能在请求中指定', 400);
   const numericCostPrice = Number(costPrice);
@@ -483,6 +483,7 @@ const calculateSellingPrice = ({ costPrice, exchangeRate, profitRate, categoryId
     roundedUp: Math.ceil(priced.rawUnitPriceUsd),
     roundedDown: Math.floor(priced.rawUnitPriceUsd),
     recommended: priced.unitPriceUsd,
+    roundingWarning: priced.roundingWarning,
     effectiveRate: priced.effectiveRate,
     markup: priced.markup,
   };
@@ -493,7 +494,7 @@ const calculateProductSellingPrice = async ({ productId, ...input } = {}) => {
   const categoryIds = productId ? (await categoryIdsByProduct([productId], prisma)).get(productId) : undefined;
   const result = calculateSellingPrice({ ...input, categoryIds });
   const last = productId ? (await lastConfirmedPrices(prisma, [productId])).get(productId) : undefined;
-  return { ...result, formulaRecommended: result.recommended, recommended: last?.price ?? result.recommended, source: last ? 'LAST_CONFIRMED' : 'RULE' };
+  return { ...result, formulaRecommended: result.recommended, recommended: last?.price ?? result.recommended, source: last ? 'LAST_CONFIRMED' : 'RULE', roundingWarning: last ? null : result.roundingWarning };
 };
 
 /** 报价/建单预览的订单整体利润率（只提示，不阻止保存）；口径见 exportPricing.orderMargin。 */

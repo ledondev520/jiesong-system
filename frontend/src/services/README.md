@@ -4,6 +4,8 @@
 
 此目录封装业务 API 和 DTO，界面通过服务调用后端；鉴权仍由共享 Axios 和后端校验。
 
+`exportPacket.service.ts` 的 Excel 预览/下载使用共享 Axios multipart、Bearer/Cookie-CSRF及取消信号；二进制错误保留服务端原因，空文件或JSON不作为三单保存。来源版本和制单版本由后端重新核对。
+
 ## 收付请求
 
 `finance.service.ts` / `.test.ts`：创建付款前复制平面输入，使用 `lib/idempotentRequest.ts` 的异步 SHA-256 标识。HTTP 标识固定 83 个 ASCII 字符，完整 UTF-8 JSON 内容参与摘要；相同 JSON 重试稳定、不同长备注不截断。失败清除短期本地缓存，再次点击沿用同一标识。

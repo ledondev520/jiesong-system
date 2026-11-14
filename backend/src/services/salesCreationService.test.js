@@ -50,7 +50,7 @@ test('未给售价的明细按唯一报价规则补齐（瓷砖按分类 ×1.1�
     items: [{ ...item, productId: 'p-cup', costPrice: 10000, sellingPrice: undefined }, { ...item, productId: 'p-tile', costPrice: 10000, sellingPrice: undefined }, item],
   });
   assert.equal(input.items[0].sellingPrice, undefined);
-  assert.deepEqual((await withRulePrices(input, db)).map(line => line.sellingPrice), [1994, 1688, 3]);
+  assert.deepEqual((await withRulePrices(input, db)).map(line => line.sellingPrice), [2000, 1700, 3]);
 });
 
 test('老商品未给售价时取上次确认价，新商品仍按规则', async () => {
@@ -64,5 +64,5 @@ test('老商品未给售价时取上次确认价，新商品仍按规则', async
     exchangeRate: 6.72,
     items: [{ ...item, productId: 'p-cup', costPrice: 10000, sellingPrice: undefined }, { ...item, productId: 'p-new', costPrice: 10000, sellingPrice: undefined }],
   });
-  assert.deepEqual((await withRulePrices(input, db)).map(line => line.sellingPrice), [2500.5, 1994]);
+  assert.deepEqual((await withRulePrices(input, db)).map(line => line.sellingPrice), [2500.5, 2000]);
 });

@@ -151,6 +151,7 @@ export function QuoteEditor({ quote, onSaved }: Props) {
                   ...line,
                   suggested: byKey.get(line.key)?.unitPriceUsd ?? null,
                   suggestedSource: byKey.get(line.key)?.source,
+                  roundingWarning: byKey.get(line.key)?.roundingWarning,
                 }
               : line,
           ),
@@ -410,6 +411,13 @@ export function QuoteEditor({ quote, onSaved }: Props) {
                     <SemanticBadge tone="info">上次成交价</SemanticBadge>
                   ) : null}
                 </Label>
+                {!isManualPrice(line) &&
+                  line.suggested !== null &&
+                  line.roundingWarning && (
+                    <p role="status" className="text-xs text-amber-700">
+                      {line.roundingWarning}
+                    </p>
+                  )}
                 <Input
                   aria-label={`第 ${index + 1} 行单价`}
                   inputMode="decimal"
