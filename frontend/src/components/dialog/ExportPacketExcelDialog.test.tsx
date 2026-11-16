@@ -71,7 +71,7 @@ const upload = async () => {
   await waitFor(() => expect(previewExcel).toHaveBeenCalled());
 };
 
-describe("Excel 出三单", () => {
+describe("Excel 出四单", () => {
   beforeEach(() => {
     previewExcel.mockReset().mockResolvedValue({ data: result() });
     generateExcel.mockReset().mockResolvedValue(
@@ -94,7 +94,7 @@ describe("Excel 出三单", () => {
     expect(screen.getByText("32.00%")).toBeInTheDocument();
     expect(screen.getByText("24.24%")).toBeInTheDocument();
     expect(
-      screen.getByText(/三单已生成并下载，共 1 行、14 箱/),
+      screen.getByText(/四单已生成并下载，共 1 行、14 箱/),
     ).toBeInTheDocument();
   });
 
@@ -124,17 +124,17 @@ describe("Excel 出三单", () => {
     fireEvent.change(screen.getByLabelText("合成设备出口单价"), {
       target: { value: "600" },
     });
-    expect(screen.getByRole("button", { name: "下载三单" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "下载四单" })).toBeDisabled();
     previewExcel.mockResolvedValueOnce({ data: result(600) });
     fireEvent.click(screen.getByRole("button", { name: "重新计算" }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "下载三单" })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "下载四单" })).toBeEnabled(),
     );
     expect(previewExcel.mock.calls[1][1].priceOverrides).toEqual([
       { packingItemId: "row-2", unitPriceUsd: 600 },
     ]);
     expect(generateExcel).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole("button", { name: "下载三单" }));
+    fireEvent.click(screen.getByRole("button", { name: "下载四单" }));
     await waitFor(() => expect(saveBlob).toHaveBeenCalledTimes(2));
     expect(generateExcel.mock.calls[1][1]).toMatchObject({
       packetVersion: "packet-600",

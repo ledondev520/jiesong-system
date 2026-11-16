@@ -1,6 +1,6 @@
 /**
- * Input: 出货汇总 XLSX、已确认的私有三单模板/商品资料、当期税库和本票参数
- * Output: 不写业务库的逐票定价结果、原版式合同/发票/箱单
+ * Input: 出货汇总 XLSX、已确认的私有公司模板/商品资料、当期税库和本票参数
+ * Output: 不写业务库的逐票定价结果、原版式合同/发票/箱单及报关预录信息
  * Pos: Excel 制单入口，复用 exportPacketService 的定价和利润口径
  */
 const fs = require('node:fs/promises');
@@ -18,6 +18,7 @@ const { loadPricingConfig } = require('./pricingConfigService');
 const { withCategoryChains } = require('./productCategoryChain');
 const { round } = require('./exportPricing');
 const { evaluateExportPacket } = require('./exportPacketService');
+const { addCustomsPreentrySheet, shipmentDate } = require('./customsPreentrySheet');
 const { fetchUsdCnyRate } = require('../controllers/system/configController');
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -159,7 +160,7 @@ const parseShipmentWorkbook = async (buffer, contractNo) => {
       excludedRows.push({ sourceRow, productName: String(valueAt(source, 'name') || ''), broker });
       continue;
     }
-    if (!['捷淞', '上海捷淞国际物流有限公司'].includes(broker)) throw createError(`第 ${sourceRow} 行报关公司未明确，无法确定三单归属`, 400);
+    if (!['捷淞', '上海捷淞国际物流有限公司'].includes(broker)) throw createError(`第 ${sourceRow} 行报关公司未明确，无法确定四单归属`, 400);
     const entry = { id: `excel:${sourceVersion.slice(0, 12)}:${sourceRow}`, sourceRow, broker };
     for (const key of Object.keys(ALIASES)) entry[key] = valueAt(source, key);
     for (const key of ['quantity', 'boxes', 'grossWeight', 'netWeight', 'volume', 'purchaseCost', 'unitPrice']) entry[key] = optionalNumber(entry[key], ALIASES[key][0], sourceRow);
@@ -168,7 +169,7 @@ const parseShipmentWorkbook = async (buffer, contractNo) => {
     if (entry.hsCode && !/^\d{10}$/.test(entry.hsCode)) throw createError(`第 ${sourceRow} 行 HS 编码必须为10位数字`, 400);
     rows.push(entry);
   }
-  if (rows.length > 500) throw createError('每票三单最多支持 500 行商品', 400);
+  if (rows.length > 500) throw createError('每票四单最多支持 500 行商品', 400);
   return { contracts, selectedContractNo: selected, rows, excludedRows, sourceVersion };
 };
 
@@ -176,15 +177,15 @@ const loadProfile = async () => {
   const file = profilePath();
   try {
     const directory = await fs.lstat(path.dirname(file));
-    if (!directory.isDirectory() || directory.isSymbolicLink() || (directory.mode & 0o077)) throw createError('三单模板目录权限无效，请管理员检查配置', 503);
+    if (!directory.isDirectory() || directory.isSymbolicLink() || (directory.mode & 0o077)) throw createError('四单模板目录权限无效，请管理员检查配置', 503);
     const stat = await fs.lstat(file);
-    if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) || stat.size > 16 * 1024 * 1024) throw createError('三单模板存储不安全，请管理员检查配置', 503);
+    if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) || stat.size > 16 * 1024 * 1024) throw createError('四单模板存储不安全，请管理员检查配置', 503);
     const profile = JSON.parse(await fs.readFile(file, 'utf8'));
     if (profile.version !== 1 || !profile.templateBase64 || !Array.isArray(profile.goods) || !Array.isArray(profile.refundLibrary?.records)) throw new Error('Invalid profile');
     return profile;
   } catch (error) {
     if (error.statusCode) throw error;
-    throw createError('尚未配置出口三单模板及税库，请管理员运行 setup-export-packet', 503);
+    throw createError('尚未配置出口四单模板及税库，请管理员运行 setup-export-packet', 503);
   }
 };
 
@@ -212,7 +213,7 @@ const prepareExcelPacket = async (buffer, options = {}, dependencies = {}) => {
       input[key] = options[key].trim();
     }
   }
-  if (input.sellerName !== profile.defaults.sellerName) throw createError('卖方与已配置三单模板不一致，请更新公司模板', 400);
+  if (input.sellerName !== profile.defaults.sellerName) throw createError('卖方与已配置四单模板不一致，请更新公司模板', 400);
   const parsedDate = new Date(`${input.documentDate}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.documentDate) || !Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== input.documentDate) throw createError('单证日期无效', 400);
   const result = { contracts: parsed.contracts, sourceVersion: parsed.sourceVersion, selectedContractNo: parsed.selectedContractNo, excludedRows: parsed.excludedRows, input, taxVersion: profile.refundLibrary.version, packet: null };
@@ -257,11 +258,12 @@ const prepareExcelPacket = async (buffer, options = {}, dependencies = {}) => {
     const hsCode = row.hsCode || String(good.hsCode || '');
     const declaration = row.declaration || good.declaration || '';
     const origin = row.origin || good.origin || '';
-    const refundDay = row.shippedAt instanceof Date && Number.isFinite(row.shippedAt.getTime()) ? row.shippedAt.toISOString().slice(0, 10) : input.documentDate;
+    const shippedAt = shipmentDate(row.shippedAt);
+    const refundDay = shippedAt || input.documentDate;
     const refund = lookupRefund(profile.refundLibrary, hsCode, refundDay);
     if (!origin) additionalIssues.push({ code: 'MISSING_ORIGIN', severity: 'error', productName: row.name, message: `第 ${row.sourceRow} 行缺少已确认货源地` });
     evidence.push({ packingItemId: row.id, productName: row.name, hsCode, declarationElements: declaration, origin, unit: row.unit, hsSource: row.hsCode ? 'excel' : 'saved_catalog', hsEvidence: refund ? { refundRate: refund.rate, version: profile.refundLibrary.version } : null });
-    return { ...row, productId: `catalog:${norm(row.name)}`, origin, declarationElements: declaration, hsCode, product: { customsName: row.name, declaration, hsCode }, store: { name: row.store || '' } };
+    return { ...row, shippedAt, productId: `catalog:${norm(row.name)}`, origin, declarationElements: declaration, hsCode, product: { customsName: row.name, declaration, hsCode }, store: { name: row.store || '' } };
   });
   const matchedItems = await withCategoryChains(items.map((item) => {
     const matches = products.filter((product) => norm(product.customsName) === norm(item.name)
@@ -301,7 +303,7 @@ const prepareExcelPacket = async (buffer, options = {}, dependencies = {}) => {
 
 const templateSheets = (workbook) => ['合同', '发票', '箱单'].map((name) => {
   const sheet = workbook.worksheets.find((item) => ({ 外销合同: '合同', 商业发票: '发票', 装箱单: '箱单' }[norm(item.name)] || norm(item.name)) === name);
-  if (!sheet || !String(sheet.getCell('A8').text).includes('Item')) throw createError('三单模板应包含原版合同、发票、箱单，明细表头在第8行', 400);
+  if (!sheet || !String(sheet.getCell('A8').text).includes('Item')) throw createError('四单模板应包含原版合同、发票、箱单，明细表头在第8行', 400);
   return sheet;
 });
 
@@ -368,6 +370,7 @@ const buildTemplatePacket = async (packet, templateBuffer) => {
   for (const [col, key] of [['E', 'boxes'], ['F', 'grossWeight'], ['G', 'netWeight'], ['H', 'volume']]) packing.getCell(`${col}${totalRow}`).value = { formula: `SUM(${col}9:${col}${totalRow - 1})`, result: packet.summary[key] };
   packing.getCell(`A${27 + extra}`).value = ref('合同', 'B5', contract.getCell('B5').value);
   packing.getCell(`E${27 + extra}`).value = ref('合同', 'B6', packet.buyerName);
+  addCustomsPreentrySheet(workbook, packet);
   workbook.calcProperties.fullCalcOnLoad = true;
   return Buffer.from(await workbook.xlsx.writeBuffer());
 };
@@ -378,7 +381,7 @@ const generateExcelPacket = async (buffer, options = {}, dependencies = {}) => {
   if (!result.packet?.ready) throw createError(result.packet?.issues.find((issue) => issue.severity === 'error')?.message || '请选择本票合同号', 400);
   const output = await buildTemplatePacket(result.packet, Buffer.from(profile.templateBase64, 'base64'));
   if (!dependencies.profile) await saveManualQuotes(result.packet);
-  return { ...result, buffer: output, filename: `外销出口合同+发票+箱单+${result.packet.contractNo}.xlsx` };
+  return { ...result, buffer: output, filename: `出口四单+${result.packet.contractNo}.xlsx` };
 };
 
 // shortcut: 逐文件读取人工报价，历史达到数千票时迁移到已有数据库索引。
@@ -420,11 +423,11 @@ const installProfile = async (profile) => {
   const directory = path.dirname(file);
   await fs.mkdir(directory, { mode: 0o700 }).catch((error) => { if (error.code !== 'EEXIST') throw error; });
   const stat = await fs.lstat(directory);
-  if (!stat.isDirectory() || stat.isSymbolicLink() || await fs.realpath(directory) !== path.join(await fs.realpath(root), 'export-packet')) throw createError('三单模板存储路径无效', 400);
+  if (!stat.isDirectory() || stat.isSymbolicLink() || await fs.realpath(directory) !== path.join(await fs.realpath(root), 'export-packet')) throw createError('四单模板存储路径无效', 400);
   await fs.chmod(directory, 0o700);
   try {
     const previous = await fs.lstat(file);
-    if (!previous.isFile() || previous.isSymbolicLink()) throw createError('三单模板文件路径无效', 400);
+    if (!previous.isFile() || previous.isSymbolicLink()) throw createError('四单模板文件路径无效', 400);
     await fs.copyFile(file, `${file}.${Date.now()}.bak`);
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const temporary = `${file}.${crypto.randomUUID()}.tmp`;

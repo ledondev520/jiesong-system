@@ -307,7 +307,7 @@ export function TaxRefundPreparationDialog({
           </DialogTitle>
           <DialogDescription>
             专项单 {contractNo}
-            ：系统自动关联三单、报关及进项发票。处理缺件和差异后，一次确认生成出货清单。
+            ：系统自动关联四单、报关及进项发票。处理缺件和差异后，一次确认生成出货清单。
           </DialogDescription>
         </DialogHeader>
 

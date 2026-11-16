@@ -96,7 +96,7 @@ describe("OrderOverviewTab 发运信息", () => {
     expect(
       screen.getByText(/订单状态与外销合同文件相互独立/),
     ).toBeInTheDocument();
-    expect(screen.getByText(/生成出口单证/)).toBeInTheDocument();
+    expect(screen.getByText(/生成出口四单/)).toBeInTheDocument();
     expect(screen.getAllByText("2026-10-20").length).toBeGreaterThan(0);
     expect(screen.getAllByText("合成报关行").length).toBeGreaterThan(0);
     await userEvent.setup().click(screen.getByRole("button", { name: "打印" }));

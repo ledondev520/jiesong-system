@@ -1,5 +1,5 @@
 /**
- * Input: 每次出货的报关商品行、采购/票面事实、归档三单和当前准备度
+ * Input: 每次出货的报关商品行、采购/票面事实、归档出口单证和当前准备度
  * Output: 自动核验的出货清单、绑定材料版本的确认归档、全量月度准备工作簿
  * Pos: 复用现有准备、发票核验和 fileService；不创建正式申报或修改退税金额
  */
@@ -95,7 +95,7 @@ const buildShipmentPreparation = ({ salesContract, purchases = [], declaration =
   const packetCurrent = /^[a-f0-9]{64}$/.test(packet?.checksum || '')
     && packet?.description === `${EXPORT_PACKET_DESCRIPTION}:${buildPackingSourceVersion(salesContract.packingItems || [])}`;
   const signed = (salesContract.files || []).find(x => x.category === 'SIGNED_CONTRACT');
-  preparation.checklist.unshift({ id: 'export-packet', category: '出货资料', requirement: 'required', label: '本次外销合同、商业发票、装箱单', status: packetCurrent ? 'ready' : 'missing', evidence: packet?.fileName || null, message: packetCurrent ? '三单版本与当前出货明细一致；签署件另行登记' : packet ? '三单版本需更新，请在出口三单工作台重新确认生成' : '请在出口三单工作台确认并生成三单' });
+  preparation.checklist.unshift({ id: 'export-packet', category: '出货资料', requirement: 'required', label: '本次出口四单（兼容历史三单）', status: packetCurrent ? 'ready' : 'missing', evidence: packet?.fileName || null, message: packetCurrent ? '单证版本与当前出货明细一致；签署件另行登记' : packet ? '单证版本需更新，请在出口四单工作台重新确认生成' : '请在出口四单工作台确认并生成四单' });
   preparation.checklist.push({ id: 'sales-signed-contract', category: '备案单证', requirement: 'post_submission', label: '外销签署合同', status: signed ? 'ready' : 'review', evidence: signed?.fileName || null, message: signed ? '外销签署件已归档' : '需补外销签署件；系统生成版本不代表已签署' });
   if (!signed) preparation.warnings.push('需补外销签署件；系统生成版本不代表已签署');
   const invoiceCheck = preparation.checklist.find(x => x.id === 'invoice-portal-verification');
@@ -234,7 +234,7 @@ const buildMonthlyPreparationWorkbook = async (filingMonth, items) => {
   validateMonth(filingMonth);
   const wb = new ExcelJS.Workbook();
   const sheet = wb.addWorksheet('月度准备清单');
-  sheet.columns = ['申报月份', '出口专项单', '报关单', '出口日期', '关联采购合同', '进项发票号码', '三单/签署件', '自动核验', '待补事项', '确认状态', '归档清单'].map(header => ({ header, width: 24 }));
+  sheet.columns = ['申报月份', '出口专项单', '报关单', '出口日期', '关联采购合同', '进项发票号码', '四单/签署件', '自动核验', '待补事项', '确认状态', '归档清单'].map(header => ({ header, width: 24 }));
   for (const item of items) sheet.addRow([filingMonth, item.contractNo, item.declarationNo || '待补', item.deadlines.basisDate,
     item.invoiceLinks.map(x => x.purchaseContractNo).join('、'), item.invoiceLinks.flatMap(x => x.invoiceNumbers).join('、'), item.documentFiles.map(x => x.fileName).join('、'),
     item.materialReady ? '通过' : '待补件/差异', [...item.materialBlockers, ...item.warnings].join('；'), item.confirmationStatus === 'CONFIRMED' ? '已确认' : item.confirmationStatus === 'CHANGED' ? '资料变化需重新确认' : '待确认', item.confirmedFile?.fileName || '']);

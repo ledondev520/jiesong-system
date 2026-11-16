@@ -2,8 +2,8 @@
 
 # 业务对话框
 
-- `ExportPacketExcelDialog.tsx` / `.test.tsx`｜Excel出三单｜单票上传自动下载，多票选择EXP，保持源行和人工报价；两种利润率分开展示，缺项仅在界面提示。关闭或换文件取消迟到结果，修改参数后须重新计算才可下载。
-- `ExportPacketWorkbenchDialog.tsx`｜现有合同三单工作台｜共用已保存单价优先、成本加价率及销售毛利率。
+- `ExportPacketExcelDialog.tsx` / `.test.tsx`｜Excel出四单｜单票上传自动下载，多票选择EXP，保持源行和人工报价；两种利润率分开展示，缺项仅在界面提示。关闭或换文件取消迟到结果，修改参数后须重新计算才可下载。
+- `ExportPacketWorkbenchDialog.tsx`｜现有合同四单工作台｜共用已保存单价优先、成本加价率及销售毛利率。
 
 业务操作的确认、校验和失败恢复交互。后端继续执行单证与附件权限校验。
 

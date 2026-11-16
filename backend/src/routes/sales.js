@@ -1,6 +1,6 @@
 /**
  * Input: 销售控制器、exportService
- * Output: 出口合同管理与受认证的 Excel 三单生成路由（上传制单不改业务数据）
+ * Output: 出口合同管理与受认证的 Excel 四单生成路由（上传制单不改业务数据）
  * Pos: 销售路由，处理出口合同CRUD操作
  * 
  * 2026-01-20 重构：合并货柜功能，EXP号即货柜号
@@ -39,7 +39,7 @@ const packetExcelUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 1, fieldSize: 64 * 1024 },
   fileFilter: (req, file, done) => {
     if (/\.xlsx$/i.test(file.originalname) && ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/octet-stream'].includes(file.mimetype)) done(null, true);
-    else done(createError('三单生成仅支持 .xlsx 文件', 400));
+    else done(createError('四单生成仅支持 .xlsx 文件', 400));
   },
 });
 router.post('/export-packet/excel/preview', roleAuth(...EXPORT_PACKET_ROLES), packetExcelUpload.single('file'), exportPacketExcelController.preview);
@@ -144,7 +144,7 @@ router.post('/:id/purchase-drafts', withIdValidation, roleAuth(ROLE_SETS.ALL), w
 // POST /api/v1/sales/:id/export-packet/preview - 只读预检和定价草案
 router.post('/:id/export-packet/preview', withIdValidation, roleAuth(...EXPORT_PACKET_ROLES), exportPacketValidation, salesController.previewExportPacket);
 
-// POST /api/v1/sales/:id/export-packet/generate - 确认价格后生成、归档出口三单
+// POST /api/v1/sales/:id/export-packet/generate - 确认价格后生成、归档出口四单
 router.post('/:id/export-packet/generate', withIdValidation, roleAuth(...EXPORT_PACKET_ROLES), exportPacketValidation, salesController.generateExportPacket);
 
 // POST /api/v1/sales/:id/files - 上传出口合同附件

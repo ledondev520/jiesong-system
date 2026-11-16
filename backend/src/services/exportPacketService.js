@@ -1,7 +1,7 @@
 /**
  * Input: 出口合同装箱明细、当前 HS/退税证据、历史报价与本票制单参数
- * Output: 出口三单预检、定价建议及合同/商业发票/装箱单 Excel 归档版本
- * Pos: 出口三单工作台领域 Module；预览只读，确认生成时统一回写价格并归档
+ * Output: 出口四单预检、定价建议及合同/商业发票/装箱单/报关预录信息 Excel 归档版本
+ * Pos: 出口四单工作台领域 Module；预览只读，确认生成时统一回写价格并归档
  */
 
 const ExcelJS = require('exceljs');
@@ -12,9 +12,11 @@ const { buildDerivedSalesAmountUpdate, isJiesongOwnedPackingItem } = require('./
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
 const fileService = require('./fileService');
+const { addCustomsPreentrySheet, shipmentDate } = require('./customsPreentrySheet');
 
 const DEFAULT_SELLER_NAME = '上海捷淞国际物流有限公司';
 const MONEY_EPSILON = 0.01;
+// 归档标记保持稳定，使历史材料及回滚后的附件权限/退税指纹仍能识别四单。
 const EXPORT_PACKET_DESCRIPTION = '出口三单生成版本（外销合同、商业发票、装箱单）';
 const buildPackingSourceVersion = (items) => crypto.createHash('sha256').update(JSON.stringify(
   [...items].sort((a, b) => a.id.localeCompare(b.id)).map((item) => ({
@@ -217,6 +219,11 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       netWeight: toNumber(item.netWeight),
       volume: toNumber(item.volume),
       storeName: item.store?.name || evidence.storeName || '',
+      portName: String(item.port || contract.port?.name || readiness.portName || '').trim(),
+      containerLabel: String(item.containerLabel || contract.containerLabel || '').trim(),
+      shippedAt: shipmentDate(item.shippedAt ?? contract.shippedAt),
+      customsBroker: String(item.broker || contract.customsBroker || '').trim(),
+      supplement: String(item.supplement || '').trim(),
       purchaseCostCny,
       unitPriceUsd: round(unitPriceUsd, 10),
       totalUsd: round(totalUsd, 4),
@@ -272,6 +279,8 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     documentDate,
     portName: contract.port?.name || readiness.portName || '',
     containerLabel: contract.containerLabel || '',
+    destinationCountry: contract.customer?.country || '',
+    portOfLoading: contract.portOfLoading || '',
     currency: 'USD',
     tradeTerm,
     pricingPolicy: {
@@ -299,6 +308,7 @@ const loadPacketSources = async (salesContractId, options = {}, prismaClient = p
     where: { id: salesContractId },
     include: {
       port: true,
+      customer: { select: { country: true } },
       items: { select: { productId: true, storeId: true, sellingPrice: true } },
       packingItems: {
         include: { product: true, store: true },
@@ -464,6 +474,7 @@ const buildExportPacketWorkbook = async (packet) => {
   styleTable(packingSheet, 9, packingTotalRow, 10);
   [1, 6, 7, 8, 9].forEach((column) => { packingSheet.getCell(packingTotalRow, column).font = { name: 'Arial', bold: true }; });
 
+  addCustomsPreentrySheet(workbook, packet);
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
 };
@@ -500,7 +511,7 @@ const persistExportPacket = async (prismaClient, salesContractId, sources, packe
   }
   const buffer = await buildExportPacketWorkbook(packet);
   const dateTag = packet.documentDate.replace(/-/g, '');
-  const fileName = `${packet.contractNo}_出口合同_商业发票_装箱单_${dateTag}.xlsx`;
+  const fileName = `${packet.contractNo}_出口四单_${dateTag}.xlsx`;
   let file;
   await prismaClient.$transaction(async (tx) => {
     if (!locked) await writePacketAmounts(tx, salesContractId, sources.contract, packet);
@@ -529,7 +540,7 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
   const packet = evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
   if (!packet.ready) {
     const first = packet.issues.find((issue) => issue.severity === 'error');
-    throw createError(`出口三单资料未完整：${first?.productName ? `${first.productName}：` : ''}${first?.message || '请先完成预检'}`, 400);
+    throw createError(`出口四单资料未完整：${first?.productName ? `${first.productName}：` : ''}${first?.message || '请先完成预检'}`, 400);
   }
   return persistExportPacket(prismaClient, salesContractId, sources, packet, locked);
 };

@@ -417,7 +417,7 @@ const getFinanceSummary = async (req, res, next) => {
   }
 };
 
-/** 只读预览出口合同、商业发票、装箱单的资料完整度和建议价格。 */
+/** 只读预览出口四单的资料完整度和建议价格。 */
 const previewExportPacket = async (req, res, next) => {
   try {
     const packet = await exportPacketService.previewExportPacket(req.params.id, req.body || {});
@@ -445,9 +445,9 @@ const generateExportPacket = async (req, res, next) => {
         lineCount: result.packet.summary.lineCount,
       },
       req,
-      note: '生成并归档出口三单（外销合同、商业发票、装箱单）',
+      note: '生成并归档出口四单（外销合同、商业发票、装箱单、报关预录信息）',
     });
-    created(res, result, '出口三单已生成并归档');
+    created(res, result, '出口四单已生成并归档');
   } catch (error) {
     next(error);
   }

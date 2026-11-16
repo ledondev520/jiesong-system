@@ -201,7 +201,7 @@ function ShippingInfoCard({
         </dl>
         {shipped && (
           <p className="mt-3 text-xs text-muted-foreground print:hidden">
-            订单状态与外销合同文件相互独立；尚未生成外销合同文件时，可在右上角「单证」→「生成出口单证」中补生成。
+            订单状态与外销合同文件相互独立；尚未生成外销合同文件时，可在右上角「单证」→「生成出口四单」中补生成。
           </p>
         )}
       </CardContent>

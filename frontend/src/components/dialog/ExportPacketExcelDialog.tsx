@@ -1,7 +1,7 @@
 /**
  * Input: 出货汇总 Excel 与本票人工价格
- * Output: 自动识别合同、计算价格、原版三单下载；多票和缺项在界面处理
- * Pos: 出口列表的 Excel 制单入口，复用现有三单服务
+ * Output: 自动识别合同、计算价格、原版四单下载；多票和缺项在界面处理
+ * Pos: 出口列表的 Excel 制单入口，复用现有四单服务
  */
 "use client";
 
@@ -51,7 +51,7 @@ const percent = (value: number | null) =>
 const message = (error: unknown) =>
   error && typeof error === "object" && "message" in error
     ? String(error.message)
-    : "三单生成失败，请重试";
+    : "四单生成失败，请重试";
 
 export function ExportPacketExcelDialog({
   open,
@@ -103,12 +103,9 @@ export function ExportPacketExcelDialog({
       signal,
     );
     if (id !== request.current || signal.aborted) return;
-    saveBlobToFile(
-      blob,
-      `外销出口合同+发票+箱单+${result.selectedContractNo}.xlsx`,
-    );
+    saveBlobToFile(blob, `出口四单+${result.selectedContractNo}.xlsx`);
     setDownloaded(true);
-    toast.success("合同、商业发票、装箱单已生成并下载");
+    toast.success("合同、发票、箱单、报关预录信息已生成并下载");
   };
   const read = async (
     source: File,
@@ -211,10 +208,10 @@ export function ExportPacketExcelDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
-            Excel 出三单
+            Excel 出四单
           </DialogTitle>
           <DialogDescription>
-            上传出货汇总，自动按原模板生成合同、商业发票和箱单。文件包含多票时选择本次
+            上传出货汇总，自动生成合同、发票、箱单和报关预录信息。文件包含多票时选择本次
             EXP。生成时会记住本票人工单价，供下次同品名、同规格报价参考。
           </DialogDescription>
         </DialogHeader>
@@ -251,7 +248,7 @@ export function ExportPacketExcelDialog({
           {busy && (
             <p role="status" className="flex items-center gap-2 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />
-              正在读取并生成三单…
+              正在读取并生成四单…
             </p>
           )}
           {error && (
@@ -341,7 +338,7 @@ export function ExportPacketExcelDialog({
               </div>
               <dl className="grid gap-3 rounded-lg bg-muted/40 p-4 sm:grid-cols-4">
                 {[
-                  ["三单总额 USD", money(packet.summary.totalUsd)],
+                  ["四单总额 USD", money(packet.summary.totalUsd)],
                   ["采购成本 CNY", money(packet.summary.purchaseCostCny)],
                   ["成本加价率", percent(packet.summary.costMarkupRate)],
                   ["销售毛利率", percent(packet.summary.salesGrossMarginRate)],
@@ -361,7 +358,7 @@ export function ExportPacketExcelDialog({
                 <p className="text-sm text-muted-foreground">
                   本票纳入 {packet.lines.length} 行；另有{" "}
                   {preview.excludedRows.length}{" "}
-                  行标记为他方报关、不报关或埋单，未纳入本方三单。
+                  行标记为他方报关、不报关或埋单，未纳入本方四单。
                 </p>
               )}
               {packet.issues.length > 0 && (
@@ -438,7 +435,7 @@ export function ExportPacketExcelDialog({
               </div>
               {downloaded && (
                 <p role="status" className="text-sm text-emerald-700">
-                  三单已生成并下载，共 {packet.lines.length} 行、
+                  四单已生成并下载，共 {packet.lines.length} 行、
                   {packet.summary.boxes} 箱。
                 </p>
               )}
@@ -462,7 +459,7 @@ export function ExportPacketExcelDialog({
             重新计算
           </Button>
           <Button disabled={!packet?.ready || dirty || busy} onClick={generate}>
-            下载三单
+            下载四单
           </Button>
         </DialogFooter>
       </DialogContent>

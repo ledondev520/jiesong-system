@@ -1,4 +1,4 @@
-/** Synthetic Excel inputs for the upload-to-three-documents workflow. */
+/** Synthetic Excel inputs for the upload-to-four-documents workflow. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const ExcelJS = require('exceljs');
@@ -76,7 +76,7 @@ test('无效文件和改动后的来源版本不能生成，预览不需要数�
   await assert.rejects(() => prepareExcelPacket(buffer, { sourceVersion: 'old' }, deps()), /来源.*变化/);
 });
 
-test('原模板只填本票内容，保留条款与打印范围，三单公式金额一致且无提示文字', async () => {
+test('原模板只填本票内容，保留条款与打印范围，四单公式金额一致且无提示文字', async () => {
   const wb = new ExcelJS.Workbook();
   for (const name of ['合同', '发票', '箱单']) {
     const s = wb.addWorksheet(name); s.getCell('A8').value = 'Item';
@@ -89,13 +89,19 @@ test('原模板只填本票内容，保留条款与打印范围，三单公式�
   const result = await prepareExcelPacket(await workbook([row({ '出口单价(USD)': 600 })]), {}, deps());
   const buffer = await buildTemplatePacket(result.packet, Buffer.from(await wb.xlsx.writeBuffer()));
   const saved = new ExcelJS.Workbook(); await saved.xlsx.load(buffer);
-  assert.deepEqual(saved.worksheets.map((s) => s.name), ['合同', '发票', '箱单']);
+  assert.deepEqual(saved.worksheets.map((s) => s.name), ['合同', '发票', '箱单', '报关预录信息']);
   assert.equal(saved.getWorksheet('合同').getCell('A26').value, 'Existing payment terms');
   assert.equal(saved.getWorksheet('合同').getCell('F25').value.result, 2400);
   assert.equal(saved.getWorksheet('发票').getCell('F25').value.result, 2400);
   assert.equal(saved.getWorksheet('箱单').getCell('E25').value.result, 14);
   assert.equal(saved.getWorksheet('合同').getCell('B10').value, null);
   assert.equal(saved.getWorksheet('合同').pageSetup.printArea, 'A1:F44');
+  const customs = saved.getWorksheet('报关预录信息');
+  assert.equal(customs.getCell('H12').value.formula, "'合同'!F9");
+  assert.equal(customs.getCell('H13').value.result, 2400);
+  assert.equal(customs.getCell('J13').value.result, 14);
+  assert.equal(customs.getCell('L7').value, null);
+  assert.equal(customs.getCell('B7').value, 'FOB', '模板条款为空时仍使用本票确认的成交方式');
   saved.eachSheet((sheet) => sheet.eachRow((r) => r.eachCell((c) => assert.doesNotMatch(String(c.value?.result ?? c.value ?? ''), /DRAFT|待确认|源行|Source:|Scope:/))));
 });
 
@@ -141,8 +147,60 @@ test('超过16行时模板扩展，原条款和合计顺延，配置变更阻止
   assert.equal(saved.getWorksheet('合同').getCell('F27').value.result, result.packet.summary.totalUsd);
   assert.equal(saved.getWorksheet('合同').getCell('A28').value, 'Existing clause');
   assert.equal(saved.getWorksheet('合同').pageSetup.printArea, 'A1:F46');
+  const customs = saved.getWorksheet('报关预录信息');
+  assert.equal(customs.getCell('H29').value.formula, "'合同'!F26");
+  assert.equal(customs.getCell('H30').value.formula, 'SUM(H12:H29)');
+  assert.equal(customs.getCell('H30').value.result, result.packet.summary.totalUsd);
+  assert.equal(customs.pageSetup.printArea, 'A1:V30');
   const changed = deps(); changed.pricingConfig = { exchangeRate: 6.8, exchangeAdjustment: -0.1, defaultMarkup: 0.4, categoryMarkups: [] };
   await assert.rejects(() => prepareExcelPacket(buffer, { ...result.input, packetVersion: result.packetVersion }, changed), /依据已变化/);
+});
+
+test('Excel预录保留逐行日期、柜号、港口和备注，多港口提示且缺失日期留空', async () => {
+  const columns = [...headers, '出货日期', '柜子编号', '港口', '门店'];
+  const result = await prepareExcelPacket(await workbook([
+    row({ 出货日期: new Date('2026-11-16T00:00:00Z'), 柜子编号: 'TEST-C01', 港口: '合成港甲', 门店: '测试店甲' }),
+    row({ 出货日期: '2026-11-17', 柜子编号: 'TEST-C02', 港口: '合成港乙', 门店: '测试店乙' }),
+    row(),
+  ], columns), {}, deps());
+  assert.deepEqual(result.packet.lines.map((line) => line.shippedAt), ['2026-11-16', '2026-11-17', '']);
+  assert.equal(result.packet.lines[1].portName, '合成港乙');
+  const template = new ExcelJS.Workbook();
+  for (const name of ['合同','发票','箱单']) template.addWorksheet(name).getCell('A8').value = 'Item';
+  template.getWorksheet('合同').getCell('A27').value = 'FROM TEST PORT TO USA';
+  const saved = new ExcelJS.Workbook();
+  await saved.xlsx.load(await buildTemplatePacket(result.packet, Buffer.from(await template.xlsx.writeBuffer())));
+  const sheet = saved.getWorksheet('报关预录信息');
+  assert.equal(sheet.getCell('N5').value.result, 'USA');
+  assert.match(sheet.getCell('B8').text, /多个港口/);
+  assert.equal(sheet.getCell('L7').value, null);
+  assert.equal(sheet.getCell('P7').value, null);
+  assert.equal(sheet.getCell('R12').value.toISOString().slice(0,10), '2026-11-16');
+  assert.equal(sheet.getCell('R14').value, null);
+  assert.equal(sheet.getCell('S13').value, '合成港乙');
+  assert.equal(sheet.getCell('T13').value, '测试店乙');
+  assert.equal(sheet.getCell('V12').value, row().商品补充信息);
+});
+
+test('非空无效出货日期不能静默写成1900年或其他日期', async () => {
+  for (const date of ['2026-02-30', 'not-a-date', 123]) {
+    const source = await workbook([row({ 出货日期: date })], [...headers,'出货日期']);
+    await assert.rejects(() => prepareExcelPacket(source, {}, deps()), /出货日期/);
+  }
+});
+
+test('日期单元格与日期文本使用同一出货日选择税库，不回退到单证日期', async () => {
+  for (const date of [new Date('2026-11-16T00:00:00Z'), '2026-11-16']) {
+    const dependencies = deps();
+    dependencies.profile.refundLibrary.records = [
+      { code: '99999999', rate: 13, startDate: '20260101', endDate: '20261031' },
+      { code: '99999999', rate: 0, startDate: '20261101', endDate: '21001231' },
+    ];
+    const source = await workbook([row({ 出货日期: date })], [...headers,'出货日期']);
+    const result = await prepareExcelPacket(source, { documentDate:'2026-10-01' }, dependencies);
+    assert.equal(result.packet.lines[0].refundRate, 0);
+    assert.equal(result.packet.lines[0].shippedAt, '2026-11-16');
+  }
 });
 
 test('稀疏超限坐标在Excel模型分配前拒绝', async () => {

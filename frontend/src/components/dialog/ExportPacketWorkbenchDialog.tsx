@@ -1,7 +1,7 @@
 /**
  * Input: 当前出口合同及用户确认的现汇、买方、包装种类、日期和价格覆盖
- * Output: 逐行定价/资料预检、确认生成并下载出口合同/商业发票/装箱单
- * Pos: 出口合同详情页的出口三单工作台
+ * Output: 逐行定价/资料预检、确认生成并下载合同/发票/箱单/报关预录信息
+ * Pos: 出口合同详情页的出口四单工作台
  */
 
 "use client";
@@ -165,7 +165,7 @@ export function ExportPacketWorkbenchDialog({
         const message =
           error && typeof error === "object" && "message" in error
             ? String(error.message)
-            : "出口三单预检失败";
+            : "出口四单预检失败";
         toast.error(message);
       },
       () => {
@@ -203,14 +203,14 @@ export function ExportPacketWorkbenchDialog({
         response.data.file.id,
         response.data.file.fileName,
       );
-      toast.success("出口合同、商业发票、装箱单已生成、归档并下载");
+      toast.success("合同、发票、箱单、报关预录信息已生成、归档并下载");
       await onGenerated?.();
       onOpenChange(false);
     } catch (error: unknown) {
       const message =
         error && typeof error === "object" && "message" in error
           ? String(error.message)
-          : "出口三单生成失败";
+          : "出口四单生成失败";
       toast.error(message);
     } finally {
       setGenerating(false);
@@ -223,10 +223,10 @@ export function ExportPacketWorkbenchDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-primary" />
-            出口三单工作台 · {salesContract.contractNo}
+            出口四单工作台 · {salesContract.contractNo}
           </DialogTitle>
           <DialogDescription>
-            一次预检并生成外销合同、商业发票、装箱单。预览不改数据，确认生成后才回写采用价格并归档版本。
+            一次预检并生成合同、发票、箱单、报关预录信息。预览不改数据，确认生成后才回写采用价格并归档版本。
           </DialogDescription>
         </DialogHeader>
 
