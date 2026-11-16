@@ -127,6 +127,8 @@ test('数据库工作簿生成出口四单，报关预录与合同及箱单同�
   assert.equal(customs.getCell('D12').value.result, packet.lines[0].declaration);
   assert.equal(customs.getCell('L7').value, null, '缺少出货日期时不拿单证日期替代');
   assert.equal(customs.getCell('N5').value, null, '缺少目的国时不按港口猜测');
+  assert.equal(customs.getCell('P12').value.formula, 'IF($N$5="","",$N$5)', '打开重算也必须保持缺失目的国为空白');
+  assert.equal(customs.getCell('O12').value.formula, "'商业发票'!I10&\"\"", '打开重算也必须保持缺失货源地为空白');
   assert.equal(customs.getCell('A1').fill.fgColor.argb, 'FF1F4E78');
   assert.equal(customs.getColumn(4).width, 48);
   assert.equal(customs.getRow(12).height, 52);

@@ -101,6 +101,7 @@ test('原模板只填本票内容，保留条款与打印范围，四单公式�
   assert.equal(customs.getCell('H13').value.result, 2400);
   assert.equal(customs.getCell('J13').value.result, 14);
   assert.equal(customs.getCell('L7').value, null);
+  assert.equal(customs.getCell('B7').value, 'FOB', '模板条款为空时仍使用本票确认的成交方式');
   saved.eachSheet((sheet) => sheet.eachRow((r) => r.eachCell((c) => assert.doesNotMatch(String(c.value?.result ?? c.value ?? ''), /DRAFT|待确认|源行|Source:|Scope:/))));
 });
 

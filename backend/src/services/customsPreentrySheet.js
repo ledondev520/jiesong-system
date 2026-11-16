@@ -67,7 +67,7 @@ const addCustomsPreentrySheet = (workbook, packet) => {
     I6: ['净重(kg)','J6',ref(packing, `${template ? 'G' : 'H'}${sourceTotal}`,packet.summary.netWeight)],
     M6: ['体积(m³)','N6',ref(packing, `${template ? 'H' : 'I'}${sourceTotal}`,packet.summary.volume)],
     Q6: ['总价(USD)','R6',ref(contract, `${template ? 'F' : 'H'}${sourceTotal}`,packet.summary.totalUsd)],
-    A7: ['贸易条款/起运港','B7',template ? linked(contract, `A${sourceTotal+3}`) : packet.tradeTerm + (packet.portOfLoading ? ` ${packet.portOfLoading}` : '')],
+    A7: ['贸易条款/起运港','B7',template && sourceValue(contract, `A${sourceTotal+3}`) ? linked(contract, `A${sourceTotal+3}`) : packet.tradeTerm + (packet.portOfLoading ? ` ${packet.portOfLoading}` : '')],
     K7: ['出货日期','L7',dateValue(single('shippedAt'))],
     O7: ['内部柜号','P7',single('containerLabel') || null],
     A8: ['整票提示','B8',null],
@@ -100,13 +100,15 @@ const addCustomsPreentrySheet = (workbook, packet) => {
     const destinations = ['A','B','C','D','E','F','J','K','L','M','N','O'];
     destinations.forEach((col,j) => {
       const other = { C: 'D', D: 'J', O: 'I' }[col];
-      sheet.getCell(`${col}${row}`).value = ref(packingColumns[j] ? packing : invoice, `${packingColumns[j] || other}${source}`, values[j]);
+      const link = ref(packingColumns[j] ? packing : invoice, `${packingColumns[j] || other}${source}`, values[j]);
+      if (['B','C','D','F','N','O'].includes(col)) link.formula += '&""';
+      sheet.getCell(`${col}${row}`).value = link;
     });
     sheet.getCell(`G${row}`).value = ref(contract, `${template ? 'E' : 'G'}${source}`,line.unitPriceUsd);
     sheet.getCell(`H${row}`).value = ref(contract, `${template ? 'F' : 'H'}${source}`,line.totalUsd);
     sheet.getCell(`I${row}`).value = { formula: '$J$5', result: packet.currency };
     sheet.getCell(`I${row}`).dataValidation = { type: 'list', formulae: ['"USD"'] };
-    sheet.getCell(`P${row}`).value = { formula: '$N$5', result: sheet.getCell('N5').value?.result ?? packet.destinationCountry ?? '' };
+    sheet.getCell(`P${row}`).value = { formula: 'IF($N$5="","",$N$5)', result: sheet.getCell('N5').value?.result ?? packet.destinationCountry ?? '' };
     for (const [col,value] of [['Q',line.containerLabel],['R',dateValue(line.shippedAt)],['S',line.portName],['T',line.storeName],['U',line.customsBroker],['V',line.supplement]]) sheet.getCell(`${col}${row}`).value = value || null;
     sheet.getRow(row).height = 52;
     for (let col=1;col<=22;col+=1) paint(sheet.getCell(row,col), { fill: i%2 ? 'FFEAF3F8' : 'FFFFFFFF', horizontal: [4,14,15,22].includes(col) ? 'left' : 'center', wrapText: [4,14,15,22].includes(col) });
