@@ -120,7 +120,7 @@ test('loading-plan 路由：显式角色白名单 ADMIN/SALES（OD-8），拒绝
 });
 
 
-test('Excel三单成本和下载仅ADMIN可读写，在读取上传前拒绝SALES及Agent', () => {
+test('Excel四单成本和下载仅ADMIN可读写，在读取上传前拒绝SALES及Agent', () => {
   for (const action of ['preview', 'generate']) {
     const guard = getRouteHandlers(salesRouter, `/export-packet/excel/${action}`, 'post')[0].handle;
     assert.deepEqual([...guard.allowedRoles], ['ADMIN']);

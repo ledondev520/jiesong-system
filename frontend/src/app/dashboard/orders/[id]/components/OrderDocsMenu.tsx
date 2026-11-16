@@ -50,7 +50,7 @@ export function OrderDocsMenu({
       <DropdownMenuContent align="end" className="w-60">
         {allowed("exportPacket") && (
           <DropdownMenuItem onSelect={() => onSelect("exportPacket")}>
-            生成出口单证（外销合同 / 商业发票 / 装箱单）
+            生成出口四单（合同 / 发票 / 箱单 / 报关预录信息）
           </DropdownMenuItem>
         )}
         {allowed("customsDraft") && (

@@ -47,6 +47,8 @@ Lightweight UI-only PRs do not weaken required checks: `scripts/check-ui-only.cj
 - Require HTTPS in external endpoints and internal服务间连接。
 
 ### 4) 数据与隐私层（Data Protection）
+
+- 出口四单的 `customsPreentrySheet.js` 只消费同一制单快照并引用本票工作簿，不写库存/申报状态。`exportPacketService.js` 保留既有内部归档标记，使 `fileService.assertFileAccess` 的ADMIN权限与 `taxRefundShipmentService.js` 的原有明细指纹/文件校验和在升级及回滚后均可识别新旧单据；显示名称和下载文件名使用四单。`backend/scripts/generate-export-packet.js` 复用网页Excel生成器，以 `wx` 独占预留0600输出、拒绝覆盖已有文件，失败只按dev/ino回收本次预留文件；不写业务库，人工价格记忆仍走既有私有存储规则。
 - Excel 三单通过 `sales.js` 现有认证及ADMIN角色接收内存上传，未登录/SALES/Agent不允许读取成本或生成。`exportPacketExcelService.js` 校验 .xlsx、10MB输入/60MB展开/500行每票上限，在ExcelJS分配模型前拒绝超出1–65535的工作表编号，避免稀疏编号导致解析挂起，按源文件与制单版本拒绝过时生成；上传文件不落库，不改变库存、出运、付款或申报状态。公司模板含银行条款，使用 `UPLOAD_DIR/export-packet/profile.json` 的0700/0600私有配置；安装器拒绝子目录/文件符号链接并备份旧配置。业务资料不发送给外部查询；外部请求只读取公开汇率和税库版本。真实模板、报价、目录和税库不放入测试夹具或Git。确认生成后的人工价以同目录0600不可覆盖记录留存，原子发布且预览只读；重复下载幂等，不修改业务表。
 - Classify data by tier per `data-classification.json` and apply处理规则 in code and documents.
 - Treat supplier bank routing fields, company bank statements and transaction identifiers, signed/generated contract artifacts, carrier packing lists, and their review records as Restricted data; persist only masked company account identifiers with structured bank rows, and do not include production values in logs, engineering memory, or test fixtures.

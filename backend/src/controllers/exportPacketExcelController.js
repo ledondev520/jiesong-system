@@ -1,4 +1,4 @@
-/** Input: authenticated XLSX upload. Output: packet preview or the three-sheet download, without business-record mutations. */
+/** Input: authenticated XLSX upload. Output: packet preview or the four-sheet download, without business-record mutations. */
 const service = require('../services/exportPacketExcelService');
 const { createError } = require('../middleware/errorHandler');
 const { success } = require('../utils/response');

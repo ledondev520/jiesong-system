@@ -1,7 +1,7 @@
 /**
  * Input: exportPacketService、API mock 与下载 mock
- * Output: 出口三单预览、生成和下载路径契约测试
- * Pos: 出口三单前端数据 Module 测试
+ * Output: 出口四单预览、生成和下载路径契约测试
+ * Pos: 出口四单前端数据 Module 测试
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,7 +38,7 @@ describe("exportPacketService", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("xlsx")));
   });
 
-  it("预览调用只读出口三单端点", async () => {
+  it("预览调用只读出口四单端点", async () => {
     mockPost.mockResolvedValue({ data: { ready: true } });
     await exportPacketService.preview("sales-1", input);
     expect(mockPost).toHaveBeenCalledWith(
@@ -50,7 +50,7 @@ describe("exportPacketService", () => {
   it("确认生成调用生成端点并可从统一受保护附件路径下载", async () => {
     mockPost.mockResolvedValue({ data: { file: { id: "file-1" } } });
     await exportPacketService.generate("sales-1", input);
-    await exportPacketService.download("file-1", "EXP260011_出口三单.xlsx");
+    await exportPacketService.download("file-1", "EXP260011_出口四单.xlsx");
     expect(mockPost).toHaveBeenCalledWith(
       "/sales/sales-1/export-packet/generate",
       input,

@@ -1,8 +1,8 @@
 import { authFetchInit } from "@/lib/browser-session";
 /**
  * Input: EXP 编号、本票现汇/买方/包装种类/单证日期及人工确认价格
- * Output: 出口三单只读预检、生成归档和受保护文件下载
- * Pos: 出口三单工作台前端数据 Module
+ * Output: 出口四单只读预检、生成归档和受保护文件下载
+ * Pos: 出口四单工作台前端数据 Module
  */
 
 import api from "@/lib/axios";
@@ -170,7 +170,7 @@ export const exportPacketService = {
         },
       );
       if (!(blob instanceof Blob) || blob.size === 0 || /json/i.test(blob.type))
-        throw new Error("三单文件内容不可用，请重新生成");
+        throw new Error("四单文件内容不可用，请重新生成");
       return blob;
     } catch (error: unknown) {
       const data =

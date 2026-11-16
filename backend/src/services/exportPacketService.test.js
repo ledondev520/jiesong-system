@@ -1,7 +1,7 @@
 /**
- * Input: 出口三单冻结快照、定价政策和 Excel 生成器
- * Output: 利润约束、历史报价筛选、预检阻断和三 Sheet 结构测试
- * Pos: 出口三单工作台领域 Module 契约测试
+ * Input: 出口四单冻结快照、定价政策和 Excel 生成器
+ * Output: 利润约束、历史报价筛选、预检阻断和四 Sheet 结构测试
+ * Pos: 出口四单工作台领域 Module 契约测试
  */
 
 const test = require('node:test');
@@ -111,15 +111,38 @@ test('人工覆盖单价偏离目标加价超过5个百分点时阻断', () => {
   assert.ok(packet.issues.some((issue) => issue.code === 'MARKUP_OUTSIDE_POLICY'));
 });
 
-test('工作簿只生成外销合同、商业发票、装箱单三张表且合计一致', async () => {
+test('数据库工作簿生成出口四单，报关预录与合同及箱单同源', async () => {
   const packet = evaluateExportPacket(contract(), readiness(), [], options());
   const buffer = await buildExportPacketWorkbook(packet);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
-  assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ['外销合同', '商业发票', '装箱单']);
+  assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), ['外销合同', '商业发票', '装箱单', '报关预录信息']);
   assert.equal(workbook.getWorksheet('外销合同').getCell('H11').value, packet.summary.totalUsd);
   assert.equal(workbook.getWorksheet('商业发票').getCell('H11').value, packet.summary.totalUsd);
   assert.equal(workbook.getWorksheet('装箱单').getCell('H11').value, packet.summary.netWeight);
+  const customs = workbook.getWorksheet('报关预录信息');
+  assert.equal(customs.getCell('H12').value.formula, "'外销合同'!H10");
+  assert.equal(customs.getCell('H13').value.result, packet.summary.totalUsd);
+  assert.equal(customs.getCell('K13').value.result, packet.summary.grossWeight);
+  assert.equal(customs.getCell('D12').value.result, packet.lines[0].declaration);
+  assert.equal(customs.getCell('L7').value, null, '缺少出货日期时不拿单证日期替代');
+  assert.equal(customs.getCell('N5').value, null, '缺少目的国时不按港口猜测');
+  assert.equal(customs.getCell('A1').fill.fgColor.argb, 'FF1F4E78');
+  assert.equal(customs.getColumn(4).width, 48);
+  assert.equal(customs.getRow(12).height, 52);
+  assert.equal(customs.pageSetup.printTitlesRow, '1:11');
+});
+
+test('数据库预录元数据来自本票装箱及客户信息，不虚构运输资料', () => {
+  const source = contract({ shippedAt: new Date('2026-11-16T00:00:00Z'), containerLabel: 'TEST-C01', customsBroker: '合成报关公司', customer: { country: 'US' } });
+  source.packingItems[0].supplement = '合成备注';
+  const packet = evaluateExportPacket(source, readiness(), [], options());
+  assert.equal(packet.destinationCountry, 'US');
+  assert.equal(packet.lines[0].shippedAt, '2026-11-16');
+  assert.equal(packet.lines[0].containerLabel, 'TEST-C01');
+  assert.equal(packet.lines[0].portName, '洛杉矶');
+  assert.equal(packet.lines[0].customsBroker, '合成报关公司');
+  assert.equal(packet.lines[0].supplement, '合成备注');
 });
 
 test('分类加价沿祖先链取最近一项：瓷砖 10%，单价分档就近取整', () => {

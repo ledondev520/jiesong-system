@@ -164,7 +164,7 @@ test('menu documents HTTP: commercial generation archives private workbook and r
   assert.deepEqual(first.bytes, repeated.bytes);
   assert.deepEqual(first.bytes, fs.readFileSync(physical));
   assert.equal(first.bytes.length, file.fileSize);
-  assert.deepEqual(first.workbook.worksheets.map(sheet => sheet.name), ['外销合同', '商业发票', '装箱单']);
+  assert.deepEqual(first.workbook.worksheets.map(sheet => sheet.name), ['外销合同', '商业发票', '装箱单', '报关预录信息']);
   for (const name of ['外销合同', '商业发票']) {
     const sheet = first.workbook.getWorksheet(name);
     assert.equal(sheet.getCell('B4').value, packetInput.sellerName);
@@ -175,6 +175,7 @@ test('menu documents HTTP: commercial generation archives private workbook and r
   }
   assert.equal(first.workbook.getWorksheet('装箱单').getCell('F10').value, 2);
   assert.equal(first.workbook.getWorksheet('装箱单').getCell('G10').value, 20);
+  assert.equal(first.workbook.getWorksheet('报关预录信息').getCell('H13').value.result, packet.summary.totalUsd);
   assert.equal(saved.packing_items[0].unitPrice, packet.lines[0].unitPriceUsd);
   assert.deepEqual(documentSnapshot(f), saved);
 });

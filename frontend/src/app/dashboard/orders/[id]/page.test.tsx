@@ -155,7 +155,7 @@ vi.mock("@/components/dialog/GenerateThreeFormsDialog", () => ({
 
 vi.mock("@/components/dialog/ExportPacketWorkbenchDialog", () => ({
   ExportPacketWorkbenchDialog: ({ open }: { open: boolean }) =>
-    open ? <div>出口三单预检区</div> : null,
+    open ? <div>出口四单预检区</div> : null,
 }));
 
 // This suite tests the parent flow; preparation API details have their own dialog tests.
@@ -489,7 +489,7 @@ describe("OrderDetailPage 交互逻辑", () => {
     expect(mockExportExcel).toHaveBeenCalledWith("s-1", "EXP260008");
   });
 
-  it("「单证 ▾」菜单区分生成出口单证与申报三表入口", async () => {
+  it("「单证 ▾」菜单区分生成出口四单与申报三表入口", async () => {
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -518,11 +518,11 @@ describe("OrderDetailPage 交互逻辑", () => {
     expect(
       screen.getByRole("menuitem", { name: "报关单草稿" }),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole("menuitem", { name: /生成出口单证/ }));
-    expect(await screen.findByText("出口三单预检区")).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: /生成出口四单/ }));
+    expect(await screen.findByText("出口四单预检区")).toBeInTheDocument();
     // 原先三个含义相近的页头按钮不再单独出现
     expect(
-      screen.queryByRole("button", { name: "出口三单工作台" }),
+      screen.queryByRole("button", { name: "出口四单工作台" }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "生成申报三表" }),

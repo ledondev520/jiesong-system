@@ -46,7 +46,7 @@ const readDownload = async (download: Download) => {
       process.execPath,
       [
         "-e",
-        `const fs=require('fs'),ExcelJS=require('exceljs');(async()=>{const w=new ExcelJS.Workbook();await w.xlsx.load(fs.readFileSync(0));const value=c=>c.value?.result??c.value;process.stdout.write(JSON.stringify({names:w.worksheets.map(s=>s.name),total:value(w.getWorksheet('合同').getCell('F25')),invoice:value(w.getWorksheet('发票').getCell('F25')),name:value(w.getWorksheet('箱单').getCell('B9')),quantity:value(w.getWorksheet('箱单').getCell('I9')),boxes:value(w.getWorksheet('箱单').getCell('E25')),next:value(w.getWorksheet('箱单').getCell('B10')),print:w.getWorksheet('合同').pageSetup.printArea}));})().catch(()=>process.exit(1));`,
+        `const fs=require('fs'),ExcelJS=require('exceljs');(async()=>{const w=new ExcelJS.Workbook();await w.xlsx.load(fs.readFileSync(0));const value=c=>c.value?.result??c.value;process.stdout.write(JSON.stringify({names:w.worksheets.map(s=>s.name),total:value(w.getWorksheet('合同').getCell('F25')),invoice:value(w.getWorksheet('发票').getCell('F25')),customs:value(w.getWorksheet('报关预录信息').getCell('H13')),declaration:value(w.getWorksheet('报关预录信息').getCell('D12')),name:value(w.getWorksheet('箱单').getCell('B9')),quantity:value(w.getWorksheet('箱单').getCell('I9')),boxes:value(w.getWorksheet('箱单').getCell('E25')),next:value(w.getWorksheet('箱单').getCell('B10')),print:w.getWorksheet('合同').pageSetup.printArea}));})().catch(()=>process.exit(1));`,
       ],
       {
         cwd: path.resolve("../backend"),
@@ -57,14 +57,14 @@ const readDownload = async (download: Download) => {
   );
 };
 
-test("上传自动下载原版三单，人工改价后金额联动，手机界面可操作，业务库未改", async ({
+test("上传自动下载原版四单，人工改价后金额联动，手机界面可操作，业务库未改", async ({
   page,
 }, testInfo) => {
   await forwardRealApi(page, fixture);
   await loginAs(page, fixture, "FINANCE");
   await page.goto("/dashboard/orders");
-  await page.getByRole("button", { name: "Excel 出三单", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Excel 出三单" });
+  await page.getByRole("button", { name: "Excel 出四单", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Excel 出四单" });
   const before = readExportDocuments(fixture);
   const downloading = page.waitForEvent("download");
   await dialog.getByLabel("上传出货汇总Excel").setInputFiles({
@@ -75,9 +75,10 @@ test("上传自动下载原版三单，人工改价后金额联动，手机界�
   });
   const first = await readDownload(await downloading);
   expect(first).toMatchObject({
-    names: ["合同", "发票", "箱单"],
+    names: ["合同", "发票", "箱单", "报关预录信息"],
     total: 2400,
     invoice: 2400,
+    customs: 2400,
     name: "合成铺饭机",
     quantity: 4,
     boxes: 14,
@@ -88,14 +89,15 @@ test("上传自动下载原版三单，人工改价后金额联动，手机界�
   await expect(dialog.getByText("销售毛利率", { exact: true })).toBeVisible();
   await expect(dialog.getByText(/另有 1 行/)).toBeVisible();
   await dialog.getByLabel("合成铺饭机出口单价").fill("650");
-  await expect(dialog.getByRole("button", { name: "下载三单" })).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "下载四单" })).toBeDisabled();
   await dialog.getByRole("button", { name: "重新计算" }).click();
-  await expect(dialog.getByRole("button", { name: "下载三单" })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "下载四单" })).toBeEnabled();
   const secondDownload = page.waitForEvent("download");
-  await dialog.getByRole("button", { name: "下载三单" }).click();
+  await dialog.getByRole("button", { name: "下载四单" }).click();
   expect(await readDownload(await secondDownload)).toMatchObject({
     total: 2600,
     invoice: 2600,
+    customs: 2600,
     quantity: 4,
     boxes: 14,
   });
@@ -103,7 +105,7 @@ test("上传自动下载原版三单，人工改价后金额联动，手机界�
     path: testInfo.outputPath("excel-export-desktop.png"),
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(dialog.getByRole("button", { name: "下载三单" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "下载四单" })).toBeVisible();
   await expect(dialog.getByLabel("本票现汇 CNY/USD")).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("excel-export-mobile.png"),
@@ -118,8 +120,8 @@ test("多票选择后才生成；无登录和销售角色不能上传制单", as
   await forwardRealApi(page, fixture);
   await loginAs(page, fixture, "FINANCE");
   await page.goto("/dashboard/orders");
-  await page.getByRole("button", { name: "Excel 出三单", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Excel 出三单" });
+  await page.getByRole("button", { name: "Excel 出四单", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Excel 出四单" });
   let count = 0;
   page.on("download", () => {
     count += 1;
@@ -183,8 +185,8 @@ test("自动报价按分档就近取整，利润偏离提示不阻止下载", as
   await forwardRealApi(page, fixture);
   await loginAs(page, fixture, "FINANCE");
   await page.goto("/dashboard/orders");
-  await page.getByRole("button", { name: "Excel 出三单", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Excel 出三单" });
+  await page.getByRole("button", { name: "Excel 出四单", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Excel 出四单" });
   const downloading = page.waitForEvent("download");
   await dialog.getByLabel("上传出货汇总Excel").setInputFiles({
     name: "automatic.xlsx",
@@ -197,5 +199,5 @@ test("自动报价按分档就近取整，利润偏离提示不阻止下载", as
     invoice: 600,
   });
   await expect(dialog.getByText(/取整后成本加价率 50%/)).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "下载三单" })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "下载四单" })).toBeEnabled();
 });

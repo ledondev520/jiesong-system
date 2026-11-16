@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { OrderDocsMenu } from "./OrderDocsMenu";
 
 const LABELS = {
-  exportPacket: "生成出口单证（外销合同 / 商业发票 / 装箱单）",
+  exportPacket: "生成出口四单（合同 / 发票 / 箱单 / 报关预录信息）",
   customsDraft: "报关单草稿",
   packingCheck: "船司装箱单核对",
   exportWorkbook: "导出出口工作簿",

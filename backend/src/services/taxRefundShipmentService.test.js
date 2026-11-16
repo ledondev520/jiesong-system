@@ -20,6 +20,15 @@ contract.files[0].checksum = 'c'.repeat(64);
 contract.files[0].description = `${EXPORT_PACKET_DESCRIPTION}:${buildPackingSourceVersion(contract.packingItems)}`;
 const readiness = { taxRefundReady: true, issues: [], lines: [{ packingItemId: 'pack1', hsEvidence: { refundRate: 13 } }] };
 const build = (overrides = {}) => service.buildShipmentPreparation({ salesContract: contract, purchases: [purchase], declaration: contract.customsDeclarations[0], invoiceRecords: [invoice], exportReadiness: readiness, ...overrides });
+
+test('四单上线后历史三单仍可作为退税材料，明细变更仍作废', () => {
+  assert.equal(EXPORT_PACKET_DESCRIPTION, '出口三单生成版本（外销合同、商业发票、装箱单）');
+  const old = structuredClone(contract);
+  old.files[0].description = `${EXPORT_PACKET_DESCRIPTION}:${buildPackingSourceVersion(old.packingItems)}`;
+  assert.equal(build({ salesContract: old }).checklist.find(x => x.id === 'export-packet').status, 'ready');
+  old.packingItems[0].quantity += 1;
+  assert.equal(build({ salesContract: old }).checklist.find(x => x.id === 'export-packet').status, 'missing');
+});
 const client = (contracts = [contract]) => ({ salesContract: { findMany: async () => contracts, findUnique: async () => contracts[0] }, purchaseContract: { findMany: async () => [purchase] }, invoiceRecord: { findMany: async () => [invoice] } });
 
 test('机器核验通过且无退税草稿，也能确认内部出货清单', () => {
@@ -84,10 +93,10 @@ test('确认拒绝旧版本、重复点击复用文件且不设置正式申报�
 test('旧三单变动、未知报关单和多次出货复用发票不能直接确认', async () => {
   const changed = { ...contract, packingItems: contract.packingItems.map(x => ({ ...x, quantity: 3 })) };
   assert.equal(build({ salesContract: changed }).materialReady, false);
-  assert.match(build({ salesContract: changed }).materialBlockers.join('；'), /三单版本/);
+  assert.match(build({ salesContract: changed }).materialBlockers.join('；'), /单证版本/);
   for (const updates of [{ specification: '新规格' }, { hsCode: '1111111111' }, { declarationElements: '新申报要素' }, { origin: '新货源地' }, { product: { ...contract.packingItems[0].product, hsCode: '1111111111' } }]) {
     const edited = { ...contract, packingItems: contract.packingItems.map(x => ({ ...x, ...updates })) };
-    assert.match(build({ salesContract: edited }).materialBlockers.join('；'), /三单版本/);
+    assert.match(build({ salesContract: edited }).materialBlockers.join('；'), /单证版本/);
   }
   await assert.rejects(service.getShipmentPreparation('sc1', 'other-cd', { prismaClient: client(), readinessLoader: async () => readiness }), /不属于/);
   assert.equal(build({ invoiceUsages: { [invoiceNo]: ['sc1:cd1', 'sc2:cd2'] } }).materialReady, false);

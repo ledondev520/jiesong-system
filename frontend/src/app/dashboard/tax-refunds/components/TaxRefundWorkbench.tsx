@@ -271,7 +271,7 @@ export function TaxRefundWorkbench() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-3xl text-sm text-muted-foreground">
-          出货后自动归集三单、报关单和进项发票；处理差异后一次确认生成清单。
+          出货后自动归集四单、报关单和进项发票；处理差异后一次确认生成清单。
         </p>
         <div className="flex flex-wrap gap-2">
           <BusinessWrite>

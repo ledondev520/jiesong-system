@@ -75,7 +75,7 @@ const configure = async ({ template, catalog, refundDbf, refundVersion, reviewed
     templateBase64: Buffer.from(await workbook.xlsx.writeBuffer()).toString('base64') };
   await installProfile(profile);
   const saved = await loadProfile();
-  if (saved.goods.length !== goods.length || saved.refundLibrary.version !== refundVersion) throw new Error('三单配置保存后核对失败');
+  if (saved.goods.length !== goods.length || saved.refundLibrary.version !== refundVersion) throw new Error('四单配置保存后核对失败');
   return { goodsCount: goods.length, taxVersion: refundVersion, templateSheets: 3 };
 };
 

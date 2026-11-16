@@ -72,7 +72,7 @@ function workbook(bytes: Buffer): Workbook {
   const script = `const fs=require('node:fs'); const ExcelJS=require('exceljs');
 (async()=>{const w=new ExcelJS.Workbook();await w.xlsx.load(fs.readFileSync(0));
 process.stdout.write(JSON.stringify(w.worksheets.map(s=>({name:s.name,
-rows:Array.from({length:s.rowCount},(_,i)=>Array.from({length:s.columnCount},(_,j)=>s.getCell(i+1,j+1).value))}))));})().catch(()=>process.exit(1));`;
+rows:Array.from({length:s.rowCount},(_,i)=>Array.from({length:s.columnCount},(_,j)=>{const v=s.getCell(i+1,j+1).value;return v?.result??v;}))}))));})().catch(()=>process.exit(1));`;
   return JSON.parse(
     execFileSync(process.execPath, ["-e", script], {
       cwd: path.resolve("../backend"),
@@ -165,21 +165,21 @@ async function generateForms(page: Page, dialog: Locator) {
   return { ids, download, bytes: await downloadBytes(download) };
 }
 /**
- * 职责：从合同详情打开商业出口三单工作台
+ * 职责：从合同详情打开商业出口四单工作台
  * @param page 已进入合成合同详情的页面
- * @returns 当前合同的商业三单弹窗定位器
+ * @returns 当前合同的商业四单弹窗定位器
  * @throws 入口点击失败或页面关闭
  */
 async function openPacket(page: Page) {
   await page.getByRole("button", { name: "单证", exact: true }).click();
-  await page.getByRole("menuitem", { name: /生成出口单证/ }).click();
+  await page.getByRole("menuitem", { name: /生成出口四单/ }).click();
   return page.getByRole("dialog", {
-    name: `出口三单工作台 · ${fixture.salesNo}`,
+    name: `出口四单工作台 · ${fixture.salesNo}`,
   });
 }
 /**
  * 职责：填写确定性的合成买卖方、包装种类及单证日期
- * @param dialog 当前商业三单弹窗
+ * @param dialog 当前商业四单弹窗
  * @returns 填写完成的 Promise，不提交生成请求
  * @throws 必要字段不可操作时由 Playwright 拒绝
  */
@@ -198,9 +198,9 @@ async function fillPacket(dialog: Locator) {
   await dialog.locator('input[type="date"]').fill("2026-10-01");
 }
 /**
- * 职责：执行商业三单只读预检并等待可以生成的真实结果
+ * 职责：执行商业四单只读预检并等待可以生成的真实结果
  * @param page 当前合同详情页面
- * @param dialog 已填写必需元数据的商业三单弹窗
+ * @param dialog 已填写必需元数据的商业四单弹窗
  * @returns 后端权威预检数据
  * @throws 请求失败、解析失败或准备度断言失败
  */
@@ -479,7 +479,7 @@ test("ADMIN commercial prerequisites and cancelled preview do not reprice or arc
   expect(readExportDocuments(fixture)).toEqual(before);
 });
 
-test("ADMIN commercial confirmation downloads three accurate sheets and archived re-download keeps identical bytes", async ({
+test("ADMIN commercial confirmation downloads four accurate sheets and archived re-download keeps identical bytes", async ({
   page,
 }) => {
   await enterFromMenu(page);
@@ -506,6 +506,7 @@ test("ADMIN commercial confirmation downloads three accurate sheets and archived
     "外销合同",
     "商业发票",
     "装箱单",
+    "报关预录信息",
   ]);
   for (const name of ["外销合同", "商业发票"]) {
     expect(sheet(data, name)[3][1]).toBe("合成卖方");
@@ -515,6 +516,8 @@ test("ADMIN commercial confirmation downloads three accurate sheets and archived
     expect(sheet(data, name)[9][7]).toBe(preview.summary.totalUsd);
   }
   expect(sheet(data, "装箱单")[9].slice(5, 9)).toEqual([2, 20, 18, 0.2]);
+  expect(sheet(data, "报关预录信息")[11][7]).toBe(preview.summary.totalUsd);
+  expect(sheet(data, "报关预录信息")[12][7]).toBe(preview.summary.totalUsd);
   await expect(dialog).not.toBeVisible();
   const saved = readExportDocuments(fixture);
   expect(saved.sales_contract_files).toHaveLength(1);
