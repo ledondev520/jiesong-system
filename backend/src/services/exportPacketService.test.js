@@ -91,14 +91,14 @@ test('完整资料形成可生成快照，展示调整汇率、实际加价和�
   assert.equal(packet.summary.boxes, 2);
 });
 
-test('包装种类、规格或表头净重与明细冲突时阻断生成', () => {
+test('固定包装口径不影响规格或表头净重不一致时的阻断', () => {
   const blockedContract = contract({
     netWeight: 99.5,
     packingItems: [{ ...contract().packingItems[0], specification: '' }],
   });
   const packet = evaluateExportPacket(blockedContract, readiness({ declarationElements: '0|0|测试用途' }), [], options({ packageKind: '' }));
   assert.equal(packet.ready, false);
-  assert.ok(packet.issues.some((issue) => issue.code === 'MISSING_PACKAGE_KIND'));
+  assert.equal(packet.packageKind, '纸制或纤维板制盒/箱（22）');
   assert.ok(packet.issues.some((issue) => issue.code === 'MISSING_SPECIFICATION'));
   assert.ok(packet.issues.some((issue) => issue.code === 'HEADER_NET_MISMATCH'));
 });
@@ -145,6 +145,23 @@ test('数据库预录元数据来自本票装箱及客户信息，不虚构运�
   assert.equal(packet.lines[0].portName, '洛杉矶');
   assert.equal(packet.lines[0].customsBroker, '合成报关公司');
   assert.equal(packet.lines[0].supplement, '合成备注');
+});
+
+test('四单固定PDF口径：指运港美国、包装22，旧输入不覆盖且原始港口保留', async () => {
+  const packet = evaluateExportPacket(contract(), readiness(), [], options({ packageKind:'木箱' }));
+  assert.equal(packet.packageKind, '纸制或纤维板制盒/箱（22）');
+  assert.equal(packet.destinationPort, '美国（USA000）');
+  assert.equal(packet.portName, '洛杉矶');
+  const workbook = new ExcelJS.Workbook();await workbook.xlsx.load(await buildExportPacketWorkbook(packet));
+  for (const name of ['外销合同','商业发票','装箱单']) {
+    assert.equal(workbook.getWorksheet(name).getCell('B6').value, '美国（USA000）');
+    assert.equal(workbook.getWorksheet(name).getCell('G7').value, '纸制或纤维板制盒/箱（22）');
+  }
+  const sheet=workbook.getWorksheet('报关预录信息');
+  assert.equal(sheet.getCell('A8').value, '包装种类');
+  assert.equal(sheet.getCell('B8').value, '纸制或纤维板制盒/箱（22）');
+  assert.equal(sheet.getCell('S11').value, '指运港');
+  assert.equal(sheet.getCell('S12').value, '美国（USA000）');
 });
 
 test('仓库发运时间按北京时间取日期，Excel日期单元格不加时区偏移', () => {
