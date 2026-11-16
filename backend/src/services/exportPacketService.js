@@ -89,6 +89,9 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   }
 
   const readinessById = new Map((readiness.lines || []).map((line) => [line.packingItemId, line]));
+  // 数据库发运记录是时刻；Excel逐行日期是无时区的票面日期。
+  const contractShipmentDay = contract.shippedAt
+    ? new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date(contract.shippedAt)) : '';
   const lines = (contract.packingItems || []).map((item, index) => {
     const evidence = readinessById.get(item.id) || {};
     const productName = evidence.productName || item.product?.customsName || '';
@@ -221,7 +224,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
       storeName: item.store?.name || evidence.storeName || '',
       portName: String(item.port || contract.port?.name || readiness.portName || '').trim(),
       containerLabel: String(item.containerLabel || contract.containerLabel || '').trim(),
-      shippedAt: shipmentDate(item.shippedAt ?? contract.shippedAt),
+      shippedAt: shipmentDate(item.shippedAt ?? contractShipmentDay),
       customsBroker: String(item.broker || contract.customsBroker || '').trim(),
       supplement: String(item.supplement || '').trim(),
       purchaseCostCny,

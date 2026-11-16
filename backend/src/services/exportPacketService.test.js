@@ -147,6 +147,16 @@ test('数据库预录元数据来自本票装箱及客户信息，不虚构运�
   assert.equal(packet.lines[0].supplement, '合成备注');
 });
 
+test('仓库发运时间按北京时间取日期，Excel日期单元格不加时区偏移', () => {
+  const timestamp = new Date('2026-11-15T17:30:00Z');
+  const fromDatabase = evaluateExportPacket(contract({ shippedAt: timestamp }), readiness(), [], options());
+  assert.equal(fromDatabase.lines[0].shippedAt, '2026-11-16');
+  const excel = contract();
+  excel.packingItems[0].shippedAt = timestamp;
+  const fromExcel = evaluateExportPacket(excel, readiness(), [], options());
+  assert.equal(fromExcel.lines[0].shippedAt, '2026-11-15');
+});
+
 test('分类加价沿祖先链取最近一项：瓷砖 10%，单价分档就近取整', () => {
   const tile = contract({
     packingItems: [{ ...contract().packingItems[0], product: { ...contract().packingItems[0].product, categoryIds: ['tile-sub', 'tile'] } }],
