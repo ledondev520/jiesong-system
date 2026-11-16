@@ -156,7 +156,7 @@ test('超过16行时模板扩展，原条款和合计顺延，配置变更阻止
   await assert.rejects(() => prepareExcelPacket(buffer, { ...result.input, packetVersion: result.packetVersion }, changed), /依据已变化/);
 });
 
-test('Excel预录保留逐行日期、柜号、港口和备注，多港口提示且缺失日期留空', async () => {
+test('Excel原始港口保留追溯，预录统一指运港并保留日期、柜号和备注', async () => {
   const columns = [...headers, '出货日期', '柜子编号', '港口', '门店'];
   const result = await prepareExcelPacket(await workbook([
     row({ 出货日期: new Date('2026-11-16T00:00:00Z'), 柜子编号: 'TEST-C01', 港口: '合成港甲', 门店: '测试店甲' }),
@@ -172,12 +172,12 @@ test('Excel预录保留逐行日期、柜号、港口和备注，多港口提示
   await saved.xlsx.load(await buildTemplatePacket(result.packet, Buffer.from(await template.xlsx.writeBuffer())));
   const sheet = saved.getWorksheet('报关预录信息');
   assert.equal(sheet.getCell('N5').value.result, 'USA');
-  assert.match(sheet.getCell('B8').text, /多个港口/);
+  assert.equal(sheet.getCell('B8').text, '纸制或纤维板制盒/箱（22）');
   assert.equal(sheet.getCell('L7').value, null);
   assert.equal(sheet.getCell('P7').value, null);
   assert.equal(sheet.getCell('R12').value.toISOString().slice(0,10), '2026-11-16');
   assert.equal(sheet.getCell('R14').value, null);
-  assert.equal(sheet.getCell('S13').value, '合成港乙');
+  assert.equal(sheet.getCell('S13').value, '美国（USA000）');
   assert.equal(sheet.getCell('T13').value, '测试店乙');
   assert.equal(sheet.getCell('V12').value, row().商品补充信息);
 });
@@ -187,6 +187,20 @@ test('非空无效出货日期不能静默写成1900年或其他日期', async (
     const source = await workbook([row({ 出货日期: date })], [...headers,'出货日期']);
     await assert.rejects(() => prepareExcelPacket(source, {}, deps()), /出货日期/);
   }
+});
+
+test('旧私有模板和命令行包装参数均升级到确认口径，合同与预录包装一致', async () => {
+  const result=await prepareExcelPacket(await workbook([row()]), { packageKind:'WOODEN CASES' }, deps());
+  assert.equal(result.input.packageKind, '纸制或纤维板制盒/箱（22）');
+  assert.equal(result.packet.packageKind, result.input.packageKind);
+  const template=new ExcelJS.Workbook();
+  for (const name of ['合同','发票','箱单']) {
+    const s=template.addWorksheet(name);s.getCell('A8').value='Item';s.getCell('A30').value='（5）Packing: To be packed in WOODEN CASES.';
+  }
+  const saved=new ExcelJS.Workbook();await saved.xlsx.load(await buildTemplatePacket(result.packet,Buffer.from(await template.xlsx.writeBuffer())));
+  for(const name of ['合同','发票'])assert.equal(saved.getWorksheet(name).getCell('A30').value,'（5）Packing: To be packed in paper or fibreboard boxes/cartons.');
+  assert.equal(saved.getWorksheet('报关预录信息').getCell('B8').value,result.input.packageKind);
+  assert.equal(saved.getWorksheet('报关预录信息').getCell('S12').value,'美国（USA000）');
 });
 
 test('日期单元格与日期文本使用同一出货日选择税库，不回退到单证日期', async () => {

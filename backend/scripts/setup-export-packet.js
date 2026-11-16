@@ -6,6 +6,7 @@ process.chdir(path.resolve(__dirname, '..'));
 const { resolveWpsUploadRoot } = require('./wps-upload-dir');
 process.env.UPLOAD_DIR = resolveWpsUploadRoot({ backendDir: process.cwd() });
 const { loadWorkbook, readCell, templateSheets, installProfile, loadProfile, todayInShanghai } = require('../src/services/exportPacketExcelService');
+const { EXPORT_PACKAGE_KIND } = require('../src/services/customsPreentrySheet');
 
 const readDbf = (buffer) => {
   if (buffer.length < 33) throw new Error('退税率DBF不完整');
@@ -56,8 +57,8 @@ const configure = async ({ template, catalog, refundDbf, refundVersion, reviewed
   const sellerName = String(readCell(contract.getCell('B5')) || '').split('\n')[0].trim();
   const buyerName = String(readCell(contract.getCell('B6')) || '').trim();
   const tradeTerm = String(readCell(contract.getCell('A28')) || '').match(/Trade term:\s*([A-Z]{3})/i)?.[1]?.toUpperCase();
-  const packageKind = String(readCell(contract.getCell('A30')) || '').match(/To be packed in\s+(.+?)\.?\s*$/i)?.[1];
-  if (!sellerName || !buyerName || !tradeTerm || !packageKind) throw new Error('原模板缺少买卖方、贸易术语或包装条款');
+  const packageKind = EXPORT_PACKAGE_KIND;
+  if (!sellerName || !buyerName || !tradeTerm) throw new Error('原模板缺少买卖方或贸易术语');
   for (const sheet of [...workbook.worksheets]) if (!sheets.includes(sheet)) workbook.removeWorksheet(sheet.id);
   sheets.forEach((sheet, index) => {
     sheet.eachRow((row) => row.eachCell((cell) => {

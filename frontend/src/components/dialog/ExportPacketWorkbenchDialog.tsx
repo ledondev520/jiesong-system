@@ -1,5 +1,5 @@
 /**
- * Input: 当前出口合同及用户确认的现汇、买方、包装种类、日期和价格覆盖
+ * Input: 当前出口合同、固定包装口径及用户确认的现汇、买方、日期和价格覆盖
  * Output: 逐行定价/资料预检、确认生成并下载合同/发票/箱单/报关预录信息
  * Pos: 出口合同详情页的出口四单工作台
  */
@@ -94,7 +94,7 @@ export function ExportPacketWorkbenchDialog({
         : salesContract.exchangeRate) || 6.8,
     sellerName: "上海捷淞国际物流有限公司",
     buyerName: "",
-    packageKind: "",
+    packageKind: "纸制或纤维板制盒/箱（22）",
     tradeTerm: "FOB",
     documentDate: todayInShanghai(),
     priceOverrides: [],
@@ -272,17 +272,8 @@ export function ExportPacketWorkbenchDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">包装种类（须确认）</label>
-              <Input
-                placeholder="例如：纸箱、木箱或纸箱+木箱"
-                value={form.packageKind}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    packageKind: event.target.value,
-                  }))
-                }
-              />
+              <label className="text-sm font-medium">包装种类（固定）</label>
+              <Input aria-label="包装种类" value={form.packageKind} readOnly />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">贸易术语</label>
@@ -319,7 +310,7 @@ export function ExportPacketWorkbenchDialog({
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                先确认买卖方、包装种类和贸易术语，再运行预检；系统不会替你猜正式单证信息。
+                先确认买卖方和贸易术语，再运行预检。包装种类使用已确认的固定口径。
               </AlertDescription>
             </Alert>
           )}

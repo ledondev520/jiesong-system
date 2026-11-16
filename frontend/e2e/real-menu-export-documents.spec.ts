@@ -178,7 +178,7 @@ async function openPacket(page: Page) {
   });
 }
 /**
- * 职责：填写确定性的合成买卖方、包装种类及单证日期
+ * 职责：填写合成买卖方和单证日期，并核对固定包装种类
  * @param dialog 当前商业四单弹窗
  * @returns 填写完成的 Promise，不提交生成请求
  * @throws 必要字段不可操作时由 Playwright 拒绝
@@ -194,7 +194,13 @@ async function fillPacket(dialog: Locator) {
     .locator("..")
     .getByRole("textbox")
     .fill("合成卖方");
-  await dialog.getByPlaceholder("例如：纸箱、木箱或纸箱+木箱").fill("CARTON");
+  await expect(dialog.getByLabel("包装种类", { exact: true })).toHaveValue(
+    "纸制或纤维板制盒/箱（22）",
+  );
+  await expect(dialog.getByLabel("包装种类", { exact: true })).toHaveAttribute(
+    "readonly",
+    "",
+  );
   await dialog.locator('input[type="date"]').fill("2026-10-01");
 }
 /**

@@ -126,7 +126,7 @@ const exportPacketValidation = [
   body('spotRate').isFloat({ gt: 0.2, lt: 20 }).withMessage('现汇必须大于 0.2 且小于 20'),
   body('sellerName').trim().notEmpty().withMessage('卖方名称不能为空').isLength({ max: 200 }).withMessage('卖方名称不能超过 200 字'),
   body('buyerName').trim().notEmpty().withMessage('买方名称不能为空').isLength({ max: 200 }).withMessage('买方名称不能超过 200 字'),
-  body('packageKind').trim().notEmpty().withMessage('包装种类不能为空').isLength({ max: 80 }).withMessage('包装种类不能超过 80 字'),
+  body('packageKind').optional().isString().withMessage('包装种类格式无效').isLength({ max: 80 }).withMessage('包装种类不能超过 80 字'),
   body('tradeTerm').trim().notEmpty().withMessage('贸易术语不能为空').isLength({ max: 40 }).withMessage('贸易术语不能超过 40 字'),
   body('documentDate').isISO8601({ strict: true }).withMessage('单证日期格式无效'),
   body('priceOverrides').optional().isArray({ max: 1000 }).withMessage('人工价格覆盖格式无效'),

@@ -12,7 +12,7 @@ const { buildDerivedSalesAmountUpdate, isJiesongOwnedPackingItem } = require('./
 const { createError } = require('../middleware/errorHandler');
 const { getExportReadiness } = require('./exportReadinessService');
 const fileService = require('./fileService');
-const { addCustomsPreentrySheet, shipmentDate } = require('./customsPreentrySheet');
+const { addCustomsPreentrySheet, shipmentDate, EXPORT_DESTINATION_PORT, EXPORT_PACKAGE_KIND } = require('./customsPreentrySheet');
 
 const DEFAULT_SELLER_NAME = '上海捷淞国际物流有限公司';
 const MONEY_EPSILON = 0.01;
@@ -62,7 +62,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   const validRate = effectiveRate > 0;
   const buyerName = String(options.buyerName || '').trim();
   const sellerName = String(options.sellerName || '').trim();
-  const packageKind = String(options.packageKind || '').trim();
+  const packageKind = EXPORT_PACKAGE_KIND;
   const tradeTerm = String(options.tradeTerm || '').trim().toUpperCase();
   const documentDate = String(options.documentDate || '').trim();
   const priceOverrideMap = new Map((options.priceOverrides || []).map((entry) => [
@@ -82,7 +82,6 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   if (!validRate) issues.push(makeIssue('INVALID_SPOT_RATE', 'error', `现汇必须大于 ${Math.max(0, FX_BUFFER)}`));
   if (!sellerName) issues.push(makeIssue('MISSING_SELLER', 'error', '请确认卖方名称'));
   if (!buyerName) issues.push(makeIssue('MISSING_BUYER', 'error', '请确认买方名称'));
-  if (!packageKind) issues.push(makeIssue('MISSING_PACKAGE_KIND', 'error', '请确认包装种类'));
   if (!tradeTerm) issues.push(makeIssue('MISSING_TRADE_TERM', 'error', '请确认贸易术语'));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(documentDate)) {
     issues.push(makeIssue('INVALID_DOCUMENT_DATE', 'error', '请确认单证日期'));
@@ -281,6 +280,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
     packageKind,
     documentDate,
     portName: contract.port?.name || readiness.portName || '',
+    destinationPort: EXPORT_DESTINATION_PORT,
     containerLabel: contract.containerLabel || '',
     destinationCountry: contract.customer?.country || '',
     portOfLoading: contract.portOfLoading || '',
@@ -394,8 +394,8 @@ const addDocumentMeta = (sheet, packet) => {
   const rows = [
     ['Seller', packet.sellerName, 'Contract No.', packet.contractNo],
     ['Buyer', packet.buyerName, 'Date', packet.documentDate],
-    ['Destination', packet.portName || '-', 'Trade Term', packet.tradeTerm],
-    ['Currency', packet.currency, 'Package', packet.packageKind],
+    ['Destination', EXPORT_DESTINATION_PORT, 'Trade Term', packet.tradeTerm],
+    ['Currency', packet.currency, 'Package', EXPORT_PACKAGE_KIND],
   ];
   rows.forEach((values, offset) => {
     const row = 4 + offset;
@@ -429,7 +429,7 @@ const buildExportPacketWorkbook = async (packet) => {
   addDocumentMeta(contractSheet, packet);
   contractSheet.getRow(9).values = ['No.', 'Description', 'Specification', 'HS Code', 'Quantity', 'Unit', 'Unit Price (USD)', 'Amount (USD)', 'Package', 'Remarks'];
   packet.lines.forEach((line, index) => {
-    contractSheet.getRow(10 + index).values = [line.index, line.productName, line.specification, line.hsCode, line.quantity, line.unit, line.unitPriceUsd, line.totalUsd, packet.packageKind, line.storeName];
+    contractSheet.getRow(10 + index).values = [line.index, line.productName, line.specification, line.hsCode, line.quantity, line.unit, line.unitPriceUsd, line.totalUsd, EXPORT_PACKAGE_KIND, line.storeName];
   });
   const contractTotalRow = 10 + packet.lines.length;
   contractSheet.mergeCells(contractTotalRow, 1, contractTotalRow, 7);
@@ -465,7 +465,7 @@ const buildExportPacketWorkbook = async (packet) => {
   addDocumentMeta(packingSheet, packet);
   packingSheet.getRow(9).values = ['No.', 'Description', 'Specification', 'Quantity', 'Unit', 'Packages', 'Gross Wt. (KG)', 'Net Wt. (KG)', 'Volume (CBM)', 'Package Kind'];
   packet.lines.forEach((line, index) => {
-    packingSheet.getRow(10 + index).values = [line.index, line.productName, line.specification, line.quantity, line.unit, line.boxes, line.grossWeight, line.netWeight, line.volume, packet.packageKind];
+    packingSheet.getRow(10 + index).values = [line.index, line.productName, line.specification, line.quantity, line.unit, line.boxes, line.grossWeight, line.netWeight, line.volume, EXPORT_PACKAGE_KIND];
   });
   const packingTotalRow = 10 + packet.lines.length;
   packingSheet.mergeCells(packingTotalRow, 1, packingTotalRow, 5);

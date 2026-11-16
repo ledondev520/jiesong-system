@@ -18,7 +18,7 @@ const { loadPricingConfig } = require('./pricingConfigService');
 const { withCategoryChains } = require('./productCategoryChain');
 const { round } = require('./exportPricing');
 const { evaluateExportPacket } = require('./exportPacketService');
-const { addCustomsPreentrySheet, shipmentDate } = require('./customsPreentrySheet');
+const { addCustomsPreentrySheet, shipmentDate, EXPORT_PACKAGE_KIND, EXPORT_PACKAGE_KIND_EN } = require('./customsPreentrySheet');
 const { fetchUsdCnyRate } = require('../controllers/system/configController');
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -206,8 +206,8 @@ const prepareExcelPacket = async (buffer, options = {}, dependencies = {}) => {
   const profile = dependencies.profile || await loadProfile();
   const pricingConfig = dependencies.pricingConfig || loadPricingConfig();
   const today = dependencies.today || todayInShanghai();
-  const input = { ...profile.defaults, documentDate: today };
-  for (const key of ['sellerName', 'buyerName', 'packageKind', 'tradeTerm', 'documentDate']) {
+  const input = { ...profile.defaults, documentDate: today, packageKind: EXPORT_PACKAGE_KIND };
+  for (const key of ['sellerName', 'buyerName', 'tradeTerm', 'documentDate']) {
     if (options[key] !== undefined) {
       if (typeof options[key] !== 'string' || options[key].length > 500) throw createError(`制单参数 ${key} 格式无效`, 400);
       input[key] = options[key].trim();
@@ -339,7 +339,7 @@ const buildTemplatePacket = async (packet, templateBuffer) => {
     const tradeCell = sheet.getCell(`A${28 + extra}`);
     if (tradeCell.value && !String(tradeCell.text).includes(packet.tradeTerm)) tradeCell.value = `（3）Trade term: ${packet.tradeTerm}.`;
     const packingCell = sheet.getCell(`A${30 + extra}`);
-    if (packingCell.value) packingCell.value = `（5）Packing: To be packed in ${packet.packageKind}.`;
+    packingCell.value = `（5）Packing: To be packed in ${EXPORT_PACKAGE_KIND_EN}.`;
   }
   const ref = (sheet, address, result) => ({ formula: `'${sheet}'!${address}`, result });
   for (const sheet of [invoice, packing]) {

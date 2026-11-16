@@ -4,6 +4,9 @@
  * Pos: Excel上传和数据库制单共用的预录页生成器；不做定价、不写业务库
  */
 const { createError } = require('../middleware/errorHandler');
+const EXPORT_DESTINATION_PORT = '美国（USA000）';
+const EXPORT_PACKAGE_KIND = '纸制或纤维板制盒/箱（22）';
+const EXPORT_PACKAGE_KIND_EN = 'paper or fibreboard boxes/cartons';
 
 const shipmentDate = (value) => {
   if (value === null || value === undefined || value === '') return '';
@@ -70,7 +73,7 @@ const addCustomsPreentrySheet = (workbook, packet) => {
     A7: ['贸易条款/起运港','B7',template && sourceValue(contract, `A${sourceTotal+3}`) ? linked(contract, `A${sourceTotal+3}`) : packet.tradeTerm + (packet.portOfLoading ? ` ${packet.portOfLoading}` : '')],
     K7: ['出货日期','L7',dateValue(single('shippedAt'))],
     O7: ['内部柜号','P7',single('containerLabel') || null],
-    A8: ['整票提示','B8',null],
+    A8: ['包装种类','B8',EXPORT_PACKAGE_KIND],
   };
   for (const [label, [title, address, value]] of Object.entries(fields)) {
     sheet.getCell(label).value = title;
@@ -87,10 +90,8 @@ const addCustomsPreentrySheet = (workbook, packet) => {
     const address = `A${sourceTotal+2}`;
     sheet.getCell('N5').value = { formula: `IF(ISNUMBER(SEARCH("USA",'合同'!${address})),"USA","")`, result: /USA/i.test(contract.getCell(address).text) ? 'USA' : '' };
   }
-  const ports = new Set(packet.lines.map((line) => line.portName).filter(Boolean));
-  sheet.getCell('B8').value = ports.size > 1 ? '本票明细包含多个港口，外发前请按最终订舱资料复核。' : null;
   paint(sheet.getCell('B8'), { size: 10, color: 'FF9C6500', fill: 'FFFFF2CC', horizontal: 'left', wrapText: true });
-  sheet.getRow(11).values = ['项号','商品名称','HS编码','规格型号/申报要素','成交数量','成交单位','单价(USD)','总价(USD)','币制','包装件数','毛重(kg)','净重(kg)','体积(m³)','包装规格(mm)','境内货源地','最终目的国','内部柜号','出货日期','港口','门店','报关公司','备注'];
+  sheet.getRow(11).values = ['项号','商品名称','HS编码','规格型号/申报要素','成交数量','成交单位','单价(USD)','总价(USD)','币制','包装件数','毛重(kg)','净重(kg)','体积(m³)','包装规格(mm)','境内货源地','最终目的国','内部柜号','出货日期','指运港','门店','报关公司','备注'];
   sheet.getRow(11).height = 36;
   sheet.getRow(11).eachCell((cell) => paint(cell, { color: 'FFFFFFFF', fill: 'FF1F4E78', bold: true, wrapText: true }));
   packet.lines.forEach((line, i) => {
@@ -109,9 +110,9 @@ const addCustomsPreentrySheet = (workbook, packet) => {
     sheet.getCell(`I${row}`).value = { formula: '$J$5', result: packet.currency };
     sheet.getCell(`I${row}`).dataValidation = { type: 'list', formulae: ['"USD"'] };
     sheet.getCell(`P${row}`).value = { formula: 'IF($N$5="","",$N$5)', result: sheet.getCell('N5').value?.result ?? packet.destinationCountry ?? '' };
-    for (const [col,value] of [['Q',line.containerLabel],['R',dateValue(line.shippedAt)],['S',line.portName],['T',line.storeName],['U',line.customsBroker],['V',line.supplement]]) sheet.getCell(`${col}${row}`).value = value || null;
+    for (const [col,value] of [['Q',line.containerLabel],['R',dateValue(line.shippedAt)],['S',EXPORT_DESTINATION_PORT],['T',line.storeName],['U',line.customsBroker],['V',line.supplement]]) sheet.getCell(`${col}${row}`).value = value || null;
     sheet.getRow(row).height = 52;
-    for (let col=1;col<=22;col+=1) paint(sheet.getCell(row,col), { fill: i%2 ? 'FFEAF3F8' : 'FFFFFFFF', horizontal: [4,14,15,22].includes(col) ? 'left' : 'center', wrapText: [4,14,15,22].includes(col) });
+    for (let col=1;col<=22;col+=1) paint(sheet.getCell(row,col), { fill: i%2 ? 'FFEAF3F8' : 'FFFFFFFF', horizontal: [4,14,15,22].includes(col) ? 'left' : 'center', wrapText: [4,14,15,19,22].includes(col) });
     for (const [col,format] of Object.entries({ C:'@',E:'#,##0.##',G:'#,##0.0000',H:'#,##0.00',J:'#,##0',K:'#,##0.00',L:'#,##0.00',M:'0.000',R:'yyyy-mm-dd' })) sheet.getCell(`${col}${row}`).numFmt = format;
   });
   for (let col=1;col<=22;col+=1) paint(sheet.getCell(total,col), { size: 10, color: 'FF17365D', fill: 'FFE2F0D9', bold: true, wrapText: true });
@@ -126,4 +127,4 @@ const addCustomsPreentrySheet = (workbook, packet) => {
   return sheet;
 };
 
-module.exports = { addCustomsPreentrySheet, shipmentDate };
+module.exports = { addCustomsPreentrySheet, shipmentDate, EXPORT_DESTINATION_PORT, EXPORT_PACKAGE_KIND, EXPORT_PACKAGE_KIND_EN };
