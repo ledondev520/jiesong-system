@@ -692,7 +692,7 @@ function renderCheckReport(plan) {
 /**
  * 职责：把计划落成文件——两份官方版式 xlsx、plan.json、核对结果.md。
  * 思路：先在内存里渲染全部内容（失败不留半成品目录）；再 mkdir 0700（已存在则拒绝覆盖）；
- *      文件用 wx 标志创建并设 0600；写入中途失败则清理本次创建的目录。
+ *      文件用 wx 标志创建并设 0600；写入中途失败则只删本次写出的固定文件名并 rmdir（非空则保留，绝不递归删除）。
  * @param {object} plan buildDeclarationPlan 的结果
  * @param {string} targetDir 全新的输出目录（受限：0700，文件 0600）
  * @returns {Promise<{outputDir: string, files: string[]}>} 输出目录与文件名清单
@@ -716,7 +716,7 @@ async function writeDeclarationFiles(plan, targetDir) {
     if (error.code === 'EEXIST') throw new Error('输出目录已存在，拒绝覆盖；请换一个新目录');
     throw error;
   }
-  // 2. 写文件（0600），失败则清理本次创建的目录
+  // 2. 写文件（0600）
   try {
     fs.chmodSync(target, 0o700);
     for (const [name, data] of contents) {
@@ -725,7 +725,12 @@ async function writeDeclarationFiles(plan, targetDir) {
       fs.chmodSync(file, 0o600);
     }
   } catch (error) {
-    fs.rmSync(target, { recursive: true, force: true });
+    // 2.1. 失败清理：只删本次要写出的固定文件名，再 rmdir；不递归删除，
+    //      目录里若有他人放入的内容则 rmdir 失败、整体保留。清理尽力而为，不覆盖原始错误。
+    for (const [name] of contents) {
+      try { fs.rmSync(path.join(target, name), { force: true }); } catch { /* 尽力而为 */ }
+    }
+    try { fs.rmdirSync(target); } catch { /* 非空或已被替换：保留，不做递归删除 */ }
     throw error;
   }
   return { outputDir: target, files: contents.map(([name]) => name) };

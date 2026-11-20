@@ -372,6 +372,44 @@ test('渲染失败不留下半成品目录', async () => {
   assert.equal(fs.existsSync(dir), false);
 });
 
+/**
+ * 让目标目录内第 3 次 writeFileSync 失败（前两份已写出）；onFail 可在失败前做额外动作（如模拟他人放入文件）。
+ * @returns {{calls: () => number}} 目标目录内已发生的写入次数
+ */
+function failThirdWrite(t, dir, onFail = () => {}) {
+  const realWrite = fs.writeFileSync;
+  let calls = 0;
+  t.mock.method(fs, 'writeFileSync', (file, ...rest) => {
+    if (String(file).startsWith(dir)) {
+      calls += 1;
+      if (calls === 3) {
+        onFail(realWrite);
+        throw new Error('磁盘已满');
+      }
+    }
+    return realWrite(file, ...rest);
+  });
+  return { calls: () => calls };
+}
+
+test('写入中途失败：清掉本次写出的固定文件并移除空目录，原始错误照常抛出', async (t) => {
+  const plan = build([makeCase()]);
+  const dir = path.join(tempDir(), 'run');
+  const probe = failThirdWrite(t, dir);
+  await assert.rejects(() => service.writeDeclarationFiles(plan, dir), /磁盘已满/);
+  assert.equal(probe.calls(), 3);
+  assert.equal(fs.existsSync(dir), false);
+});
+
+test('写入中途失败：不递归删除目录里他人放入的内容', async (t) => {
+  const plan = build([makeCase()]);
+  const dir = path.join(tempDir(), 'run');
+  failThirdWrite(t, dir, (realWrite) => realWrite(path.join(dir, '他人文件.txt'), 'keep')); // 模拟窗口期内他人放入文件
+  await assert.rejects(() => service.writeDeclarationFiles(plan, dir), /磁盘已满/);
+  assert.deepEqual(fs.readdirSync(dir), ['他人文件.txt']); // 本次写出的文件已删，他人文件与目录保留
+  assert.equal(fs.readFileSync(path.join(dir, '他人文件.txt'), 'utf8'), 'keep');
+});
+
 test('核对结果.md 列出条数、待核项、提示与分批余额', () => {
   const partial = makeCase();
   partial.is_candidate = false;
