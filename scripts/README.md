@@ -31,6 +31,7 @@
 | resolve_pending_shipments.js | 数据归并 | 同步后按唯一源行和正式装箱核对 PENDING；无引用的零数量占位可补全迁移，等价重复行保留来源后合并；库存需源行与正式装箱双重匹配且无重复；父占位全部关联和金额归零才删除；默认预览，备份后用 `--apply-plan` 摘要写入 |
 | verify_tax_refund_invoices.js | 数据核对 | 按出货汇总的发票号码精确查询本地发票记录或税务数字账户导出清单，核验销方、价税合计、品名与状态；只读，输出受限 JSON/CSV，不绕过验证码 |
 | import_tax_refund_customs_xml.js | 数据导入 | 解析海关解密 XML，按报关品名、数量、已有 HS 与已有金额唯一命中装箱明细后，幂等关联报关单和出口合同；XML 合同号错位必须用 `--map` 显式传入业务确认映射；默认 dry-run，不创建退税草稿 |
+| build_tax_refund_declaration_tables.js / build_tax_refund_declaration_tables.test.js | 数据生成与回归 | CLI 适配层：把已核验的 `cases.json` 经 `backend/src/services/taxRefundDeclarationTableService.js` 生成税局格式《进货明细申报表》《出口明细申报表》xlsx 及 `plan.json`、`核对结果.md`；输出目录 0700/文件 0600、拒绝覆盖，控制台不打印税号/票号/金额；只生成核对/填写稿，不联网，不代表已录入、自检或正式申报。回归含参数解析、受限输出、拒绝覆盖与退出码 |
 | merge_export_data.py | 数据合并 | 合并出口数据 |
 | debug_contract.py | 调试工具 | 调试合同数据 |
 
@@ -69,6 +70,22 @@ node scripts/import_tax_refund_customs_xml.js \
 ```
 
 计划文件默认写入 `tmp/tax-refund-customs-xml-import/`，目录权限为 `0700`、文件权限为 `0600`。XML 合同号与目标合同号一致也仍会逐项校验；不会仅凭文件名或行序关联。
+
+### 出口退税两表生成
+
+```bash
+# 把已核验的 cases.json 生成《进货明细申报表》《出口明细申报表》（示例值需替换）
+npm --prefix backend run refund:tables -- \
+  --cases ~/work/cases.json \
+  --period 202612 --batch 001 \
+  --buyer-tax-id <本企业纳税人识别号>
+
+# 回归（合成数据，不访问数据库和网络）
+node --test scripts/build_tax_refund_declaration_tables.test.js
+node --test backend/src/services/taxRefundDeclarationTableService.test.js
+```
+
+默认写入 `tmp/tax-refund-declaration-tables/<年月>-<批次>/`，目录权限 `0700`、文件权限 `0600`，目录已存在则拒绝覆盖；控制台只显示条数和路径，金额汇总在 `核对结果.md`。可选 `--overrides`（分批用票，须写原因）、`--used`（历史正式占用台账）、`--as-of`、`--out-dir`，`--help` 查看全部参数。`cases.json` 契约、待核错误码和税局录入后核对步骤见 `docs/operations/出口退税两表生成与录入指引.md`。
 
 ### JavaScript 脚本
 ```bash

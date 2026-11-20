@@ -113,6 +113,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | taxRefundShipmentService.js | 按报关单归集出货资料、机器核验、版本确认归档与全量跨月准备汇总；技术时间戳不触发重新确认 |
 | taxRefundWorkbenchService.js | 保留既有查询；按申报月份展示逐次出货准备与确认状态，不冒充正式申报 |
 | taxRefundExportService.js | 退税记录与采购合同、发票号码、征税率的导出前严格匹配 |
+| taxRefundDeclarationTableService.js | 已核验 cases 离线生成税局格式进货/出口明细申报表（官方样表版式 xlsx）、plan.json 与核对结果；精确十进制、受限输出、不连库不联网，由 `scripts/build_tax_refund_declaration_tables.js` 调用，生成物不代表已申报 |
 | exportReminderService.js | 次月5号内部退税材料准备提醒、已出货缺发票提醒（幂等通知） |
 | patrolService.js | 业务 / 系统巡检、管理员通知、系统操作日志 |
 
