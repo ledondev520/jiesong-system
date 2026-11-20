@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Input: 已人工核验的 cases.json、申报年月/批次/购方税号；可选 overrides.json（分摊指定）、used.json（历史正式占用台账）、--as-of、--out-dir
- * Output: 受限目录下的进货/出口明细申报表（官方版式 xlsx）、plan.json、核对结果.md；控制台只输出条数摘要与目录路径
+ * Output: 受限目录下的进货/出口明细申报表（官方版式 xlsx）、plan.json、核对结果.md；本脚本控制台只输出条数摘要与目录路径
+ *         （经 npm 调用时 npm 会回显完整命令行含税号，须加 --silent）
  * Pos: 出口退税两表生成 CLI Adapter；复用 backend/src/services/taxRefundDeclarationTableService，
  *      不读 .env、不连数据库、不联网、不触达税局，输出只是核对/填写稿，不代表已录入或正式申报
  * 我被更新时，必须同步更新本头注释 + 所属目录 README/INDEX。
@@ -26,8 +27,9 @@ const VALUE_OPTIONS = new Set(['cases', 'period', 'batch', 'buyer-tax-id', 'as-o
 function usage() {
   return `
 用法:
-  npm --prefix backend run refund:tables -- [参数]
+  npm --silent --prefix backend run refund:tables -- [参数]
   node scripts/build_tax_refund_declaration_tables.js [参数]
+  （经 npm 调用务必加 --silent：否则 npm 会把含税号的完整命令行回显到终端）
 
 必填参数:
   --cases <json>          已人工核验的归并结果 cases.json
@@ -48,8 +50,9 @@ function usage() {
   plan.json                                            可录入 entries / 待核 pending / 未列入 excluded / 余额 balances
   核对结果.md                                          条数、金额、待核项与分批余额
 
-说明: 相对路径按执行命令时的目录解析，也支持 ~/ 开头。控制台不打印税号、票号或金额；
-      金额汇总在 核对结果.md。本命令只生成核对/填写稿，不代表已录入、自检通过或正式申报。
+说明: 相对路径按执行命令时的目录解析，也支持 ~/ 开头。本脚本自身不打印税号、票号或金额
+      （npm 的命令行回显除外，见上方 --silent 提示）；金额汇总在 核对结果.md。
+      本命令只生成核对/填写稿，不代表已录入、自检通过或正式申报。
 `;
 }
 

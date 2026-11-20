@@ -114,6 +114,7 @@ test('命令行：--help 退出码 0；成功只打印摘要；失败退出码 1
   const help = spawnSync(process.execPath, [SCRIPT, '--help'], { encoding: 'utf8' });
   assert.equal(help.status, 0);
   assert.match(help.stdout, /--buyer-tax-id/);
+  assert.match(help.stdout, /npm --silent --prefix backend run refund:tables/); // 经 npm 调用必须 --silent，避免回显税号
 
   const casesFile = writeJson('cases-spawn.json', [syntheticCase()]);
   const outDir = path.join(workDir, 'out-spawn');
