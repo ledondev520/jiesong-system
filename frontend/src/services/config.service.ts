@@ -77,37 +77,6 @@ export const configService = {
     } as ApiResponse<string[]>;
   },
 
-  addUnit: async (unit: string) => {
-    const current = await fetchSystemConfig();
-    const currentUnits = toStringArray(current.data?.units, []);
-    const nextUnits = Array.from(new Set([...currentUnits, unit]));
-    const response = await api.put<
-      ApiResponse<SystemConfig>,
-      ApiResponse<SystemConfig>,
-      { value: string[] }
-    >("/system/configs/units", { value: nextUnits });
-    return {
-      ...response,
-      data: toStringArray(response.data?.units, nextUnits),
-    } as ApiResponse<string[]>;
-  },
-
-  deleteUnit: async (unit: string) => {
-    const current = await fetchSystemConfig();
-    const nextUnits = toStringArray(current.data?.units, []).filter(
-      (item) => item !== unit,
-    );
-    const response = await api.put<
-      ApiResponse<SystemConfig>,
-      ApiResponse<SystemConfig>,
-      { value: string[] }
-    >("/system/configs/units", { value: nextUnits });
-    return {
-      ...response,
-      data: toStringArray(response.data?.units, nextUnits),
-    } as ApiResponse<string[]>;
-  },
-
   getCustomsBrokers: async () => {
     const response = await fetchSystemConfig();
     return {

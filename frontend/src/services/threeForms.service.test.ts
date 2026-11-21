@@ -72,38 +72,6 @@ describe("threeFormsService", () => {
     expect(result.data.customsDeclarationId).toBe("cd-1");
   });
 
-  it("应该单独生成报关单", async () => {
-    const mockResponse = { code: 200, data: { customsDeclarationId: "cd-1" } };
-    vi.mocked(api.post).mockResolvedValueOnce(mockResponse);
-
-    const result = await threeFormsService.generateCustomsDeclaration({
-      salesContractId: "sc-1",
-      items: [],
-    });
-
-    expect(api.post).toHaveBeenCalledWith("/three-forms/customs-declaration", {
-      salesContractId: "sc-1",
-      items: [],
-    });
-    expect(result.data.customsDeclarationId).toBe("cd-1");
-  });
-
-  it("应该单独生成外汇核销单", async () => {
-    const mockResponse = { code: 200, data: { forexId: "f-1" } };
-    vi.mocked(api.post).mockResolvedValueOnce(mockResponse);
-
-    const result = await threeFormsService.generateForexVerification({
-      salesContractId: "sc-1",
-      customsDeclarationId: "cd-1",
-    });
-
-    expect(api.post).toHaveBeenCalledWith("/three-forms/forex-verification", {
-      salesContractId: "sc-1",
-      customsDeclarationId: "cd-1",
-    });
-    expect(result.data.forexId).toBe("f-1");
-  });
-
   it("应该单独生成出口退税单", async () => {
     const mockResponse = { code: 200, data: { taxRefundId: "tr-1" } };
     vi.mocked(api.post).mockResolvedValueOnce(mockResponse);

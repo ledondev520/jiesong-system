@@ -246,19 +246,4 @@ export const taxRefundService = {
       { data: ContractInvoiceVerification },
       { data: ContractInvoiceVerification }
     >(`/tax-refunds/workbench/${salesContractId}/invoice-verification`),
-  exportDeclarationCsv: async (ids?: string[]) => {
-    const response = await fetch("/api/v1/tax-refunds/export?download=1", {
-      method: "POST",
-      ...authFetchInit(),
-      headers: {
-        ...authFetchInit().headers,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(ids?.length ? { ids } : {}),
-    });
-    if (!response.ok) {
-      await throwDownloadError(response, "出口退税申报明细生成失败");
-    }
-    return downloadResponseBlob(response, "出口退税申报明细.csv");
-  },
 };

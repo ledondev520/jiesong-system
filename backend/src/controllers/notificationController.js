@@ -14,8 +14,10 @@ const { normalizePagination } = require('../utils/pagination');
 const list = async (req, res, next) => {
   try {
     const { page, pageSize } = normalizePagination(req.query, { maxPageSize: 100 });
-    const result = await notificationService.list(req.user.id, { page, pageSize });
-    paginated(res, result.items, result.total, result.page, result.pageSize);
+    const keyword = String(req.query.keyword ?? '').trim();
+    const unreadOnly = req.query.unreadOnly === 'true';
+    const result = await notificationService.list(req.user.id, { page, pageSize, keyword, unreadOnly });
+    paginated(res, result.items, result.total, result.page, result.pageSize, { unreadCount: result.unreadCount });
   } catch (error) {
     next(error);
   }

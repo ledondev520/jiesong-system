@@ -68,7 +68,6 @@ const mockInventoryGetAll = vi.fn();
 const mockApiGet = vi.fn();
 const mockApiDelete = vi.fn();
 const mockToastError = vi.fn();
-const mockExportPdf = vi.fn();
 const mockExportExcel = vi.fn();
 const mockUpdateSalesStatus = vi.fn();
 const mockUpdateSales = vi.fn();
@@ -105,7 +104,6 @@ vi.mock("@/services/sales.service", () => ({
     addPackingItem: vi.fn(),
     updatePackingItem: vi.fn(),
     removePackingItem: vi.fn(),
-    exportPdf: (...args: unknown[]) => mockExportPdf(...args),
     exportExcel: (...args: unknown[]) => mockExportExcel(...args),
     updateStatus: (...args: unknown[]) => mockUpdateSalesStatus(...args),
   },
@@ -215,7 +213,6 @@ describe("OrderDetailPage 交互逻辑", () => {
     mockApiGet.mockReset();
     mockApiDelete.mockReset();
     mockToastError.mockReset();
-    mockExportPdf.mockReset();
     mockExportExcel.mockReset();
     mockUpdateSalesStatus.mockReset();
     mockUpdateSales.mockReset();

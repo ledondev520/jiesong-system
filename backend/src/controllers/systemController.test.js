@@ -28,57 +28,6 @@ const createMockRes = () => {
   return res;
 };
 
-test('markNotificationRead: 仅允许标记当前用户通知', async () => {
-  const original = prisma.notification.updateMany;
-  let capturedArgs = null;
-
-  prisma.notification.updateMany = async (args) => {
-    capturedArgs = args;
-    return { count: 1 };
-  };
-
-  try {
-    const req = { params: { id: 'notice-1' }, user: { id: 'user-1' } };
-    const res = createMockRes();
-    let capturedError = null;
-    const next = (error) => {
-      capturedError = error;
-    };
-
-    await systemController.markNotificationRead(req, res, next);
-
-    assert.equal(capturedError, null);
-    assert.deepEqual(capturedArgs.where, { id: 'notice-1', userId: 'user-1' });
-    assert.equal(res.statusCode, 200);
-    assert.equal(res.payload.message, '已标记为已读');
-  } finally {
-    prisma.notification.updateMany = original;
-  }
-});
-
-test('markNotificationRead: 通知不存在或非本人时返回404', async () => {
-  const original = prisma.notification.updateMany;
-
-  prisma.notification.updateMany = async () => ({ count: 0 });
-
-  try {
-    const req = { params: { id: 'notice-2' }, user: { id: 'user-1' } };
-    const res = createMockRes();
-    let capturedError = null;
-    const next = (error) => {
-      capturedError = error;
-    };
-
-    await systemController.markNotificationRead(req, res, next);
-
-    assert.ok(capturedError);
-    assert.equal(capturedError.statusCode, 404);
-    assert.equal(capturedError.message, '通知不存在或无权限访问');
-  } finally {
-    prisma.notification.updateMany = original;
-  }
-});
-
 test('getPorts: 默认只查询启用港口并返回分页结构', async () => {
   const originalFindMany = prisma.port.findMany;
   const originalCount = prisma.port.count;

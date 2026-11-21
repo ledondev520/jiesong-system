@@ -11,8 +11,6 @@ const {
   getSellerIdentity,
 } = require('./system/configController');
 const {
-  getNotifications,
-  markNotificationRead,
   getLogs,
   getOperationLogs,
   exportOperationLogsCsv,
@@ -40,8 +38,6 @@ module.exports = {
   getLogs,
   getOperationLogs,
   exportOperationLogsCsv,
-  getNotifications,
-  markNotificationRead,
   getExchangeRate,
   getSellerIdentity,
   getPorts,

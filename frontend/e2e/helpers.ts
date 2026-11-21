@@ -2203,7 +2203,7 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
-    if (pathname === "/api/v1/system/notifications" && method === "GET") {
+    if (pathname === "/api/v1/notifications" && method === "GET") {
       const unreadOnly = searchParams.get("unreadOnly") === "true";
       const items = unreadOnly
         ? state.notifications.filter((item) => !item.isRead)
@@ -2216,10 +2216,10 @@ export const mockApiRoutes = async (page: Page) => {
     }
 
     if (
-      /^\/api\/v1\/system\/notifications\/[^/]+\/read$/.test(pathname) &&
-      method === "PUT"
+      /^\/api\/v1\/notifications\/[^/]+\/read$/.test(pathname) &&
+      method === "POST"
     ) {
-      const notificationId = pathname.split("/")[5];
+      const notificationId = pathname.split("/")[4];
       state.notifications = state.notifications.map((item) =>
         item.id === notificationId ? { ...item, isRead: true } : item,
       );

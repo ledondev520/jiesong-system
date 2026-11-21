@@ -37,7 +37,6 @@ vi.mock("@/services/taxRefund.service", () => ({
     getAll: (...args: unknown[]) => mockGetAll(...args),
     generateDrafts: (...args: unknown[]) => mockGenerateDrafts(...args),
     getWorkbench: (...args: unknown[]) => mockGetWorkbench(...args),
-    exportDeclarationCsv: vi.fn(),
     exportMonthlyPreparations: vi.fn(),
     getInvoiceVerification: vi.fn(),
   },

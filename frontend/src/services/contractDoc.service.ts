@@ -9,16 +9,6 @@ import { ApiResponse } from "@/types";
 
 export const contractDocService = {
   /**
-   * 检查模板状态
-   */
-  checkTemplate: async () => {
-    return api.get<
-      ApiResponse<{ exists: boolean }>,
-      ApiResponse<{ exists: boolean }>
-    >("/contract-doc/template/check");
-  },
-
-  /**
    * 获取模板列表（当前后端仅支持单模板）
    */
   getTemplates: async () => {

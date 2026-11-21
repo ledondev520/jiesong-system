@@ -203,7 +203,6 @@ const coreCases = [
   { id: 'system_configs', method: 'GET', path: '/api/v1/system/configs' },
   { id: 'system_config_domains', method: 'GET', path: '/api/v1/system/configs/domains' },
   { id: 'system_logs', method: 'GET', path: '/api/v1/system/logs?page=1&pageSize=20' },
-  { id: 'system_notifications', method: 'GET', path: '/api/v1/system/notifications?page=1&pageSize=20' },
   { id: 'system_exchange_rate', method: 'GET', path: '/api/v1/system/exchange-rate' },
   { id: 'system_ports', method: 'GET', path: '/api/v1/system/ports?page=1&pageSize=20' },
   { id: 'system_categories', method: 'GET', path: '/api/v1/system/categories?page=1&pageSize=20' },

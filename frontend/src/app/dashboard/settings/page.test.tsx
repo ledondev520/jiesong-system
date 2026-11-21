@@ -45,10 +45,6 @@ vi.mock("sonner", () => ({
   },
 }));
 
-vi.mock("@/components/tools/ClaudeCostCalculator", () => ({
-  ClaudeCostCalculator: () => <div>Claude成本计算器</div>,
-}));
-
 vi.mock("@/lib/api-cache", () => ({
   cachedFetch: async (_key: string, fetcher: () => unknown) => fetcher(),
   invalidateCache: vi.fn(),

@@ -47,7 +47,8 @@ for (const width of [390, 1440]) {
     test("old /dashboard/sales URL redirects and keeps filters (keyword → q)", async ({ page }) => {
       const requests = await mockOrders(page);
       await signInAsAdmin(page, "/dashboard/sales?keyword=EXP26&status=SHIPPED");
-      await expect(page).toHaveURL(/\/dashboard\/orders\?q=EXP26&status=SHIPPED$/);
+      // 配置重定向保留原查询串并追加 q，所以 keyword 仍在 URL 里
+      await expect(page).toHaveURL(/\/dashboard\/orders\?(?=.*\bq=EXP26)(?=.*\bstatus=SHIPPED)/);
       await expect(page.getByRole("link", { name: /EXP260102/ }).first()).toBeVisible();
       await expect(page.getByText("EXP260101")).toHaveCount(0);
       expect(requests.some((url) => url.searchParams.get("keyword") === "EXP26" && url.searchParams.get("status") === "SHIPPED")).toBe(true);
