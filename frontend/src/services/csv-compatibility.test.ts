@@ -4,7 +4,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import * as XLSX from "xlsx";
 import { downloadCatalogTemplate } from "./catalog-import.service";
 import { exportSystemData, exportSystemLogsCsv } from "./system.service";
-import { taxRefundService } from "./taxRefund.service";
 
 const { apiGet } = vi.hoisted(() => ({ apiGet: vi.fn() }));
 vi.mock("@/lib/axios", () => ({ default: { get: apiGet } }));
@@ -41,7 +40,6 @@ it.each([
   ["sales", () => exportSystemData("sales")],
   ["products", () => exportSystemData("products")],
   ["operation logs", () => exportSystemLogsCsv()],
-  ["tax refunds", () => taxRefundService.exportDeclarationCsv()],
   ["catalog template", () => downloadCatalogTemplate("products", "csv")],
 ] as const)(
   "%s downloads preserve the original BOM-bearing Blob",

@@ -16,20 +16,24 @@ const NOTIFICATION_TYPES = {
 };
 
 /**
- * 职责：获取用户通知列表
+ * 职责：获取用户通知列表；keyword 搜标题/内容/类型，unreadOnly 只返回未读；unreadCount 始终是该用户全部未读数
  */
-const list = async (userId, { page = 1, pageSize = 20 } = {}) => {
+const list = async (userId, { page = 1, pageSize = 20, keyword = '', unreadOnly = false } = {}) => {
   const skip = (page - 1) * pageSize;
-  const [items, total] = await Promise.all([
+  const where = { userId };
+  if (unreadOnly) where.isRead = false;
+  if (keyword) where.OR = ['title', 'content', 'type'].map((field) => ({ [field]: { contains: keyword } }));
+  const [items, total, unread] = await Promise.all([
     prisma.notification.findMany({
-      where: { userId },
+      where,
       orderBy: { createdAt: 'desc' },
       skip,
       take: pageSize,
     }),
-    prisma.notification.count({ where: { userId } }),
+    prisma.notification.count({ where }),
+    unreadCount(userId),
   ]);
-  return { items, total, page, pageSize };
+  return { items, total, page, pageSize, unreadCount: unread };
 };
 
 /**

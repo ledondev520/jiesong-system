@@ -4,15 +4,15 @@
  * Pos: 前端服务层
  */
 
-import api from '@/lib/axios';
-import type { ApiResponse } from '@/types';
+import api from "@/lib/axios";
+import type { ApiResponse } from "@/types";
 
 export interface AiActionRecommendation {
   code: string;
   title: string;
   domain: string;
-  priority: 'high' | 'medium' | 'low';
-  executionMode: 'manual' | 'confirmable_write';
+  priority: "high" | "medium" | "low";
+  executionMode: "manual" | "confirmable_write";
   reason: string;
   actionType?: string | null;
   params?: Record<string, unknown> | null;
@@ -23,12 +23,12 @@ export interface AiPendingActionSummary {
   actionId: string;
   actionType: string;
   description: string;
-  status: 'pending' | 'executed' | 'cancelled' | 'failed';
+  status: "pending" | "executed" | "cancelled" | "failed";
   createdAt?: string | null;
   resultDetail?: string | null;
   timeline?: Array<{
-    type: 'created' | 'pending' | 'executed' | 'cancelled' | 'failed';
-    status: 'pending' | 'executed' | 'cancelled' | 'failed';
+    type: "created" | "pending" | "executed" | "cancelled" | "failed";
+    status: "pending" | "executed" | "cancelled" | "failed";
     detail?: string | null;
     at: string;
   }>;
@@ -36,8 +36,17 @@ export interface AiPendingActionSummary {
 
 export interface AiGovernanceReplayProfile {
   available: boolean;
-  source: 'none' | 'session-metadata' | 'session-metadata+operation-log' | 'agent-run-log' | 'agent-run-log+operation-log' | 'replay-snapshot-log' | 'replay-snapshot-log+operation-log' | 'replay-summary-record' | 'replay-summary-record+operation-log';
-  level: 'none' | 'actions' | 'recommendations' | 'tools';
+  source:
+    | "none"
+    | "session-metadata"
+    | "session-metadata+operation-log"
+    | "agent-run-log"
+    | "agent-run-log+operation-log"
+    | "replay-snapshot-log"
+    | "replay-snapshot-log+operation-log"
+    | "replay-summary-record"
+    | "replay-summary-record+operation-log";
+  level: "none" | "actions" | "recommendations" | "tools";
   evidence: {
     operationLogEvents: number;
     actionLifecycleCount: number;
@@ -61,8 +70,17 @@ export interface AiSessionItem {
   preview?: string;
   governanceReplayProfile?: AiGovernanceReplayProfile;
   governanceReplayAvailable?: boolean;
-  governanceReplaySource?: 'none' | 'session-metadata' | 'session-metadata+operation-log' | 'agent-run-log' | 'agent-run-log+operation-log' | 'replay-snapshot-log' | 'replay-snapshot-log+operation-log' | 'replay-summary-record' | 'replay-summary-record+operation-log';
-  governanceReplayLevel?: 'none' | 'actions' | 'recommendations' | 'tools';
+  governanceReplaySource?:
+    | "none"
+    | "session-metadata"
+    | "session-metadata+operation-log"
+    | "agent-run-log"
+    | "agent-run-log+operation-log"
+    | "replay-snapshot-log"
+    | "replay-snapshot-log+operation-log"
+    | "replay-summary-record"
+    | "replay-summary-record+operation-log";
+  governanceReplayLevel?: "none" | "actions" | "recommendations" | "tools";
   governanceReplayCounts?: {
     tools: number;
     recommendations: number;
@@ -102,13 +120,22 @@ export interface AiSessionItem {
 export interface AiChatHistoryItem {
   id: string;
   sessionId: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   imageUrl?: string;
   governanceReplayProfile?: AiGovernanceReplayProfile;
   governanceReplayAvailable?: boolean;
-  governanceReplaySource?: 'none' | 'session-metadata' | 'session-metadata+operation-log' | 'agent-run-log' | 'agent-run-log+operation-log' | 'replay-snapshot-log' | 'replay-snapshot-log+operation-log' | 'replay-summary-record' | 'replay-summary-record+operation-log';
-  governanceReplayLevel?: 'none' | 'actions' | 'recommendations' | 'tools';
+  governanceReplaySource?:
+    | "none"
+    | "session-metadata"
+    | "session-metadata+operation-log"
+    | "agent-run-log"
+    | "agent-run-log+operation-log"
+    | "replay-snapshot-log"
+    | "replay-snapshot-log+operation-log"
+    | "replay-summary-record"
+    | "replay-summary-record+operation-log";
+  governanceReplayLevel?: "none" | "actions" | "recommendations" | "tools";
   governanceReplayCounts?: {
     tools: number;
     recommendations: number;
@@ -202,15 +229,44 @@ export interface AiAgentToolRegistryResponse {
 export interface DashboardAnalytics {
   alerts?: { draftPurchases: number; exportPendingParams: number };
   contracts: {
-    purchase: { count: number; totalAmount: number; paidAmount: number; unpaidAmount: number };
-    sales: { count: number; totalAmount: number; receivedAmount: number; receivable: number };
+    purchase: {
+      count: number;
+      totalAmount: number;
+      paidAmount: number;
+      unpaidAmount: number;
+    };
+    sales: {
+      count: number;
+      totalAmount: number;
+      receivedAmount: number;
+      receivable: number;
+    };
   };
-  inventory: { productCount: number; recordCount: number; totalQuantity: number };
+  inventory: {
+    productCount: number;
+    recordCount: number;
+    totalQuantity: number;
+  };
   shipments: {
-    monthly: Array<{ month: string; count: number; amount: number; boxes: number }>;
+    monthly: Array<{
+      month: string;
+      count: number;
+      amount: number;
+      boxes: number;
+    }>;
   };
-  topProducts: Array<{ productName: string; count: number; quantity: number; totalAmount: number }>;
-  storeStats: Array<{ storeName: string; orderCount: number; quantity: number; totalAmount: number }>;
+  topProducts: Array<{
+    productName: string;
+    count: number;
+    quantity: number;
+    totalAmount: number;
+  }>;
+  storeStats: Array<{
+    storeName: string;
+    orderCount: number;
+    quantity: number;
+    totalAmount: number;
+  }>;
 }
 
 export interface TrackResult {
@@ -228,7 +284,7 @@ export interface AiTokenUsageResponse {
   message?: string;
 }
 
-type AiBusinessAgentType = 'finance' | 'export' | 'executive' | 'unified';
+type AiBusinessAgentType = "finance" | "export" | "executive" | "unified";
 
 export interface AiBusinessAgentPromptInput {
   agentType: AiBusinessAgentType;
@@ -309,75 +365,66 @@ export interface AiStandaloneTokenRow {
 
 export const aiService = {
   getSessions: async () => {
-    return api.get<ApiResponse<AiSessionItem[]>, ApiResponse<AiSessionItem[]>>('/ai/sessions');
+    return api.get<ApiResponse<AiSessionItem[]>, ApiResponse<AiSessionItem[]>>(
+      "/ai/sessions",
+    );
   },
 
   getStandaloneTokenUsage: async (limit = 50) => {
-    return api.get<ApiResponse<AiStandaloneTokenRow[]>, ApiResponse<AiStandaloneTokenRow[]>>(
-      '/ai/standalone-token-usage',
-      { params: { limit } },
-    );
+    return api.get<
+      ApiResponse<AiStandaloneTokenRow[]>,
+      ApiResponse<AiStandaloneTokenRow[]>
+    >("/ai/standalone-token-usage", { params: { limit } });
   },
 
   getChatHistory: async (sessionId: string, page = 1, pageSize = 100) => {
-    return api.get<ApiResponse<AiChatHistoryItem[]>, ApiResponse<AiChatHistoryItem[]>>(
-      '/ai/history',
-      { params: { sessionId, page, pageSize } },
-    );
+    return api.get<
+      ApiResponse<AiChatHistoryItem[]>,
+      ApiResponse<AiChatHistoryItem[]>
+    >("/ai/history", { params: { sessionId, page, pageSize } });
   },
 
   deleteSession: async (sessionId: string) => {
-    return api.delete<ApiResponse<null>, ApiResponse<null>>(`/ai/sessions/${sessionId}`);
+    return api.delete<ApiResponse<null>, ApiResponse<null>>(
+      `/ai/sessions/${sessionId}`,
+    );
   },
 
   getTokenStats: async (days = 30) => {
-    return api.get<ApiResponse<AiTokenStats>, ApiResponse<AiTokenStats>>('/ai/token-stats', {
-      params: { days },
-    });
-  },
-
-  getModels: async () => {
-    return api.get<ApiResponse<AiModelsResponse>, ApiResponse<AiModelsResponse>>('/ai/models');
+    return api.get<ApiResponse<AiTokenStats>, ApiResponse<AiTokenStats>>(
+      "/ai/token-stats",
+      {
+        params: { days },
+      },
+    );
   },
 
   getAgentToolRegistry: async () => {
-    return api.get<ApiResponse<AiAgentToolRegistryResponse>, ApiResponse<AiAgentToolRegistryResponse>>('/ai/agents/tools');
-  },
-
-  getDashboardAnalytics: async () => {
-    return api.get<ApiResponse<DashboardAnalytics>, ApiResponse<DashboardAnalytics>>('/dashboard/analytics');
-  },
-
-  trackProduct: async (params: { product: string; store?: string }) => {
-    return api.get<ApiResponse<TrackResult[]>, ApiResponse<TrackResult[]>>('/dashboard/track-product', {
-      params,
-    });
+    return api.get<
+      ApiResponse<AiAgentToolRegistryResponse>,
+      ApiResponse<AiAgentToolRegistryResponse>
+    >("/ai/agents/tools");
   },
 
   parseImageTokenUsage: async (message: string, imageUrl: string) => {
-    return api.post<ApiResponse<AiTokenUsageResponse>, ApiResponse<AiTokenUsageResponse>, { message: string; imageUrl: string }>(
-      '/ai/chat',
-      { message, imageUrl },
-    );
-  },
-
-  runBusinessAgent: async (data: AiBusinessAgentPromptInput) => {
-    return api.post<ApiResponse<AiBusinessAgentPromptResult>, ApiResponse<AiBusinessAgentPromptResult>, AiBusinessAgentPromptInput>(
-      '/ai/agents/prompt',
-      data,
-    );
+    return api.post<
+      ApiResponse<AiTokenUsageResponse>,
+      ApiResponse<AiTokenUsageResponse>,
+      { message: string; imageUrl: string }
+    >("/ai/chat", { message, imageUrl });
   },
 
   executeAgentAction: async (actionId: string) => {
-    return api.post<ApiResponse<AgentActionExecuteResult>, ApiResponse<AgentActionExecuteResult>, { actionId: string }>(
-      '/ai/agents/execute-action',
-      { actionId },
-    );
+    return api.post<
+      ApiResponse<AgentActionExecuteResult>,
+      ApiResponse<AgentActionExecuteResult>,
+      { actionId: string }
+    >("/ai/agents/execute-action", { actionId });
   },
 
   cancelAgentAction: async (actionId: string) => {
     return api.post<ApiResponse<null>, ApiResponse<null>, { actionId: string }>(
-      '/ai/agents/cancel-action',
+      "/ai/agents/cancel-action",
       { actionId },
     );
   },

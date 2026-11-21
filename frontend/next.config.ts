@@ -22,16 +22,55 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  /* 旧地址永久指向合并后的设置/通知页（规格 §3.4） */
+  /*
+   * 旧地址永久（308）指向合并后的页面（规格 §3.4）。Next 会把请求的查询串原样带到目标上，
+   * 目标自带的参数优先；顺序即匹配顺序，具体规则必须排在 :id 之前。
+   * 回归：e2e/legacy-redirects.spec.ts 逐条请求旧地址并断言 308 与 Location。
+   */
   async redirects() {
+    const to = (source: string, destination: string) => ({ source, destination, permanent: true });
+    const query = (key: string, value: string) => ({ type: 'query' as const, key, value });
     return [
-      { source: '/dashboard/users', destination: '/dashboard/settings/users', permanent: true },
-      { source: '/dashboard/system', destination: '/dashboard/settings', permanent: true },
-      { source: '/dashboard/system/logs', destination: '/dashboard/settings/logs', permanent: true },
-      { source: '/dashboard/system/notifications', destination: '/dashboard/notifications', permanent: true },
-      { source: '/dashboard/about', destination: '/dashboard/settings/ai-usage', permanent: true },
-      { source: '/dashboard/sales/create', destination: '/dashboard/orders/new', permanent: true }, // A99: old create page removed
-      { source: '/dashboard/ai/sessions', destination: '/dashboard/settings/ai-usage', permanent: true },
+      to('/dashboard/users', '/dashboard/settings/users'),
+      to('/dashboard/system', '/dashboard/settings'),
+      to('/dashboard/system/logs', '/dashboard/settings/logs'),
+      to('/dashboard/system/notifications', '/dashboard/notifications'),
+      to('/dashboard/about', '/dashboard/settings/ai-usage'),
+      to('/dashboard/sales/create', '/dashboard/orders/new'), // A99: old create page removed
+      to('/dashboard/ai/sessions', '/dashboard/settings/ai-usage'),
+      to('/dashboard/ai', '/dashboard?ai=1'),
+      // 出口订单（旧 keyword 参数改名为 q；原 keyword 会随查询串保留，目标页忽略）
+      { ...to('/dashboard/sales', '/dashboard/orders?q=:kw'), has: [query('keyword', '(?<kw>.+)')] },
+      to('/dashboard/sales', '/dashboard/orders'),
+      to('/dashboard/sales/:id', '/dashboard/orders/:id'),
+      to('/dashboard/logistics/containers', '/dashboard/orders'),
+      to('/dashboard/logistics', '/dashboard/inventory'),
+      to('/dashboard/inventory-status', '/dashboard/inventory'),
+      // 采购
+      to('/dashboard/contracts', '/dashboard/purchases'),
+      to('/dashboard/contracts/template', '/dashboard/purchases'),
+      to('/dashboard/contracts/templates', '/dashboard/purchases'),
+      to('/dashboard/purchase', '/dashboard/purchases'),
+      to('/dashboard/purchase/create', '/dashboard/purchases/new'),
+      to('/dashboard/purchase/:id', '/dashboard/purchases/:id'),
+      // 财务：旧 payments 按 tab 分流，overdue 只对应收、pastDelivery 只对应付有意义
+      { ...to('/dashboard/payments', '/dashboard/finance/receivable?overdue=true'), has: [query('tab', 'receivable'), query('overdue', 'true')] },
+      { ...to('/dashboard/payments', '/dashboard/finance/receivable'), has: [query('tab', 'receivable')] },
+      { ...to('/dashboard/payments', '/dashboard/finance/payable?pastDelivery=true'), has: [query('pastDelivery', 'true')] },
+      to('/dashboard/payments', '/dashboard/finance/payable'),
+      to('/dashboard/reports', '/dashboard/finance/analysis'),
+      // 报关与退税
+      to('/dashboard/customs-declarations', '/dashboard/customs?view=customs'),
+      to('/dashboard/customs-declarations/create', '/dashboard/customs/new'),
+      to('/dashboard/customs-declarations/:id/edit', '/dashboard/customs/:id/edit'),
+      to('/dashboard/customs-declarations/:id', '/dashboard/customs/:id'),
+      to('/dashboard/tax-refunds', '/dashboard/customs'),
+      to('/customs-declarations', '/dashboard/customs?view=customs'),
+      to('/customs-declarations/create', '/dashboard/customs/new'),
+      to('/customs-declarations/:id/edit', '/dashboard/customs/:id/edit'),
+      to('/customs-declarations/:id', '/dashboard/customs/:id'),
+      to('/tax-refunds', '/dashboard/customs'),
+      to('/forex-verifications', '/'),
     ];
   },
 

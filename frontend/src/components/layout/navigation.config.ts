@@ -84,8 +84,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     label: "出口订单",
     mobileLabel: "订单",
     icon: PackageOpen,
-    // 详情/新建在 J18/J19 迁到 /orders/* 之前仍在 /dashboard/sales/*
-    childPrefixes: ["/dashboard/sales"],
+    childPrefixes: [],
     children: [],
     group: "business",
     mobilePrimary: true,
@@ -107,7 +106,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: "/dashboard/inventory",
     label: "库存",
     icon: Boxes,
-    childPrefixes: ["/dashboard/logistics"],
+    childPrefixes: [],
     children: [],
     group: "business",
     mobilePrimary: true,
@@ -129,7 +128,7 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
     defaultHref: "/dashboard/finance",
     label: "财务",
     icon: Landmark,
-    childPrefixes: ["/dashboard/payments", "/dashboard/reports"],
+    childPrefixes: [],
     children: [
       { href: "/dashboard/finance", label: "财务概览" },
       { href: "/dashboard/finance/receivable", label: "应收" },
@@ -239,7 +238,6 @@ export const MODULE_NAV_ITEMS: ModuleNavItem[] = [
       "/dashboard/settings/ports",
       "/dashboard/settings/categories",
       "/dashboard/settings/customs-brokers",
-      "/dashboard/import",
     ],
     // 设置内部导航由 SettingsNav 提供；侧栏不再重复列出子页面（B56）
     children: [],

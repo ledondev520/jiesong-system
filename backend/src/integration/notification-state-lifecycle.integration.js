@@ -93,8 +93,8 @@ test('HTTP/SQLite: own notification read states and counts survive reload and re
     database], { encoding: 'utf8', timeout: 10000 }));
   const assertReadback = async (unreadIds) => {
     const list = await good('GET', '/notifications?page=1&pageSize=50');
-    const all = await good('GET', '/system/notifications?page=1&pageSize=20');
-    const unread = await good('GET', '/system/notifications?page=1&pageSize=20&unreadOnly=true');
+    const all = await good('GET', '/notifications?page=1&pageSize=20');
+    const unread = await good('GET', '/notifications?page=1&pageSize=20&unreadOnly=true');
     const count = await good('GET', '/notifications/unread-count');
     assert.equal(list.pagination.total, 4);
     assert.equal(all.pagination.total, 4);
@@ -119,7 +119,6 @@ test('HTTP/SQLite: own notification read states and counts survive reload and re
       good('POST', `/notifications/${rows[0].id}/read`),
     ]);
     repeated.forEach(row => { assert.equal(row.id, rows[0].id); assert.equal(row.isRead, true); });
-    await good('PUT', `/system/notifications/${rows[0].id}/read`);
     const after = await assertReadback(rows.slice(1, 3).map(row => row.id));
     assert.deepEqual(after, before.map(row => row.id === rows[0].id ? { ...row, isRead: 1 } : row));
     // A fresh Prisma connection still reads the saved state, as a page reload should.

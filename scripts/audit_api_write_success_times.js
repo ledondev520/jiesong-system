@@ -335,13 +335,6 @@ const cases = [
     body: () => ({}),
   },
   {
-    id: 'system_notification_mark_read_success',
-    category: 'write_success',
-    method: 'PUT',
-    path: () => `/api/v1/system/notifications/${state.notificationId}/read`,
-    body: () => ({}),
-  },
-  {
     id: 'contract_template_create_success',
     category: 'write_success',
     method: 'POST',

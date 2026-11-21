@@ -1,5 +1,5 @@
 /**
- * Input: 系统通知 API
+ * Input: 通知 API（/notifications）
  * Output: 通知中心页面（查看通知、标记已读）
  * Pos: 运维中心
  */
@@ -38,11 +38,8 @@ import {
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  getSystemNotifications,
-  markSystemNotificationRead,
-  SystemNotificationItem,
-} from "@/services/system.service";
+import { notificationService } from "@/services/notification.service";
+import type { Notification } from "@/types";
 import { toast } from "sonner";
 import { runAwait } from "@/lib/run-await";
 import { formatDateTime } from "@/lib/date-format";
@@ -64,9 +61,7 @@ export default function SystemNotificationsPage() {
   const requestId = useRef(0);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState<SystemNotificationItem[]>(
-    [],
-  );
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
@@ -85,12 +80,15 @@ export default function SystemNotificationsPage() {
     const currentRequest = ++requestId.current;
     return runAwait(
       () =>
-        getSystemNotifications({
-          page: currentPage,
-          pageSize,
-          keyword: keyword.trim() || undefined,
-          unreadOnly: filter === "unread",
-        }),
+        notificationService.getList(
+          {
+            page: currentPage,
+            pageSize,
+            keyword: keyword.trim() || undefined,
+            unreadOnly: filter === "unread",
+          },
+          { cache: { enabled: false } },
+        ),
       (response) => {
         if (currentRequest !== requestId.current) return;
         const items = response.data?.items || [];
@@ -136,7 +134,7 @@ export default function SystemNotificationsPage() {
     void requestNotifications();
   }, [requestNotifications]);
 
-  const sort = useTableSort<SystemNotificationItem, string>(
+  const sort = useTableSort<Notification, string>(
     notifications,
     useCallback((item, key) => {
       switch (key) {
@@ -158,7 +156,7 @@ export default function SystemNotificationsPage() {
   const handleMarkRead = async (id: string) => {
     setMarkingId(id);
     try {
-      await markSystemNotificationRead(id);
+      await notificationService.markRead(id);
       await loadNotifications();
       toast.success("已标记为已读");
     } catch {

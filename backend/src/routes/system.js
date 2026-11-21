@@ -47,15 +47,6 @@ router.get('/logs', roleAuth(ROLE_SETS.ADMIN), withPaginationValidation, systemC
 // GET /api/v1/system/logs/export/csv - 导出操作日志（CSV）
 router.get('/logs/export/csv', roleAuth(ROLE_SETS.ADMIN), systemController.exportOperationLogsCsv);
 
-// GET /api/v1/system/notifications - 获取通知列表
-router.get('/notifications', withPaginationValidation, systemController.getNotifications);
-
-// PUT /api/v1/system/notifications/:id/read - 标记通知已读
-router.put('/notifications/:id/read', roleAuth(ROLE_SETS.ALL), withAuditLog(
-  { entity: 'Notification', action: 'UPDATE', model: 'notification' },
-  systemController.markNotificationRead
-));
-
 // GET /api/v1/system/seller-identity - 统一卖方信息（公司信息 + 旧开票抬头别名；银行资料仅 ADMIN/FINANCE）
 router.get('/seller-identity', systemController.getSellerIdentity);
 

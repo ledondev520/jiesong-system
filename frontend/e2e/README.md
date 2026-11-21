@@ -55,7 +55,7 @@
 
 - `dashboard-return-context.spec.ts`：390/1440px 实际 Next 路由下的合成只读工作台/经营报表，验证阻塞范围与已应用日期经销售明细返回、Back/Forward 和整页刷新保留，范围快速切换/原生历史、未应用草稿、倒序日期禁用以及全部期间重置。业务写请求拒绝，检查未捕获页面异常；定义与实际浏览器通过情况分别报告。
 
-- `real-dashboard-sources.spec.ts`：两项1440px已挂载工作台验收；每项/重试独占 `dashboard-sources` 已提交迁移0700/0600 SQLite，通过真实 PURCHASE/BOSS 登录和真实 Express 透传，核对待起草2、待补录1、库存记录3、正确最大年月账期、USD825/CNY1350；最近六笔之外的旧合同经阻塞/风险优先出现且取消合同不出现。PURCHASE 点击真正下一步到采购详情，BOSS 点击只读任务到历史销售详情，均要求真实GET200、可见合同号和整页重载；独立只读完整业务/目录/账期/业务审计快照不变且无业务写请求、无未捕获页面异常。只在现有工作台操作，不访问经营执行/报表，也不为未挂载的 ProductTracker 新增入口。`playwright test real-dashboard-sources.spec.ts --list` 只确认两项定义；实际浏览器由既有 hosted CI 执行，不绕过本地 Chromium/loopback 限制。后端独立 HTTP/SQL 来源证据见 `backend/src/testHelpers/role-browser-dashboard.test.js`。
+- `real-dashboard-sources.spec.ts`：两项1440px已挂载工作台验收；每项/重试独占 `dashboard-sources` 已提交迁移0700/0600 SQLite，通过真实 PURCHASE/BOSS 登录和真实 Express 透传，核对待起草2、待补录1、库存记录3、正确最大年月账期、USD825/CNY1350；最近六笔之外的旧合同经阻塞/风险优先出现且取消合同不出现。PURCHASE 点击真正下一步到采购详情，BOSS 点击只读任务到历史销售详情，均要求真实GET200、可见合同号和整页重载；独立只读完整业务/目录/账期/业务审计快照不变且无业务写请求、无未捕获页面异常。只在现有工作台操作，不访问经营执行/报表。`playwright test real-dashboard-sources.spec.ts --list` 只确认两项定义；实际浏览器由既有 hosted CI 执行，不绕过本地 Chromium/loopback 限制。后端独立 HTTP/SQL 来源证据见 `backend/src/testHelpers/role-browser-dashboard.test.js`。
 
 - `real-role-lifecycle.spec.ts` 新增六项1440px FINANCE内部报关/退税表单验收（每种三项）：新建完整草稿经返回取消/刷新/重开零业务与审计写入；真实重复编号拒绝后保留全部输入，纠正编号重试创建一次，整页重载读回及备注编辑保存/重载，报关明细ID不变；已有记录编辑金额/日期/备注后返回取消，重开恢复原始日期与输入。每项独占 `tax-record-forms` 私有迁移SQLite及真实Express，不mock业务响应，独立只读连接核对整条记录与FINANCE审计操作者。退税编辑使用真实API ISO日期以防空白回填。全部保持DRAFT/已退金额0，不调用正式申报、确认、资金结算、导出、上传或外部服务。`playwright test real-role-lifecycle.spec.ts --list --grep='FINANCE (customs|refunds)'` 仅验证六项定义；浏览器执行以既有hosted CI为准。
 

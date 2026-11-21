@@ -149,38 +149,6 @@ export const threeFormsService = {
   },
 
   /**
-   * 单独生成报关单
-   */
-  generateCustomsDeclaration: async (
-    data: Omit<
-      ThreeFormsGenerateInput,
-      "generateCustoms" | "generateForex" | "generateTaxRefund"
-    >,
-  ) => {
-    return api.post<
-      ApiResponse<ThreeFormsGenerateResult>,
-      ApiResponse<ThreeFormsGenerateResult>
-    >("/three-forms/customs-declaration", data);
-  },
-
-  /**
-   * 单独生成外汇核销单
-   */
-  generateForexVerification: async (data: {
-    salesContractId: string;
-    customsDeclarationId: string;
-    extraData?: {
-      bankName?: string;
-      note?: string;
-    };
-  }) => {
-    return api.post<
-      ApiResponse<ThreeFormsGenerateResult>,
-      ApiResponse<ThreeFormsGenerateResult>
-    >("/three-forms/forex-verification", data);
-  },
-
-  /**
    * 下载三张表 Excel 文件
    * 职责：使用共享认证传输下载当前三表的原始 Blob 和响应文件名
    * 思路：在 Axios 解包前提取响应头，禁止 JSON 缓存，再保存返回的完整 Blob。
