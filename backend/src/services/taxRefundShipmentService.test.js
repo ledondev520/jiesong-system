@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const ExcelJS = require('exceljs');
 const service = require('./taxRefundShipmentService');
 const fileService = require('./fileService');
-const { EXPORT_PACKET_DESCRIPTION, buildPackingSourceVersion } = require('./exportPacketService');
+const { buildPackingSourceVersion } = require('./exportPacketService');
+const { EXPORT_PACKET_DESCRIPTION, LEGACY_EXPORT_PACKET_DESCRIPTION } = require('./exportPacketMarker');
 const invoiceNo = '26110000000000000001';
 const purchase = { id: 'pc1', contractNo: 'CG1', invoiceNo, taxRate: 13, totalAmount: 113,
   supplier: { name: '测试供货方', taxId: 'TEST-ID' },
@@ -21,13 +22,15 @@ contract.files[0].description = `${EXPORT_PACKET_DESCRIPTION}:${buildPackingSour
 const readiness = { taxRefundReady: true, issues: [], lines: [{ packingItemId: 'pack1', hsEvidence: { refundRate: 13 } }] };
 const build = (overrides = {}) => service.buildShipmentPreparation({ salesContract: contract, purchases: [purchase], declaration: contract.customsDeclarations[0], invoiceRecords: [invoice], exportReadiness: readiness, ...overrides });
 
-test('四单上线后历史三单仍可作为退税材料，明细变更仍作废', () => {
-  assert.equal(EXPORT_PACKET_DESCRIPTION, '出口三单生成版本（外销合同、商业发票、装箱单）');
-  const old = structuredClone(contract);
-  old.files[0].description = `${EXPORT_PACKET_DESCRIPTION}:${buildPackingSourceVersion(old.packingItems)}`;
-  assert.equal(build({ salesContract: old }).checklist.find(x => x.id === 'export-packet').status, 'ready');
-  old.packingItems[0].quantity += 1;
-  assert.equal(build({ salesContract: old }).checklist.find(x => x.id === 'export-packet').status, 'missing');
+test('新四单与历史三单归档都可作为退税材料，明细变更仍作废', () => {
+  assert.equal(LEGACY_EXPORT_PACKET_DESCRIPTION, '出口三单生成版本（外销合同、商业发票、装箱单）');
+  for (const base of [EXPORT_PACKET_DESCRIPTION, LEGACY_EXPORT_PACKET_DESCRIPTION]) {
+    const old = structuredClone(contract);
+    old.files[0].description = `${base}:${buildPackingSourceVersion(old.packingItems)}`;
+    assert.equal(build({ salesContract: old }).checklist.find(x => x.id === 'export-packet').status, 'ready', base);
+    old.packingItems[0].quantity += 1;
+    assert.equal(build({ salesContract: old }).checklist.find(x => x.id === 'export-packet').status, 'missing', base);
+  }
 });
 const client = (contracts = [contract]) => ({ salesContract: { findMany: async () => contracts, findUnique: async () => contracts[0] }, purchaseContract: { findMany: async () => [purchase] }, invoiceRecord: { findMany: async () => [invoice] } });
 

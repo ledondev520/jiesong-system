@@ -86,19 +86,6 @@ test('sales route includes export packet preview and confirmed generation endpoi
   assert.notEqual(getRouteIndex(salesRouter, '/:id/export-packet/generate', 'post'), -1);
 });
 
-test('sales export routes: 缺失合同时将404错误传给 next', async () => {
-  const originalSalesContractFindUnique = prisma.salesContract.findUnique;
-  prisma.salesContract.findUnique = async () => null;
-
-  try {
-    const excelError = await invokeExportHandler('/:id/export-excel');
-
-    assert.equal(excelError?.statusCode, 404);
-    assert.match(excelError?.message || '', /合同不存在/);
-  } finally {
-    prisma.salesContract.findUnique = originalSalesContractFindUnique;
-  }
-});
 
 test('loading-plan 路由：显式角色白名单 ADMIN/SALES（OD-8），拒绝未登录、Agent、未知角色', async () => {
   const guard = getRouteHandlers(salesRouter, '/:id/loading-plan', 'get').find((layer) => layer.handle.isRoleAuth).handle;

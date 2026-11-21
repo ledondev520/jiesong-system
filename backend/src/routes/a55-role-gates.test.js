@@ -1,5 +1,5 @@
 /**
- * Input: 真实挂载的 /ai、/import、/three-forms、/contract-doc 路由与真实 authenticate/roleAuth（仅 prisma 读取被桩替换）
+ * Input: 真实挂载的 /ai、/import、/contract-doc 路由与真实 authenticate/roleAuth（仅 prisma 读取被桩替换）
  * Output: A55 的角色门槛：A1（ADMIN-only 读）、OD-1/OD-4 在 OD-8 两角色下仅 ADMIN；已停用角色一律 403
  * Pos: 后端路由权限回归测试；与 rbac-policy-matrix.test.js 互补（那边断言最大角色集合的 403，这里断言放行与特例）
  */

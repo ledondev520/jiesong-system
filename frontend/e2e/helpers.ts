@@ -707,22 +707,6 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
-    if (
-      /^\/api\/v1\/sales\/[^/]+\/export-excel$/.test(pathname) &&
-      method === "GET"
-    ) {
-      await route.fulfill({
-        status: 200,
-        contentType:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers: {
-          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent("EXP2600001_出口模板.xlsx")}`,
-        },
-        body: "mock-excel-content",
-      });
-      return;
-    }
-
     if (pathname === "/api/v1/ai/greeting" && method === "GET") {
       await fulfillJson(route, {
         greeting: "欢迎回来，今天也要稳步推进。",

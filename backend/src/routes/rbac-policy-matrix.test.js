@@ -32,7 +32,6 @@ const MODULES = {
   '/system': './system',
   '/reports': './reports',
   '/sales': './sales',
-  '/three-forms': './threeForms',
   '/contract-doc': './contractDoc',
 };
 
@@ -42,7 +41,7 @@ const POLICY = [
   { re: /^\/tax-refunds\/(workbench\/(monthly-export|[^/]+\/(preparation(-export)?|confirm|invoice-verification))|auto-drafts)$/, read: ADMIN, write: ADMIN },
   // OD-9: SALES may read refund / forex records; settledAmount, refundableAmount and refundedAmount are stripped by warehouseMoneyRedaction.
   { re: /^\/(tax-refunds|forex-verifications)(\/|$)/, read: ALL, write: ADMIN },
-  { re: /^\/(bank-flow|finance|three-forms|reports)(\/|$)/, read: ADMIN, write: ADMIN },
+  { re: /^\/(bank-flow|finance|reports)(\/|$)/, read: ADMIN, write: ADMIN },
   { re: /^\/suppliers\/[^/]+\/hard-delete(-preview)?$/, read: ADMIN, write: ADMIN },
   { re: /^\/suppliers(\/|$)/, read: ALL, write: ALL },
   { re: /^\/users(\/|$)/, read: ADMIN, write: ADMIN },

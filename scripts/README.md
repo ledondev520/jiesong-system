@@ -94,23 +94,11 @@ python scripts/extract_wps_purchase_evidence.py
 
 VPS 发布后运行 `node scripts/verify-vps-runtime.cjs https://celerada.link` 核对真实进程与公网构建；其回归检查为 `node --test scripts/verify-vps-runtime.test.cjs`。
 
-## Portable export-packet paths
-
-`prepare_export_packet.py` resolves paths in this order: CLI option, environment variable, repository default.
-
-| Option | Environment variable | Default |
-| --- | --- | --- |
-| `--database` | `JIESONG_EXPORT_DATABASE` | `backend/prisma/dev.db` relative to repository |
-| `--history-root` | `JIESONG_HISTORY_ROOT` | `data/export-history` relative to repository |
-
-Paths support `~`; explicit relative paths resolve against the working directory. The script does not load `.env`.
-Put local history workbooks in the selected directory. An absent/empty history directory gives no historical quotes; it does not fabricate evidence. The SQLite database must already exist. Keep business workbooks and databases outside Git. Pricing formulas are unchanged.
-
 `drill_sqlite_restore.py --directory <不存在的临时目录>` 使用已提交迁移和合成商品/期初库存，调用真实备份恢复CLI并保存独立读回回执。它不访问已有库或.env。详见 `docs/operations/sqlite-backup-restore.md`。
 
 ## 出口报价规则
 
 报价规则只在后端 `services/exportPricing.js` 的 `priceFor()` 实现，配置为 `config/pricing.json`（新结构见 `config/pricing.schema.json`）。
-`prepare_export_packet.py` 的 Python 公式副本已退役，脚本拒绝运行（待负责人确认生产不再使用后删除）；原 `pricing_config.py`、
+`prepare_export_packet.py` 的 Python 公式副本已删除（出口四单只由后端 `exportPacketService.js` 生成）；原 `pricing_config.py`、
 `pricing_snapshot.cjs`、`verify_pricing_defaults.py` 及其测试已删除。运行时 `pricing.json` 由部署保留，旧结构用
 `node backend/scripts/convert-pricing-config.js --file <路径> --spot-rate <现汇>`（默认 dry-run）转换。

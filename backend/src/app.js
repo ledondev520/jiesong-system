@@ -12,8 +12,6 @@ const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { requestLogger } = require('./middleware/logger');
 const { createApiRateLimiter, exposeApiRateLimitHeaders } = require('./middleware/apiRateLimit');
-const { startInventoryAlertJob } = require('./jobs/inventoryAlertJob');
-const { startPatrolJob } = require('./jobs/patrolJob');
 const { startExportReminderJob } = require('./jobs/exportReminderJob');
 
 const app = express();
@@ -110,11 +108,7 @@ async function startServer() {
   await require('./utils/sqliteConcurrency').ensureWalJournal(require('./utils/prisma'));
   await require('./services/bootstrapAdmin').ensureBootstrapAdmin(require('./utils/prisma'));
 
-  startInventoryAlertJob();
   startExportReminderJob();
-  startPatrolJob({
-    runOnStart: config.nodeEnv === 'production' || process.env.PATROL_RUN_ON_START === 'true',
-  });
   app.listen(PORT, () => {
     console.log(`
 ╔════════════════════════════════════════════╗

@@ -707,13 +707,6 @@ const cases = [
     }),
   },
   {
-    id: 'three_forms_preview_success',
-    category: 'write_success',
-    method: 'POST',
-    path: '/api/v1/three-forms/preview',
-    body: () => ({ salesContractId: state.salesId, items: [] }),
-  },
-  {
     id: 'customs_auto_drafts_success',
     category: 'write_success',
     method: 'POST',
@@ -1068,13 +1061,6 @@ const cases = [
     body: () => ({ keyword: `NO_MATCH_${state.runId}` }),
   },
   {
-    id: 'system_patrol_trigger_success',
-    category: 'write_success',
-    method: 'POST',
-    path: '/api/v1/system/patrol/trigger',
-    body: () => ({}),
-  },
-  {
     id: 'system_exchange_rate_sync_degraded_success',
     category: 'write_success',
     method: 'POST',
@@ -1275,7 +1261,7 @@ const writeOutputs = (results) => {
 - Generated at: ${summary.generatedAt}
 
 ## Scope
-This audit writes only to a disposable database copy and isolated upload/template directories. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, Agent credentials, notifications, customs declarations, tax refunds, tax rates, forex verifications, inventory status changes, finance matching/allocation, operations checklists, store recommendation, file upload/delete, selected exports/imports, patrol trigger, HS local batch match, AI config/session cleanup, AI local/degraded provider paths, exchange-rate sync degraded fallback, contract-doc template generation, and price calculation.
+This audit writes only to a disposable database copy and isolated upload/template directories. It covers selected success-path write interfaces for users, suppliers, products, stores, system dictionaries, contract templates, purchase contracts, sales contracts, containers, Agent credentials, notifications, customs declarations, tax refunds, tax rates, forex verifications, inventory status changes, finance matching/allocation, operations checklists, store recommendation, file upload/delete, selected exports/imports, HS local batch match, AI config/session cleanup, AI local/degraded provider paths, exchange-rate sync degraded fallback, contract-doc template generation, and price calculation.
 
 ## Over Threshold Or Error
 ${problemLines}

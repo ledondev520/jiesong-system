@@ -173,11 +173,11 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
   const boxes = [3, 7];
   const costs = [531.1, 1875.8];
   /**
-   * 职责：建立只缺船司核对的两商品合成出货及真实三单、报关和发票依据。
-   * 思路：私有库创建采购/装箱来源，调用既有三单生成入口，再补合成已放行报关行和票面事实。
+   * 职责：建立只缺船司核对的两商品合成出货及真实四单、报关和发票依据。
+   * 思路：私有库创建采购/装箱来源，调用既有四单生成入口，再补合成已放行报关行和票面事实。
    * @param {string} label 本测试内唯一的合同与报关编号后缀
    * @returns {Promise<{sale: object, declaration: object, rows: Array<object>}>} 合成出货、报关单及按创建时间排序的装箱行
-   * @throws {Error} 夹具持久化、三单请求或响应断言失败时拒绝 Promise
+   * @throws {Error} 夹具持久化、四单请求或响应断言失败时拒绝 Promise
   */
   const makeFixture = async label => {
     // 0. 创建合成采购来源及两条商品明细。
@@ -207,7 +207,7 @@ test('HTTP/SQLite: genuine carrier PDF edges keep comparisons and readiness hone
         createdAt: new Date(`2026-10-01T12:00:0${index}Z`),
       })) },
     } });
-    // 2. 通过真实 HTTP 生成三单，再回读实际装箱行。
+    // 2. 通过真实 HTTP 生成四单，再回读实际装箱行。
     const packet = (await call('POST', `/sales/${sale.id}/export-packet/generate`, {
       spotRate: 7.2, sellerName: 'Synthetic seller', buyerName: 'Synthetic buyer',
       packageKind: 'CARTON', tradeTerm: 'FOB', documentDate: '2026-10-01',

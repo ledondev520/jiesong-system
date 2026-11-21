@@ -1,10 +1,9 @@
 /**
- * Input: 销售控制器、exportService
+ * Input: 销售控制器、pdfExportService
  * Output: 出口合同管理与受认证的 Excel 四单生成路由（上传制单不改业务数据）
  * Pos: 销售路由，处理出口合同CRUD操作
  * 
  * 2026-01-20 重构：合并货柜功能，EXP号即货柜号
- * 2026-02-21 新增：GET /:id/export-excel 生成三 Sheet 标准出口 Excel
  * 2026-06-03 新增：/:id/files 出口源文件附件上传、列表、下载、删除
  * 2026-07-10 升级：船司装箱单 PDF 原件、差异、历史和人工结论持久化
  */
@@ -12,7 +11,6 @@
 const { Router } = require('express');
 const salesController = require('../controllers/salesController');
 const purchaseDraftController = require('../controllers/purchaseDraftController');
-const { exportSalesContractExcel } = require('../services/exportService');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, param, handleValidation } = require('../utils/validators');
@@ -117,7 +115,8 @@ router.delete('/:id/packing-items/:itemId', withIdValidation, roleAuth(...WRITE_
 
 const exportPacketValidation = [
   body('spotRate').isFloat({ gt: 0.2, lt: 20 }).withMessage('现汇必须大于 0.2 且小于 20'),
-  body('sellerName').trim().notEmpty().withMessage('卖方名称不能为空').isLength({ max: 200 }).withMessage('卖方名称不能超过 200 字'),
+  // 卖方默认取设置里的公司名称（sellerIdentityService）；显式传入时才校验长度。
+  body('sellerName').optional({ values: 'falsy' }).trim().isLength({ max: 200 }).withMessage('卖方名称不能超过 200 字'),
   body('buyerName').trim().notEmpty().withMessage('买方名称不能为空').isLength({ max: 200 }).withMessage('买方名称不能超过 200 字'),
   body('packageKind').optional().isString().withMessage('包装种类格式无效').isLength({ max: 80 }).withMessage('包装种类不能超过 80 字'),
   body('tradeTerm').trim().notEmpty().withMessage('贸易术语不能为空').isLength({ max: 40 }).withMessage('贸易术语不能超过 40 字'),
@@ -214,16 +213,5 @@ router.put('/:id/status', withIdValidation, roleAuth(...WRITE_ROLES), withAuditL
   salesController.updateStatus
 ));
 
-// GET /api/v1/sales/:id/export-excel - 导出单份合同标准出口 Excel（三 Sheet）
-router.get('/:id/export-excel', roleAuth(...EXPORT_DOC_ROLES), withIdValidation, async (req, res, next) => {
-  try {
-    const { buffer, filename } = await exportSalesContractExcel(req.params.id);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
-    res.send(buffer);
-  } catch (err) {
-    next(err);
-  }
-});
 
 module.exports = router;

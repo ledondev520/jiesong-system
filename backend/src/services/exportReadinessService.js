@@ -1,7 +1,7 @@
 /**
  * Input: 出口合同装箱明细、历史报关 HS、当前税则快照、采购价税资料与人工确认覆盖
  * Output: 全量出口行、单证/退税准备度、HS 证据、出口定价建议与预计退税
- * Pos: 出口单证生成前的权威 Module，页面预览、三表生成和工作簿共用同一 Interface
+ * Pos: 出口单证生成前的权威 Module，页面预览与出口四单、报关和退税草稿共用同一 Interface；税率只读 HsCode
  */
 
 const prisma = require('../utils/prisma');
@@ -37,20 +37,12 @@ const getFirstByKey = (items, key) => {
   return map;
 };
 
-const resolveVatRate = (item, hsRecord, activeTaxRate) => {
+const resolveVatRate = (item, hsRecord) => {
   const purchaseRate = toFiniteOrNull(item?.purchaseItem?.purchaseContract?.taxRate);
   if (purchaseRate !== null) {
     return {
       value: normalizePurchaseTaxRate(purchaseRate),
       source: 'purchase_contract',
-    };
-  }
-
-  const configuredRate = toFiniteOrNull(activeTaxRate?.purchaseTaxRate);
-  if (configuredRate !== null) {
-    return {
-      value: normalizePurchaseTaxRate(configuredRate),
-      source: 'product_tax_rate',
     };
   }
 
@@ -96,7 +88,6 @@ const evaluateExportReadiness = (contract = {}, {
   overrides = [],
   historicalItems = [],
   hsRecords = [],
-  activeTaxRates = [],
 } = {}, config = loadPricingConfig()) => {
   const exchangeRate = toPositiveOrNull(contract.exchangeRate);
   const effectiveExchangeRate = orderEffectiveRate(contract, config);
@@ -107,7 +98,6 @@ const evaluateExportReadiness = (contract = {}, {
       .map((record) => [normalizeHsCode(record?.hsCode), record])
       .filter(([code]) => code),
   );
-  const taxRateByProduct = getFirstByKey(activeTaxRates, 'productId');
 
   const lines = (Array.isArray(contract.packingItems) ? contract.packingItems : []).map((item, index) => {
     const issues = [];
@@ -192,7 +182,7 @@ const evaluateExportReadiness = (contract = {}, {
       ));
     }
 
-    const vatRate = resolveVatRate(item, hsRecord, taxRateByProduct.get(item.productId));
+    const vatRate = resolveVatRate(item, hsRecord);
     if (vatRate.value === null) {
       issues.push(makeIssue(
         'MISSING_PURCHASE_VAT_RATE',
@@ -357,33 +347,15 @@ const getExportReadiness = async (salesContractId, {
     return resolveHsChoice(item, override, historical).hsCode;
   }).filter((code) => code.length === 10);
   const uniqueCodes = Array.from(new Set(preliminaryCodes));
-  const now = new Date();
-
-  const [hsRecords, activeTaxRates] = await Promise.all([
-    uniqueCodes.length > 0
-      ? prismaClient.hsCode.findMany({ where: { hsCode: { in: uniqueCodes } } })
-      : [],
-    productIds.length > 0
-      ? prismaClient.taxRate.findMany({
-          where: {
-            productId: { in: productIds },
-            isActive: true,
-            effectiveFrom: { lte: now },
-            OR: [
-              { effectiveTo: null },
-              { effectiveTo: { gte: now } },
-            ],
-          },
-          orderBy: { effectiveFrom: 'desc' },
-        })
-      : [],
-  ]);
+  // 税率只读 HsCode（TaxRate 表已无数据，A118）。
+  const hsRecords = uniqueCodes.length > 0
+    ? await prismaClient.hsCode.findMany({ where: { hsCode: { in: uniqueCodes } } })
+    : [];
 
   return evaluateExportReadiness(contract, {
     overrides,
     historicalItems,
     hsRecords,
-    activeTaxRates,
   }, config);
 };
 
