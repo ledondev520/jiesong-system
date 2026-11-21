@@ -33,7 +33,6 @@ const customsDeclarationRoutes = require('./customsDeclarations');
 const forexVerificationRoutes = require('./forexVerifications');
 const taxRefundRoutes = require('./taxRefunds');
 const hsCodeRoutes = require('./hsCodes');
-const contractTemplateRoutes = require('./contractTemplates');
 const bankFlowRoutes = require('./bankFlow');
 const notificationRoutes = require('./notifications');
 const fileRoutes = require('./files');
@@ -73,7 +72,6 @@ router.use('/customs-declarations', customsDeclarationRoutes);
 router.use('/forex-verifications', forexVerificationRoutes);
 router.use('/tax-refunds', taxRefundRoutes);
 router.use('/hs-codes', hsCodeRoutes);
-router.use('/contract-templates', contractTemplateRoutes);  // 合同配置模板
 router.use('/bank-flow', bankFlowRoutes);  // 银行流水与发票查询
 router.use('/notifications', notificationRoutes);  // 站内通知
 router.use('/', fileRoutes);  // 合同附件（/contracts/:id/files, /files/:id/download）

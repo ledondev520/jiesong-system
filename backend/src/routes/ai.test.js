@@ -20,7 +20,3 @@ test('ai: 模块可正常加载并导出', () => {
   assert.ok(mod !== undefined);
 });
 
-test('ai route includes agent tool registry endpoint', () => {
-  const index = getRouteIndex(aiRouter, '/agents/tools', 'get');
-  assert.notEqual(index, -1, '缺少 GET /agents/tools 路由');
-});

@@ -38,7 +38,6 @@ const shouldForceLocalAI =
   ((isCiRuntime || isTestRuntime) && process.env.AI_ALLOW_REMOTE !== 'true');
 
 const kimiRequestTimeoutMs = parsePositiveIntEnv(process.env.KIMI_REQUEST_TIMEOUT_MS, 30000, 500, 30000);
-const kimiGreetingTimeoutMs = parsePositiveIntEnv(process.env.KIMI_GREETING_TIMEOUT_MS, 300, 200, 10000);
 
 // DeepSeek 统一四个场景；Kimi 保留既有模型配置。
 const MODELS = isOpenAI() ? {
@@ -129,16 +128,6 @@ const extractErrorMessage = (error) => {
   }
 
   return '抱歉，AI服务出错了。';
-};
-
-const pickStableOrRandom = (items) => {
-  if (!Array.isArray(items) || items.length === 0) {
-    return null;
-  }
-  if (isCiRuntime || isTestRuntime) {
-    return items[0];
-  }
-  return items[Math.floor(Math.random() * items.length)];
 };
 
 const createTimeoutSignal = (timeoutMs) => {
@@ -261,7 +250,6 @@ const collectStreamText = async (stream) => {
   return fullContent;
 };
 
-const toSafeCallback = (value) => (typeof value === 'function' ? value : null);
 
 const buildZeroTokenUsage = () => ({
   promptTokens: 0,
@@ -926,224 +914,6 @@ const parseLocally = (content, type) => {
 };
 
 /**
- * 职责：获取Token使用统计
- * @param {string} userId - 用户ID
- * @param {number} days - 统计天数
- * @returns {Object} 统计结果
- */
-const getTokenStats = async (userId, days = 30) => {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-
-  // 1. 汇总统计
-  const stats = await prisma.tokenUsage.aggregate({
-    where: {
-      userId,
-      createdAt: { gte: startDate },
-    },
-    _sum: {
-      promptTokens: true,
-      outputTokens: true,
-      totalTokens: true,
-    },
-    _count: true,
-  });
-
-  // 2. 按模型分组
-  const byModel = await prisma.tokenUsage.groupBy({
-    by: ['model'],
-    where: {
-      userId,
-      createdAt: { gte: startDate },
-    },
-    _sum: { totalTokens: true },
-    _count: true,
-  });
-
-  // 3. 获取时间序列明细（按日或按小时）
-  // SQLite 将 DateTime 存储为毫秒级 Unix 时间戳；区间过滤用 startDateMs
-  // days===1（近 24 小时）：按北京时间（UTC+8）整点分桶，与前端「北京时间」展示一致；否则按 UTC 自然日聚合
-  const startDateMs = startDate.getTime();
-  const dailyRaw =
-    days === 1
-      ? await prisma.$queryRaw`
-    SELECT
-      strftime('%Y-%m-%d %H:00', datetime(CAST(createdAt AS INTEGER) / 1000, 'unixepoch', '+8 hours')) AS day,
-      model,
-      CAST(SUM(totalTokens) AS INTEGER) AS tokens,
-      CAST(COUNT(*) AS INTEGER) AS requests,
-      CAST(SUM(CASE WHEN totalTokens > 0 THEN 1 ELSE 0 END) * 100 / COUNT(*) AS INTEGER) AS successRate
-    FROM token_usages
-    WHERE userId = ${userId}
-      AND CAST(createdAt AS INTEGER) >= ${startDateMs}
-    GROUP BY day, model
-    ORDER BY day ASC
-  `
-      : await prisma.$queryRaw`
-    SELECT
-      date(datetime(CAST(createdAt AS INTEGER) / 1000, 'unixepoch', '+8 hours')) AS day,
-      model,
-      CAST(SUM(totalTokens) AS INTEGER) AS tokens,
-      CAST(COUNT(*) AS INTEGER) AS requests,
-      CAST(SUM(CASE WHEN totalTokens > 0 THEN 1 ELSE 0 END) * 100 / COUNT(*) AS INTEGER) AS successRate
-    FROM token_usages
-    WHERE userId = ${userId}
-      AND CAST(createdAt AS INTEGER) >= ${startDateMs}
-    GROUP BY day, model
-    ORDER BY day ASC
-  `;
-
-  return {
-    period: days === 1 ? '近24小时' : `${days}天`,
-    totalRequests: stats._count,
-    totalTokens: stats._sum.totalTokens || 0,
-    promptTokens: stats._sum.promptTokens || 0,
-    outputTokens: stats._sum.outputTokens || 0,
-    byModel: byModel.map(m => ({
-      model: m.model,
-      requests: m._count,
-      tokens: m._sum.totalTokens,
-    })),
-    // 每日折线图数据：[{ day, model, tokens, requests, successRate }]
-    daily: (dailyRaw || []).map(r => ({
-      day: r.day,
-      model: r.model,
-      tokens: Number(r.tokens) || 0,
-      requests: Number(r.requests) || 0,
-      successRate: Math.round(Number(r.successRate) || 100),
-    })),
-  };
-};
-
-// 五月天50首经典歌曲名称列表
-const MAYDAY_SONGS = [
-  '倔强', '温柔', '知足', '突然好想你', '我不愿让你一个人',
-  '干杯', '恋爱ing', '天使', '志明与春娇', '疯狂世界',
-  '后来的我们', '盛夏光年', '憨人', '人生海海', '爱情万岁',
-  '入阵曲', '仓颉', '拥抱', '纯真', '生命有一种绝对',
-  '听不到', '咸鱼', '如烟', '洋葱', '星空',
-  '离开地球表面', '孙悟空', '最重要的小事', '伤心的人别听慢歌', '顽固',
-  '好好', '如果我们不曾相遇', '一颗苹果', '终结孤单', '圣诞结',
-  '而我知道', '倾听', '春天的呐喊', '雌雄同体', 'DNA',
-  '派对动物', '为爱而生', '你不是真正的快乐', '笑忘歌', '第二人生',
-  '将军令', '出头天', '我心中尚未崩坏的地方', '候鸟', '成名在望'
-];
-
-/**
- * 职责：生成带五月天歌曲主题的AI问候语
- * 思路：
- * 1. 使用 kimi-k2-turbo-preview 模型（快速响应）
- * 2. 从50首著名歌曲中随机选择一首
- * 3. 让模型生成问候语
- */
-const generateGreeting = async () => {
-  if (usesUpstreamUsage()) return getLocalGreeting();
-  const client = await getOpenAIClient({ fallback: false });
-  if (!client) {
-    return getLocalGreeting();
-  }
-
-  const selectedSong = pickStableOrRandom(MAYDAY_SONGS) || MAYDAY_SONGS[0];
-
-  const systemPrompt = `你是精通歌词的大师。请根据五月天歌曲《${selectedSong}》的歌词，生成一段温暖的问候语。
-
-要求：
-1. 生成一句简短的问候语（10字） 
-2. 获取这首歌连贯的4句歌词
-
-直接输出5行文字，不要其他内容。`;
-
-  try {
-    const requestOptions = {
-      model: 'kimi-k2-turbo-preview',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: '生成问候语' },
-      ],
-      temperature: 0.8,
-      stream: true,
-    };
-
-    const deadlineOptions = getAIRequestOptions(kimiGreetingTimeoutMs);
-    const stream = await client.chat.completions.create(requestOptions, deadlineOptions);
-
-    const fullContent = await collectStreamText(stream);
-    deadlineOptions.signal?.throwIfAborted();
-
-    const lines = fullContent.trim().split('\n').filter(line => line.trim());
-    
-    if (lines.length >= 2) {
-      console.log(`[AI Greeting] 成功生成问候语，歌曲：${selectedSong}`);
-      return {
-        greeting: lines[0].trim(),
-        songName: selectedSong,
-        lyrics: lines.slice(1, 5).map(line => line.trim()),
-        source: 'ai',
-      };
-    }
-    
-    return getLocalGreeting();
-  } catch (error) {
-    console.error('生成问候语失败:', { name: error.name, status: error.status || null });
-    return getLocalGreeting();
-  }
-};
-
-const generateGreetingStream = async (onThinking, onContent, onDone) => {
-  const resolvedOnThinking = toSafeCallback(onThinking);
-  const resolvedOnContent = toSafeCallback(onContent);
-  const resolvedOnDone = toSafeCallback(onDone);
-
-  if (resolvedOnThinking) {
-    resolvedOnThinking('生成问候语中...');
-  }
-
-  const result = await generateGreeting();
-
-  if (resolvedOnContent) {
-    if (result.greeting) {
-      resolvedOnContent(result.greeting);
-    }
-    if (Array.isArray(result.lyrics)) {
-      result.lyrics.forEach((line) => resolvedOnContent(line));
-    }
-  }
-
-  if (resolvedOnDone) {
-    resolvedOnDone(result);
-  }
-
-  return result;
-};
-
-/**
- * 职责：获取本地预设问候语（备用方案，不含歌词）
- * 说明：当 AI 服务不可用时的降级方案
- */
-const getLocalGreeting = () => {
-  const greetings = [
-    {
-      greeting: '每一天都是新的开始！',
-      songName: '',
-      lyrics: ['欢迎使用捷淞进销存系统', 'AI助手随时为您服务', '祝您工作顺利', '今天也要加油哦'],
-    },
-    {
-      greeting: '用热情开启元气满满的一天！',
-      songName: '',
-      lyrics: ['新的一天新的希望', '让我们一起努力', '相信自己的力量', '美好的事情即将发生'],
-    },
-    {
-      greeting: '愿今天的你充满力量！',
-      songName: '',
-      lyrics: ['保持微笑面对挑战', '每一步都是成长', '坚持就是胜利', '你是最棒的'],
-    },
-  ];
-
-  const randomGreeting = pickStableOrRandom(greetings) || greetings[0];
-  return { ...randomGreeting, source: 'local' };
-};
-
-/**
  * 职责：简单非流式 AI 调用（供内部其他模块使用）
  * @param {Array} messages - OpenAI 格式的消息列表
  * @param {string} [model] - 使用的模型（默认 MODELS.fast）
@@ -1161,14 +931,9 @@ module.exports = {
   callAI,
   estimateTokens,
   generateLocalResponse,
-  getTokenStats,
-  generateGreetingStream,
-  generateGreeting,
   getConfiguredModels,
   MODELS,
   recordTokenUsage,
-  isMissingDetailSnapshotColumnError,
-  isMissingPromptBriefColumnError,
   getOpenAIClient,
   getAIRequestOptions,
   getAIModelOptions,

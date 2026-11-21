@@ -17,8 +17,6 @@ const aiService = require('./aiService');
 const customsDeclarationService = require('./customsDeclarationService');
 const taxRefundService = require('./taxRefundService');
 const forexVerificationService = require('./forexVerificationService');
-const { buildGovernanceReplayProfile } = require('./governanceReplayService');
-const { buildReplaySummaryRecord, upsertReplaySummary } = require('./agentReplaySummaryService');
 const { getOpenAgentRuntimeToken } = require('../utils/openAgentRuntimeAuth');
 const { ROLES } = require('../config/constants');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
@@ -153,49 +151,6 @@ const DOMAIN_ROUTING_RULES = {
   'trade-compliance': ['报关', '退税', '核销', '外汇', '收汇', '报关单', '退税单'],
   ops: ['导入', '异常', '告警', '巡检', '通知', '任务'],
   system: ['系统', '配置', '参数', '日志', '事件', '权限', '设置'],
-};
-
-const DOMAIN_METADATA = {
-  search: {
-    label: '统一检索',
-    description: '用来建立问题上下文，先定位合同、供应商、商品与相关主数据',
-  },
-  finance: {
-    label: '财务',
-    description: '围绕应收、应付、回款、收款池与财务风险做事实查询和判断',
-  },
-  'sales-export': {
-    label: '销售/出口',
-    description: '围绕出口合同、出运状态、门店与履约链路做查询和诊断',
-  },
-  procurement: {
-    label: '采购',
-    description: '围绕采购合同、供应商、付款与到货执行做查询和诊断',
-  },
-  inventory: {
-    label: '库存',
-    description: '围绕库存状态、入出库和缺货风险建立履约视角',
-  },
-  'trade-compliance': {
-    label: '税退链路',
-    description: '围绕报关、收汇核销、退税三条链路判断就绪度和缺口',
-  },
-  events: {
-    label: '事件台账',
-    description: '追踪系统事件、AI/Agent 运行和近期异常',
-  },
-  ops: {
-    label: '运营巡检',
-    description: '观察导入、异常和系统运行状态',
-  },
-  executive: {
-    label: '经营视图',
-    description: '压缩经营摘要，适合管理视角快速理解全局',
-  },
-  system: {
-    label: '系统配置',
-    description: '围绕配置、日志与系统参数进行读取或变更',
-  },
 };
 
 const normalizeMessageForRouting = (message) => String(message || '').trim().toLowerCase();
@@ -444,43 +399,6 @@ const listToolRegistry = () => [...READ_TOOL_SPECS, ...WRITE_TOOL_SPECS].map((to
   allowedRoles: tool.allowedRoles || Object.values(ROLES),
   description: tool.description,
 }));
-
-const buildToolRegistryPayload = (viewerRole = null) => {
-  const tools = listToolRegistry().map((tool) => ({
-    ...tool,
-    availableForViewer: viewerRole ? isToolAllowedForRole(tool.name, viewerRole) : true,
-  }));
-
-  const domainMap = new Map();
-  tools.forEach((tool) => {
-    const current = domainMap.get(tool.domain) || {
-      domain: tool.domain,
-      label: DOMAIN_METADATA[tool.domain]?.label || tool.domain,
-      description: DOMAIN_METADATA[tool.domain]?.description || '',
-      toolCount: 0,
-      readCount: 0,
-      writeCount: 0,
-      availableCount: 0,
-      availableWriteCount: 0,
-      compositeToolCount: 0,
-    };
-    current.toolCount += 1;
-    if (tool.access === 'read') current.readCount += 1;
-    if (tool.access === 'write') current.writeCount += 1;
-    if (tool.availableForViewer) current.availableCount += 1;
-    if (tool.availableForViewer && tool.access === 'write') current.availableWriteCount += 1;
-    if (tool.isComposite) current.compositeToolCount += 1;
-    domainMap.set(tool.domain, current);
-  });
-
-  return {
-    primaryAgentType: PRIMARY_AGENT_TYPE,
-    legacyAgentTypes: LEGACY_AGENT_TYPES,
-    viewerRole,
-    domains: Array.from(domainMap.values()).sort((a, b) => a.domain.localeCompare(b.domain)),
-    tools,
-  };
-};
 
 const findToolSpec = (toolName) => [...READ_TOOL_SPECS, ...WRITE_TOOL_SPECS].find((tool) => tool.name === toolName) || null;
 
@@ -978,11 +896,6 @@ const persistAgentRun = async ({
     pendingActionSummary,
   });
   const metadata = JSON.stringify(metadataPayload);
-  const replaySnapshotValue = buildReplaySnapshotLogValue({
-    governanceReplayProfile: metadataPayload.governanceReplayProfile,
-    routePlan: routePlan || null,
-    selectedToolNames: selectedToolNames || [],
-  });
   await prisma.$transaction(async (tx) => {
     await tx.chatHistory.create({
       data: {
@@ -1035,25 +948,9 @@ const persistAgentRun = async ({
           toolTraceSummary: toolTraceSummary || null,
           actionRecommendations: actionRecommendations || [],
           pendingActionSummary: pendingActionSummary || [],
-          governanceReplayProfile: metadataPayload.governanceReplayProfile,
         }),
       },
     });
-    await tx.operationLog.create({
-      data: {
-        actorType: 'USER',
-        userId,
-        action: 'AGENT_REPLAY_SNAPSHOT',
-        entity: 'AgentRuntimeReplay',
-        entityId: sessionId,
-        newValue: JSON.stringify(replaySnapshotValue),
-      },
-    });
-    await upsertReplaySummary({
-      userId,
-      sessionId,
-      governanceReplayProfile: metadataPayload.governanceReplayProfile,
-    }, tx);
   });
 };
 
@@ -1075,11 +972,6 @@ const buildAgentRunMetadata = ({
   toolTraceSummary: toolTraceSummary || null,
   actionRecommendations: actionRecommendations || [],
   pendingActionSummary: pendingActionSummary || [],
-  governanceReplayProfile: buildGovernanceReplayProfile({
-    toolTraceSummary: toolTraceSummary || null,
-    actionRecommendations: actionRecommendations || [],
-    pendingActionSummary: pendingActionSummary || [],
-  }),
 });
 
 const buildAgentDoneEvent = ({
@@ -1101,23 +993,6 @@ const buildAgentDoneEvent = ({
   routePlan,
   toolTraceSummary,
   actionRecommendations,
-});
-
-const buildReplaySnapshotLogValue = ({
-  governanceReplayProfile,
-  routePlan,
-  selectedToolNames,
-}) => ({
-  source: 'open-agent-sdk',
-  replaySource: 'dedicated-replay-snapshot',
-  governanceReplayProfile: {
-    ...governanceReplayProfile,
-    source: governanceReplayProfile?.source === 'session-metadata'
-      ? 'replay-snapshot-log'
-      : governanceReplayProfile?.source,
-  },
-  routePlan: routePlan || null,
-  selectedToolNames: selectedToolNames || [],
 });
 
 // SDK prompt() 会丢弃 result.subtype；两种入口都直接校验 query 的终止事件。
@@ -1371,7 +1246,6 @@ module.exports = {
   listToolRegistry,
   buildToolPool,
   buildWriteToolPool,
-  buildToolRegistryPayload,
   buildSalesContractFlowDiagnostic,
   buildPurchaseExecutionDiagnostic,
   buildTradeComplianceReadinessDiagnostic,
@@ -1380,8 +1254,6 @@ module.exports = {
   summarizeToolTrace,
   buildAgentRunMetadata,
   buildAgentDoneEvent,
-  buildReplaySnapshotLogValue,
-  buildReplaySummaryRecord,
   resolveSdkSessionConfig,
   persistAgentRun,
   runAgentPrompt,

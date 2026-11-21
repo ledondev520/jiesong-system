@@ -35,9 +35,9 @@ const nextConfig: NextConfig = {
       to('/dashboard/system', '/dashboard/settings'),
       to('/dashboard/system/logs', '/dashboard/settings/logs'),
       to('/dashboard/system/notifications', '/dashboard/notifications'),
-      to('/dashboard/about', '/dashboard/settings/ai-usage'),
+      to('/dashboard/about', '/dashboard/settings'),
       to('/dashboard/sales/create', '/dashboard/orders/new'), // A99: old create page removed
-      to('/dashboard/ai/sessions', '/dashboard/settings/ai-usage'),
+      to('/dashboard/ai/sessions', '/dashboard/settings'),
       to('/dashboard/ai', '/dashboard?ai=1'),
       // 出口订单（旧 keyword 参数改名为 q；原 keyword 会随查询串保留，目标页忽略）
       { ...to('/dashboard/sales', '/dashboard/orders?q=:kw'), has: [query('keyword', '(?<kw>.+)')] },

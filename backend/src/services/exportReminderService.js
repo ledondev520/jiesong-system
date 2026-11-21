@@ -11,7 +11,7 @@ const { OFFICIAL_RULES } = require('./taxRefundPreparationService');
 // 5号仅是内部材料准备节点，不代表法定申报截止日。
 const TAX_REFUND_REMINDER_DAY = 5;
 
-// 退税提醒接收角色：管理员 + 财务
+// 退税提醒接收角色：仅管理员（OD-8 后无财务角色）
 const TAX_REFUND_NOTIFY_ROLES = [ROLES.ADMIN];
 
 /**
@@ -34,7 +34,7 @@ const findRecipientIds = async (tx, roles) => {
  *   1. 非提醒日（且未 force）直接跳过
  *   2. 找出上个自然月已发运的出口合同（shippedAt 在上月区间）
  *   3. 统计其中尚未创建退税单的合同，拼入提醒内容
- *   4. 对财务/管理员角色逐用户创建通知（本月已有该类型通知则跳过）
+ *   4. 对管理员逐用户创建通知（本月已有该类型通知则跳过）
  * @param {object} tx Prisma 客户端（默认全局实例）
  * @param {object} options { now?: Date, force?: boolean }
  * @returns {Promise<{ skipped: boolean, reason?: string, created: number, contracts: number }>}

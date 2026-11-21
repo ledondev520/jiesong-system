@@ -42,9 +42,6 @@ router.post('/parse', roleAuth(ROLE_SETS.ALL), [
   body('type').notEmpty().withMessage('解析类型不能为空'),
 ], handleValidation, aiController.parseInput);
 
-// GET /api/v1/ai/agents/tools - 获取 Agent 工具注册表
-router.get('/agents/tools', roleAuth(ROLE_SETS.ALL), aiController.agentToolRegistry);
-
 // POST /api/v1/ai/agents/prompt-stream - SSE 流式运行预置业务 Agent
 router.post('/agents/prompt-stream', roleAuth(ROLE_SETS.ALL), [
   body('agentType').optional().isIn(SUPPORTED_AGENT_TYPES).withMessage('agentType 不合法'),
@@ -76,32 +73,6 @@ router.get('/history', aiController.getChatHistory);
 // GET /api/v1/ai/sessions - 获取会话列表
 router.get('/sessions', aiController.getSessions);
 
-// GET /api/v1/ai/standalone-token-usage - 无聊天会话绑定的 Token 记录（HS 推荐等）
-router.get('/standalone-token-usage', aiController.getStandaloneTokenUsage);
-
-// DELETE /api/v1/ai/sessions/:sessionId - 删除会话
-router.delete('/sessions/:sessionId', roleAuth(ROLE_SETS.ALL), withAuditLog(
-  {
-    entity: 'ChatSession',
-    action: 'DELETE',
-    idParam: 'sessionId',
-    captureBefore: false,
-    captureAfter: false,
-    getEntityId: ({ req }) => req.params?.sessionId || null,
-    getOldValue: ({ req }) => ({
-      sessionId: req.params?.sessionId || null,
-      userId: req.user?.id || null,
-    }),
-  },
-  aiController.deleteSession
-));
-
-// GET /api/v1/ai/token-stats - 获取Token使用统计
-router.get('/token-stats', aiController.getTokenStats);
-
 // GET /api/v1/ai/models - 获取可用模型列表
 router.get('/models', aiController.getModels);
-
-// ─── AI 用量统计路由 ───
-
 module.exports = router;

@@ -19,7 +19,6 @@ import {
   Landmark,
   Download,
   History,
-  BarChart3,
   Search,
   ChevronRight,
   type LucideIcon,
@@ -73,16 +72,6 @@ const navGroups: NavGroup[] = [
         href: "/dashboard/settings/export",
         label: "数据导入导出",
         icon: Download,
-      },
-    ],
-  },
-  {
-    label: "AI",
-    items: [
-      {
-        href: "/dashboard/settings/ai-usage",
-        label: "AI 用量",
-        icon: BarChart3,
       },
     ],
   },

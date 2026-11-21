@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import NextImage from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bot,
@@ -41,8 +40,6 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/store/auth.store";
-import { Role } from "@/types";
 import { errorLogger } from "@/lib/error-logger";
 import {
   aiService,
@@ -150,7 +147,6 @@ export function AIAssistant({
 }: AIAssistantProps) {
   const router = useRouter();
   // 助手操作记录在「设置 > AI 用量」，仅管理员可进入
-  const isAdmin = useAuthStore((state) => state.user?.role === Role.ADMIN);
   const businessReadOnly = useBusinessReadOnly();
   // 同步拦截重复点击（React 重渲染前 status 仍为 pending）；流中止与会话切换序号。
   const executingIdsRef = useRef(new Set<string>());
@@ -1209,17 +1205,6 @@ export function AIAssistant({
             </form>
             <p className="text-xs text-muted-foreground text-center">
               内部草稿按请求直接生成；付款、实物状态和异常操作需一次确认
-              {isAdmin && (
-                <>
-                  {" · "}
-                  <Link
-                    href="/dashboard/settings/ai-usage"
-                    className="underline underline-offset-2 hover:text-foreground"
-                  >
-                    查看助手操作记录
-                  </Link>
-                </>
-              )}
             </p>
           </CardFooter>
         </Card>

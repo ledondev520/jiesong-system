@@ -707,16 +707,6 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
-    if (pathname === "/api/v1/ai/greeting" && method === "GET") {
-      await fulfillJson(route, {
-        greeting: "欢迎回来，今天也要稳步推进。",
-        songName: "倔强",
-        lyrics: ["当我和世界不一样", "那就让我不一样"],
-        source: "local",
-      });
-      return;
-    }
-
     // Business mocks have no server cookie; browser-session.spec uses a real isolated backend.
     if (pathname === "/api/v1/auth/session" && method === "GET") {
       await route.fulfill({
@@ -1387,75 +1377,6 @@ export const mockApiRoutes = async (page: Page) => {
       return;
     }
 
-    if (
-      /^\/api\/v1\/ai\/sessions\/[^/]+$/.test(pathname) &&
-      method === "DELETE"
-    ) {
-      await fulfillJson(route, null);
-      return;
-    }
-
-    if (pathname === "/api/v1/ai/token-stats" && method === "GET") {
-      await fulfillJson(route, {
-        period: "30d",
-        totalRequests: 12,
-        totalTokens: 34567,
-        promptTokens: 21000,
-        outputTokens: 13567,
-        byModel: [
-          { model: "gpt-4.1-mini", requests: 8, tokens: 22000 },
-          { model: "gpt-4.1", requests: 4, tokens: 12567 },
-        ],
-        daily: [
-          {
-            day: "2026-03-20",
-            model: "gpt-4.1-mini",
-            tokens: 8200,
-            requests: 3,
-            successRate: 1,
-          },
-          {
-            day: "2026-03-21",
-            model: "gpt-4.1-mini",
-            tokens: 7400,
-            requests: 2,
-            successRate: 1,
-          },
-          {
-            day: "2026-03-22",
-            model: "gpt-4.1",
-            tokens: 9100,
-            requests: 4,
-            successRate: 1,
-          },
-          {
-            day: "2026-03-23",
-            model: "gpt-4.1-mini",
-            tokens: 9867,
-            requests: 3,
-            successRate: 1,
-          },
-        ],
-      });
-      return;
-    }
-
-    if (pathname === "/api/v1/ai/standalone-token-usage" && method === "GET") {
-      await fulfillJson(route, [
-        {
-          id: "standalone-1",
-          model: "gpt-4.1-mini",
-          promptTokens: 800,
-          outputTokens: 200,
-          totalTokens: 1000,
-          requestType: "hs_code_recommend",
-          detailSnapshot: "HS 编码推荐结果",
-          createdAt: now,
-        },
-      ]);
-      return;
-    }
-
     if (pathname === "/api/v1/ai/history" && method === "GET") {
       await fulfillJson(
         route,
@@ -2101,42 +2022,6 @@ export const mockApiRoutes = async (page: Page) => {
             },
           ],
         },
-      });
-      return;
-    }
-
-    if (pathname === "/api/v1/contract-templates" && method === "GET") {
-      await fulfillJson(route, [
-        {
-          id: "tpl-1",
-          name: "标准采购模板",
-          type: "PURCHASE",
-          supplierId: suppliers[0].id,
-          taxRate: 13,
-          note: "E2E 模板",
-          items: [
-            {
-              productId: products[0].id,
-              quantity: 1,
-              unitPrice: 1000,
-              unit: products[0].unit,
-            },
-          ],
-          createdBy: mockUser.id,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ]);
-      return;
-    }
-
-    if (pathname === "/api/v1/contract-templates" && method === "POST") {
-      await fulfillJson(route, {
-        id: "tpl-2",
-        ...parseJsonBody(route),
-        createdBy: mockUser.id,
-        createdAt: now,
-        updatedAt: now,
       });
       return;
     }

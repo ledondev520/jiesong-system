@@ -15,12 +15,10 @@ datasource db {
   url      = env("DATABASE_URL") // 本地开发默认使用 SQLite（file:./dev.db）
 }
 
-// Role 类型说明 (SQLite 不支持枚举，使用 String):
-// - ADMIN: 管理员
-// - PURCHASE: 采购
-// - SALES: 销售
-// - FINANCE: 财务
-// - WAREHOUSE: 仓库
+// Role 类型说明 (SQLite 不支持枚举，使用 String；OD-8 / OD-21):
+// - ADMIN: 管理员（全部可见）
+// - SALES: 普通用户（界面标签；存储值保持 SALES，不看财务）
+// 其余旧角色已停用，持有者登录返回 403，需管理员重新分配。
 
 // ==================== 用户与权限 ====================
 

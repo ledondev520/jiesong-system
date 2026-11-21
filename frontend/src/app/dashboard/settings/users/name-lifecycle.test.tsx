@@ -88,7 +88,7 @@ async function openTarget(target: AccountNameFixture["first"]) {
   expect(screen.getByLabelText(/密码/)).toHaveValue("");
   expect(screen.getByRole("switch", { name: "账号开通" })).toBeChecked();
   expect(screen.getByRole("combobox", { name: "角色权限" })).toHaveTextContent(
-    "销售人员",
+    "普通用户",
   );
 }
 

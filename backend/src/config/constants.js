@@ -8,7 +8,7 @@
 const ROLES = {
   // OD-8 (owner, 2026-11-11): PURCHASE, FINANCE, WAREHOUSE and BOSS are retired.
   ADMIN: 'ADMIN',       // 管理员：全部可见
-  SALES: 'SALES',       // 销售：资料/合同/采购录入，不看财务
+  SALES: 'SALES',       // 普通用户（OD-21：仅界面标签，存储值不变）：资料/合同/采购录入，不看财务
 };
 
 // 采购状态
