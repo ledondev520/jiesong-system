@@ -14,10 +14,10 @@ const { getExportReadiness } = require('./exportReadinessService');
 const fileService = require('./fileService');
 const { addCustomsPreentrySheet, shipmentDate, EXPORT_DESTINATION_PORT, EXPORT_PACKAGE_KIND } = require('./customsPreentrySheet');
 
-const DEFAULT_SELLER_NAME = '上海捷淞国际物流有限公司';
+const { loadSellerIdentity } = require('./sellerIdentityService');
+const { EXPORT_PACKET_DESCRIPTION } = require('./exportPacketMarker');
+
 const MONEY_EPSILON = 0.01;
-// 归档标记保持稳定，使历史材料及回滚后的附件权限/退税指纹仍能识别四单。
-const EXPORT_PACKET_DESCRIPTION = '出口三单生成版本（外销合同、商业发票、装箱单）';
 const buildPackingSourceVersion = (items) => crypto.createHash('sha256').update(JSON.stringify(
   [...items].sort((a, b) => a.id.localeCompare(b.id)).map((item) => ({
     id: item.id, productId: item.productId, quantity: item.quantity, unit: item.unit,
@@ -80,7 +80,7 @@ const evaluateExportPacket = (contract, readiness, historicalQuotes = [], option
   const issues = [];
 
   if (!validRate) issues.push(makeIssue('INVALID_SPOT_RATE', 'error', `现汇必须大于 ${Math.max(0, FX_BUFFER)}`));
-  if (!sellerName) issues.push(makeIssue('MISSING_SELLER', 'error', '请确认卖方名称'));
+  if (!sellerName) issues.push(makeIssue('MISSING_SELLER', 'error', '请先在设置中填写公司名称（卖方）'));
   if (!buyerName) issues.push(makeIssue('MISSING_BUYER', 'error', '请确认买方名称'));
   if (!tradeTerm) issues.push(makeIssue('MISSING_TRADE_TERM', 'error', '请确认贸易术语'));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(documentDate)) {
@@ -349,8 +349,15 @@ const loadPacketSources = async (salesContractId, options = {}, prismaClient = p
   return { contract, readiness, historicalQuotes };
 };
 
-const previewExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
+// 卖方信息唯一来源：设置里的公司名称（sellerIdentityService）；调用方显式传入 sellerName 时以传入为准（CLI/旧调用）。
+const withSellerFromSettings = async (options, prismaClient) => {
+  if (String(options.sellerName || '').trim()) return options;
+  return { ...options, sellerName: (await loadSellerIdentity({ db: prismaClient })).name };
+};
+
+const previewExportPacket = async (salesContractId, rawOptions = {}, prismaClient = prisma) => {
   const config = loadPricingConfig();
+  const options = await withSellerFromSettings(rawOptions, prismaClient);
   const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
   return evaluateExportPacket(sources.contract, sources.readiness, sources.historicalQuotes, options, config);
 };
@@ -535,8 +542,9 @@ const persistExportPacket = async (prismaClient, salesContractId, sources, packe
   return { packet, file };
 };
 
-const generateExportPacket = async (salesContractId, options = {}, prismaClient = prisma) => {
+const generateExportPacket = async (salesContractId, rawOptions = {}, prismaClient = prisma) => {
   const config = loadPricingConfig();
+  const options = await withSellerFromSettings(rawOptions, prismaClient);
   // 发运后/已有出库记录：仍可生成单证（退税资料流程需要），但不得改写装箱价格与合同金额。
   const locked = isSalesCargoLocked(await getSalesCargoState(prismaClient, salesContractId));
   const sources = await loadPacketSources(salesContractId, options, prismaClient, config);
@@ -551,7 +559,6 @@ const generateExportPacket = async (salesContractId, options = {}, prismaClient 
 module.exports = {
   EXPORT_PACKET_DESCRIPTION,
   buildPackingSourceVersion,
-  DEFAULT_SELLER_NAME,
   get FX_BUFFER() { return -loadPricingConfig().exchangeAdjustment; },
   buildExportPacketWorkbook,
   // Sheet styling helpers shared with the quotation export (quoteExportService.js).
@@ -559,6 +566,7 @@ module.exports = {
   styleTable,
   configureSheet,
   evaluateExportPacket,
+  withSellerFromSettings,
   generateExportPacket,
   writePacketAmounts,
   persistExportPacket,

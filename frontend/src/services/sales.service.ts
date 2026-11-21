@@ -409,16 +409,6 @@ export const salesService = {
   },
 
   /**
-   * 导出单份出口合同为三 Sheet 标准 Excel。
-   */
-  exportExcel: async (id: string, contractNo: string) => {
-    const response = await fetch(`/api/v1/sales/${id}/export-excel`, {
-      ...authFetchInit(),
-    });
-    await downloadResponseBlob(response, `${contractNo}_出口模板.xlsx`);
-  },
-
-  /**
    * 导出单份出口合同 PDF。
    */
   exportPdf: async (id: string, contractNo: string) => {

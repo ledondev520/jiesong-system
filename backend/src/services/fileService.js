@@ -13,6 +13,7 @@ const path = require('path');
 const config = require('../config');
 const { createError } = require('../middleware/errorHandler');
 const { deleteFile: removeFile, getFullPath, resolveContainedUploadPath } = require('../utils/upload');
+const { isExportPacketDescription } = require('./exportPacketMarker');
 
 const CONTRACT_TYPE = {
   PURCHASE: 'PURCHASE',
@@ -70,10 +71,10 @@ const assertFileAccess = (file, user, { action = 'read' } = {}) => {
     && user?.role !== 'ADMIN') {
     throw createError('仅管理员可访问已确认退税清单', 403);
   }
-  // R3 P1-3 / OD-8：出口三单归档工作簿含结汇/退税金额，仅 ADMIN 可下载/删除（描述前缀见 exportPacketService）。
-  if (String(file?.description || '').startsWith('出口三单生成版本')
+  // R3 P1-3 / OD-8：出口四单归档工作簿（含历史三单文案）含结汇/退税金额，仅 ADMIN 可下载/删除（描述前缀见 exportPacketService）。
+  if (isExportPacketDescription(file?.description)
     && user.role !== 'ADMIN') {
-    throw createError('无权访问出口三单归档文件', 403);
+    throw createError('无权访问出口四单归档文件', 403);
   }
 };
 

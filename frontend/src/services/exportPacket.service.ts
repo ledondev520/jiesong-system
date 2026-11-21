@@ -11,7 +11,7 @@ import type { ApiResponse } from "@/types";
 
 export interface ExportPacketInput {
   spotRate: number;
-  sellerName: string;
+  sellerName?: string; // 缺省由后端按系统设置的公司名称填入
   buyerName: string;
   packageKind: string;
   tradeTerm: string;

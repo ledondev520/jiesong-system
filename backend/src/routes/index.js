@@ -36,7 +36,6 @@ const forexVerificationRoutes = require('./forexVerifications');
 const taxRefundRoutes = require('./taxRefunds');
 const taxRateRoutes = require('./taxRates');
 const hsCodeRoutes = require('./hsCodes');
-const threeFormsRoutes = require('./threeForms');
 const procurementTemplateRoutes = require('./procurementTemplate');
 const contractTemplateRoutes = require('./contractTemplates');
 const bankFlowRoutes = require('./bankFlow');
@@ -80,7 +79,6 @@ router.use('/forex-verifications', forexVerificationRoutes);
 router.use('/tax-refunds', taxRefundRoutes);
 router.use('/tax-rates', taxRateRoutes);
 router.use('/hs-codes', hsCodeRoutes);
-router.use('/three-forms', threeFormsRoutes);
 router.use('/procurement-template', procurementTemplateRoutes);  // 开业采购模板（CSV分析）
 router.use('/contract-templates', contractTemplateRoutes);  // 合同配置模板
 router.use('/batch-import', batchImportRoutes);  // 批量导入

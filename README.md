@@ -113,7 +113,7 @@ cd ../frontend
 npm test -- --maxWorkers=2
 ./node_modules/.bin/tsc --noEmit
 cd ..
-python3 -m unittest discover -s tests -p test_prepare_export_packet.py
+python3 -m unittest discover -s tests -p test_sqlite_snapshot.py
 ```
 
 测试数量随代码变化，以本次完整输出为准。浏览器 E2E、生产构建和 ESLint 是单独检查，不能由单测数量推导通过。历史 QA 报告保留其日期与当时范围，不代表当前状态。

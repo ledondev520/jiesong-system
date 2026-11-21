@@ -12,8 +12,6 @@ const LABELS = {
   exportPacket: "生成出口四单（合同 / 发票 / 箱单 / 报关预录信息）",
   customsDraft: "报关单草稿",
   packingCheck: "船司装箱单核对",
-  exportWorkbook: "导出出口工作簿",
-  threeForms: "申报三表（报关 / 核销 / 退税）",
 };
 
 const visibleFor = async (role?: string) => {

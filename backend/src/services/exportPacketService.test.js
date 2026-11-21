@@ -13,6 +13,7 @@ const {
   historicalQuoteAllowed,
   writePacketAmounts,
   persistExportPacket,
+  withSellerFromSettings,
 } = require('./exportPacketService');
 
 const contract = (overrides = {}) => ({
@@ -302,4 +303,14 @@ test('同品名同规格的人工历史价优先按门店匹配，未区分的�
   assert(result.issues.some((issue) => issue.code === 'CONFIRMED_PRICE_OUTSIDE_POLICY'));
   const ambiguous = evaluateExportPacket(c, readiness(), quotes.map(({ storeName, ...quote }) => quote), options());
   assert.equal(ambiguous.lines[0].pricingSource, 'formula');
+});
+
+test('卖方来自设置里的公司名称；显式传入的 sellerName 优先；设置为空时阻断', async () => {
+  const { COMPANY_NAME_KEY } = require('../utils/companyConfig');
+  const db = (value) => ({ systemConfig: { findMany: async () => (value ? [{ key: COMPANY_NAME_KEY, value }] : []) } });
+  assert.equal((await withSellerFromSettings({ buyerName: 'B' }, db('合成卖方有限公司'))).sellerName, '合成卖方有限公司');
+  assert.equal((await withSellerFromSettings({ sellerName: '显式卖方' }, db('合成卖方有限公司'))).sellerName, '显式卖方');
+  const blank = await withSellerFromSettings({}, db(''));
+  assert.equal(evaluateExportPacket(contract(), readiness(), [], options({ sellerName: blank.sellerName })).issues
+    .some((issue) => issue.code === 'MISSING_SELLER'), true);
 });

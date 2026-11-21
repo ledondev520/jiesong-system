@@ -210,7 +210,6 @@ const coreCases = [
   { id: 'system_customs_brokers', method: 'GET', path: '/api/v1/system/customs-brokers?page=1&pageSize=20' },
   { id: 'system_import_records', method: 'GET', path: '/api/v1/system/import/records?page=1&pageSize=20' },
   { id: 'system_event_ledger', method: 'GET', path: '/api/v1/system/event-ledger?page=1&pageSize=20' },
-  { id: 'system_patrol_status', method: 'GET', path: '/api/v1/system/patrol/status' },
 
   { id: 'data_import_history', method: 'GET', path: '/api/v1/import/history?page=1&pageSize=20' },
   { id: 'data_import_stats', method: 'GET', path: '/api/v1/import/stats' },

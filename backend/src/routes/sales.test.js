@@ -96,12 +96,9 @@ test('sales export routes: 缺失合同时将404错误传给 next', async () => 
   prisma.salesContract.findUnique = async () => null;
 
   try {
-    const excelError = await invokeExportHandler('/:id/export-excel');
     const pdfError = await invokeExportHandler('/:id/export-pdf');
 
-    assert.equal(excelError?.statusCode, 404);
     assert.equal(pdfError?.statusCode, 404);
-    assert.match(excelError?.message || '', /合同不存在/);
     assert.match(pdfError?.message || '', /合同不存在/);
   } finally {
     prisma.salesContract.findUnique = originalSalesContractFindUnique;

@@ -5,7 +5,6 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
 
 const stubPrisma = (t, delegate, name, impl) => {
@@ -102,30 +101,6 @@ test('OD-3：GET /sales 列表控制器对 WAREHOUSE 去掉金额字段', async 
   assert.doesNotMatch(wh, /totalAmount|receivedAmount/);
   assert.match(wh, /EXP-1/);
   assert.match(JSON.stringify(await run('ADMIN')), /totalAmount/);
-});
-
-test('A3：出口合同 Excel 的总额/已收/未收用 B87 口径（扣除第三方货值，已收封顶）', async (t) => {
-  stubPrisma(t, prisma.salesContract, 'findUnique', async () => ({
-    id: 'c1', contractNo: 'EXP-0020', status: 'CONFIRMED', exchangeRate: 7.2, amountSource: 'DERIVED',
-    totalAmount: 190, receivedAmount: 500, totalBoxes: 1, port: { name: 'LA' }, items: [],
-    packingItems: [
-      { id: 'a', productId: 'p1', quantity: 1, unit: '箱', boxes: 1, unitPrice: 150, totalPrice: 150, isOwnedByJiesong: true, note: '', product: { id: 'p1', customsName: 'x' }, store: null },
-      { id: 'b', productId: 'p2', quantity: 1, unit: '箱', boxes: 1, unitPrice: 40, totalPrice: 40, isOwnedByJiesong: false, note: '拼船', product: { id: 'p2', customsName: 'y' }, store: null },
-    ],
-  }));
-  stubPrisma(t, prisma.customsDeclarationItem, 'findMany', async () => []);
-  stubPrisma(t, prisma.hsCode, 'findMany', async () => []);
-  stubPrisma(t, prisma.taxRate, 'findMany', async () => []);
-  const { exportSalesContractExcel } = require('./exportService');
-  const { buffer } = await exportSalesContractExcel('c1');
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer);
-  const sheet = wb.getWorksheet('合同信息');
-  const byField = {};
-  sheet.eachRow((row) => { byField[row.getCell(1).value] = row.getCell(2).value; });
-  assert.equal(byField['总金额 (USD)'], '$150.00'); // 190 − 第三方 40
-  assert.equal(byField['已收金额 (USD)'], '$150.00'); // 500 封顶到自有额
-  assert.equal(byField['未收金额 (USD)'], '$0.00'); // 原式 190−500 = −310
 });
 
 test('OD-3/OD-6：GET /sales/:id 对 WAREHOUSE 去掉合同总额、已收金额与收款记录，状态保留', async (t) => {

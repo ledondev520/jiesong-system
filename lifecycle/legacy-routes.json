@@ -422,26 +422,6 @@
       "reason": "taxRefunds存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
     },
     {
-      "key": "backend/src/routes/threeForms.js POST /preview",
-      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/threeForms.js POST /generate",
-      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/threeForms.js POST /customs-declaration",
-      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/threeForms.js POST /forex-verification",
-      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/threeForms.js POST /tax-refund",
-      "reason": "threeForms存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
       "key": "backend/src/routes/users.js POST /",
       "reason": "users存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
     },

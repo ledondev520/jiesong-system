@@ -65,10 +65,8 @@ const cases = [
   { id: 'file_download_missing', category: 'export_guard', method: 'GET', path: '/api/v1/files/perf-missing-file/download', expectedStatuses: [404] },
   { id: 'purchase_file_download_missing', category: 'export_guard', method: 'GET', path: '/api/v1/purchases/files/perf-missing-file/download', expectedStatuses: [404] },
   { id: 'sales_file_download_missing', category: 'export_guard', method: 'GET', path: '/api/v1/sales/files/perf-missing-file/download', expectedStatuses: [404] },
-  { id: 'sales_export_excel_missing_contract', category: 'export_guard', method: 'GET', path: '/api/v1/sales/perf-missing-sales/export-excel', expectedStatuses: [404] },
   { id: 'sales_export_pdf_missing_contract', category: 'export_guard', method: 'GET', path: '/api/v1/sales/perf-missing-sales/export-pdf', expectedStatuses: [404] },
   { id: 'contract_doc_pdf_missing_contract', category: 'export_guard', method: 'GET', path: '/api/v1/contract-doc/pdf/perf-missing-contract', expectedStatuses: [404] },
-  { id: 'three_forms_export_missing_contract', category: 'export_guard', method: 'GET', path: '/api/v1/three-forms/export/perf-missing-sales', expectedStatuses: [404] },
   { id: 'system_logs_export_csv', category: 'export_guard', method: 'GET', path: '/api/v1/system/logs/export/csv', expectedStatuses: [200] },
 
   // Common write routes with explicit validation guards.
@@ -92,11 +90,6 @@ const cases = [
   { id: 'hs_code_update_missing_record', category: 'write_guard', method: 'PUT', path: '/api/v1/hs-codes/9999999999', body: { note: 'performance guard audit' }, expectedStatuses: [404] },
   { id: 'store_create_missing_fields', category: 'write_guard', method: 'POST', path: '/api/v1/stores', body: {}, expectedStatuses: [400] },
   { id: 'supplier_create_missing_name', category: 'write_guard', method: 'POST', path: '/api/v1/suppliers', body: {}, expectedStatuses: [400] },
-  { id: 'three_forms_preview_missing_contract', category: 'write_guard', method: 'POST', path: '/api/v1/three-forms/preview', body: {}, expectedStatuses: [400, 404] },
-  { id: 'three_forms_generate_missing_contract', category: 'write_guard', method: 'POST', path: '/api/v1/three-forms/generate', body: {}, expectedStatuses: [400] },
-  { id: 'three_forms_customs_missing_contract', category: 'write_guard', method: 'POST', path: '/api/v1/three-forms/customs-declaration', body: {}, expectedStatuses: [400] },
-  { id: 'three_forms_forex_missing_fields', category: 'write_guard', method: 'POST', path: '/api/v1/three-forms/forex-verification', body: {}, expectedStatuses: [400] },
-  { id: 'three_forms_tax_refund_missing_fields', category: 'write_guard', method: 'POST', path: '/api/v1/three-forms/tax-refund', body: {}, expectedStatuses: [400] },
   { id: 'user_create_missing_fields', category: 'write_guard', method: 'POST', path: '/api/v1/users', body: {}, expectedStatuses: [400] },
 ];
 

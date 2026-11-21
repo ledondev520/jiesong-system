@@ -69,7 +69,6 @@ const formatMoney = (value: number, currency: "USD" | "CNY") =>
   }).format(value || 0);
 
 const isPreviewFormComplete = (form: ExportPacketInput) =>
-  !!form.sellerName.trim() &&
   !!form.packageKind.trim() &&
   !!form.buyerName.trim() &&
   !!form.tradeTerm.trim();
@@ -92,7 +91,6 @@ export function ExportPacketWorkbenchDialog({
       (salesContract.rateBasis === "effective"
         ? salesContract.spotRate
         : salesContract.exchangeRate) || 6.8,
-    sellerName: "上海捷淞国际物流有限公司",
     buyerName: "",
     packageKind: "纸制或纤维板制盒/箱（22）",
     tradeTerm: "FOB",
@@ -248,18 +246,6 @@ export function ExportPacketWorkbenchDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">卖方名称</label>
-              <Input
-                value={form.sellerName}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    sellerName: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-1.5">
               <label className="text-sm font-medium">买方名称</label>
               <Input
                 value={form.buyerName}
@@ -303,14 +289,13 @@ export function ExportPacketWorkbenchDialog({
             </div>
           </div>
 
-          {(!form.sellerName.trim() ||
-            !form.packageKind.trim() ||
+          {(!form.packageKind.trim() ||
             !form.buyerName.trim() ||
             !form.tradeTerm.trim()) && (
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                先确认买卖方和贸易术语，再运行预检。包装种类使用已确认的固定口径。
+                先确认买方和贸易术语（卖方取自系统设置的公司名称），再运行预检。包装种类使用已确认的固定口径。
               </AlertDescription>
             </Alert>
           )}
@@ -326,7 +311,6 @@ export function ExportPacketWorkbenchDialog({
               onClick={runPreview}
               disabled={
                 loading ||
-                !form.sellerName.trim() ||
                 !form.packageKind.trim() ||
                 !form.buyerName.trim() ||
                 !form.tradeTerm.trim()
