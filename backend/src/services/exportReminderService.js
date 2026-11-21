@@ -1,21 +1,18 @@
 /**
  * Input: PrismaClient（销售/采购合同、退税单、通知、用户）
- * Output: 出口退税月度提醒（每月5号）与已出货缺发票提醒的生成能力
- * Pos: 出口流程提醒服务，供 exportReminderJob 定时任务与手动触发复用
+ * Output: 出口退税月度提醒（每月5号）的生成能力
+ * Pos: 出口流程提醒服务，供 exportReminderJob 定时任务复用；缺发票催办不再发通知，由首页 TodoBoard「缺进项发票」承担
  */
 
 const prisma = require('../utils/prisma');
 const { NOTIFICATION_TYPE, ROLES } = require('../config/constants');
-const { findInvoicedPurchaseContractIds } = require('./invoiceRecordService');
 const { OFFICIAL_RULES } = require('./taxRefundPreparationService');
 
 // 5号仅是内部材料准备节点，不代表法定申报截止日。
 const TAX_REFUND_REMINDER_DAY = 5;
 
-// 退税提醒接收角色：管理员 + 财务
+// 退税提醒接收角色：仅管理员（OD-8 后无财务角色）
 const TAX_REFUND_NOTIFY_ROLES = [ROLES.ADMIN];
-// 缺发票提醒接收角色：管理员 + 财务 + 采购
-const INVOICE_NOTIFY_ROLES = [ROLES.ADMIN];
 
 /**
  * 职责：查询指定角色的活跃用户 id 列表
@@ -37,7 +34,7 @@ const findRecipientIds = async (tx, roles) => {
  *   1. 非提醒日（且未 force）直接跳过
  *   2. 找出上个自然月已发运的出口合同（shippedAt 在上月区间）
  *   3. 统计其中尚未创建退税单的合同，拼入提醒内容
- *   4. 对财务/管理员角色逐用户创建通知（本月已有该类型通知则跳过）
+ *   4. 对管理员逐用户创建通知（本月已有该类型通知则跳过）
  * @param {object} tx Prisma 客户端（默认全局实例）
  * @param {object} options { now?: Date, force?: boolean }
  * @returns {Promise<{ skipped: boolean, reason?: string, created: number, contracts: number }>}
@@ -105,7 +102,7 @@ const runMonthlyTaxRefundReminder = async (tx = prisma, options = {}) => {
       type: NOTIFICATION_TYPE.TAX_REFUND_MONTHLY,
       title,
       content,
-      link: `/dashboard/sales/${pendingContracts[0]?.id || shippedContracts[0].id}`,
+      link: `/dashboard/orders/${pendingContracts[0]?.id || shippedContracts[0].id}`,
       metadata: JSON.stringify({
         month: monthLabel,
         shippedCount: shippedContracts.length,
@@ -123,88 +120,7 @@ const runMonthlyTaxRefundReminder = async (tx = prisma, options = {}) => {
   return { skipped: false, created: rows.length, contracts: shippedContracts.length };
 };
 
-/**
- * 职责：生成「货已出但未登记发票号」的催票提醒（幂等：同一用户每天一条）
- * 思路：
- *   1. 找出已发货/已收货/已完成、invoiceNo 为空且无有效关联发票记录的采购合同
- *   2. 拼接合同号+供应商摘要，对管理员/财务/采购角色创建当日通知
- * @param {object} tx Prisma 客户端（默认全局实例）
- * @param {object} options { now?: Date }
- * @returns {Promise<{ skipped: boolean, reason?: string, created: number, contracts: number }>}
- */
-const runInvoiceMissingReminder = async (tx = prisma, options = {}) => {
-  const now = options.now instanceof Date ? new Date(options.now) : new Date();
-  const todayStart = new Date(now);
-  todayStart.setHours(0, 0, 0, 0);
-
-  // 1. 货已出但未登记发票号的采购合同
-  const candidates = await tx.purchaseContract.findMany({
-    where: {
-      status: { in: ['SHIPPED', 'RECEIVED', 'COMPLETED'] },
-    },
-    select: {
-      id: true,
-      contractNo: true,
-      invoiceNo: true,
-      supplier: { select: { name: true } },
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
-  const noNumber = candidates.filter((contract) => !String(contract.invoiceNo || '').trim());
-  // 发票关联规则与看板「缺进项发票」共用；但催票保留完整名单，不套用看板的签约日期截止（已决定）。
-  const invoiced = await findInvoicedPurchaseContractIds(tx, noNumber.map((c) => c.id));
-  const missingContracts = noNumber.filter((c) => !invoiced.has(c.id));
-
-  if (missingContracts.length === 0) {
-    return { skipped: true, reason: 'no-missing-invoice', created: 0, contracts: 0 };
-  }
-
-  const summary = missingContracts
-    .slice(0, 5)
-    .map((c) => `${c.contractNo}（${c.supplier?.name || '未知供应商'}）`)
-    .join('、');
-  const title = `${missingContracts.length} 份采购合同待催开发票`;
-  const content = `${summary}${missingContracts.length > 5 ? ' 等' : ''} 货已出但未登记发票号。请在采购合同详情使用「催开发票」发送品名、单位、数量、金额和税率，收票后登记号码；发票原件附件选填。`;
-
-  // 2. 对目标角色逐用户创建（当日幂等）
-  const recipientIds = await findRecipientIds(tx, INVOICE_NOTIFY_ROLES);
-  if (recipientIds.length === 0) {
-    return { skipped: true, reason: 'no-recipients', created: 0, contracts: missingContracts.length };
-  }
-
-  const existing = await tx.notification.findMany({
-    where: {
-      type: NOTIFICATION_TYPE.INVOICE_MISSING,
-      userId: { in: recipientIds },
-      createdAt: { gte: todayStart },
-    },
-    select: { userId: true },
-  });
-  const notified = new Set(existing.map((n) => n.userId));
-
-  const rows = recipientIds
-    .filter((userId) => !notified.has(userId))
-    .map((userId) => ({
-      userId,
-      type: NOTIFICATION_TYPE.INVOICE_MISSING,
-      title,
-      content,
-      link: `/dashboard/purchases/${missingContracts[0].id}`,
-      metadata: JSON.stringify({
-        missingCount: missingContracts.length,
-        contractIds: missingContracts.slice(0, 20).map((c) => c.id),
-      }),
-    }));
-
-  if (rows.length > 0) {
-    await tx.notification.createMany({ data: rows });
-  }
-
-  return { skipped: false, created: rows.length, contracts: missingContracts.length };
-};
-
 module.exports = {
   TAX_REFUND_REMINDER_DAY,
   runMonthlyTaxRefundReminder,
-  runInvoiceMissingReminder,
 };

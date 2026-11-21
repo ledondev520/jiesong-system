@@ -30,68 +30,6 @@ const createMockRes = () => {
   return res;
 };
 
-test('getNotifications: unreadOnly=true 时按未读筛选并返回 unreadCount', async () => {
-  const originalFindMany = prisma.notification.findMany;
-  const originalCount = prisma.notification.count;
-  let findManyArgs = null;
-  const countCalls = [];
-
-  prisma.notification.findMany = async (args) => {
-    findManyArgs = args;
-    return [{ id: 'n-1', isRead: false }];
-  };
-  prisma.notification.count = async (args) => {
-    countCalls.push(args);
-    if (args.where.isRead === false) {
-      return 3;
-    }
-    return 1;
-  };
-
-  try {
-    const req = {
-      user: { id: 'u-1' },
-      query: { page: '1', pageSize: '20', unreadOnly: 'true' },
-    };
-    const res = createMockRes();
-    let capturedError = null;
-
-    await notificationController.getNotifications(req, res, (error) => {
-      capturedError = error;
-    });
-
-    assert.equal(capturedError, null);
-    assert.deepEqual(findManyArgs.where, { userId: 'u-1', isRead: false });
-    assert.equal(countCalls.length, 2);
-    assert.equal(res.payload.data.unreadCount, 3);
-    assert.deepEqual(res.payload.data.items, [{ id: 'n-1', isRead: false }]);
-  } finally {
-    prisma.notification.findMany = originalFindMany;
-    prisma.notification.count = originalCount;
-  }
-});
-
-test('markNotificationRead: 无权限或不存在时返回404', async () => {
-  const originalUpdateMany = prisma.notification.updateMany;
-  prisma.notification.updateMany = async () => ({ count: 0 });
-
-  try {
-    const req = { params: { id: 'n-404' }, user: { id: 'u-1' } };
-    const res = createMockRes();
-    let capturedError = null;
-
-    await notificationController.markNotificationRead(req, res, (error) => {
-      capturedError = error;
-    });
-
-    assert.ok(capturedError);
-    assert.equal(capturedError.statusCode, 404);
-    assert.equal(capturedError.message, '通知不存在或无权限访问');
-  } finally {
-    prisma.notification.updateMany = originalUpdateMany;
-  }
-});
-
 test('getLogs: 透传 userId/entity/action 过滤条件', async () => {
   const originalFindMany = prisma.operationLog.findMany;
   const originalCount = prisma.operationLog.count;
@@ -219,20 +157,3 @@ test('exportOperationLogsCsv: 返回 CSV 文件', async () => {
   }
 });
 
-test('getNotifications: 全部历史分页及标题/内容/类型搜索共用服务端where', async () => {
-  const originalFindMany = prisma.notification.findMany;
-  const originalCount = prisma.notification.count;
-  let args;
-  prisma.notification.findMany = async (value) => { args = value; return []; };
-  prisma.notification.count = async (value) => value.where.OR ? 81 : 4;
-  try {
-    const res = createMockRes();
-    await notificationController.getNotifications({ user: { id: 'synthetic-user' }, query: { page: '4', pageSize: '20', keyword: '合成标题' } }, res, (error) => { throw error; });
-    assert.equal(args.skip, 60); assert.equal(args.take, 20);
-    assert.equal(args.where.userId, 'synthetic-user');
-    assert.deepEqual(args.where.OR, ['title', 'content', 'type'].map((field) => ({ [field]: { contains: '合成标题' } })));
-    assert.equal(res.payload.data.pagination.total, 81);
-  } finally {
-    prisma.notification.findMany = originalFindMany; prisma.notification.count = originalCount;
-  }
-});

@@ -12,14 +12,3 @@ test('index: 模块可正常加载并导出', () => {
   assert.ok(mod !== undefined);
 });
 
-test('index: 挂载 batch-import 路由', () => {
-  const router = require('./index');
-  const mountedPaths = router.stack
-    .filter((layer) => layer.name === 'router' && layer.regexp)
-    .map((layer) => String(layer.regexp));
-
-  assert.ok(
-    mountedPaths.some((entry) => entry.includes('batch-import')),
-    '缺少 /batch-import 路由挂载',
-  );
-});

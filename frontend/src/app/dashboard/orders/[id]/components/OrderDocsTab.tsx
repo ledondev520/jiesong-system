@@ -10,11 +10,8 @@ import { AlertTriangle, FileSpreadsheet } from "lucide-react";
 import type { SalesContract } from "@/types";
 import type { ContractFile } from "@/services/contractFile.service";
 import { formatMoney } from "@/lib/format";
-import { BusinessWrite } from "@/lib/hooks/useBusinessReadOnly";
 import ContractFiles from "@/components/contract/ContractFiles";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/store/auth.store";
 import {
   Card,
   CardContent,
@@ -35,14 +32,11 @@ export function OrderDocsTab({
   contract,
   files,
   onFilesChange,
-  onResolveHs,
 }: {
   contract: SalesContract;
   files: ContractFile[];
   onFilesChange: (files: ContractFile[]) => void;
-  onResolveHs: () => void;
 }) {
-  const role = useAuthStore((state) => state.user?.role);
   const packingItems = contract.packingItems;
 
   // 按 HS + 商品名分组：相同 HS 的不同商品不合并
@@ -110,23 +104,10 @@ export function OrderDocsTab({
                   </p>
                   <p>未匹配：{missingHsLabel}</p>
                   <p className="text-xs">
-                    为避免申报遗漏，请先通过历史记录、AI
-                    建议或人工确认补齐；申报三表会阻止不完整单据生成。
+                    为避免申报遗漏，请先在装箱明细或 HS
+                    编码库中补齐；出口四单预检会阻止不完整单据生成。
                   </p>
                 </div>
-                {/* OD-8：三表对话框仅 ADMIN 可用 */}
-                <BusinessWrite>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    disabled={role !== "ADMIN"}
-                    onClick={onResolveHs}
-                  >
-                    处理未匹配 HS 编码
-                  </Button>
-                </BusinessWrite>
               </AlertDescription>
             </Alert>
           )}

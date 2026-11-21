@@ -45,11 +45,6 @@ const loadApp = (configOverride = {}) => {
           gentleRateLimit: () => noopMiddleware,
         };
       }
-      if (request === './jobs/inventoryAlertJob') {
-        return {
-          startInventoryAlertJob: () => {},
-        };
-      }
       if (request === './jobs/opsTaskReminderJob') {
         return {
           startOpsTaskReminderJob: () => {},

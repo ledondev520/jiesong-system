@@ -1,12 +1,9 @@
-import { getApiBaseUrl } from "@/lib/api-base-url";
-import { authFetchInit } from "@/lib/browser-session";
 import api from "@/lib/axios";
 import {
   buildIdempotencyKey,
   runIdempotentRequest,
 } from "@/lib/idempotentRequest";
 import { ApiResponse, PaginatedResponse, Payment, PaymentType } from "@/types";
-import { downloadResponseBlob } from "./fileDownload";
 
 export interface FinanceOverviewStats {
   payable: {
@@ -129,13 +126,6 @@ export interface FinanceAutoMatchResult {
 }
 
 export const financeService = {
-  getPayments: async (params?: FinancePaymentQuery) => {
-    return api.get<
-      ApiResponse<PaginatedResponse<Payment>>,
-      ApiResponse<PaginatedResponse<Payment>>
-    >("/finance/payments", { params });
-  },
-
   getUnallocatedPayments: async () => {
     return api.get<ApiResponse<Payment[]>, ApiResponse<Payment[]>>(
       "/finance/unallocated-payments",
@@ -232,18 +222,5 @@ export const financeService = {
       ApiResponse<ReceivableReconciliation | null>
     >("/finance/receivable-reconciliation", { params: { year, month } });
     return response.data || null;
-  },
-
-  exportReportPdf: async (
-    type: FinanceReportPdfType,
-    fallbackFilename?: string,
-  ) => {
-    const response = await fetch(
-      `${getApiBaseUrl()}/system/export/${type}/pdf`,
-      {
-        ...authFetchInit(),
-      },
-    );
-    await downloadResponseBlob(response, fallbackFilename || `${type}.pdf`);
   },
 };

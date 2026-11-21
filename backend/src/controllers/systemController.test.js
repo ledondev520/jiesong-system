@@ -1,6 +1,6 @@
 /**
- * Input: systemController、prisma、importService
- * Output: 系统控制器关键行为测试（通知权限、导入记录筛选透传）
+ * Input: systemController、prisma
+ * Output: 系统控制器关键行为测试（通知权限、港口与分类）
  * Pos: 后端控制器测试
  */
 
@@ -8,8 +8,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const systemController = require('./systemController');
-const importService = require('../services/importService');
-const eventLedgerService = require('../services/eventLedgerService');
 
 const createMockRes = () => {
   const res = {
@@ -29,143 +27,6 @@ const createMockRes = () => {
 
   return res;
 };
-
-test('markNotificationRead: 仅允许标记当前用户通知', async () => {
-  const original = prisma.notification.updateMany;
-  let capturedArgs = null;
-
-  prisma.notification.updateMany = async (args) => {
-    capturedArgs = args;
-    return { count: 1 };
-  };
-
-  try {
-    const req = { params: { id: 'notice-1' }, user: { id: 'user-1' } };
-    const res = createMockRes();
-    let capturedError = null;
-    const next = (error) => {
-      capturedError = error;
-    };
-
-    await systemController.markNotificationRead(req, res, next);
-
-    assert.equal(capturedError, null);
-    assert.deepEqual(capturedArgs.where, { id: 'notice-1', userId: 'user-1' });
-    assert.equal(res.statusCode, 200);
-    assert.equal(res.payload.message, '已标记为已读');
-  } finally {
-    prisma.notification.updateMany = original;
-  }
-});
-
-test('markNotificationRead: 通知不存在或非本人时返回404', async () => {
-  const original = prisma.notification.updateMany;
-
-  prisma.notification.updateMany = async () => ({ count: 0 });
-
-  try {
-    const req = { params: { id: 'notice-2' }, user: { id: 'user-1' } };
-    const res = createMockRes();
-    let capturedError = null;
-    const next = (error) => {
-      capturedError = error;
-    };
-
-    await systemController.markNotificationRead(req, res, next);
-
-    assert.ok(capturedError);
-    assert.equal(capturedError.statusCode, 404);
-    assert.equal(capturedError.message, '通知不存在或无权限访问');
-  } finally {
-    prisma.notification.updateMany = original;
-  }
-});
-
-test('getImportRecords: 透传 status/keyword 筛选参数', async () => {
-  const original = importService.getImportRecords;
-  let capturedArgs = null;
-
-  importService.getImportRecords = async (...args) => {
-    capturedArgs = args;
-    return { records: [], total: 0 };
-  };
-
-  try {
-    const req = {
-      query: {
-        page: '2',
-        pageSize: '10',
-        status: ' FAILED ',
-        keyword: ' demo ',
-      },
-    };
-    const res = createMockRes();
-    let capturedError = null;
-    const next = (error) => {
-      capturedError = error;
-    };
-
-    await systemController.getImportRecords(req, res, next);
-
-    assert.equal(capturedError, null);
-    assert.equal(capturedArgs[0], 2);
-    assert.equal(capturedArgs[1], 10);
-    assert.deepEqual(capturedArgs[2], { status: 'FAILED', keyword: 'demo' });
-    assert.equal(res.payload.code, 200);
-    assert.deepEqual(res.payload.data.items, []);
-  } finally {
-    importService.getImportRecords = original;
-  }
-});
-
-test('getEventLedger: 透传 source/eventType/category 等筛选参数', async () => {
-  const original = eventLedgerService.listEventLedger;
-  let capturedArgs = null;
-
-  eventLedgerService.listEventLedger = async (...args) => {
-    capturedArgs = args;
-    return { events: [], total: 0, sources: ['OPERATION_LOG', 'IMPORT_RECORD'] };
-  };
-
-  try {
-    const req = {
-      query: {
-        page: '2',
-        pageSize: '15',
-        source: 'OPERATION_LOG, IMPORT_RECORD',
-        actorType: ' user ',
-        entityType: ' Store ',
-        eventType: ' audit_update ',
-        category: ' audit ',
-        keyword: ' demo ',
-      },
-    };
-    const res = createMockRes();
-    let capturedError = null;
-    const next = (error) => {
-      capturedError = error;
-    };
-
-    await systemController.getEventLedger(req, res, next);
-
-    assert.equal(capturedError, null);
-    assert.equal(capturedArgs[0], 2);
-    assert.equal(capturedArgs[1], 15);
-    assert.deepEqual(capturedArgs[2], {
-      source: ['OPERATION_LOG', 'IMPORT_RECORD'],
-      actorType: 'USER',
-      entityType: 'Store',
-      eventType: 'AUDIT_UPDATE',
-      category: 'AUDIT',
-      keyword: 'demo',
-    });
-    assert.equal(res.payload.code, 200);
-    assert.deepEqual(res.payload.data.items, []);
-    assert.deepEqual(res.payload.data.sources, ['OPERATION_LOG', 'IMPORT_RECORD']);
-  } finally {
-    eventLedgerService.listEventLedger = original;
-  }
-});
 
 test('getPorts: 默认只查询启用港口并返回分页结构', async () => {
   const originalFindMany = prisma.port.findMany;

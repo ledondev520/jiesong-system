@@ -30,10 +30,8 @@ function definition(kind) {
   return TYPES[kind];
 }
 
-function listTemplates() {
-  return Object.entries(TYPES).map(([kind, spec]) => ({
-    kind, label: spec.label, headers: Object.keys(spec.fields), required: spec.required,
-  }));
+function listTemplates() { // used by the database test only (HTTP list route removed in A110)
+  return Object.entries(TYPES).map(([kind, spec]) => ({ kind, headers: Object.keys(spec.fields) }));
 }
 
 async function template(kind, format = 'xlsx') {

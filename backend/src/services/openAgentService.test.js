@@ -152,7 +152,7 @@ test('unified preset: 作为唯一主公开入口，legacy preset 退为内部�
   assert.equal(finance.isLegacy, true);
 });
 
-test('persistAgentRun: 使用交互式事务统一持久化运行记录与回放摘要', async () => {
+test('persistAgentRun: 使用交互式事务统一持久化运行记录', async () => {
   const writes = [];
   const tx = {
     chatHistory: {
@@ -163,9 +163,6 @@ test('persistAgentRun: 使用交互式事务统一持久化运行记录与回放
     },
     operationLog: {
       create: async ({ data }) => writes.push(['operationLog', data.action]),
-    },
-    agentReplaySummary: {
-      upsert: async () => writes.push(['agentReplaySummary']),
     },
   };
 
@@ -196,8 +193,6 @@ test('persistAgentRun: 使用交互式事务统一持久化运行记录与回放
     ['chatHistory', 'assistant'],
     ['tokenUsage'],
     ['operationLog', 'AGENT_RUN'],
-    ['operationLog', 'AGENT_REPLAY_SNAPSHOT'],
-    ['agentReplaySummary'],
   ]);
 });
 
@@ -270,25 +265,6 @@ test('isToolAllowedForRole: 按工具 allowedRoles 控制写工具授权', () =>
   assert.equal(openAgentService.isToolAllowedForRole('UpdateInventoryStatus', 'PURCHASE'), false); // retired role (OD-8)
   assert.equal(openAgentService.isToolAllowedForRole('AllocatePayment', 'SALES'), false);
   assert.equal(openAgentService.isToolAllowedForRole('SearchEntities', 'SALES'), true);
-});
-
-test('buildToolRegistryPayload: 按当前角色给出可用工具与域级摘要', () => {
-  const payload = openAgentService.buildToolRegistryPayload('ADMIN');
-
-  assert.equal(payload.primaryAgentType, 'unified');
-  assert.equal(payload.viewerRole, 'ADMIN');
-  assert.ok(Array.isArray(payload.domains));
-  assert.ok(payload.tools.some((tool) => tool.name === 'AllocatePayment' && tool.availableForViewer === true));
-  assert.ok(payload.tools.some((tool) => tool.name === 'CreateSupplierRecord' && tool.availableForViewer === true));
-
-  const financeDomain = payload.domains.find((item) => item.domain === 'finance');
-  assert.ok(financeDomain);
-  assert.ok(financeDomain.availableWriteCount >= 1);
-  assert.ok(financeDomain.compositeToolCount >= 1);
-
-  const complianceDomain = payload.domains.find((item) => item.domain === 'trade-compliance');
-  assert.ok(complianceDomain);
-  assert.ok(complianceDomain.compositeToolCount >= 1);
 });
 
 test('buildSalesContractFlowDiagnostic: 聚合销售合同、库存、报关、核销、退税链路并给出阻塞项', async () => {
@@ -742,7 +718,7 @@ test('resolveSdkSessionConfig: 新会话持久化，旧会话走 resume', () => 
   assert.equal(resumed.resume, 'agent_finance_demo');
 });
 
-test('buildAgentRunMetadata: 会持久化基础 governanceReplayProfile 快照', () => {
+test('buildAgentRunMetadata: 不再持久化 governanceReplayProfile', () => {
   const metadata = openAgentService.buildAgentRunMetadata({
     agentType: 'unified',
     model: 'kimi-k2',
@@ -769,77 +745,7 @@ test('buildAgentRunMetadata: 会持久化基础 governanceReplayProfile 快照',
     ],
   });
 
-  assert.deepEqual(metadata.governanceReplayProfile, {
-    available: true,
-    source: 'session-metadata',
-    level: 'tools',
-    evidence: {
-      operationLogEvents: 0,
-      actionLifecycleCount: 0,
-    },
-    summary: {
-      tools: true,
-      recommendations: true,
-      actions: true,
-    },
-    counts: {
-      tools: 1,
-      recommendations: 1,
-      actions: 1,
-    },
-  });
-});
-
-test('buildReplaySnapshotLogValue: 会生成专用 replay snapshot 日志载荷', () => {
-  const payload = openAgentService.buildReplaySnapshotLogValue({
-    governanceReplayProfile: {
-      available: true,
-      source: 'replay-snapshot-log',
-      level: 'tools',
-      evidence: {
-        operationLogEvents: 0,
-        actionLifecycleCount: 0,
-      },
-      summary: {
-        tools: true,
-        recommendations: true,
-        actions: true,
-      },
-      counts: {
-        tools: 1,
-        recommendations: 1,
-        actions: 1,
-      },
-    },
-    routePlan: { mode: 'cross-domain', selectedDomains: ['finance', 'inventory'] },
-    selectedToolNames: ['SearchEntities'],
-  });
-
-  assert.deepEqual(payload, {
-    source: 'open-agent-sdk',
-    replaySource: 'dedicated-replay-snapshot',
-    governanceReplayProfile: {
-      available: true,
-      source: 'replay-snapshot-log',
-      level: 'tools',
-      evidence: {
-        operationLogEvents: 0,
-        actionLifecycleCount: 0,
-      },
-      summary: {
-        tools: true,
-        recommendations: true,
-        actions: true,
-      },
-      counts: {
-        tools: 1,
-        recommendations: 1,
-        actions: 1,
-      },
-    },
-    routePlan: { mode: 'cross-domain', selectedDomains: ['finance', 'inventory'] },
-    selectedToolNames: ['SearchEntities'],
-  });
+  assert.equal(metadata.governanceReplayProfile, undefined);
 });
 
 test('Agent 上游失败：普通和流式请求均拒绝，不能落库成功记录', async () => {

@@ -48,16 +48,4 @@ router.get('/:id/hard-delete-preview', withIdValidation, roleAuth(ROLE_SETS.ADMI
 // POST /api/v1/suppliers/:id/hard-delete - 永久删除（仅 ADMIN；审计行在删除事务内写入，故不套 withAuditLog）
 router.post('/:id/hard-delete', withIdValidation, roleAuth(ROLE_SETS.ADMIN), supplierController.hardDelete);
 
-// POST /api/v1/suppliers/:id/aliases - 添加供应商昵称
-router.post('/:id/aliases', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
-  { entity: 'SupplierAlias', action: 'CREATE', model: 'supplierAlias' },
-  supplierController.addAlias
-));
-
-// POST /api/v1/suppliers/:id/quality-issue - 标记质量问题
-router.post('/:id/quality-issue', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
-  { entity: 'Supplier', action: 'UPDATE', model: 'supplier' },
-  supplierController.markQualityIssue
-));
-
 module.exports = router;

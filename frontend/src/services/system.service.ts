@@ -5,7 +5,7 @@ import { authFetchInit } from "@/lib/browser-session";
  * Pos: 前端系统运维服务层
  */
 
-import api, { type ApiRequestConfig } from "@/lib/axios";
+import api from "@/lib/axios";
 import { ApiResponse, PaginatedResponse, User } from "@/types";
 
 export interface SystemLogItem {
@@ -93,45 +93,6 @@ export const exportSystemLogsCsv = async (
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-};
-
-export interface SystemNotificationItem {
-  id: string;
-  userId: string;
-  type: string;
-  title: string;
-  content: string;
-  isRead: boolean;
-  metadata?: string | null;
-  link?: string | null;
-  createdAt: string;
-}
-
-export interface GetSystemNotificationsParams {
-  keyword?: string;
-  page?: number;
-  pageSize?: number;
-  unreadOnly?: boolean;
-}
-
-export interface SystemNotificationsResponse extends PaginatedResponse<SystemNotificationItem> {
-  unreadCount: number;
-}
-
-export const getSystemNotifications = async (
-  params: GetSystemNotificationsParams = { page: 1, pageSize: 50 },
-) => {
-  const config: ApiRequestConfig = { params, cache: { enabled: false } };
-  return api.get<
-    ApiResponse<SystemNotificationsResponse>,
-    ApiResponse<SystemNotificationsResponse>
-  >("/system/notifications", config);
-};
-
-export const markSystemNotificationRead = async (id: string) => {
-  return api.put<ApiResponse<null>, ApiResponse<null>>(
-    `/system/notifications/${id}/read`,
-  );
 };
 
 export interface SystemPortItem {

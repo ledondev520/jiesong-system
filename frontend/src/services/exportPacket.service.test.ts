@@ -25,7 +25,6 @@ import { exportPacketService } from "./exportPacket.service";
 describe("exportPacketService", () => {
   const input = {
     spotRate: 6.8,
-    sellerName: "上海捷淞国际物流有限公司",
     buyerName: "Test Buyer LLC",
     packageKind: "木箱",
     tradeTerm: "FOB",

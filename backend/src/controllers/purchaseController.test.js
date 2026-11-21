@@ -110,61 +110,6 @@ test('updateStatus: 生产资料缺失时后端拒绝从生产中推进到完成
   }
 });
 
-test('uploadFile: 登记附件前收紧目录和文件权限，保持 201 响应', async t => {
-  const originalFind = prisma.purchaseContract.findUnique;
-  prisma.purchaseContract.findUnique = async () => ({ id: 'purchase-1' });
-  t.after(() => { prisma.purchaseContract.findUnique = originalFind; });
-  const directory = path.join(uploadRoot, 'permission-success');
-  fs.mkdirSync(directory, { mode: 0o755 });
-  const filePath = path.join(directory, 'synthetic.pdf');
-  fs.writeFileSync(filePath, '%PDF-1.4\nsynthetic attachment\n%%EOF', { mode: 0o644 });
-  const originalCreate = prisma.contractFile.create;
-  let recorded = null;
-  prisma.contractFile.create = async ({ data }) => {
-    assert.equal(fs.statSync(directory).mode & 0o777, 0o700);
-    assert.equal(fs.statSync(filePath).mode & 0o777, 0o600);
-    recorded = data;
-    return { id: 'attachment-1', ...data };
-  };
-  const res = { status(code) { this.statusCode = code; return this; }, json(payload) { this.payload = payload; return this; } };
-  try {
-    await purchaseController.uploadFile({
-      params: { id: 'purchase-1' },
-      user: { role: 'ADMIN' },
-      body: { description: 'synthetic test attachment', category: 'SUPPLIER_INVOICE' },
-      file: { path: filePath, originalname: 'synthetic.pdf', mimetype: 'application/pdf', size: fs.statSync(filePath).size },
-    }, res, (error) => { throw error; });
-    assert.equal(res.statusCode, 201);
-    assert.equal(res.payload.message, '文件上传成功');
-    assert.equal(recorded.purchaseContractId, 'purchase-1');
-    assert.equal(recorded.filePath, path.join('permission-success', 'synthetic.pdf'));
-    assert.equal(recorded.description, 'synthetic test attachment');
-    assert.equal(recorded.category, 'SUPPLIER_INVOICE');
-  } finally {
-    prisma.contractFile.create = originalCreate;
-  }
-});
-
-test('uploadFile: 权限收紧失败时不建立数据库附件记录', async (t) => {
-  const originalFind = prisma.purchaseContract.findUnique;
-  prisma.purchaseContract.findUnique = async () => ({ id: 'purchase-1' });
-  t.after(() => { prisma.purchaseContract.findUnique = originalFind; });
-  const permissionError = new Error('synthetic chmod failure');
-  fs.writeFileSync(path.join(uploadRoot, 'synthetic.pdf'), '%PDF generated fixture', { mode: 0o600 });
-  t.mock.method(fs, 'chmodSync', () => { throw permissionError; });
-  let createCalled = false;
-  const originalCreate = prisma.contractFile.create;
-  prisma.contractFile.create = async () => { createCalled = true; return {}; };
-  t.after(() => { prisma.contractFile.create = originalCreate; });
-  let caught = null;
-  await purchaseController.uploadFile({
-    params: { id: 'purchase-1' }, body: {},
-    file: { path: path.join(uploadRoot, 'synthetic.pdf'), originalname: 'synthetic.pdf', mimetype: 'application/pdf', size: 1 },
-  }, { status() { return this; }, json() {} }, (error) => { caught = error; });
-  assert.equal(caught, permissionError);
-  assert.equal(createCalled, false);
-});
-
 test('downloadFile: 相对附件路径从 UPLOAD_DIR 解析，兼容已有绝对路径', async (t) => {
   const directory = path.join(uploadRoot, 'download');
   fs.mkdirSync(directory, { mode: 0o700 });
@@ -312,23 +257,7 @@ test('updateStatus: 直接已发货→已收货不能绕过批次验货入库', 
   assert.equal(stockCreated, false);
 });
 
-test('addItem: 与共享草稿更正一致，已签约/发货/完成/付款/归档不能加行', async (t) => {
-  const oldTransaction = prisma.$transaction;
-  t.after(() => { prisma.$transaction = oldTransaction; });
-  const draft = { status: 'DRAFT', taxRate: 13, paidAmount: 0, _count: { receipts: 0, payments: 0, files: 0 }, items: [] };
-  for (const contract of [draft, { ...draft, status: 'SIGNED' }, { ...draft, status: 'SHIPPED' }, { ...draft, status: 'COMPLETED' }, { ...draft, paidAmount: 1 }, { ...draft, _count: { ...draft._count, files: 1 } }]) {
-    let added = false;
-    prisma.$transaction = async (run) => run({ purchaseContract: { findUnique: async () => contract, update: async () => ({}) }, purchaseItem: { create: async ({ data }) => { added = true; return data; }, aggregate: async () => ({ _sum: { totalPrice: 11.3 } }) } });
-    let caught;
-    const res = { status() { return this; }, json() {} };
-    await purchaseController.addItem({ params: { id: 'pc-1' }, body: { productId: 'product-1', quantity: 1, unitPrice: 10 } }, res, (error) => { caught = error; });
-    if (contract === draft) { assert.equal(caught, undefined); assert.equal(added, true); }
-    else { assert.equal(caught?.statusCode, 400); assert.equal(added, false); }
-  }
-});
-
-
-test('getById/getFiles: SALES 看不到采购合同文书附件，ADMIN 可见（OD-8）（R3 P1-2）', async () => {
+test('getById: SALES 看不到采购合同文书附件，ADMIN 可见（OD-8）（R3 P1-2）', async () => {
   const files = ['SIGNED_CONTRACT', 'SUPPLIER_INVOICE', 'SYSTEM_GENERATED_PDF', 'SYSTEM_GENERATED_WORD', 'PRODUCTION_PHOTO', 'OTHER']
     .map((category) => ({ id: category, purchaseContractId: 'pc-1', category, fileName: `${category}.pdf` }));
   const originals = { findUnique: prisma.purchaseContract.findUnique, items: prisma.purchaseItem.findMany, groupBy: prisma.purchaseReceiptItem.groupBy, files: prisma.contractFile.findMany };
@@ -340,13 +269,11 @@ test('getById/getFiles: SALES 看不到采购合同文书附件，ADMIN 可见�
     let payload = null;
     const res = { status: () => res, json: (value) => { payload = value; } };
     await purchaseController[handler]({ params: { id: 'pc-1' }, user: { role } }, res, (error) => { throw error; });
-    return (handler === 'getById' ? payload.data.files : payload.data).map((file) => file.id);
+    return payload.data.files.map((file) => file.id);
   };
   try {
-    for (const handler of ['getById', 'getFiles']) {
-      assert.deepEqual(await call(handler, 'SALES'), ['PRODUCTION_PHOTO', 'OTHER'], `${handler} SALES`);
-      for (const role of ['ADMIN']) assert.equal((await call(handler, role)).length, 6, `${handler} ${role}`);
-    }
+    assert.deepEqual(await call('getById', 'SALES'), ['PRODUCTION_PHOTO', 'OTHER'], 'getById SALES');
+    assert.equal((await call('getById', 'ADMIN')).length, 6, 'getById ADMIN');
   } finally {
     prisma.purchaseContract.findUnique = originals.findUnique;
     prisma.purchaseItem.findMany = originals.items;

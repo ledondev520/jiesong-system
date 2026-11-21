@@ -87,7 +87,7 @@ test('HTTP/SQLite: generic CSV exports retain existing fields and leave business
     database], { encoding: 'utf8', timeout: 10000 }));
   const exportCsv = async (type, audited = false) => {
     const requestId = `synthetic-export-${++sequence}`;
-    const response = await fetch(`${base}${audited ? '/system' : ''}/export/${type}`, {
+    const response = await fetch(`${base}/export/${type}`, {
       headers: { authorization: `Bearer ${token}`, 'x-request-id': requestId },
     });
     const bytes = Buffer.from(await response.arrayBuffer());
@@ -256,31 +256,6 @@ test('HTTP/SQLite: generic CSV exports retain existing fields and leave business
       assert.deepEqual([...bytes.subarray(0, 3)], [0xEF, 0xBB, 0xBF]);
       assert.notEqual(bytes.toString('utf8')[1], '\uFEFF');
       assert.equal(bytes.toString('utf8'), `\uFEFF${headers.join(',')}\r\n`);
-    }
-  });
-
-  await t.test('tax refund CSV downloads add a BOM only when absent', async () => {
-    const service = require('../services/taxRefundExportService');
-    const csv = '合同号,商品\r\nSYN-EXP-001,"中文,商品"\r\n';
-    let result;
-    const stub = t.mock.method(service, 'exportTaxRefunds', async () => result);
-    try {
-      for (const source of [csv, `\uFEFF${csv}`]) {
-        result = { blocked: false, csv: source };
-        const response = await fetch(`${base}/tax-refunds/export?download=1`, {
-          method: 'POST',
-          headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-          body: '{}',
-        });
-        assert.equal(response.status, 200);
-        assert.equal(response.headers.get('content-type'), 'text/csv; charset=utf-8');
-        const bytes = Buffer.from(await response.arrayBuffer());
-        assert.deepEqual([...bytes.subarray(0, 3)], [0xEF, 0xBB, 0xBF]);
-        assert.equal(bytes.toString('utf8'), `\uFEFF${csv}`);
-        assert.equal(result.csv, source, 'download must preserve the service result');
-      }
-    } finally {
-      stub.mock.restore();
     }
   });
 });

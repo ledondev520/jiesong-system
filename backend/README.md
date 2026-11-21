@@ -8,7 +8,7 @@
 
 当前schema使用SQLite。历史VPS运行约定记载于DEPLOY.md，本轮未访问或核实部署。密码找回路由使用锁定express-rate-limit；`TRUSTED_PROXY_CIDRS` 默认空，显式可信IP/CIDR配置及生产一致备份前置条件见 `../docs/security/password-recovery.md`。不要使用固定本地dev.db备份替代生产数据库。
 
-`src/testHelpers/account-name-server.js` 为两个用户页面的普通名称回归提供已提交迁移初始化的私有SQLite/localhost服务，不查询凭据字段或调用外部服务；夹具目录边界见 `src/testHelpers/README.md`，真实HTTP与React执行层级见 `../docs/qa/account-name-lifecycle-2026-10-06.md`。
+`src/testHelpers/account-name-server.js` 为两个用户页面的普通名称回归提供已提交迁移初始化的私有SQLite/localhost服务，不查询凭据字段或调用外部服务；夹具目录边界见 `src/testHelpers/README.md`，真实HTTP与React执行层级见 `../account-name-lifecycle-2026-10-06.md（已删除，见 git 历史）`。
 
 ## 快速开始
 
@@ -53,8 +53,8 @@ npm run test:all          # 依次执行 test → test:db → test:carrier-pdf�
 
 `test:db` 包含 `src/integration/overview-source-readbacks.integration.js` 的三类真实只读概览验收：上海发运期间与销售下钻的 CNY 毛利/净现金、当前所有权应收应付、固定 UTC 收付趋势来源。使用已提交迁移、独立 SQL 字面夹具和全库非变更断言，保留合同汇总余额与逐笔 USD 收款的不同用途；当前 CI 与本地测试统一要求 Node.js 22.23.4+（支持 Date/object-form mock timers），另需 Python 3，不访问现有业务库。
 
-`src/integration/application-audit-readback.integration.js` 验证系统日志实际 HTTP 查询与 CSV：八类关键词/IP、组合日期/角色/实体过滤、分页独立导出、完整旧新值与空用户、中文引号换行及真实生成审计的重复读取。只用已提交迁移、0700/0600 合成 SQLite 与独立只读全表快照；SQLite `contains` 保留既有 LIKE 子串语义，禁止在日志查询中传入不支持的 Prisma `mode`。现有页面只有摘要列表，完整记录经同一列表 DTO 验证，没有新增详情端点；不构成浏览器通过。证据与边界见 [系统日志回归](../docs/quality/application-audit-readback-2026-10-06.md)。
-`ordinary-setting-text.integration.js` 仅验证 `companyName`（原 `invoiceTitleInfo` 已并入公司信息，J35）的合成公司固定文本单键保存、重复保存、实际私有库约束失败、明确重试、清空与独立回读。使用已提交迁移、现有合成 ADMIN 与正常限流/审计，配置表始终只含该普通文本键；不能替代当前含汇率/AI 参数的整表 UI 保存验收。范围说明见 `docs/quality/ordinary-setting-text-20261006.md`。
+`src/integration/application-audit-readback.integration.js` 验证系统日志实际 HTTP 查询与 CSV：八类关键词/IP、组合日期/角色/实体过滤、分页独立导出、完整旧新值与空用户、中文引号换行及真实生成审计的重复读取。只用已提交迁移、0700/0600 合成 SQLite 与独立只读全表快照；SQLite `contains` 保留既有 LIKE 子串语义，禁止在日志查询中传入不支持的 Prisma `mode`。现有页面只有摘要列表，完整记录经同一列表 DTO 验证，没有新增详情端点；不构成浏览器通过。证据与边界见 [系统日志回归](../application-audit-readback-2026-10-06.md（已删除，见 git 历史）)。
+`ordinary-setting-text.integration.js` 仅验证 `companyName`（原 `invoiceTitleInfo` 已并入公司信息，J35）的合成公司固定文本单键保存、重复保存、实际私有库约束失败、明确重试、清空与独立回读。使用已提交迁移、现有合成 ADMIN 与正常限流/审计，配置表始终只含该普通文本键；不能替代当前含汇率/AI 参数的整表 UI 保存验收。范围说明见 `ordinary-setting-text-20261006.md（已删除，见 git 历史）`。
 `test:db` 也包含 `src/integration/email-registration-http.integration.js`：真实 localhost HTTP 发码 200 → 注册 201 → 重放 400，独立安全字段 SQL 回读确认一个未激活 SALES 账号，响应不发 token/Set-Cookie。仅模拟邮件出口，保留真实校验、bcrypt、事务及限流；只创建私有临时合成库，不激活或登录新账号，不覆盖浏览器。
 
 ## 目录结构
@@ -117,7 +117,7 @@ Authorization: Bearer <token>
 - 分配在 SQLite 写锁后的同一事务内校验来源状态和剩余余额，全部成功才写入子记录和合同应收汇总；沿用原有 0.01 金额容差及角色权限，不新增汇率换算
 - 历史到账币种接受既有规范化语义；只把新分配子记录存为 `USD`，不改写历史来源的币种或金额
 - 通用 `POST /finance/payments` 对新的非空 `sourcePaymentId` 明确返回 400，避免跳过分配余额校验。普通未关联到账、直接合同收款和已有幂等键记录的只读重放仍受支持；已有来源关联响应字段保留
-- 隔离实际 HTTP/SQLite 验收及未覆盖范围见 `docs/api-contracts/收款分配链路验收.md`；这只是内部记账，不代表外部汇款或财务审批
+- 隔离实际 HTTP/SQLite 验收及未覆盖范围见 `收款分配链路验收.md（已删除，见 git 历史）`；这只是内部记账，不代表外部汇款或财务审批
 
 #### 1. 数据导入导出
 

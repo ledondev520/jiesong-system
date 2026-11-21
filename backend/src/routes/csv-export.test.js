@@ -55,8 +55,7 @@ test('CSV export routes return UTF-8 BOM bytes and charset without altering cont
     return text.slice(1);
   };
   for (const type of ['suppliers', 'stores', 'products', 'purchases', 'sales', 'containers', 'inventory', 'payments']) {
-    const ordinary = await download(`/export/${type}`);
-    assert.equal(await download(`/system/export/${type}`), ordinary);
+    await download(`/export/${type}`);
   }
   rows.product = [{
     id: 'synthetic-product', customsName: '中文,"商品"', description: '第一行\n第二行',
@@ -76,11 +75,4 @@ test('CSV export routes return UTF-8 BOM bytes and charset without altering cont
   }
   assert.equal(await download('/system/logs/export/csv'),
     '"ID","时间","用户ID","用户名","姓名","动作","实体","实体ID","IP地址","UserAgent","修改前","修改后"');
-  const service = require('../services/taxRefundExportService');
-  const csv = '合同号,商品\r\nSYN-EXP-001,"中文,商品"\r\n';
-  let source;
-  t.mock.method(service, 'exportTaxRefunds', async () => ({ blocked: false, csv: source }));
-  for (source of [csv, `\uFEFF${csv}`]) {
-    assert.equal(await download('/tax-refunds/export?download=1', { method: 'POST' }), csv);
-  }
 });

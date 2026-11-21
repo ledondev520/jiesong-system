@@ -277,16 +277,6 @@ export interface IncomingSummaryResult {
   total: number;
 }
 
-/**
- * 职责：获取银行收入按对手方汇总（应收 fallback）
- */
-export async function getIncomingSummary(): Promise<IncomingSummaryResult> {
-  const res: { data: IncomingSummaryResult } = await api.get(
-    "/bank-flow/incoming-summary",
-  );
-  return res.data;
-}
-
 // ==================== 智能关联引擎 API ====================
 
 export interface UnmatchedItemsResult {

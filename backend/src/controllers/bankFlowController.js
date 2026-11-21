@@ -60,19 +60,6 @@ async function getInvoiceStats(req, res, next) {
 }
 
 /**
- * 职责：按销方汇总发票
- */
-async function getInvoicesBySeller(req, res, next) {
-  try {
-    const { dateFrom, dateTo, limit } = req.query;
-    const data = await invoiceRecordService.groupBySeller({
-      dateFrom, dateTo, limit: limit ? parseInt(limit) : 50,
-    });
-    success(res, data);
-  } catch (err) { next(err); }
-}
-
-/**
  * 职责：获取导入批次列表
  */
 async function listBatches(req, res, next) {
@@ -80,47 +67,6 @@ async function listBatches(req, res, next) {
     const { type } = req.query;
     const batches = await bankFlowService.listBatches(type);
     success(res, batches);
-  } catch (err) { next(err); }
-}
-
-/**
- * 职责：获取指定对方名称的银行流水 + 发票关联汇总
- * 思路：按 counterpart 查银行流水，按 seller 查发票，返回汇总对比
- */
-async function getReconciliation(req, res, next) {
-  try {
-    const { counterpart } = req.query;
-    if (!counterpart) return error(res, '缺少 counterpart 参数', 400);
-
-    // 合计走数据库聚合（精确户名、CNY），与展示用的前 50 行分页无关
-    const [totals, txns, invs, invTotals] = await Promise.all([
-      bankFlowService.getCounterpartTotals({ counterpart, currency: 'CNY' }),
-      bankFlowService.listTransactions({
-        counterpartNames: bankFlowService.counterpartNameVariants(counterpart), currency: 'CNY', page: 1, pageSize: 50,
-      }),
-      invoiceRecordService.listInvoices({ search: counterpart, page: 1, pageSize: 50 }),
-      invoiceRecordService.sumValidInvoices({ search: counterpart }),
-    ]);
-    const { totalPaid, totalReceived } = totals;
-    const { totalInvoice, validInvoiceCount } = invTotals;
-
-    success(res, {
-      counterpart,
-      bankFlow: {
-        items: txns.items.slice(0, 50),
-        totalPaid,
-        totalReceived,
-        netPaid: totalPaid - totalReceived,
-        txnCount: totals.txnCount,
-      },
-      invoices: {
-        items: invs.items.slice(0, 50),
-        totalInvoice,
-        validInvoiceCount,
-        totalRecords: invs.total,
-      },
-      gap: totalPaid - totalReceived - totalInvoice,
-    });
   } catch (err) { next(err); }
 }
 
@@ -150,9 +96,7 @@ module.exports = {
   getTransactionStats,
   listInvoices,
   getInvoiceStats,
-  getInvoicesBySeller,
   listBatches,
-  getReconciliation,
   getFullReconciliation,
   getIncomingSummary,
 };

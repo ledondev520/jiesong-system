@@ -219,12 +219,14 @@ test('assertFileAccess: 财务确认附件权限共享，普通附件不增加�
 });
 
 test('assertFileAccess: 新四单与历史三单归档文件均仅 ADMIN（R3 P1-3，OD-8）', () => {
-  // 守卫在 fileService 里按前缀匹配；描述取自 exportPacketService 的常量，避免测试与实现各写一份字符串（fileService 不能反向 require，会循环）。
-  const { EXPORT_PACKET_DESCRIPTION } = require('./exportPacketService');
-  const packet = { description: `${EXPORT_PACKET_DESCRIPTION}:v1` };
-  for (const action of ['read','write','delete']) {
-    assert.throws(() => fileService.assertFileAccess(packet, { role: 'SALES' }, { action }), error => error.statusCode === 403);
-    assert.doesNotThrow(() => fileService.assertFileAccess(packet, { role: 'ADMIN' }, { action }));
+  // 守卫在 fileService 里按前缀匹配；描述取自 exportPacketMarker 的常量，避免测试与实现各写一份字符串。
+  const { EXPORT_PACKET_DESCRIPTION, LEGACY_EXPORT_PACKET_DESCRIPTION } = require('./exportPacketMarker');
+  for (const base of [EXPORT_PACKET_DESCRIPTION, LEGACY_EXPORT_PACKET_DESCRIPTION]) {
+    const packet = { description: `${base}:v1` };
+    for (const action of ['read','write','delete']) {
+      assert.throws(() => fileService.assertFileAccess(packet, { role: 'SALES' }, { action }), error => error.statusCode === 403);
+      assert.doesNotThrow(() => fileService.assertFileAccess(packet, { role: 'ADMIN' }, { action }));
+    }
   }
 });
 

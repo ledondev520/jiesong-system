@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { copyTemplate } = require('../testHelpers/sqlite-template');
+const { getInventorySnapshot } = require('../services/inventorySnapshot');
 
 test('HTTP/SQLite：WAREHOUSE 异常出库、FIFO、分配边界与角色限制', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-warehouse-test-'));
@@ -101,7 +102,7 @@ test('HTTP/SQLite：WAREHOUSE 异常出库、FIFO、分配边界与角色限制'
     const held = await inspect(b, second, 0, 4);
     assert.equal(held.summary.totals.pendingQuantity, 6);
     assert.equal(held.summary.totals.reinspectionQuantity, 4);
-    const snapshot = await call('GET', '/inventory/snapshot');
+    const snapshot = await getInventorySnapshot(db, { productId: null });
     assert.equal(snapshot.byProduct.find(row => row.productId === products[0].id).availableQuantity, 10);
     assert.equal(snapshot.byProduct.find(row => row.productId === products[1].id)?.availableQuantity || 0, 0);
     const contract = await prepare([packing(products[0], 4, { grossWeight: 10000 }), packing(products[1], 1, { grossWeight: 10000 })]);
@@ -142,8 +143,8 @@ test('HTTP/SQLite：WAREHOUSE 异常出库、FIFO、分配边界与角色限制'
     const row = await db.packingItem.findFirst({ where: { salesContractId: exportContract.id } });
     await call('PUT', `/sales/${exportContract.id}/packing-items/${row.id}`, { unitPrice: 0, note: '合成价格及单证补录' });
     assert.deepEqual(await inventories(), before);
-    assert.equal((await call('GET', `/inventory/contract/${exportContract.id}`)).reduce((sum, row) => sum + row.quantity, 0), 7);
-    assert.equal((await call('GET', `/inventory/snapshot?productId=${products[2].id}`)).byProduct[0].availableQuantity, 3);
+    assert.equal((await db.inventory.findMany({ where: { salesContractId: exportContract.id } })).reduce((sum, row) => sum + row.quantity, 0), 7);
+    assert.equal((await getInventorySnapshot(db, { productId: products[2].id })).byProduct[0].availableQuantity, 3);
   });
 
   await t.test('仓储导入箱数不得超分配，整批失败无部分行；来源库存手工批转拒绝', async () => {
@@ -180,11 +181,11 @@ test('HTTP/SQLite：WAREHOUSE 异常出库、FIFO、分配边界与角色限制'
     await inspect(source, receipt, 10);
     await call('PUT', `/sales/${b.id}/status`, { status: 'SHIPPED' });
     assert.equal((await db.inventory.aggregate({ where: { purchaseItemId: otherSource.items[0].id, status: 'INBOUND' }, _sum: { quantity: true } }))._sum.quantity, 10);
-    assert.equal((await call('GET', `/inventory/contract/${b.id}`)).reduce((sum, row) => sum + row.quantity, 0), 10);
+    assert.equal((await db.inventory.findMany({ where: { salesContractId: b.id } })).reduce((sum, row) => sum + row.quantity, 0), 10);
   });
 
   await t.test('真实 WAREHOUSE 可查库存及到货史，财务证据/退税确认/改权入口拒绝', async () => {
-    for (const url of ['/inventory?lite=true', '/inventory/stats', '/inventory/alerts', `/inventory/product/${products[0].id}`]) await call('GET', url);
+    await call('GET', '/inventory?lite=true');
     for (const [method, url, body] of [
       ['GET', '/users'],
       ['GET', '/finance/statements/evidence/documents'],

@@ -13,16 +13,6 @@
 | check-ui-only.cjs / check-ui-only.test.cjs | CI 工具与回归 | 轻量 UI PR：`ui-only` 模式按 §14.1 清单校验完整 diff（重命名新旧路径、删除均计入，空 diff 失败）；`backend-gate` 模式仅在 diff 全为 UI-only 时输出 `backend_changed=false`，其余及任何错误为 true |
 | check-review-freshness.cjs / check-review-freshness.test.cjs | 复核时效门禁与离线回归 | 本地合并前和 CI 共用 CLI；PR 文件集合取 B0/H、B1/H 两对所有最佳共同祖先（`merge-base --all`）到 H 的 diff 文件并集；检查可信最新评论、head/base 历史和文件交集，保留重命名/复制双路径及改后撤销记录，含交叉合并回归，信息不足则失败 |
 | audit_api_write_success_times.js | 性能审计 | 只对一次性（disposable）后端做写接口成功路径耗时审计；须同时设置 `API_PERF_ALLOW_WRITES`/`API_PERF_DISPOSABLE_DB`/`API_PERF_ISOLATED_FILES=true`、`API_BASE_URL`，以及 `API_PERF_UPLOAD_DIR`（该后端自己的 UPLOAD_DIR，绝对路径且已存在）。该目录真实路径与默认 `backend/uploads`（按脚本位置或调用方 cwd）、`backend/.env` 配置的 UPLOAD_DIR、启动环境 UPLOAD_DIR 相同或互相包含时拒绝运行；残留文件清理只删除该目录真实路径内的普通文件（相对/绝对路径统一做包含检查，拒绝符号链接逃逸，清理前复核根目录身份未被替换；`backend/scripts/perf-upload-cleanup.js`），清理目录不回退 `backend/.env` 或默认目录（`backend/.env` 仅用于拒绝比对）。运行本脚本的 shell 不要设置 `UPLOAD_DIR`（一次性后端在自己的进程环境中设置即可） |
-| fix_export_contracts.js | 数据修复 | 修复出口合同的美元金额 + 创建装箱明细（已修正箱数逻辑） |
-| fix_boxes_data.js | 数据修复 | 修复EXP25合同中被错误填充的箱数数据（置空处理） |
-| import_contracts_data.js | 数据导入 | 导入采购合同数据 |
-| import_declaration_data.js | 数据导入 | 导入报关单数据 |
-| import_export_contracts.js | 数据导入 | 导入出口合同数据 |
-| import_formal_sales_contract_amounts.js | 数据修复 | 从受限 JSON 导入已核验的正式 EXP 美元合同金额并锁定金额来源，防止装箱明细覆盖；默认 dry-run，`--apply` 写库，日志不输出合同金额 |
-| import_prices_from_excel.js | 数据修复 | 从历史发票表补装箱单价和货值；已锁定的正式合同金额保持不变 |
-| extract_contracts.py | 数据提取 | Python脚本，提取合同数据 |
-| extract_export_contracts.py | 数据提取 | 提取出口合同数据 |
-| extract_export_complete.py | 数据提取 | 完整提取出口数据 |
 | extract_wps_purchase_evidence.py | 数据核对 | 从 WPS 采购合同 DOCX/XLSX/PDF 附件抽取供应商、合同头和采购明细；DOCX 图片 CRC 损坏或异常条目导致 `python-docx` 失败时可退回读取正文 XML；PDF 文本合同可抽表格明细和乙方税号/地址/银行信息；对已人工复核的扫描 PDF 保留路径级 OCR 兜底；同合同号签章 PDF 可回填 XLSX 空乙方但不回填税号/地址/银行；无逐项明细但合同头完整时标记 `header_ready_for_import`；生成缺失采购合同差异报告，不写库 |
 | build_supplier_directory.py | 数据核对 | 汇总当前 SQLite 供应商、采购合同证据和本机独有 Word；按合同号/正式名称/唯一税号定位主体，清洗长文本污染候选，输出字段建议、名称差异、来源和 SHA-256 文档去重清单；只写受限 JSON，不回填数据库、不删除外部文件 |
 | import_shipment_summary_incremental.js | 数据导入 | 对受限归档的最新 `出货汇总.xlsx` 做严格 SHA-256 校验，只新增 EXP260010/EXP260011、已裁决的 PENDING 异常占位与对应装箱行；不覆盖现有合同/明细，不把人民币采购金额写成 USD 装箱售价；默认 dry-run，`--apply` 单事务写库 |
@@ -32,8 +22,6 @@
 | verify_tax_refund_invoices.js | 数据核对 | 按出货汇总的发票号码精确查询本地发票记录或税务数字账户导出清单，核验销方、价税合计、品名与状态；只读，输出受限 JSON/CSV，不绕过验证码 |
 | import_tax_refund_customs_xml.js | 数据导入 | 解析海关解密 XML，按报关品名、数量、已有 HS 与已有金额唯一命中装箱明细后，幂等关联报关单和出口合同；XML 合同号错位必须用 `--map` 显式传入业务确认映射；默认 dry-run，不创建退税草稿 |
 | build_tax_refund_declaration_tables.js / build_tax_refund_declaration_tables.test.js | 数据生成与回归 | CLI 适配层：把已核验的 `cases.json` 经 `backend/src/services/taxRefundDeclarationTableService.js` 生成税局格式《进货明细申报表》《出口明细申报表》xlsx 及 `plan.json`、`核对结果.md`；输出目录 0700/文件 0600、拒绝覆盖，脚本自身不打印税号/票号/金额（经 npm 调用须加 `--silent`，否则 npm 会回显含税号的命令行）；只生成核对/填写稿，不联网，不代表已录入、自检或正式申报。回归含参数解析、受限输出、拒绝覆盖与退出码 |
-| merge_export_data.py | 数据合并 | 合并出口数据 |
-| debug_contract.py | 调试工具 | 调试合同数据 |
 
 ## 使用说明
 
@@ -87,17 +75,8 @@ node --test backend/src/services/taxRefundDeclarationTableService.test.js
 
 默认写入 `tmp/tax-refund-declaration-tables/<年月>-<批次>/`，目录权限 `0700`、文件权限 `0600`，目录已存在则拒绝覆盖；脚本自身只显示条数和路径，金额汇总在 `核对结果.md`。经 npm 调用必须带 `--silent`，否则 npm 会把含税号的完整命令行回显到终端。可选 `--overrides`（分批用票，须写原因）、`--used`（历史正式占用台账）、`--as-of`、`--out-dir`，`--help` 查看全部参数。`cases.json` 契约、待核错误码和税局录入后核对步骤见 `docs/operations/出口退税两表生成与录入指引.md`。
 
-### JavaScript 脚本
-```bash
-# 在 backend 目录下执行（需要 Prisma 环境）
-node ../scripts/fix_export_contracts.js
-node ../scripts/fix_boxes_data.js
-```
-
 ### Python 脚本
 ```bash
-python scripts/extract_contracts.py
-
 # 真实凭证抽取需要 pypdf/openpyxl；优先使用 Codex Python，避免系统 Python 缺 PDF 依赖导致 empty_text 假 blocked
 python scripts/extract_wps_purchase_evidence.py
 
@@ -110,29 +89,16 @@ python scripts/extract_wps_purchase_evidence.py
 ```
 
 ## 更新记录
-- 2026-01-26: 修正 fix_export_contracts.js 中的箱数逻辑，新增 fix_boxes_data.js
 
 采购凭据税率解析保留显式 `%/％` 单位（1%→1），仅无百分号的小数按Excel比例换算；PDF和正文提取不得丢失百分号语义。回归：`python3 -m unittest scripts.test_wps_purchase_tax_rate`。
 
 VPS 发布后运行 `node scripts/verify-vps-runtime.cjs https://celerada.link` 核对真实进程与公网构建；其回归检查为 `node --test scripts/verify-vps-runtime.test.cjs`。
-
-## Portable export-packet paths
-
-`prepare_export_packet.py` resolves paths in this order: CLI option, environment variable, repository default.
-
-| Option | Environment variable | Default |
-| --- | --- | --- |
-| `--database` | `JIESONG_EXPORT_DATABASE` | `backend/prisma/dev.db` relative to repository |
-| `--history-root` | `JIESONG_HISTORY_ROOT` | `data/export-history` relative to repository |
-
-Paths support `~`; explicit relative paths resolve against the working directory. The script does not load `.env`.
-Put local history workbooks in the selected directory. An absent/empty history directory gives no historical quotes; it does not fabricate evidence. The SQLite database must already exist. Keep business workbooks and databases outside Git. Pricing formulas are unchanged.
 
 `drill_sqlite_restore.py --directory <不存在的临时目录>` 使用已提交迁移和合成商品/期初库存，调用真实备份恢复CLI并保存独立读回回执。它不访问已有库或.env。详见 `docs/operations/sqlite-backup-restore.md`。
 
 ## 出口报价规则
 
 报价规则只在后端 `services/exportPricing.js` 的 `priceFor()` 实现，配置为 `config/pricing.json`（新结构见 `config/pricing.schema.json`）。
-`prepare_export_packet.py` 的 Python 公式副本已退役，脚本拒绝运行（待负责人确认生产不再使用后删除）；原 `pricing_config.py`、
+`prepare_export_packet.py` 的 Python 公式副本已删除（出口四单只由后端 `exportPacketService.js` 生成）；原 `pricing_config.py`、
 `pricing_snapshot.cjs`、`verify_pricing_defaults.py` 及其测试已删除。运行时 `pricing.json` 由部署保留，旧结构用
 `node backend/scripts/convert-pricing-config.js --file <路径> --spot-rate <现汇>`（默认 dry-run）转换。

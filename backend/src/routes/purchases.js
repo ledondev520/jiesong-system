@@ -10,7 +10,6 @@ const purchaseReceiptController = require('../controllers/purchaseReceiptControl
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, handleValidation } = require('../utils/validators');
-const { upload } = require('../utils/upload');
 const { purchaseExcelUpload } = require('../utils/purchaseExcelUpload');
 const { withAuditLog } = require('../middleware/auditLog');
 const purchaseImportExportController = require('../controllers/purchaseImportExportController');
@@ -96,12 +95,6 @@ router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   purchaseController.remove
 ));
 
-// POST /api/v1/purchases/:id/items - 添加采购明细
-router.post('/:id/items', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
-  { entity: 'PurchaseItem', action: 'CREATE', model: 'purchaseItem' },
-  purchaseController.addItem
-));
-
 // PUT /api/v1/purchases/:id/production-details - 批量保存生产规格、箱数、重量、体积与箱体尺寸
 router.put('/:id/production-details', withIdValidation, roleAuth(ROLE_SETS.ALL), purchaseController.updateProductionDetails);
 
@@ -109,21 +102,6 @@ router.put('/:id/production-details', withIdValidation, roleAuth(ROLE_SETS.ALL),
 router.put('/:id/status', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'PurchaseContract', action: 'UPDATE', model: 'purchaseContract' },
   purchaseController.updateStatus
-));
-
-// POST /api/v1/purchases/:id/files - 上传合同文件
-router.post('/:id/files', withIdValidation, roleAuth(ROLE_SETS.ALL), upload.single('file'), withAuditLog(
-  { entity: 'ContractFile', action: 'CREATE', model: 'contractFile' },
-  purchaseController.uploadFile
-));
-
-// GET /api/v1/purchases/:id/files - 获取合同文件列表
-router.get('/:id/files', withIdValidation, purchaseController.getFiles);
-
-// DELETE /api/v1/purchases/files/:fileId - 删除合同文件
-router.delete('/files/:fileId', roleAuth(ROLE_SETS.ALL), withAuditLog(
-  { entity: 'ContractFile', action: 'DELETE', model: 'contractFile', idParam: 'fileId' },
-  purchaseController.deleteFile
 ));
 
 // GET /api/v1/purchases/files/:fileId/download - 下载合同文件

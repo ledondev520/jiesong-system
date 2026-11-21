@@ -20,10 +20,6 @@ const { attachPurchaseSubStatus } = require('../services/purchaseSubStatusServic
 const { normalizePagination } = require('../utils/pagination');
 const auditLog = require('../utils/auditLog');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
-const { assertPurchaseDraftEditable } = require('../agent/commands/purchase/updatePurchase');
-const { normalizeItem } = require('../agent/commands/purchase/createPurchaseWithItems');
-const contractTemplateService = require('../services/contractTemplateService');
-const { normalizePurchaseTaxRate } = require('../services/purchaseAmountService');
 const {
   assertPurchaseProductionReady,
   evaluatePurchaseProductionReadiness,
@@ -248,26 +244,7 @@ const registerInvoiceNumbers = async (req, res, next) => {
  */
 const create = async (req, res, next) => {
   try {
-    let input = req.body || {};
-
-    // 如果提供了 templateId，合并模板数据
-    if (req.query.templateId) {
-      const template = await contractTemplateService.getById(req.query.templateId);
-      if (template.type !== 'PURCHASE') {
-        throw createError('模板类型不匹配', 400);
-      }
-      const mergedItems = Array.isArray(input.items) && input.items.length > 0
-        ? input.items
-        : (template.items || []);
-      input = {
-        supplierId: input.supplierId || template.supplierId,
-        taxRate: input.taxRate !== undefined ? input.taxRate : template.taxRate,
-        note: input.note || template.note,
-        items: mergedItems,
-        ...input,
-        items: mergedItems,
-      };
-    }
+    const input = req.body || {};
 
     const contract = await createPurchaseWithItems({
       input,
@@ -342,45 +319,6 @@ const remove = async (req, res, next) => {
     });
 
     success(res, null, '采购合同删除成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：添加采购明细
- */
-const addItem = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const data = req.body;
-
-    const item = await prisma.$transaction(async (tx) => {
-      const contract = await tx.purchaseContract.findUnique({
-        where: { id },
-        include: { items: { include: { _count: { select: { inventories: true, packingItems: true, receiptItems: true } } } }, _count: { select: { payments: true, files: true, receipts: true } } },
-      });
-      if (!contract) throw createError('采购合同不存在', 404);
-      assertPurchaseDraftEditable(contract);
-
-      const taxRate = normalizePurchaseTaxRate(contract.taxRate);
-      const createdItem = await tx.purchaseItem.create({
-        data: { purchaseContractId: id, ...normalizeItem(data, 0, taxRate) },
-        include: { product: true },
-      });
-
-      const total = await tx.purchaseItem.aggregate({
-        where: { purchaseContractId: id },
-        _sum: { totalPrice: true },
-      });
-      await tx.purchaseContract.update({
-        where: { id },
-        data: { totalAmount: total._sum.totalPrice || 0 },
-      });
-      return createdItem;
-    });
-    
-    created(res, item, '采购明细添加成功');
   } catch (error) {
     next(error);
   }
@@ -498,85 +436,6 @@ const updateStatus = async (req, res, next) => {
     });
 
     success(res, contract, '状态更新成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：上传合同文件
- * 思路：
- * 1. multer中间件处理文件上传
- * 2. 统一附件服务收紧目录/文件权限后保存文件信息到数据库
- * 3. 返回文件记录
- */
-const uploadFile = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    
-    if (!req.file) {
-      throw createError('请选择要上传的文件', 400);
-    }
-    
-    const contractFile = await fileService.createFile(
-      id,
-      fileService.CONTRACT_TYPE.PURCHASE,
-      req.file,
-      req.body?.description,
-      req.body?.category,
-      req.user,
-    );
-    
-    created(res, contractFile, '文件上传成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：获取合同文件列表
- */
-const getFiles = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    
-    const files = await prisma.contractFile.findMany({
-      where: { purchaseContractId: id },
-      orderBy: { uploadedAt: 'desc' },
-    });
-    
-    success(res, fileService.filterVisibleFiles(files, req.user));
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：删除合同文件
- */
-const deleteFile = async (req, res, next) => {
-  try {
-    const { fileId } = req.params;
-    
-    // 获取文件记录
-    const file = await prisma.contractFile.findUnique({
-      where: { id: fileId },
-    });
-    
-    if (!file) {
-      throw createError('文件不存在', 404);
-    }
-    fileService.assertFileAccess(file, req.user, { action: 'delete' });
-    fileService.assertReceiptPhotoAccess(fileService.CONTRACT_TYPE.PURCHASE, file.category, req.user);
-    
-    // 旧采购入口继续保留物理归档；不改变现有留存约定。
-    
-    // 删除数据库记录
-    await prisma.contractFile.delete({
-      where: { id: fileId },
-    });
-    
-    success(res, null, '文件删除成功');
   } catch (error) {
     next(error);
   }
@@ -782,12 +641,8 @@ module.exports = {
   create,
   update,
   remove,
-  addItem,
   updateProductionDetails,
   updateStatus,
-  uploadFile,
-  getFiles,
-  deleteFile,
   downloadFile,
   getNextContractNo,
   getProductPriceHistory,

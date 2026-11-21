@@ -8,7 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const config = require('../config');
-const { MODELS, estimateTokens, parseInput, generateGreeting } = require('./aiService');
+const { MODELS, estimateTokens, parseInput } = require('./aiService');
 
 /**
  * 职责：临时关闭Kimi配置执行测试
@@ -48,18 +48,6 @@ test('parseInput 在无API Key时走本地解析', async () => {
     assert.equal(typeof result.data.quantity, 'number');
     assert.equal(typeof result.data.unitPrice, 'number');
   });
-});
-
-test('generateGreeting 在测试环境默认走本地降级且输出稳定', async () => {
-  const result = await generateGreeting();
-  assert.equal(result.source, 'local');
-  assert.equal(result.greeting, '每一天都是新的开始！');
-  assert.deepEqual(result.lyrics, [
-    '欢迎使用捷淞进销存系统',
-    'AI助手随时为您服务',
-    '祝您工作顺利',
-    '今天也要加油哦',
-  ]);
 });
 
 test('AI SDK: 单次流请求使用 usage，失败不重试，问候 deadline 覆盖 body', () => {
@@ -107,19 +95,12 @@ test('AI SDK: 单次流请求使用 usage，失败不重试，问候 deadline �
       assert.match(incomplete.content, /超时/);
       assert.equal(calls.length, 1);
       assert.ok(Date.now() - stalledAt >= 450 && Date.now() - stalledAt < 1000);
-      phase = 'greeting'; calls.length = 0;
-      const started = Date.now();
-      const greeting = await ai.generateGreeting();
-      assert.equal(greeting.source, 'local');
-      assert.equal(aborted, true);
-      assert.equal(Object.hasOwn(greetingBody, 'signal'), false);
-      assert.ok(Date.now() - started < 1000);
       console.log('transport checks completed');
     })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { clearTimeout(testDeadline); return prisma.$disconnect(); });
   `;
   const result = spawnSync(process.execPath, ['-e', code], {
     cwd: require('node:path').resolve(__dirname, '../..'),
-    env: { ...process.env, NODE_ENV: 'test', AI_ALLOW_REMOTE: 'true', KIMI_REQUEST_TIMEOUT_MS: '500', KIMI_GREETING_TIMEOUT_MS: '200' },
+    env: { ...process.env, NODE_ENV: 'test', AI_ALLOW_REMOTE: 'true', KIMI_REQUEST_TIMEOUT_MS: '500' },
     encoding: 'utf8', timeout: 5000,
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -165,8 +146,6 @@ test('DeepSeek service: DB 密钥优先、ENV 回退、profile/预算/本地问�
       assert.equal(models.hsCodeModel, 'deepseek-flash');
       const budget = await ai.estimateTokens([{ role: 'user', content: 'synthetic' }]);
       assert.ok(budget.data.total_tokens > 0);
-      assert.equal(calls, 0);
-      assert.equal((await ai.generateGreeting()).source, 'local');
       assert.equal(calls, 0);
       const result = await ai.callAI([{ role: 'user', content: 'synthetic' }], 'moonshot-v1-8k');
       assert.equal(result.content, 'OK');
@@ -226,8 +205,7 @@ test('OpenAI service (mocked transport): env key only, OpenAI body shape, one bo
       assert.ok(Object.values(ai.MODELS).every(model => model === 'synthetic-openai-model'));
       assert.deepEqual(ai.getAIModelOptions(), { model: 'synthetic-openai-model' });
       assert.equal((await ai.estimateTokens([{ role: 'user', content: 'synthetic' }])).data.total_tokens > 0, true);
-      assert.equal((await ai.generateGreeting()).source, 'local');
-      assert.equal(seen.length, 0, 'budget estimate and greeting never call upstream');
+      assert.equal(seen.length, 0, 'budget estimate never calls upstream');
 
       const ok = await ai.callAI([{ role: 'user', content: 'synthetic' }], 'ignored-legacy-model');
       assert.equal(ok.content, 'OK');

@@ -10,7 +10,6 @@ const assert = require('node:assert/strict');
 const customsDeclarationsRouter = require('./customsDeclarations');
 const forexVerificationsRouter = require('./forexVerifications');
 const taxRefundsRouter = require('./taxRefunds');
-const taxRatesRouter = require('./taxRates');
 const indexRouter = require('./index');
 
 const getRouteIndex = (router, path, method) => {
@@ -44,22 +43,15 @@ test('tax modules: forex verifications router exposes CRUD routes', () => {
 test('tax modules: tax refunds router exposes CRUD routes', () => {
   assertCrudRoutes(taxRefundsRouter, 'taxRefunds');
   const autoDraftIndex = getRouteIndex(taxRefundsRouter, '/auto-drafts', 'post');
-  const exportIndex = getRouteIndex(taxRefundsRouter, '/export', 'post');
   const workbenchIndex = getRouteIndex(taxRefundsRouter, '/workbench', 'get');
   const invoiceVerificationIndex = getRouteIndex(taxRefundsRouter, '/workbench/:salesContractId/invoice-verification', 'get');
   const detailIndex = getRouteIndex(taxRefundsRouter, '/:id', 'get');
 
   assert.notEqual(autoDraftIndex, -1, 'taxRefunds 缺少 POST /auto-drafts');
-  assert.notEqual(exportIndex, -1, 'taxRefunds 缺少 POST /export');
   assert.notEqual(workbenchIndex, -1, 'taxRefunds 缺少 GET /workbench');
   assert.notEqual(invoiceVerificationIndex, -1, 'taxRefunds 缺少 GET /workbench/:salesContractId/invoice-verification');
   assert.ok(autoDraftIndex < detailIndex, 'taxRefunds /auto-drafts 必须位于 /:id 之前');
-  assert.ok(exportIndex < detailIndex, 'taxRefunds /export 必须位于 /:id 之前');
   assert.ok(workbenchIndex < detailIndex, 'taxRefunds /workbench 必须位于 /:id 之前');
-});
-
-test('tax modules: tax rates router exposes CRUD routes', () => {
-  assertCrudRoutes(taxRatesRouter, 'taxRates');
 });
 
 test('tax modules: route index mounts all module routers', () => {
@@ -79,8 +71,5 @@ test('tax modules: route index mounts all module routers', () => {
     mountedPaths.some((entry) => entry.includes('tax-refunds')),
     '缺少 /tax-refunds 路由挂载',
   );
-  assert.ok(
-    mountedPaths.some((entry) => entry.includes('tax-rates')),
-    '缺少 /tax-rates 路由挂载',
-  );
+
 });

@@ -25,6 +25,7 @@
 | mobile.spec.ts | 移动验收 | 邮箱验证码注册申请、登录退出、平板桌面、设置菜单及错误恢复 |
 | button-coverage.spec.ts | 交互验收 | 主要页面按钮、弹窗与无运行时异常检查 |
 | smoke.spec.ts | 冒烟验收 | 主要页面与业务入口 |
+| core-flow-steps.spec.ts | 核心流程缺口验收 | 1440px 合成 API：生成采购单、录入生产资料并登记完工、船司装箱单核对、登记到港→完成订单、报关单草稿、退税工作台发票核验与清单确认；步骤对照见下「核心流程 12 步覆盖」 |
 | visual.spec.ts / snapshots | 可选视觉验收 | 平台相关截图，仅在 VISUAL_REGRESSION=1 时运行 |
 | real-export-3d.spec.ts | 真实 SALES 场景验收 | 既有缺尺寸货物的实际绘制、旋转/缩放/平移、响应式尺寸与页签/重载返回，独立 SQLite 零业务写入核对 |
 | real-export-pdf.spec.ts | 真实 SALES 装柜图 PDF 导出验收 | 点击导出 PDF 并取得下载：%PDF 头、<5 MB、每页 MediaBox 为 A4 竖版（595×842±1）、页数≥柜数；真实 DOM 上每个 h3 标题块是断点而其首个表体行不是（引用 containerExport 导出的 PDF_BREAK_SELECTOR，collectBreaks 自身也用它）；再用测试专用 CSS 把单元格撑高到强制分页，断言每个打印页高于一页 A4 且页数>柜数（<caption> 回归只由「找不到 h3」间接拦截，无法读取 JPEG 页内容） |
@@ -55,7 +56,7 @@
 
 - `dashboard-return-context.spec.ts`：390/1440px 实际 Next 路由下的合成只读工作台/经营报表，验证阻塞范围与已应用日期经销售明细返回、Back/Forward 和整页刷新保留，范围快速切换/原生历史、未应用草稿、倒序日期禁用以及全部期间重置。业务写请求拒绝，检查未捕获页面异常；定义与实际浏览器通过情况分别报告。
 
-- `real-dashboard-sources.spec.ts`：两项1440px已挂载工作台验收；每项/重试独占 `dashboard-sources` 已提交迁移0700/0600 SQLite，通过真实 PURCHASE/BOSS 登录和真实 Express 透传，核对待起草2、待补录1、库存记录3、正确最大年月账期、USD825/CNY1350；最近六笔之外的旧合同经阻塞/风险优先出现且取消合同不出现。PURCHASE 点击真正下一步到采购详情，BOSS 点击只读任务到历史销售详情，均要求真实GET200、可见合同号和整页重载；独立只读完整业务/目录/账期/业务审计快照不变且无业务写请求、无未捕获页面异常。只在现有工作台操作，不访问经营执行/报表，也不为未挂载的 ProductTracker 新增入口。`playwright test real-dashboard-sources.spec.ts --list` 只确认两项定义；实际浏览器由既有 hosted CI 执行，不绕过本地 Chromium/loopback 限制。后端独立 HTTP/SQL 来源证据见 `backend/src/testHelpers/role-browser-dashboard.test.js`。
+- `real-dashboard-sources.spec.ts`：两项1440px已挂载工作台验收；每项/重试独占 `dashboard-sources` 已提交迁移0700/0600 SQLite，通过真实 PURCHASE/BOSS 登录和真实 Express 透传，核对待起草2、待补录1、库存记录3、正确最大年月账期、USD825/CNY1350；最近六笔之外的旧合同经阻塞/风险优先出现且取消合同不出现。PURCHASE 点击真正下一步到采购详情，BOSS 点击只读任务到历史销售详情，均要求真实GET200、可见合同号和整页重载；独立只读完整业务/目录/账期/业务审计快照不变且无业务写请求、无未捕获页面异常。只在现有工作台操作，不访问经营执行/报表。`playwright test real-dashboard-sources.spec.ts --list` 只确认两项定义；实际浏览器由既有 hosted CI 执行，不绕过本地 Chromium/loopback 限制。后端独立 HTTP/SQL 来源证据见 `backend/src/testHelpers/role-browser-dashboard.test.js`。
 
 - `real-role-lifecycle.spec.ts` 新增六项1440px FINANCE内部报关/退税表单验收（每种三项）：新建完整草稿经返回取消/刷新/重开零业务与审计写入；真实重复编号拒绝后保留全部输入，纠正编号重试创建一次，整页重载读回及备注编辑保存/重载，报关明细ID不变；已有记录编辑金额/日期/备注后返回取消，重开恢复原始日期与输入。每项独占 `tax-record-forms` 私有迁移SQLite及真实Express，不mock业务响应，独立只读连接核对整条记录与FINANCE审计操作者。退税编辑使用真实API ISO日期以防空白回填。全部保持DRAFT/已退金额0，不调用正式申报、确认、资金结算、导出、上传或外部服务。`playwright test real-role-lifecycle.spec.ts --list --grep='FINANCE (customs|refunds)'` 仅验证六项定义；浏览器执行以既有hosted CI为准。
 
@@ -77,3 +78,24 @@ home-todos.spec.ts：首页待办卡片（合成只读 API，390/1440px），无
 - `landing.spec.ts`：公开落地页 `/`（匿名访客不再被转去登录；CTA 去 `/login`、`/register`；已登录会话转去 `/dashboard`；320/390/1440px 无横向滚动）。
 
 出口定价验收按2026-11-14确认的分档就近取整：订单建议价样例为2000美元，商业四单低价样例为2美元；原有人工价及已保存单据仍保持原值。Excel入口使用原生文件选择/拖放，覆盖扩展名、多文件和大小边界。
+
+## 核心流程 12 步覆盖（A109，清理计划 Phase 0.4）
+
+「覆盖」= 某个 Playwright 用例走到该步骤的主界面动作及其请求。合成 API 只证明页面入口与请求体；后端语义看最后一列。
+
+| # | 步骤 | Playwright 用例 | 后端真实 HTTP/SQLite（非 Playwright） |
+| --- | --- | --- | --- |
+| 1 | 采购 | core-flow-steps（生成采购单）；business-qa、supplier-editor（采购内联新建供应商） | trade-lifecycle、purchase-drafts、procurement-lifecycle |
+| 2 | 订单 | quote-to-order、order-editor、orders、real-sales-header | quote-lifecycle、sales-creation |
+| 3 | 付定金 | payment-roundtrip | trade-lifecycle（定金、幂等重放、尾款） |
+| 4 | 等生产 | core-flow-steps（已签订合同的主动作即「登记完工资料」）；界面没有单独的“开始生产”，SIGNED→PRODUCING 只剩后端兼容状态 | 仅单元级：purchaseStateMachine.test.js、purchaseController.test.js |
+| 5 | 生产完成 | core-flow-steps（生产资料 + 保存并登记完工） | trade-lifecycle、procurement-lifecycle（READY） |
+| 6 | 装柜/发运时机 | real-export-3d、real-export-pdf、home-todos | 仅路由/单元级：routes/sales.test.js、shipmentReadinessService.test.js；发运拒绝见 trade-lifecycle |
+| 7 | 出口四单 | real-menu-export-documents、real-excel-export | trade-lifecycle、tax-preparation-content |
+| 8 | 发运 | real-role-lifecycle（SALES 发运） | trade-lifecycle、sales-cargo-lifecycle |
+| 9 | 装箱/货柜图/船司核对 | real-export-3d、real-export-pdf；core-flow-steps（船司装箱单核对） | trade-lifecycle、carrier-pdf-edges |
+| 10 | 到港、完成 | core-flow-steps（登记到港 → 完成订单） | trade-lifecycle、sales-transition-races、container-bl-no |
+| 11 | 报关草稿 | core-flow-steps（单证 ▾ → 报关单草稿）；手工报关表单 real-role-lifecycle | trade-lifecycle（自动草稿、重复、409） |
+| 12 | 退税工作台、申报表 | core-flow-steps（清单确认、发票核验）；tax-navigation 只核对页签地址 | trade-lifecycle（清单确认、月度导出）；申报表离线生成见 scripts/build_tax_refund_declaration_tables.test.js |
+
+仍然偏薄（本次不改）：步骤 4 的 PRODUCING 真实 HTTP 跳转；步骤 6 的 `GET /sales/:id/loading-plan` 只有 real-export-3d、real-export-pdf 经真实 Express 读取；`invoice-verification` 接口没有真实 HTTP 用例（只有 RBAC 路由测试）。

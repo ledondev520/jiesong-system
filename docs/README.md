@@ -3,82 +3,30 @@
 > 若本文件夹结构或内容变化，请更新本文件。
 
 ## 目的/边界/职责
-- 目的：集中维护进销存系统需求、方案、验收与执行类文档。
-- 边界：仅存放项目文档与索引，不承载业务实现代码。
-- 职责：提供可追溯文档入口，并在文件增删时同步更新清单。
+- 目的：集中维护仍有效的方案、运维手册与契约文档。
+- 边界：仅存放项目文档与索引，不承载业务实现代码。历史计划、QA/验收证据、API 联调台账已于 A115 删除，需要时从 git 历史取回；卡片证据放 PR 描述和队列报告。
+- 职责：文件增删时同步更新本清单。
 
 ## 文件清单
 
-| 文件名 | 地位 | 功能 |
-|--------|------|------|
-| [operations/production-rollback.md](operations/production-rollback.md) | 运维手册 | VPS 生产代码、配置与可选数据库回滚、运行时例外及验收 |
-| [operations/出口退税两表生成与录入指引.md](operations/出口退税两表生成与录入指引.md) | 运维手册 | 用已核验的 `cases.json` 生成税局格式进货/出口明细申报表的命令、数据契约、待核错误码，以及税局录入顺序与保存后核对步骤 |
-| 需求总结_v2.0.md | 核心文档 | 完整的需求规格说明，作为PRD和技术方案的输入 |
-| PRD.md | 核心文档 | 产品需求文档，包含功能清单、用户故事、业务流程 |
-| 技术方案.md | 核心文档 | 技术架构设计、目录结构、API设计、AI集成方案 |
-| 出口退税自动化方案.md | 实施方案 | 核对现有退税链路与官方规则，定义月度批次、线上申报和回执到账的实施顺序及验收条件 |
-| 数据库设计.md | 核心文档 | 数据库Schema设计、Prisma模型、实体关系图 |
-| data-migration/进销存核心数据Schema与迁移蓝图.md | 迁移基线 | 按当前 Prisma 与 SQLite 实存数据说明核心表、供应商—商品链路、目标增量 Schema、数据缺口和迁移顺序 |
-| data-migration/进销存迁移只读质量检查.sql | 校验脚本 | 只读输出迁移前后的表规模、完整性、重复、外键和跨表关联指标 |
-| data-migration/供应商名录与Word文档去重说明.md | 迁移说明 | 记录 Word 合同供应商名录的主体匹配、字段裁决口径和捷淞主目录 SHA-256 去重结论 |
-| 数据导入与清洗方案.md | 核心文档 | CSV历史数据导入方案、清洗规则、异常处理 |
-| 测试样例.md | 开发基线 | 测试先行样例与用例清单 |
-| 模拟数据汇总.md | 追踪清单 | 标记并汇总模拟数据位置 |
-| 前端统一重构验收清单.md | 验收台账 | 记录前端 shadcn/ui 统一重构的验收项与复核命令 |
-| 2026-03-28-ceo-roadmap-upgrade.md | 路线图 | CEO 视角的产品升级路线、30/90 天目标、取舍边界与检查点 |
-| plans/2026-03-29-agent-cli-mcp-ready-design.md | 架构设计 | 定义 Agent 独立账号、命令层、CLI 协议与 MCP-ready 演进路径 |
-| plans/2026-04-04-universal-agent-runtime-v2-design.md | 架构设计 | 将 Agent 下一阶段收口为“一个对外通用主 Agent + 内部路由/工具域”的统一智能体方案 |
-| coverage-98-master-plan.md | 专项总纲 | 定义前端覆盖率提升到 98% 的分阶段路径、门禁与里程碑 |
-| coverage-98-ci-plan.md | CI 方案 | 定义 Coverage `>=98%` 的 CI 门禁切换顺序、前置条件、风险与回退 |
-| 系统架构落地执行方案.md | 执行总纲 | 定义多 Agent 协同的系统架构落地路径、WU清单与门禁 |
-| 可执行里程碑计划.md | 调度清单 | 未来2周按批次可执行的6个里程碑、角色、验证与回滚 |
-| api-contracts/README.md | 子目录索引 | 维护 API 契约子目录导航与职责说明 |
-| api-contracts/采购链路契约.md | 领域契约 | 定义采购链路请求/响应/错误码与示例 |
-| api-contracts/采购链路联调面板.md | 联调台账 | 跟踪采购链路 READY/BLOCKED/DONE 与阻塞解除 |
-| api-contracts/销售链路契约.md | 领域契约 | 定义销售链路请求/响应与装箱接口契约 |
-| api-contracts/销售链路联调面板.md | 联调台账 | 跟踪销售链路 READY/BLOCKED/DONE 与阻塞解除 |
-| api-contracts/库存链路契约.md | 领域契约 | 定义库存查询、状态机与批量状态更新接口契约 |
-| api-contracts/库存链路联调面板.md | 联调台账 | 跟踪库存链路 READY/BLOCKED/DONE 与阻塞解除 |
-| api-contracts/合同附件链路验收.md | 验收矩阵 | 真实 HTTP/SQLite 附件上传、版本留存、旧入口权限与失败清理证据 |
-| quality/README.md | 子目录索引 | 维护质量门禁与发布结论文档导航 |
-| quality/ordinary-setting-text-20261006.md | 聚焦验收 | 既有开票固定文本的单键接口保存、错误留存与重试，组件放弃编辑及整表混合保存的范围边界 |
-| quality/财务工作簿导入回归_20261006.md | 聚焦验收 | 数字公式缓存、空结果兼容、真实财务 XLSX 预览确认回读、替换/回滚和既有角色边界的隔离证据 |
-| quality/HS本地字典回归_20261006.md | 聚焦验收 | 本地名称/编码组合检索缺陷、真实角色证据维护/独立SQLite回读与浏览器定义和执行边界 |
-| quality/application-audit-readback-2026-10-06.md | 聚焦验收 | 系统日志合成应用审计查询/完整记录/CSV、现有角色与SQLite关键词故障修复证据 |
-| qa/purchase-excel-import-2026-10-06.md | 聚焦验收 | 当前采购 Excel 的非法值、错误/无缓存公式单元格、保留缓存值、重传及组件取消/结果/失败恢复证据 |
-| qa/carrier-pdf-edges-2026-10-06.md | 聚焦验收 | 真实多页 PDF、局部商品数量差异、纯图片人工复核及损坏文件拒绝的 HTTP/SQLite、原件归档与准备度证据 |
-| qa/financial-library-source-readbacks-2026-10-06.md | 聚焦验收 | 现有资料库CLI合成来源入库、脱敏/有序行/来源身份回读、空筛选和迟到旧Sheet修复及hosted定义边界 |
-| qa/README.md | 子目录索引 | 维护聚焦QA证据及执行层级 |
-| qa/account-name-lifecycle-2026-10-06.md | 聚焦验收 | 两个人类用户入口的名称取消、后页目录、真实失败保留和重试；明确Agent客户端隔离及浏览器未执行 |
-| quality/发布结论_M5_20260212.md | 发布报告 | 记录 M5 门禁证据、风险评估与 Go/No-Go 结论 |
-| 周节奏指标看板.md | 指标看板 | 追踪每周质量/效率/回归率并给出迭代建议 |
-
-## 文档状态
-- ✅ 需求总结 - 已完成
-- ✅ PRD文档 - 已完成（待审核）
-- ✅ 技术方案 - 已完成（待审核）
-- ✅ 数据库设计 - 已完成（待审核）
-- ✅ 数据导入与清洗方案 - 已完成（待审核）
-- ✅ 测试样例 - 已完成（待审核）
-- ✅ 模拟数据汇总 - 已完成（待审核）
-- ✅ 前端统一重构验收清单 - 已完成
-- ✅ CEO 路线图升级计划 - 已完成
-- ✅ Agent CLI + MCP-ready 架构设计 - 已完成
-- ✅ Frontend Coverage 98 Master Plan - 已完成
-- ✅ Frontend Coverage 98 CI Gate Plan - 已完成
-- ✅ 系统架构落地执行方案 - 已完成
-- ✅ 可执行里程碑计划（V1） - 已完成
-- ✅ 采购链路 API 契约与联调面板 - 已完成（M2）
-- ✅ 库存链路 API 契约与联调面板 - 已完成（M7）
-- ✅ 发布结论（M5）- 已完成（Go）
-- ✅ 周节奏指标看板（V1）- 已完成
-- ✅ Agent Runtime 主链实现 - 已落地代码，当前主要缺口转为文档校正与收口
-- ✅ Universal Agent Runtime V2 方案 - 已完成设计稿，待进入实施拆解
-
-## 下一步
-- 用户审核确认文档
-- Agent 相关文档改为以“实现状态校正”为主：收口 runtime/CLI/MCP 已落地事实、补当前剩余缺口与风险说明
-- 继续收口 Agent 实现与设计文档漂移，重点核对 grant 模型、默认权限口径与深度集成验证
-- 以 `plans/2026-04-04-universal-agent-runtime-v2-design.md` 为下一阶段 Agent 主线：统一到一个对外通用主 Agent，并扩工具面与内部路由
-- 先按 `2026-03-28-ceo-roadmap-upgrade.md` 推进路线图整理与 shell/workspace 升级，再把 `FE-COV-98` 作为护栏继续收口
-- 先按 `coverage-98-ci-plan.md` 处理 coverage 稳定性与门禁切换，再按 `coverage-98-master-plan.md` 执行 FE-COV-98 的 M1-M6
+| 文件 | 地位 | 功能 |
+|------|------|------|
+| `operations/production-rollback.md` | 运维手册 | 生产代码、配置与可选数据库回滚 |
+| `operations/sqlite-backup-restore.md` | 运维手册 | SQLite 备份、恢复与演练 |
+| `operations/archive-test-data.md` | 运维手册 | 测试数据归档 |
+| `operations/export-pricing.md` | 运维手册 | 出口报价规则运维 |
+| `operations/financial-evidence-transfer.md` | 运维手册 | 财务资料跨机迁移 |
+| `operations/出口退税两表生成与录入指引.md` | 运维手册 | 进货/出口明细申报表离线生成与录入 |
+| `security/browser-sessions.md`、`security/password-recovery.md` | 安全说明 | 浏览器会话、密码找回 |
+| `quality/lifecycle-contract.md`（及 `quality/README.md`） | 契约 | 生命周期契约 |
+| `redesign/UX-REDESIGN-2026.md` | 规格 | UX 重设计（AGENTS.md §14 引用） |
+| `redesign/DATA-MODEL-2026.md`、`数据库设计.md` | 数据模型 | 两份数据模型文档，以 `schema.prisma` 为准 |
+| `migration/catalog-import.md` | 迁移 | 商品目录导入 |
+| `container-loading/AUDIT-2026-10.md` | 审计 | 排柜审计 |
+| `brand/BRAND-ASSETS.md` | 品牌 | 品牌资源说明 |
+| `出口清单快速制单SOP.md`、`出口退税自动化方案.md`、`购销合同模板说明.md` | 业务说明 | 制单 SOP、退税方案、合同模板 |
+| `技术方案.md`、`API文档.md` | 方案 | 第一阶段后更新或删除 |
+| `系统简化方案.md` | 已被取代 | 见文件首行 |
+| `greenfield/`、`money-minor-units-plan.md`、`可执行里程碑计划.md` | 待负责人确认 | 是否仍在使用；否则删除 |
+| `供应商名录.md`、`采购合同明细.md`、`wps-import-decision-memo.md` | 受限（OD-12） | 按 OD-12 保持原样，勿修改 |
+| `system-overview.html` | 概览 | 系统概览页 |

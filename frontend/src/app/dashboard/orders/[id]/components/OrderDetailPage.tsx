@@ -63,11 +63,6 @@ import { OrderDocsMenu, type OrderDocAction } from "./OrderDocsMenu";
 import { OrderRefundTab } from "./OrderRefundTab";
 import { DetailSkeleton } from "@/components/ui/detail-skeleton";
 
-const GenerateThreeFormsDialog = lazy(() =>
-  import("@/components/dialog/GenerateThreeFormsDialog").then((module) => ({
-    default: module.GenerateThreeFormsDialog,
-  })),
-);
 const ExportPacketWorkbenchDialog = lazy(() =>
   import("@/components/dialog/ExportPacketWorkbenchDialog").then((module) => ({
     default: module.ExportPacketWorkbenchDialog,
@@ -158,7 +153,6 @@ export function OrderDetailPage({ id }: { id: string }) {
     SalesContract["status"] | null
   >(null);
   const [dialog, setDialog] = useState<
-    | "threeForms"
     | "exportPacket"
     | "packingCheck"
     | "taxPreparation"
@@ -273,15 +267,6 @@ export function OrderDetailPage({ id }: { id: string }) {
 
   const runDocAction = async (action: OrderDocAction) => {
     if (!contract) return;
-    if (action === "exportWorkbook") {
-      try {
-        await salesService.exportExcel(contract.id, contract.contractNo);
-        toast.success("出口工作簿已导出");
-      } catch (error: unknown) {
-        toast.error(errorMessage(error, "导出出口工作簿失败"));
-      }
-      return;
-    }
     if (action === "customsDraft") {
       try {
         const response = await customsDeclarationService.generateDrafts({
@@ -464,7 +449,6 @@ export function OrderDetailPage({ id }: { id: string }) {
             contract={contract}
             files={contractFiles}
             onFilesChange={setContractFiles}
-            onResolveHs={() => setDialog("threeForms")}
           />
         </TabsContent>
 
@@ -496,18 +480,6 @@ export function OrderDetailPage({ id }: { id: string }) {
       </Tabs>
 
       <Suspense fallback={null}>
-        {dialog === "threeForms" && (
-          <GenerateThreeFormsDialog
-            open
-            onOpenChange={closeDialog}
-            salesContract={contract}
-            onGenerated={(results) => {
-              if (results.customsDeclarationId) toast.success("报关单已生成");
-              if (results.forexId) toast.success("外汇核销单已生成");
-              if (results.taxRefundId) toast.success("出口退税单已生成");
-            }}
-          />
-        )}
         {dialog === "exportPacket" && (
           <ExportPacketWorkbenchDialog
             open

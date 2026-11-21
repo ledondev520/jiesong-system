@@ -68,8 +68,6 @@ const mockInventoryGetAll = vi.fn();
 const mockApiGet = vi.fn();
 const mockApiDelete = vi.fn();
 const mockToastError = vi.fn();
-const mockExportPdf = vi.fn();
-const mockExportExcel = vi.fn();
 const mockUpdateSalesStatus = vi.fn();
 const mockUpdateSales = vi.fn();
 const mockForexRender = vi.fn();
@@ -105,8 +103,6 @@ vi.mock("@/services/sales.service", () => ({
     addPackingItem: vi.fn(),
     updatePackingItem: vi.fn(),
     removePackingItem: vi.fn(),
-    exportPdf: (...args: unknown[]) => mockExportPdf(...args),
-    exportExcel: (...args: unknown[]) => mockExportExcel(...args),
     updateStatus: (...args: unknown[]) => mockUpdateSalesStatus(...args),
   },
 }));
@@ -146,11 +142,6 @@ vi.mock("sonner", () => ({
 
 vi.mock("@/components/container/Container3DView", () => ({
   default: () => <div>3D容器视图</div>,
-}));
-
-vi.mock("@/components/dialog/GenerateThreeFormsDialog", () => ({
-  GenerateThreeFormsDialog: ({ open }: { open: boolean }) =>
-    open ? <div>申报三表 HS 处理区</div> : null,
 }));
 
 vi.mock("@/components/dialog/ExportPacketWorkbenchDialog", () => ({
@@ -215,8 +206,6 @@ describe("OrderDetailPage 交互逻辑", () => {
     mockApiGet.mockReset();
     mockApiDelete.mockReset();
     mockToastError.mockReset();
-    mockExportPdf.mockReset();
-    mockExportExcel.mockReset();
     mockUpdateSalesStatus.mockReset();
     mockUpdateSales.mockReset();
     mockForexRender.mockReset();
@@ -463,33 +452,7 @@ describe("OrderDetailPage 交互逻辑", () => {
     });
   });
 
-  it("详情页可直接导出标准出口工作簿", async () => {
-    mockGetById.mockResolvedValue({
-      data: {
-        id: "s-1",
-        contractNo: "EXP260008",
-        status: "PACKING",
-        totalBoxes: 1,
-        volume: 60,
-        grossWeight: 1000,
-        totalAmount: 100,
-        packingItems: [],
-        port: { name: "Oakland" },
-      },
-    });
-    mockExportExcel.mockResolvedValue(undefined);
-    const user = userEvent.setup();
-    renderPage("s-1");
-
-    await user.click(await screen.findByRole("button", { name: "单证" }));
-    await user.click(
-      await screen.findByRole("menuitem", { name: "导出出口工作簿" }),
-    );
-
-    expect(mockExportExcel).toHaveBeenCalledWith("s-1", "EXP260008");
-  });
-
-  it("「单证 ▾」菜单区分生成出口四单与申报三表入口", async () => {
+  it("「单证 ▾」菜单只有出口四单、报关草稿与装箱核对", async () => {
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -510,10 +473,7 @@ describe("OrderDetailPage 交互逻辑", () => {
 
     await user.click(await screen.findByRole("button", { name: "单证" }));
     expect(
-      await screen.findByRole("menuitem", { name: /申报三表/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("menuitem", { name: "船司装箱单核对" }),
+      await screen.findByRole("menuitem", { name: "船司装箱单核对" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("menuitem", { name: "报关单草稿" }),
@@ -525,11 +485,11 @@ describe("OrderDetailPage 交互逻辑", () => {
       screen.queryByRole("button", { name: "出口四单工作台" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "生成申报三表" }),
+      screen.queryByRole("menuitem", { name: /申报三表|导出出口工作簿/ }),
     ).not.toBeInTheDocument();
   });
 
-  it("报关汇总明确警示缺失 HS 编码的装箱商品并提供处理入口", async () => {
+  it("报关汇总明确警示缺失 HS 编码的装箱商品", async () => {
     mockGetById.mockResolvedValue({
       data: {
         id: "s-1",
@@ -573,11 +533,6 @@ describe("OrderDetailPage 交互逻辑", () => {
       screen.getByText("仍有 1 项装箱商品未匹配 HS 编码"),
     ).toBeInTheDocument();
     expect(screen.getByText("未匹配：隔断")).toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole("button", { name: "处理未匹配 HS 编码" }),
-    );
-    expect(await screen.findByText("申报三表 HS 处理区")).toBeInTheDocument();
   });
 
   it("报关汇总不会把相同 HS 编码的不同商品合并成一行", async () => {

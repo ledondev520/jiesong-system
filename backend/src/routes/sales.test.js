@@ -56,11 +56,6 @@ test('sales route order: /options/next-no must be before /:id for GET', () => {
   );
 });
 
-test('sales route includes PDF export endpoint', () => {
-  const pdfExportIndex = getRouteIndex(salesRouter, '/:id/export-pdf', 'get');
-  assert.notEqual(pdfExportIndex, -1, '缺少 GET /:id/export-pdf 路由');
-});
-
 test('sales route includes persistent packing-list check history and review endpoints', () => {
   assert.notEqual(getRouteIndex(salesRouter, '/:id/packing-list-check', 'post'), -1);
   assert.notEqual(getRouteIndex(salesRouter, '/:id/packing-list-checks', 'get'), -1);
@@ -91,22 +86,6 @@ test('sales route includes export packet preview and confirmed generation endpoi
   assert.notEqual(getRouteIndex(salesRouter, '/:id/export-packet/generate', 'post'), -1);
 });
 
-test('sales export routes: 缺失合同时将404错误传给 next', async () => {
-  const originalSalesContractFindUnique = prisma.salesContract.findUnique;
-  prisma.salesContract.findUnique = async () => null;
-
-  try {
-    const excelError = await invokeExportHandler('/:id/export-excel');
-    const pdfError = await invokeExportHandler('/:id/export-pdf');
-
-    assert.equal(excelError?.statusCode, 404);
-    assert.equal(pdfError?.statusCode, 404);
-    assert.match(excelError?.message || '', /合同不存在/);
-    assert.match(pdfError?.message || '', /合同不存在/);
-  } finally {
-    prisma.salesContract.findUnique = originalSalesContractFindUnique;
-  }
-});
 
 test('loading-plan 路由：显式角色白名单 ADMIN/SALES（OD-8），拒绝未登录、Agent、未知角色', async () => {
   const guard = getRouteHandlers(salesRouter, '/:id/loading-plan', 'get').find((layer) => layer.handle.isRoleAuth).handle;

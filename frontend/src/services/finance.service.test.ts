@@ -26,20 +26,6 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("financeService", () => {
-  it("getPayments: 传递查询参数", async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
-
-    await financeService.getPayments({
-      page: 1,
-      pageSize: 20,
-      type: PaymentType.PAYABLE,
-    });
-
-    expect(api.get).toHaveBeenCalledWith("/finance/payments", {
-      params: { page: 1, pageSize: 20, type: "PAYABLE" },
-    });
-  });
-
   it("createPayment: 提交新增数据", async () => {
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
     const payload = {

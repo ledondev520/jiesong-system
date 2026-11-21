@@ -112,24 +112,6 @@ router.get('/search', async (req, res, next) => {
  * 思路：先检查 HSCIQ 可用性，调用 getCodeDetail 返回完整信息
  * GET /api/hs-codes/hsciq-detail/:code
  */
-router.get('/hsciq-detail/:code', async (req, res, next) => {
-  try {
-    if (!(await isHsciqToggleOn())) {
-      throw createError('HSCIQ API 未启用，请在系统设置中开启', 403);
-    }
-    if (!hsciqService.isAvailable()) {
-      throw createError('HSCIQ 服务未配置', 503);
-    }
-    if (!hsciqService.hasQuota()) {
-      throw createError('HSCIQ 今日调用额度已用完', 429);
-    }
-    const detail = await hsciqService.getCodeDetail(req.params.code, req.query.country || 'CN');
-    success(res, detail);
-  } catch (error) {
-    next(error);
-  }
-});
-
 /**
  * 职责：获取 HSCIQ API 使用统计（今日调用量、剩余配额）
  * GET /api/hs-codes/hsciq-usage

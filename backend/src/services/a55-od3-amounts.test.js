@@ -5,7 +5,6 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const ExcelJS = require('exceljs');
 const prisma = require('../utils/prisma');
 
 const stubPrisma = (t, delegate, name, impl) => {
@@ -30,17 +29,6 @@ test('OD-3：CSV 导出 WAREHOUSE 无金额列，其余角色保留', async (t) 
   assert.doesNotMatch(wh, /1234|321/);
   assert.match(wh, /EXP-1/);
   assert.match(wh, /CONFIRMED/);
-});
-
-test('OD-3：PDF 导出行 WAREHOUSE 无 Total/Received/Outstanding', async (t) => {
-  stubPrisma(t, prisma.salesContract, 'findMany', async () => CONTRACTS);
-  const { exportSystemDataRows } = require('./pdfExportService');
-  const full = await exportSystemDataRows('sales', {}, { includeMoney: true });
-  assert.deepEqual(full.headers.slice(0, 4), ['Contract No.', 'Total', 'Received', 'Outstanding']);
-  const wh = await exportSystemDataRows('sales', {}, { includeMoney: false });
-  assert.deepEqual(wh.headers, ['Contract No.', 'Exchange Rate', 'Status', 'Signed At']);
-  assert.equal(wh.rows[0].length, wh.headers.length);
-  assert.ok(!JSON.stringify(wh.rows).includes('1,234') && !JSON.stringify(wh.rows).includes('1234'));
 });
 
 test('OD-3：GetExportOverview 仅对 WAREHOUSE 去掉 totalAmount/receivedAmount', async (t) => {
@@ -104,30 +92,6 @@ test('OD-3：GET /sales 列表控制器对 WAREHOUSE 去掉金额字段', async 
   assert.match(JSON.stringify(await run('ADMIN')), /totalAmount/);
 });
 
-test('A3：出口合同 Excel 的总额/已收/未收用 B87 口径（扣除第三方货值，已收封顶）', async (t) => {
-  stubPrisma(t, prisma.salesContract, 'findUnique', async () => ({
-    id: 'c1', contractNo: 'EXP-0020', status: 'CONFIRMED', exchangeRate: 7.2, amountSource: 'DERIVED',
-    totalAmount: 190, receivedAmount: 500, totalBoxes: 1, port: { name: 'LA' }, items: [],
-    packingItems: [
-      { id: 'a', productId: 'p1', quantity: 1, unit: '箱', boxes: 1, unitPrice: 150, totalPrice: 150, isOwnedByJiesong: true, note: '', product: { id: 'p1', customsName: 'x' }, store: null },
-      { id: 'b', productId: 'p2', quantity: 1, unit: '箱', boxes: 1, unitPrice: 40, totalPrice: 40, isOwnedByJiesong: false, note: '拼船', product: { id: 'p2', customsName: 'y' }, store: null },
-    ],
-  }));
-  stubPrisma(t, prisma.customsDeclarationItem, 'findMany', async () => []);
-  stubPrisma(t, prisma.hsCode, 'findMany', async () => []);
-  stubPrisma(t, prisma.taxRate, 'findMany', async () => []);
-  const { exportSalesContractExcel } = require('./exportService');
-  const { buffer } = await exportSalesContractExcel('c1');
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer);
-  const sheet = wb.getWorksheet('合同信息');
-  const byField = {};
-  sheet.eachRow((row) => { byField[row.getCell(1).value] = row.getCell(2).value; });
-  assert.equal(byField['总金额 (USD)'], '$150.00'); // 190 − 第三方 40
-  assert.equal(byField['已收金额 (USD)'], '$150.00'); // 500 封顶到自有额
-  assert.equal(byField['未收金额 (USD)'], '$0.00'); // 原式 190−500 = −310
-});
-
 test('OD-3/OD-6：GET /sales/:id 对 WAREHOUSE 去掉合同总额、已收金额与收款记录，状态保留', async (t) => {
   const salesService = require('./salesService');
   stubPrisma(t, salesService, 'getSalesContractById', async () => ({
@@ -150,13 +114,11 @@ test('A63：导出 includeMoney 缺省即无金额（fail closed）', async (t) 
   stubPrisma(t, prisma.salesContract, 'findMany', async () => CONTRACTS);
   stubPrisma(t, prisma.purchaseContract, 'findMany', async () => []);
   const { exportData } = require('./exportService');
-  const { exportSystemDataRows } = require('./pdfExportService');
   assert.doesNotMatch((await exportData('sales', {})).data, /总金额|1234/);
   assert.doesNotMatch((await exportData('purchases', {})).data, /总金额|已付金额/);
-  assert.deepEqual((await exportSystemDataRows('sales', {})).headers, ['Contract No.', 'Exchange Rate', 'Status', 'Signed At']);
 });
 
-test('A63：销售列表 CSV/PDF 对 DERIVED 合同扣除第三方装箱货值（B87 口径）', async (t) => {
+test('A63：销售列表 CSV 对 DERIVED 合同扣除第三方装箱货值（B87 口径）', async (t) => {
   const derived = {
     ...CONTRACTS[0], totalAmount: 1000, receivedAmount: 300, amountSource: 'DERIVED',
     packingItems: [
@@ -166,11 +128,8 @@ test('A63：销售列表 CSV/PDF 对 DERIVED 合同扣除第三方装箱货值�
   };
   stubPrisma(t, prisma.salesContract, 'findMany', async () => [derived]);
   const { exportData } = require('./exportService');
-  const { exportSystemDataRows } = require('./pdfExportService');
   const csv = (await exportData('sales', {}, { includeMoney: true })).data.split('\n')[1].replace(/"/g, '').split(',');
   assert.deepEqual(csv.slice(1, 4).map(Number), [700, 300, 400]);
-  const pdf = (await exportSystemDataRows('sales', {}, { includeMoney: true })).rows[0];
-  assert.deepEqual(pdf.slice(1, 4), ['700.00', '300.00', '400.00']);
 });
 
 test('A69/A63-F1：采购 Excel 导出 includeMoney 缺省即无总金额列（fail closed）', async (t) => {
@@ -191,7 +150,7 @@ test('A69/A63-F1：采购 Excel 导出 includeMoney 缺省即无总金额列（f
   assert.equal((await read({ includeMoney: true }))['总金额'], 98765);
 });
 
-test('A69/A63-F3：销售列表导出已收封顶到自有额（owned 600 / received 900），CSV 与 PDF 一致', async (t) => {
+test('A69/A63-F3：销售列表导出已收封顶到自有额（owned 600 / received 900），CSV 口径', async (t) => {
   const capped = {
     ...CONTRACTS[0], totalAmount: 1000, receivedAmount: 900, amountSource: 'DERIVED',
     packingItems: [
@@ -201,9 +160,6 @@ test('A69/A63-F3：销售列表导出已收封顶到自有额（owned 600 / rece
   };
   stubPrisma(t, prisma.salesContract, 'findMany', async () => [capped]);
   const { exportData } = require('./exportService');
-  const { exportSystemDataRows } = require('./pdfExportService');
   const csv = (await exportData('sales', {}, { includeMoney: true })).data.split('\n')[1].replace(/"/g, '').split(',');
   assert.deepEqual(csv.slice(1, 4).map(Number), [600, 600, 0]);
-  const pdf = (await exportSystemDataRows('sales', {}, { includeMoney: true })).rows[0];
-  assert.deepEqual(pdf.slice(1, 4), ['600.00', '600.00', '0.00']);
 });

@@ -8,7 +8,7 @@
 const ROLES = {
   // OD-8 (owner, 2026-11-11): PURCHASE, FINANCE, WAREHOUSE and BOSS are retired.
   ADMIN: 'ADMIN',       // 管理员：全部可见
-  SALES: 'SALES',       // 销售：资料/合同/采购录入，不看财务
+  SALES: 'SALES',       // 普通用户（OD-21：仅界面标签，存储值不变）：资料/合同/采购录入，不看财务
 };
 
 // 采购状态
@@ -43,14 +43,6 @@ const INVENTORY_STATUS = {
   OUTBOUND: 'OUTBOUND',   // 已出库
 };
 
-// 货柜状态
-const CONTAINER_STATUS = {
-  PENDING: 'PENDING',   // 待装柜
-  LOADING: 'LOADING',   // 装柜中
-  SHIPPED: 'SHIPPED',   // 已发运
-  ARRIVED: 'ARRIVED',   // 已到达
-};
-
 // 付款类型
 const PAYMENT_TYPE = {
   PAYABLE: 'PAYABLE',       // 应付（付给供应商）
@@ -82,7 +74,6 @@ module.exports = {
   PURCHASE_STATUS,
   SALES_STATUS,
   INVENTORY_STATUS,
-  CONTAINER_STATUS,
   PAYMENT_TYPE,
   NOTIFICATION_TYPE,
   IMPORT_STATUS,

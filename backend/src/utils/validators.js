@@ -63,11 +63,6 @@ const validateResetPassword = [
   body('code').isString().bail().matches(/^\d{6}$/).withMessage('请输入6位验证码'),
   passwordRule('newPassword'),
 ];
-const validateChangePassword = [
-  body('oldPassword').isString().bail().notEmpty().withMessage('请输入原密码'),
-  passwordRule('newPassword'),
-];
-
 /**
  * 复用分页参数校验链。
  */
@@ -91,7 +86,6 @@ module.exports = {
   validateLogin,
   validateRegister,
   validateResetPassword,
-  validateChangePassword,
   passwordRule,
   emailRule,
   withPaginationValidation,

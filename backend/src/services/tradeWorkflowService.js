@@ -155,24 +155,24 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisatio
   const procurementStage = purchaseContractNos.length === 0
     ? {
         key: 'procurement', label: '采购签约', status: 'blocked', reason: '装箱明细未关联购销合同',
-        action: { label: '关联购销合同', href: `/dashboard/sales/${salesContract.id}` },
+        action: { label: '关联购销合同', href: `/dashboard/orders/${salesContract.id}` },
       }
     : purchaseReferenceNotes.length > 0
       ? {
           key: 'procurement', label: '采购签约', status: 'blocked',
           reason: `采购引用填写为备注（${purchaseReferenceNotes.join('、')}），请补充正式合同号`,
-          action: { label: '补充采购合同号', href: `/dashboard/sales/${salesContract.id}` },
+          action: { label: '补充采购合同号', href: `/dashboard/orders/${salesContract.id}` },
         }
     : combinedPurchaseReferences.length > 0
       ? {
           key: 'procurement', label: '采购签约', status: 'blocked',
           reason: `多个采购合同号混写（${combinedPurchaseReferences.join('、')}），需明确明细分配`,
-          action: { label: '核对采购合同分配', href: `/dashboard/sales/${salesContract.id}` },
+          action: { label: '核对采购合同分配', href: `/dashboard/orders/${salesContract.id}` },
         }
     : missingPurchaseNos.length > 0
       ? {
           key: 'procurement', label: '采购签约', status: 'blocked', reason: `找不到购销合同 ${missingPurchaseNos.join('、')}`,
-          action: { label: '修正合同关联', href: `/dashboard/sales/${salesContract.id}` },
+          action: { label: '修正合同关联', href: `/dashboard/orders/${salesContract.id}` },
         }
       : !allPurchasesSigned
         ? {
@@ -229,17 +229,17 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisatio
     const firstCode = check.blockers[0].code;
     loadingStage = {
       key: 'loading', label: '排柜与出货', status: 'blocked', reason: check.headline,
-      action: { label: LOADING_ACTIONS[firstCode] || '调整排柜', href: `/dashboard/sales/${salesContract.id}` },
+      action: { label: LOADING_ACTIONS[firstCode] || '调整排柜', href: `/dashboard/orders/${salesContract.id}` },
     };
   } else if (check.ready) {
     loadingStage = {
       key: 'loading', label: '排柜与出货', status: 'current', reason: '利用率达标且全部箱件可装下',
-      action: { label: '确认发运', href: `/dashboard/sales/${salesContract.id}` },
+      action: { label: '确认发运', href: `/dashboard/orders/${salesContract.id}` },
     };
   } else {
     loadingStage = {
       key: 'loading', label: '排柜与出货', status: 'current', reason: check.headline,
-      action: { label: '继续排柜', href: `/dashboard/sales/${salesContract.id}` },
+      action: { label: '继续排柜', href: `/dashboard/orders/${salesContract.id}` },
     };
   }
 
@@ -260,7 +260,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisatio
       : {
           key: 'documents', label: '出口单证', status: 'current',
           reason: `待处理：${[!hasDeclaration && '申报三表', !packingListCheckPassed && packingListCheckGap].filter(Boolean).join('、')}`,
-          action: { label: '完善出口单证', href: `/dashboard/sales/${salesContract.id}` },
+          action: { label: '完善出口单证', href: `/dashboard/orders/${salesContract.id}` },
         };
 
   const invoiceStage = invoicesComplete
@@ -280,7 +280,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisatio
           key: 'tax-refund', label: '退税准备', status: 'current',
           reason: prepareOn ? `${prepareOn} 为内部准备提醒；法定期限以当前税务规则和申报期为准` : '内部准备提醒待生成',
           prepareOn,
-          action: { label: '检查退税材料', href: `/dashboard/sales/${salesContract.id}` },
+          action: { label: '检查退税材料', href: `/dashboard/orders/${salesContract.id}` },
         };
 
   const financeStage = allPurchasesPaid && receivableComplete
@@ -288,7 +288,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisatio
     : {
         key: 'finance', label: '财务结清', status: salesRank >= SALES_RANK[SALES_STATUS.SHIPPED] ? 'current' : 'pending',
         reason: `采购${paymentUnverifiedPurchase ? '付款待核验' : allPurchasesPaid ? '已付清' : '未付清'}，货款${receivableComplete ? '已收齐' : '未收齐'}`,
-        action: { label: '查看收付与单柜毛利', href: `/dashboard/sales/${salesContract.id}` },
+        action: { label: '查看收付与单柜毛利', href: `/dashboard/orders/${salesContract.id}` },
       };
 
   const stages = [
@@ -338,7 +338,7 @@ const buildTradeWorkflow = (salesContract, purchaseMap = new Map(), { utilisatio
     stages,
     completedStageCount: stages.filter((stage) => stage.status === 'completed').length,
     stageCount: stages.length,
-    nextAction: nextStage?.action || { label: '查看专项单', href: `/dashboard/sales/${salesContract.id}` },
+    nextAction: nextStage?.action || { label: '查看专项单', href: `/dashboard/orders/${salesContract.id}` },
     issues,
     readiness,
     finance: {

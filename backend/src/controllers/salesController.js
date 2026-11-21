@@ -8,7 +8,6 @@ const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const { createError } = require('../middleware/errorHandler');
 const salesService = require('../services/salesService');
-const contractTemplateService = require('../services/contractTemplateService');
 const auditLog = require('../utils/auditLog');
 const packingListCheckService = require('../services/packingListCheckService');
 const fileService = require('../services/fileService');
@@ -55,34 +54,7 @@ const getLoadingPlan = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    let data = req.body || {};
-    let template = null;
-
-    // 如果提供了 templateId，合并模板数据
-    if (req.query.templateId) {
-      template = await contractTemplateService.getById(req.query.templateId);
-      if (template.type !== 'SALES') {
-        throw createError('模板类型不匹配', 400);
-      }
-      data = {
-        exchangeRate: data.exchangeRate !== undefined ? data.exchangeRate : template.items?.[0]?.exchangeRate,
-        note: data.note || template.note,
-        ...data,
-      };
-    }
-
-    // 模板明细与表头一并创建；不能在表头提交后留下部分明细。
-    if (template && template.items && template.items.length > 0) {
-      data.items = data.items ?? template.items.map(item => ({
-        productId: item.productId,
-        storeId: item.storeId,
-        quantity: item.quantity,
-        unit: item.unit,
-        costPrice: item.costPrice,
-        sellingPrice: item.sellingPrice,
-        note: item.note,
-      }));
-    }
+    const data = req.body || {};
 
     const contract = await salesService.createSalesContract(data, {
       idempotencyKey: req.headers?.['x-idempotency-key'],
@@ -108,15 +80,6 @@ const remove = async (req, res, next) => {
   try {
     await salesService.removeSalesContract(req.params.id);
     success(res, null, '出口合同删除成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-const addItem = async (req, res, next) => {
-  try {
-    const item = await salesService.addSalesItem(req.params.id, req.body || {});
-    created(res, item, '销售明细添加成功');
   } catch (error) {
     next(error);
   }
@@ -188,24 +151,6 @@ const getNextContractNo = async (req, res, next) => {
   }
 };
 
-// 带 items 时返回订单整体利润率预览（只提示）；否则按单个成本（可带 productId 取分类加价）给推荐单价。
-const calculatePrice = async (req, res, next) => {
-  try {
-    const body = req.body || {};
-    const result = body.items !== undefined
-      ? await salesService.previewOrderMargin({ exchangeRate: body.exchangeRate, items: body.items })
-      : await salesService.calculateProductSellingPrice({
-        productId: typeof body.productId === 'string' ? body.productId : undefined,
-        costPrice: body.costPrice,
-        exchangeRate: body.exchangeRate,
-        profitRate: body.profitRate,
-      });
-    success(res, result);
-  } catch (error) {
-    next(error);
-  }
-};
-
 const addPackingItem = async (req, res, next) => {
   try {
     const item = await salesService.addPackingItem(req.params.id, req.body || {});
@@ -270,29 +215,6 @@ const removePackingItem = async (req, res, next) => {
   }
 };
 
-const uploadFile = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    if (!req.file) {
-      throw createError('请选择要上传的文件', 400);
-    }
-
-    const contractFile = await fileService.createFile(
-      id,
-      fileService.CONTRACT_TYPE.SALES,
-      req.file,
-      req.body?.description,
-      req.body?.category,
-      req.user,
-    );
-
-    created(res, contractFile, '文件上传成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
 const getFiles = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -300,21 +222,6 @@ const getFiles = async (req, res, next) => {
     const files = await fileService.listFiles(id, fileService.CONTRACT_TYPE.SALES);
 
     success(res, fileService.filterVisibleFiles(files, req.user));
-  } catch (error) {
-    next(error);
-  }
-};
-
-const deleteFile = async (req, res, next) => {
-  try {
-    const { fileId } = req.params;
-
-    const file = await fileService.findFileById(fileId);
-    if (!file || file.contractType !== fileService.CONTRACT_TYPE.SALES) throw createError('文件不存在', 404);
-    fileService.assertFileAccess(file, req.user);
-    await fileService.deleteFileRecord(fileId);
-
-    success(res, null, '文件删除成功');
   } catch (error) {
     next(error);
   }
@@ -460,19 +367,15 @@ module.exports = {
   create,
   update,
   remove,
-  addItem,
   updateItemLine,
   updateStatus,
   getNextContractNo,
-  calculatePrice,
   addPackingItem,
   getAvailablePurchaseItems,
   importPurchasePackingItems,
   updatePackingItem,
   removePackingItem,
-  uploadFile,
   getFiles,
-  deleteFile,
   downloadFile,
   checkPackingList,
   listPackingListChecks,

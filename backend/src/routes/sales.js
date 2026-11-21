@@ -1,10 +1,9 @@
 /**
- * Input: 销售控制器、exportService
+ * Input: 销售控制器、pdfExportService
  * Output: 出口合同管理与受认证的 Excel 四单生成路由（上传制单不改业务数据）
  * Pos: 销售路由，处理出口合同CRUD操作
  * 
  * 2026-01-20 重构：合并货柜功能，EXP号即货柜号
- * 2026-02-21 新增：GET /:id/export-excel 生成三 Sheet 标准出口 Excel
  * 2026-06-03 新增：/:id/files 出口源文件附件上传、列表、下载、删除
  * 2026-07-10 升级：船司装箱单 PDF 原件、差异、历史和人工结论持久化
  */
@@ -12,13 +11,11 @@
 const { Router } = require('express');
 const salesController = require('../controllers/salesController');
 const purchaseDraftController = require('../controllers/purchaseDraftController');
-const { exportSalesContractExcel } = require('../services/exportService');
-const { exportSalesContractPdf } = require('../services/pdfExportService');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, param, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
-const { upload, pdfCheckUpload } = require('../utils/upload');
+const { pdfCheckUpload } = require('../utils/upload');
 const multer = require('multer');
 const { createError } = require('../middleware/errorHandler');
 const exportPacketExcelController = require('../controllers/exportPacketExcelController');
@@ -84,12 +81,6 @@ router.delete('/:id', withIdValidation, roleAuth(...WRITE_ROLES), withAuditLog(
 
 // ==================== 销售明细 ====================
 
-// POST /api/v1/sales/:id/items - 添加销售明细
-router.post('/:id/items', withIdValidation, roleAuth(...WRITE_ROLES), withAuditLog(
-  { entity: 'SalesItem', action: 'CREATE', model: 'salesItem' },
-  salesController.addItem
-));
-
 // POST /api/v1/sales/:id/items/:itemId/reprice - 改单行数量/售价（A84；审计行在服务事务内写入）
 // ADMIN/SALES（OD-8：SALES 录入合同价格，但响应不回显合同总额，OD-7）。
 router.post('/:id/items/:itemId/reprice', withIdValidation, roleAuth(ROLE_SETS.ALL), salesController.updateItemLine);
@@ -124,7 +115,8 @@ router.delete('/:id/packing-items/:itemId', withIdValidation, roleAuth(...WRITE_
 
 const exportPacketValidation = [
   body('spotRate').isFloat({ gt: 0.2, lt: 20 }).withMessage('现汇必须大于 0.2 且小于 20'),
-  body('sellerName').trim().notEmpty().withMessage('卖方名称不能为空').isLength({ max: 200 }).withMessage('卖方名称不能超过 200 字'),
+  // 卖方默认取设置里的公司名称（sellerIdentityService）；显式传入时才校验长度。
+  body('sellerName').optional({ values: 'falsy' }).trim().isLength({ max: 200 }).withMessage('卖方名称不能超过 200 字'),
   body('buyerName').trim().notEmpty().withMessage('买方名称不能为空').isLength({ max: 200 }).withMessage('买方名称不能超过 200 字'),
   body('packageKind').optional().isString().withMessage('包装种类格式无效').isLength({ max: 80 }).withMessage('包装种类不能超过 80 字'),
   body('tradeTerm').trim().notEmpty().withMessage('贸易术语不能为空').isLength({ max: 40 }).withMessage('贸易术语不能超过 40 字'),
@@ -147,20 +139,8 @@ router.post('/:id/export-packet/preview', withIdValidation, roleAuth(...EXPORT_P
 // POST /api/v1/sales/:id/export-packet/generate - 确认价格后生成、归档出口四单
 router.post('/:id/export-packet/generate', withIdValidation, roleAuth(...EXPORT_PACKET_ROLES), exportPacketValidation, salesController.generateExportPacket);
 
-// POST /api/v1/sales/:id/files - 上传出口合同附件
-router.post('/:id/files', withIdValidation, roleAuth(...WRITE_ROLES), upload.single('file'), withAuditLog(
-  { entity: 'SalesContractFile', action: 'CREATE', model: 'salesContractFile' },
-  salesController.uploadFile
-));
-
 // GET /api/v1/sales/:id/files - 获取出口合同附件列表
 router.get('/:id/files', withIdValidation, salesController.getFiles);
-
-// DELETE /api/v1/sales/files/:fileId - 删除出口合同附件
-router.delete('/files/:fileId', roleAuth(...WRITE_ROLES), withAuditLog(
-  { entity: 'SalesContractFile', action: 'DELETE', model: 'salesContractFile', idParam: 'fileId' },
-  salesController.deleteFile
-));
 
 // GET /api/v1/sales/files/:fileId/download - 下载出口合同附件
 router.get('/files/:fileId/download', salesController.downloadFile);
@@ -233,31 +213,5 @@ router.put('/:id/status', withIdValidation, roleAuth(...WRITE_ROLES), withAuditL
   salesController.updateStatus
 ));
 
-// POST /api/v1/sales/calculate-price - 计算销售价格
-router.post('/calculate-price', roleAuth(...WRITE_ROLES), salesController.calculatePrice);
-
-// GET /api/v1/sales/:id/export-excel - 导出单份合同标准出口 Excel（三 Sheet）
-router.get('/:id/export-excel', roleAuth(...EXPORT_DOC_ROLES), withIdValidation, async (req, res, next) => {
-  try {
-    const { buffer, filename } = await exportSalesContractExcel(req.params.id);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
-    res.send(buffer);
-  } catch (err) {
-    next(err);
-  }
-});
-
-// GET /api/v1/sales/:id/export-pdf - 导出单份合同 PDF
-router.get('/:id/export-pdf', roleAuth(...EXPORT_DOC_ROLES), withIdValidation, async (req, res, next) => {
-  try {
-    const { buffer, filename } = await exportSalesContractPdf(req.params.id);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
-    res.send(buffer);
-  } catch (err) {
-    next(err);
-  }
-});
 
 module.exports = router;

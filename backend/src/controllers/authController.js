@@ -86,22 +86,6 @@ const getCurrentUser = async (req, res, next) => {
 };
 
 /**
- * 职责：修改当前用户密码
- * @param {Request} req - Express请求对象
- * @param {Response} res - Express响应对象
- * @param {NextFunction} next - 下一个中间件
- */
-const changePassword = async (req, res, next) => {
-  try {
-    const { oldPassword, newPassword } = req.body;
-    await authService.changePassword(req.user.id, oldPassword, newPassword);
-    success(res, null, '密码修改成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：获取用户列表（管理员）
  * @param {Request} req - Express请求对象
  * @param {Response} res - Express响应对象
@@ -160,7 +144,6 @@ module.exports = {
   register,
   publicRegister,
   getCurrentUser,
-  changePassword,
   getUsers,
   resetPassword,
 };

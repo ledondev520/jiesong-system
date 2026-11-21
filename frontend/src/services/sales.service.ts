@@ -314,25 +314,6 @@ export const salesService = {
     >(`/sales/${salesContractId}/packing-items`, data);
   },
 
-  addItem: async (
-    salesContractId: string,
-    data: {
-      productId: string;
-      storeId: string;
-      quantity: number;
-      unit?: string;
-      costPrice: number;
-      sellingPrice?: number;
-      specification?: string;
-      note?: string;
-    },
-  ) => {
-    return api.post<ApiResponse<void>, ApiResponse<void>, typeof data>(
-      `/sales/${salesContractId}/items`,
-      data,
-    );
-  },
-
   repriceItem: async (
     salesContractId: string,
     itemId: string,
@@ -408,25 +389,6 @@ export const salesService = {
     >(`/sales/${id}/status`, { status });
   },
 
-  /**
-   * 导出单份出口合同为三 Sheet 标准 Excel。
-   */
-  exportExcel: async (id: string, contractNo: string) => {
-    const response = await fetch(`/api/v1/sales/${id}/export-excel`, {
-      ...authFetchInit(),
-    });
-    await downloadResponseBlob(response, `${contractNo}_出口模板.xlsx`);
-  },
-
-  /**
-   * 导出单份出口合同 PDF。
-   */
-  exportPdf: async (id: string, contractNo: string) => {
-    const response = await fetch(`/api/v1/sales/${id}/export-pdf`, {
-      ...authFetchInit(),
-    });
-    await downloadResponseBlob(response, `${contractNo}_sales_contract.pdf`);
-  },
 
   /**
    * 上传船司装箱单 PDF 与系统装箱数据比对。
@@ -498,43 +460,5 @@ export const salesService = {
       response,
       `出口退税材料准备清单-${contractNo}.xlsx`,
     );
-  },
-
-  /** 当前现汇（来自唯一报价配置），用于新订单的汇率预填。 */
-  getExchangeRate: () =>
-    api.get<
-      ApiResponse<{ rate: number; buffer: number; effectiveRate: number }>,
-      ApiResponse<{ rate: number; buffer: number; effectiveRate: number }>
-    >("/system/exchange-rate"),
-
-  /** 推荐售价（USD 单价）：由后端 priceFor 计算（现汇-0.2、分类加价、单价取整规则）；带 productId 才能取瓷砖等分类加价。 */
-  calculatePrice: async (
-    costPrice: number,
-    exchangeRate: number,
-    productId?: string,
-  ): Promise<number> => {
-    const response = await api.post<
-      ApiResponse<{ recommended: number }>,
-      ApiResponse<{ recommended: number }>,
-      { costPrice: number; exchangeRate: number; productId?: string }
-    >("/sales/calculate-price", {
-      costPrice,
-      exchangeRate,
-      ...(productId ? { productId } : {}),
-    });
-    return response.data.recommended;
-  },
-
-  /** 订单整体利润率预览（后端 orderMargin）；warning 只提示，不阻止保存。 */
-  previewOrderMargin: async (
-    exchangeRate: number,
-    items: OrderMarginItem[],
-  ): Promise<OrderMargin> => {
-    const response = await api.post<
-      ApiResponse<OrderMargin>,
-      ApiResponse<OrderMargin>,
-      { exchangeRate: number; items: OrderMarginItem[] }
-    >("/sales/calculate-price", { exchangeRate, items });
-    return response.data;
   },
 };

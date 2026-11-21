@@ -157,10 +157,9 @@ test('采购创建：价格警告文案（含价格）不返回给 WAREHOUSE', a
   }
 });
 
-test('导出：purchases CSV/PDF/xlsx 对 WAREHOUSE 无金额与发票号列，其他角色保留', async () => {
+test('导出：purchases CSV/xlsx 对 WAREHOUSE 无金额与发票号列，其他角色保留', async () => {
   const exportService = require('../services/exportService');
   const { exportPurchasesExcel } = require('../services/purchaseImportExportService');
-  const { exportSystemDataPdf } = require('../services/pdfExportService');
   await withPrisma({ purchaseContract: { findMany: async () => [contract()] } }, async () => {
     const csvW = (await exportService.exportData('purchases', {}, { includeMoney: false })).data;
     assert.deepEqual(leaks(csvW), []);
@@ -171,18 +170,14 @@ test('导出：purchases CSV/PDF/xlsx 对 WAREHOUSE 无金额与发票号列，�
     const sheet = xlsx.read(xW.buffer, { type: 'buffer' });
     assert.deepEqual(leaks(xlsx.utils.sheet_to_csv(sheet.Sheets[sheet.SheetNames[0]])), []);
     assert.ok(JSON.stringify(xlsx.utils.sheet_to_json(xlsx.read((await exportPurchasesExcel({}, { includeMoney: true })).buffer, { type: 'buffer' }).Sheets['采购合同'])).includes('987654.32'));
-    assert.ok((await exportSystemDataPdf('purchases', {}, { includeMoney: false })).buffer.length > 0);
   });
 });
 
-test('/export/:type 与 /system/export/:type 同守卫：WAREHOUSE 导出 payments 403，且 /export 有审计日志', () => {
+test('/export/:type 守卫：WAREHOUSE 导出 payments 403，且 /export 有审计日志', () => {
   const dataExport = require('../routes/dataExport');
   const route = dataExport.stack.find((l) => l.route?.path === '/:type').route;
   const names = route.stack.map((l) => l.handle.name);
   assert.ok(names.includes('paymentsExportGuard'), 'guard on /export/:type');
-  // 与 /system/export/:type 同形（角色校验、守卫、withAuditLog 包裹的控制器），审计日志不再缺失
-  const systemRoute = require('../routes/system').stack.find((l) => l.route?.path === '/export/:type').route;
-  assert.deepEqual(names, systemRoute.stack.map((l) => l.handle.name));
   assert.match(require('fs').readFileSync(require.resolve('../routes/dataExport'), 'utf8'), /withAuditLog\(\s*\{\s*entity: 'DataExport'/);
   const { paymentsExportGuard } = require('../middleware/paymentsExportGuard');
   let denied;

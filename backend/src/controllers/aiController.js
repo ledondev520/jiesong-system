@@ -12,23 +12,12 @@ const { createError } = require('../middleware/errorHandler');
 const aiService = require('../services/aiService');
 const openAgentService = require('../services/openAgentService');
 const anthropicCompatService = require('../services/anthropicCompatService');
-const { buildGovernanceReplayProfile } = require('../services/governanceReplayService');
-const { buildReplaySummaryProfileMap } = require('../services/agentReplaySummaryService');
-const { normalizeConfigValueForStorage } = require('../utils/secretCrypto');
 
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
   'Cache-Control': 'no-cache',
   'Connection': 'keep-alive',
   'X-Accel-Buffering': 'no',
-};
-
-const parsePositiveInt = (value, fallback) => {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed)) {
-    return fallback;
-  }
-  return parsed > 0 ? parsed : fallback;
 };
 
 const parseMessage = (body) => {
@@ -88,7 +77,6 @@ const parseAgentMetadata = (raw) => {
       toolTraceSummary: parsed?.toolTraceSummary || null,
       actionRecommendations: Array.isArray(parsed?.actionRecommendations) ? parsed.actionRecommendations : [],
       pendingActionSummary: Array.isArray(parsed?.pendingActionSummary) ? parsed.pendingActionSummary : [],
-      governanceReplayProfile: parsed?.governanceReplayProfile || null,
     };
   } catch {
     return {};
@@ -138,74 +126,6 @@ const buildPendingActionOutcomeMap = async (userId, actionIds = []) => {
     map.set(row.entityId, current);
   });
   return map;
-};
-
-const buildPersistedReplayProfileMap = async (userId, sessionIds = []) => {
-  const uniqueIds = Array.from(new Set((Array.isArray(sessionIds) ? sessionIds : []).filter(Boolean)));
-  if (!userId || uniqueIds.length === 0) return new Map();
-
-  const rows = await prisma.operationLog.findMany({
-    where: {
-      userId,
-      action: { in: ['AGENT_REPLAY_SNAPSHOT', 'AGENT_RUN'] },
-      entity: { in: ['AgentRuntimeReplay', 'AgentRuntime'] },
-      entityId: { in: uniqueIds },
-    },
-    orderBy: [{ createdAt: 'desc' }],
-    select: {
-      entityId: true,
-      action: true,
-      newValue: true,
-      createdAt: true,
-    },
-  });
-
-  const map = new Map();
-  rows.forEach((row) => {
-    const details = parseJsonSafely(row.newValue) || {};
-    if (!details?.governanceReplayProfile) return;
-    const next = {
-      profile: details.governanceReplayProfile,
-      source: row.action === 'AGENT_REPLAY_SNAPSHOT' ? 'replay-snapshot-log' : 'agent-run-log',
-    };
-    const current = map.get(row.entityId);
-    if (!current) {
-      map.set(row.entityId, next);
-      return;
-    }
-    if (current.source === 'agent-run-log' && next.source === 'replay-snapshot-log') {
-      map.set(row.entityId, next);
-    }
-  });
-
-  return map;
-};
-
-const resolvePersistedReplayFallback = (metadata, replaySummaryMap, replayMap, sessionId) => {
-  if (metadata?.governanceReplayProfile) {
-    return {
-      profile: null,
-      source: null,
-    };
-  }
-  const summaryFallback = replaySummaryMap.get(sessionId) || null;
-  if (summaryFallback) {
-    return {
-      profile: summaryFallback.profile,
-      source: summaryFallback.source,
-    };
-  }
-  const fallback = replayMap.get(sessionId) || null;
-  if (!fallback) {
-    return {
-      profile: null,
-      source: null,
-    };
-  }
-  return {
-    profile: fallback.profile,
-    source: fallback.source,
-  };
 };
 
 const mergePendingActionSummary = (items = [], outcomeMap = new Map()) => (
@@ -263,57 +183,6 @@ const chat = async (req, res, next) => {
 };
 
 /**
- * 职责：流式智能问答（SSE，支持 thinking 展示）
- * 思路：
- * 1. 设置SSE响应头
- * 2. 调用aiService的流式聊天
- * 3. 分别发送 thinking 和 content 给前端
- */
-const chatStream = async (req, res) => {
-  try {
-    const message = parseMessage(req.body);
-    const { sessionId, imageUrl } = req.body;
-    const userId = req.user.id;
-    
-    // 生成会话ID
-    const currentSessionId = sessionId || `session_${Date.now()}`;
-    
-    setSseHeaders(res);
-    
-    // 发送sessionId
-    sendSseMessage(res, { type: 'session', sessionId: currentSessionId });
-    
-    // 发送开始处理消息
-    sendSseMessage(res, { type: 'start', message: '开始处理...' });
-    
-    // 流式调用AI服务（支持 thinking）
-    const result = await aiService.chatStream(
-      userId, 
-      currentSessionId, 
-      message, 
-      imageUrl,
-      // onChunk - 最终内容回调
-      (chunk) => {
-        sendSseMessage(res, { type: 'chunk', content: chunk });
-      },
-      // onThinking - 思考过程回调
-      (thinking) => {
-        sendSseMessage(res, { type: 'thinking', content: thinking });
-      },
-      req.user.role,
-    );
-    
-    // 发送完成消息
-    sendSseMessage(res, { type: 'done', tokenUsage: result.tokenUsage, model: result.model });
-    
-    res.end();
-  } catch (error) {
-    sendSseMessage(res, { type: 'error', message: error.message });
-    res.end();
-  }
-};
-
-/**
  * 职责：解析输入内容（辅助录入，支持图片）
  * 思路：
  * 1. 接收文本或图片
@@ -329,41 +198,6 @@ const parseInput = async (req, res, next) => {
     const parsed = await aiService.parseInput(content, type, imageUrl, userId);
     
     success(res, parsed);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：运行预置业务 Agent
- * 思路：
- * 1. 校验 agentType / message
- * 2. 调用 openAgentService 执行一次 in-process agent prompt
- * 3. 返回会话、回答、token 用量与 Agent 类型
- */
-const agentPrompt = async (req, res, next) => {
-  try {
-    const message = parseMessage(req.body);
-    const agentType = parseAgentType(req.body);
-    const result = await openAgentService.runAgentPrompt({
-      userId: req.user.id,
-      userRole: req.user.role,
-      agentType,
-      message,
-      sessionId: req.body?.sessionId,
-    });
-    success(res, result);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：返回当前通用 Agent 的工具注册表，供治理与观测使用
- */
-const agentToolRegistry = async (req, res, next) => {
-  try {
-    success(res, openAgentService.buildToolRegistryPayload(req.user?.role || null));
   } catch (error) {
     next(error);
   }
@@ -498,31 +332,11 @@ const getChatHistory = async (req, res, next) => {
       (item.parsedMetadata.pendingActionSummary || []).map((summary) => summary.actionId)
     );
     const outcomeMap = await buildPendingActionOutcomeMap(req.user.id, actionIds);
-    const replaySummaryMap = await buildReplaySummaryProfileMap(
-      req.user.id,
-      Array.from(new Set(parsedMessages.map((item) => item.sessionId).filter(Boolean))),
-    );
-    const persistedReplayProfileMap = await buildPersistedReplayProfileMap(
-      req.user.id,
-      Array.from(new Set(parsedMessages.map((item) => item.sessionId).filter(Boolean))),
-    );
     const enrichedMessages = parsedMessages.map((item) => {
       const pendingActionSummary = mergePendingActionSummary(item.parsedMetadata.pendingActionSummary, outcomeMap);
-      const replayFallback = resolvePersistedReplayFallback(item.parsedMetadata, replaySummaryMap, persistedReplayProfileMap, item.sessionId);
-      const replayProfile = buildGovernanceReplayProfile(item.parsedMetadata, {
-        pendingActionSummary,
-        persistedProfile: replayFallback.profile,
-        persistedSource: replayFallback.source,
-      });
       return {
         ...item,
         ...item.parsedMetadata,
-        governanceReplayAvailable: replayProfile.available,
-        governanceReplaySummary: replayProfile.summary,
-        governanceReplayCounts: replayProfile.counts,
-        governanceReplayLevel: replayProfile.level,
-        governanceReplaySource: replayProfile.source,
-        governanceReplayProfile: replayProfile,
         pendingActionSummary,
         parsedMetadata: undefined,
       };
@@ -611,29 +425,10 @@ const getSessions = async (req, res, next) => {
       (item?.metadata?.pendingActionSummary || []).map((summary) => summary.actionId)
     );
     const outcomeMap = await buildPendingActionOutcomeMap(req.user.id, pendingActionIds);
-    const replaySummaryMap = await buildReplaySummaryProfileMap(
-      req.user.id,
-      sessions.map((s) => s.sessionId),
-    );
-    const persistedReplayProfileMap = await buildPersistedReplayProfileMap(
-      req.user.id,
-      sessions.map((s) => s.sessionId),
-    );
 
     // 5. 合并后返回
     const enrichedSessions = sessions.map((s) => {
       const pendingActionSummary = mergePendingActionSummary(previewMap[s.sessionId]?.metadata?.pendingActionSummary, outcomeMap);
-      const replayFallback = resolvePersistedReplayFallback(
-        previewMap[s.sessionId]?.metadata,
-        replaySummaryMap,
-        persistedReplayProfileMap,
-        s.sessionId,
-      );
-      const replayProfile = buildGovernanceReplayProfile(previewMap[s.sessionId]?.metadata, {
-        pendingActionSummary,
-        persistedProfile: replayFallback.profile,
-        persistedSource: replayFallback.source,
-      });
       return {
         ...s,
         totalTokens: tokenMap[s.sessionId] || 0,
@@ -646,174 +441,11 @@ const getSessions = async (req, res, next) => {
         domainsTouched: previewMap[s.sessionId]?.metadata?.routePlan?.selectedDomains || [],
         toolTraceSummary: previewMap[s.sessionId]?.metadata?.toolTraceSummary || null,
         actionRecommendations: previewMap[s.sessionId]?.metadata?.actionRecommendations || [],
-        governanceReplayAvailable: replayProfile.available,
-        governanceReplaySummary: replayProfile.summary,
-        governanceReplayCounts: replayProfile.counts,
-        governanceReplayLevel: replayProfile.level,
-        governanceReplaySource: replayProfile.source,
-        governanceReplayProfile: replayProfile,
         pendingActionSummary,
       };
     });
 
     success(res, enrichedSessions);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：列出未绑定聊天会话的 Token 记录（如 HS 编码推荐、辅助解析等）
- * 思路：
- * 1. sessionId 为 null 的 tokenUsage 不会出现在 getSessions（基于 ChatHistory）中
- * 2. 按时间倒序返回，供「AI 用量」页展示完整消耗来源
- * @param {import('express').Request} req - query.limit 可选，默认 50，最大 200
- */
-const getStandaloneTokenUsage = async (req, res, next) => {
-  try {
-    const limit = Math.min(parsePositiveInt(req.query.limit, 50), 200);
-    const where = {
-      userId: req.user.id,
-      sessionId: null,
-    };
-    const selectFull = {
-      id: true,
-      model: true,
-      promptTokens: true,
-      outputTokens: true,
-      totalTokens: true,
-      requestType: true,
-      detailSnapshot: true,
-      promptBrief: true,
-      createdAt: true,
-    };
-    const selectWithoutBrief = {
-      id: true,
-      model: true,
-      promptTokens: true,
-      outputTokens: true,
-      totalTokens: true,
-      requestType: true,
-      detailSnapshot: true,
-      createdAt: true,
-    };
-    const selectBase = {
-      id: true,
-      model: true,
-      promptTokens: true,
-      outputTokens: true,
-      totalTokens: true,
-      requestType: true,
-      createdAt: true,
-    };
-    let rows;
-    try {
-      rows = await prisma.tokenUsage.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        select: selectFull,
-      });
-    } catch (err) {
-      if (aiService.isMissingPromptBriefColumnError(err)) {
-        try {
-          rows = await prisma.tokenUsage.findMany({
-            where,
-            orderBy: { createdAt: 'desc' },
-            take: limit,
-            select: selectWithoutBrief,
-          });
-          rows = rows.map((r) => ({ ...r, promptBrief: null }));
-        } catch (err2) {
-          if (aiService.isMissingDetailSnapshotColumnError(err2)) {
-            rows = await prisma.tokenUsage.findMany({
-              where,
-              orderBy: { createdAt: 'desc' },
-              take: limit,
-              select: selectBase,
-            });
-            rows = rows.map((r) => ({ ...r, detailSnapshot: null, promptBrief: null }));
-          } else {
-            throw err2;
-          }
-        }
-      } else if (aiService.isMissingDetailSnapshotColumnError(err)) {
-        rows = await prisma.tokenUsage.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          take: limit,
-          select: selectBase,
-        });
-        rows = rows.map((r) => ({ ...r, detailSnapshot: null, promptBrief: null }));
-      } else {
-        throw err;
-      }
-    }
-    success(res, rows);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：删除会话
- */
-const deleteSession = async (req, res, next) => {
-  try {
-    const { sessionId } = req.params;
-    
-    await prisma.chatHistory.deleteMany({
-      where: { userId: req.user.id, sessionId },
-    });
-    
-    success(res, null, '会话删除成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：配置AI设置（仅管理员）
- * 思路：
- * 1. 更新 Kimi / MiniMax API Key
- * 2. 更新模型优先级（primaryModel、fallbackModel）
- */
-const updateConfig = async (req, res, next) => {
-  try {
-    const { apiKey, baseUrl, minimaxApiKey, primaryModel, fallbackModel } = req.body;
-
-    const upsertConfig = async (key, value, note) => {
-      const stored = normalizeConfigValueForStorage(key, value);
-      await prisma.systemConfig.upsert({
-        where: { key },
-        update: { value: stored, note },
-        create: { key, value: stored, note },
-      });
-    };
-
-    if (apiKey) await upsertConfig('kimiApiKey', apiKey, 'Kimi API Key (加密存储)');
-    if (minimaxApiKey) await upsertConfig('minimaxApiKey', minimaxApiKey, 'MiniMax API Key (加密存储)');
-    if (primaryModel) await upsertConfig('aiPrimaryModel', primaryModel, 'AI 首选模型');
-    if (fallbackModel !== undefined) await upsertConfig('aiFallbackModel', fallbackModel, 'AI 备用模型');
-
-    success(res, null, 'AI配置更新成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：获取Token使用统计
- */
-const getTokenStats = async (req, res, next) => {
-  try {
-    const { days = 30 } = req.query;
-    const userId = req.user.id;
-    
-    const parsedDays = parsePositiveInt(days, 30);
-    const stats = await aiService.getTokenStats(userId, parsedDays);
-    
-    success(res, stats);
   } catch (error) {
     next(error);
   }
@@ -848,69 +480,9 @@ const getModels = async (req, res, next) => {
   }
 };
 
-/**
- * 职责：获取AI问候语（带五月天歌词）
- */
-const getGreeting = async (req, res, next) => {
-  try {
-    const result = await aiService.generateGreeting();
-    
-    success(res, {
-      greeting: result.greeting,
-      songName: result.songName,
-      lyrics: result.lyrics,
-      source: result.source,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：流式获取AI问候语（支持 thinking 展示）
- * 思路：
- * 1. 使用 SSE 流式返回
- * 2. 先返回 thinking 内容
- * 3. 再返回最终内容
- */
-const getGreetingStream = async (req, res) => {
-  // 设置 SSE 响应头
-  setSseHeaders(res);
-
-  try {
-    await aiService.generateGreetingStream(
-      // onThinking - 思考过程回调
-      (chunk) => {
-        sendSseMessage(res, { type: 'thinking', content: chunk });
-      },
-      // onContent - 最终内容回调
-      (chunk) => {
-        sendSseMessage(res, { type: 'content', content: chunk });
-      },
-      // onDone - 完成回调
-      (result) => {
-        sendSseMessage(res, {
-          type: 'done',
-          greeting: result.greeting,
-          songName: result.songName,
-          lyrics: result.lyrics,
-          source: result.source,
-        });
-        res.end();
-      }
-    );
-  } catch (error) {
-    sendSseMessage(res, { type: 'error', message: error.message });
-    res.end();
-  }
-};
-
 module.exports = {
   chat,
-  chatStream,
   parseInput,
-  agentPrompt,
-  agentToolRegistry,
   agentPromptStream,
   executeAgentAction,
   cancelAgentAction,
@@ -918,11 +490,5 @@ module.exports = {
   anthropicCompatCountTokens,
   getChatHistory,
   getSessions,
-  getStandaloneTokenUsage,
-  deleteSession,
-  updateConfig,
-  getTokenStats,
   getModels,
-  getGreeting,
-  getGreetingStream,
 };

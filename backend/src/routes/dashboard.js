@@ -17,14 +17,8 @@ router.get('/wps-sync', (req, res) => {
   require('../utils/response').success(res, require('../services/wpsSyncStatusService').getStatus());
 });
 
-// GET /api/v1/dashboard/stats - 获取仪表盘统计数据
-router.get('/stats', dashboardController.getStats);
-
 // GET /api/v1/dashboard/todos - 首页待办（按角色，只读）
 router.get('/todos', dashboardController.getTodos);
-
-// GET /api/v1/dashboard/track-product - 商品追踪查询
-router.get('/track-product', dashboardController.trackProduct);
 
 // GET /api/v1/dashboard/analytics - 数据看板详细分析
 router.get('/analytics', roleAuth('ADMIN'), dashboardController.getAnalytics);

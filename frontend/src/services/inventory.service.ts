@@ -21,17 +21,6 @@ export const inventoryService = {
     >("/inventory", config);
   },
 
-  updateLocation: async (
-    id: string,
-    data: { lotNo?: string; binLocation?: string },
-  ) => {
-    return api.post<
-      ApiResponse<Pick<Inventory, "id" | "lotNo" | "binLocation">>,
-      ApiResponse<Pick<Inventory, "id" | "lotNo" | "binLocation">>,
-      { lotNo?: string; binLocation?: string }
-    >(`/inventory/${id}/location`, data);
-  },
-
   updateStatus: async (id: string, status: string) => {
     return api.put<
       ApiResponse<Inventory>,

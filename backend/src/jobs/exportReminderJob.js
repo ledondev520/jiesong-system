@@ -1,13 +1,10 @@
 /**
- * Input: exportReminderService（退税月度提醒 + 缺发票催票提醒）
+ * Input: exportReminderService（退税月度提醒）
  * Output: 每日定时触发的出口流程提醒任务（退税提醒自守卫仅每月5号生效）
- * Pos: 运行时任务编排，与 inventoryAlertJob 同构
+ * Pos: 运行时任务编排，唯一的后台通知任务（缺发票催办由首页 TodoBoard 承担）
  */
 
-const {
-  runMonthlyTaxRefundReminder,
-  runInvoiceMissingReminder,
-} = require('../services/exportReminderService');
+const { runMonthlyTaxRefundReminder } = require('../services/exportReminderService');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -56,7 +53,7 @@ const getNextRunAt = (now, hour, minute) => {
 };
 
 /**
- * 职责：执行一轮出口流程提醒（退税月度提醒 + 缺发票提醒）
+ * 职责：执行一轮出口流程提醒（退税月度提醒）
  * @param {string} reason 触发原因（scheduled/startup/manual）
  */
 const executeExportReminderCheck = async (reason = 'scheduled') => {
@@ -67,14 +64,12 @@ const executeExportReminderCheck = async (reason = 'scheduled') => {
 
   state.running = true;
   try {
-    // 1. 每月5号退税申报提醒（服务内部自守卫非5号跳过）
+    // 每月5号退税申报提醒（服务内部自守卫非5号跳过）
     const taxResult = await runMonthlyTaxRefundReminder();
-    // 2. 已出货缺发票催票提醒（每日）
-    const invoiceResult = await runInvoiceMissingReminder();
     console.log(
-      `[export-reminder-job] ${reason} run completed: taxRefund=${taxResult.skipped ? `skipped(${taxResult.reason})` : `created ${taxResult.created}`}, invoiceMissing=${invoiceResult.skipped ? `skipped(${invoiceResult.reason})` : `created ${invoiceResult.created}`}`,
+      `[export-reminder-job] ${reason} run completed: taxRefund=${taxResult.skipped ? `skipped(${taxResult.reason})` : `created ${taxResult.created}`}`,
     );
-    return { taxResult, invoiceResult };
+    return { taxResult };
   } catch (error) {
     console.error(`[export-reminder-job] ${reason} run failed`, error);
     return null;
@@ -84,7 +79,7 @@ const executeExportReminderCheck = async (reason = 'scheduled') => {
 };
 
 /**
- * 职责：启动出口流程提醒定时任务（每日 hour:minute 触发一次）
+ * 职责：启动出口流程提醒定时任务（每日 hour:minute 触发一次，退税提醒仅每月5号生效）
  * @param {object} options { hour?, minute?, runOnStart? }（默认 9:10，可用环境变量 EXPORT_REMINDER_* 覆盖）
  */
 const startExportReminderJob = (options = {}) => {

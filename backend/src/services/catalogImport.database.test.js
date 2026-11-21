@@ -46,7 +46,7 @@ test('catalog imports: downloadable templates, read-only preview, atomic executi
     const form = new FormData(); form.append('file', new Blob([bytes]), `synthetic.${format}`); if (confirm) form.append('confirmOpening', 'true');
     return request(`/catalog/${kind}/${action}`, { method: 'POST', body: form }, role);
   };
-  const templates = (await request('/templates')).body.data;
+  const templates = require('./catalogImportService').listTemplates();
   assert.equal(templates.length, 4);
   const evidence = process.env.JIESONG_TEST_EVIDENCE_DIR;
   if (evidence) fs.mkdirSync(evidence, { recursive: true, mode: 0o700 });
@@ -68,7 +68,7 @@ test('catalog imports: downloadable templates, read-only preview, atomic executi
   });
 
   await t.test('every route authenticates and rejects a non-admin before parsing uploads', async () => {
-    for (const url of ['/templates', '/templates/products']) {
+    for (const url of ['/templates/products']) {
       assert.equal((await request(url, {}, null)).status, 401);
       assert.equal((await request(url, {}, 'PURCHASE')).status, 403);
     }

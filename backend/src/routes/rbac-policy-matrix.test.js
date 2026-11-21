@@ -32,7 +32,6 @@ const MODULES = {
   '/system': './system',
   '/reports': './reports',
   '/sales': './sales',
-  '/three-forms': './threeForms',
   '/contract-doc': './contractDoc',
 };
 
@@ -42,15 +41,13 @@ const POLICY = [
   { re: /^\/tax-refunds\/(workbench\/(monthly-export|[^/]+\/(preparation(-export)?|confirm|invoice-verification))|auto-drafts)$/, read: ADMIN, write: ADMIN },
   // OD-9: SALES may read refund / forex records; settledAmount, refundableAmount and refundedAmount are stripped by warehouseMoneyRedaction.
   { re: /^\/(tax-refunds|forex-verifications)(\/|$)/, read: ALL, write: ADMIN },
-  { re: /^\/(bank-flow|finance|three-forms|reports)(\/|$)/, read: ADMIN, write: ADMIN },
+  { re: /^\/(bank-flow|finance|reports)(\/|$)/, read: ADMIN, write: ADMIN },
   { re: /^\/suppliers\/[^/]+\/hard-delete(-preview)?$/, read: ADMIN, write: ADMIN },
   { re: /^\/suppliers(\/|$)/, read: ALL, write: ALL },
   { re: /^\/users(\/|$)/, read: ADMIN, write: ADMIN },
-  { re: /^\/system\/(configs|notifications|seller-identity|exchange-rate|ports|categories|customs-brokers)$/, read: ALL, write: ADMIN },
-  { re: /^\/system\/notifications\/[^/]+\/read$/, read: ALL, write: ALL },
-  { re: /^\/system\/export\//, read: ALL, write: ADMIN },
+  { re: /^\/system\/(configs|seller-identity|exchange-rate|ports|categories|customs-brokers)$/, read: ALL, write: ADMIN },
   { re: /^\/system(\/|$)/, read: ADMIN, write: ADMIN },
-  { re: /^\/sales\/[^/]+\/(export-packet\/(preview|generate)|export-(excel|pdf)|finance-summary|tax-refund-preparation(\/export)?)$/, read: ADMIN, write: ADMIN },
+  { re: /^\/sales\/[^/]+\/(export-packet\/(preview|generate)|export-excel|finance-summary|tax-refund-preparation(\/export)?)$/, read: ADMIN, write: ADMIN },
   { re: /^\/sales(\/|$)/, read: ALL, write: ALL },
   { re: /^\/contract-doc\/(pdf|generate)\/[^/]+$/, read: ADMIN, write: ADMIN },
   { re: /^\/contract-doc(\/|$)/, read: ALL, write: ADMIN },
@@ -173,19 +170,19 @@ test('OD-8：SALES 不能经通用导出读取付款流水，也拿不到供应�
     const res = await fetch(`${base}/api/v1${path}`, { headers: { Authorization: `Bearer ${humanToken(role)}` } });
     return { status: res.status, text: await res.text() };
   };
-  for (const path of ['/system/export/payments', '/system/export/payments/pdf']) {
+  for (const path of ['/export/payments']) {
     assert.equal((await get(path, 'SALES')).status, 403, path);
     assert.notEqual((await get(path, 'ADMIN')).status, 403, path);
   }
   for (const role of ['SALES']) {
-    const csv = await get('/system/export/suppliers', role);
+    const csv = await get('/export/suppliers', role);
     assert.equal(csv.status, 200);
     assert.ok(!csv.text.includes('SYN-ACCT-0001') && !csv.text.includes('银行账户'), `${role} export leaks bank`);
     const detail = await get('/purchases/x1', role);
     assert.equal(detail.status, 200, detail.text);
     assert.ok(!detail.text.includes('SYN-ACCT-0001') && !detail.text.includes('bankName'), `${role} purchase detail leaks bank`);
   }
-  assert.ok((await get('/system/export/suppliers', 'ADMIN')).text.includes('SYN-ACCT-0001'));
+  assert.ok((await get('/export/suppliers', 'ADMIN')).text.includes('SYN-ACCT-0001'));
 });
 
 test('SALES 的 PUT /purchases/:id 响应不含 supplier 银行字段，ADMIN 保留', async (t) => {

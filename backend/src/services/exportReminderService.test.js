@@ -1,15 +1,12 @@
 /**
  * Input: exportReminderService、伪造 Prisma 客户端
- * Output: 退税月度提醒与缺发票提醒的幂等/守卫逻辑测试
+ * Output: 退税月度提醒的幂等/守卫逻辑测试
  * Pos: 出口流程提醒服务回归测试
  */
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {
-  runMonthlyTaxRefundReminder,
-  runInvoiceMissingReminder,
-} = require('./exportReminderService');
+const { runMonthlyTaxRefundReminder } = require('./exportReminderService');
 
 /**
  * 职责：构造伪造 Prisma 客户端，记录 createMany 写入
@@ -27,12 +24,6 @@ const buildFakeTx = (data = {}) => {
     },
     taxRefund: {
       findMany: async () => data.taxRefunds ?? [],
-    },
-    purchaseContract: {
-      findMany: async () => data.missingInvoiceContracts ?? [],
-    },
-    invoiceRecord: {
-      findMany: async () => data.matchedInvoices ?? [],
     },
     notification: {
       findMany: async () => data.existingNotifications ?? [],
@@ -71,7 +62,7 @@ test('runMonthlyTaxRefundReminder: 5号为上月发运合同生成提醒（含�
   assert.match(tx.created[0].content, /次年4月30日前/);
   assert.doesNotMatch(tx.created[0].content, /每月1-15日/);
   assert.equal(tx.created[0].type, 'TAX_REFUND_MONTHLY');
-  assert.equal(tx.created[0].link, '/dashboard/sales/sc2');
+  assert.equal(tx.created[0].link, '/dashboard/orders/sc2');
 });
 
 test('runMonthlyTaxRefundReminder: 本月已提醒的用户不重复生成', async () => {
@@ -89,53 +80,4 @@ test('runMonthlyTaxRefundReminder: 上月无发运合同时跳过', async () => 
   const result = await runMonthlyTaxRefundReminder(tx, { now: new Date('2026-07-05T09:00:00') });
   assert.equal(result.skipped, true);
   assert.equal(result.reason, 'no-shipped-contracts');
-});
-
-test('runInvoiceMissingReminder: 已有有效关联发票记录的合同不催票', async () => {
-  const tx = buildFakeTx({
-    missingInvoiceContracts: [
-      { id: 'pc1', contractNo: 'PO-001', supplier: { name: '供应商A' } },
-      { id: 'pc2', contractNo: 'PO-002', supplier: { name: '供应商B' } },
-    ],
-    matchedInvoices: [{ matchedContractId: 'pc1' }],
-  });
-  const result = await runInvoiceMissingReminder(tx, { now: new Date('2026-07-04T09:00:00') });
-  assert.equal(result.contracts, 1);
-  assert.match(tx.created[0].title, /1 份采购合同待催开发票/);
-  assert.doesNotMatch(tx.created[0].content, /PO-001/);
-});
-
-test('runInvoiceMissingReminder: 已出货缺发票合同生成催票提醒', async () => {
-  const tx = buildFakeTx({
-    missingInvoiceContracts: [
-      { id: 'pc1', contractNo: 'PO-001', supplier: { name: '供应商A' } },
-      { id: 'pc2', contractNo: 'PO-002', supplier: { name: '供应商B' } },
-    ],
-  });
-  const result = await runInvoiceMissingReminder(tx, { now: new Date('2026-07-04T09:00:00') });
-  assert.equal(result.skipped, false);
-  assert.equal(result.created, 2);
-  assert.equal(result.contracts, 2);
-  assert.match(tx.created[0].title, /2 份采购合同待催开发票/);
-  assert.match(tx.created[0].content, /PO-001（供应商A）/);
-  assert.match(tx.created[0].content, /发票原件附件选填/);
-  assert.equal(tx.created[0].type, 'INVOICE_MISSING');
-  assert.equal(tx.created[0].link, '/dashboard/purchases/pc1');
-});
-
-test('runInvoiceMissingReminder: 当日已提醒则跳过重复用户', async () => {
-  const tx = buildFakeTx({
-    missingInvoiceContracts: [{ id: 'pc1', contractNo: 'PO-001', supplier: { name: '供应商A' } }],
-    existingNotifications: [{ userId: 'u1' }, { userId: 'u2' }],
-  });
-  const result = await runInvoiceMissingReminder(tx, { now: new Date('2026-07-04T09:00:00') });
-  assert.equal(result.created, 0);
-  assert.equal(tx.created.length, 0);
-});
-
-test('runInvoiceMissingReminder: 无缺发票合同时跳过', async () => {
-  const tx = buildFakeTx({ missingInvoiceContracts: [] });
-  const result = await runInvoiceMissingReminder(tx, { now: new Date('2026-07-04T09:00:00') });
-  assert.equal(result.skipped, true);
-  assert.equal(result.reason, 'no-missing-invoice');
 });
