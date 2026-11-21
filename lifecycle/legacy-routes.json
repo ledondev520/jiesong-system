@@ -394,10 +394,6 @@
       "reason": "分类、配置、通知或汇率有旧清空协议及专用状态，尚未迁移共享合同"
     },
     {
-      "key": "backend/src/routes/system.js POST /patrol/trigger",
-      "reason": "分类、配置、通知或汇率有旧清空协议及专用状态，尚未迁移共享合同"
-    },
-    {
       "key": "backend/src/routes/taxRates.js POST /",
       "reason": "taxRates存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
     },

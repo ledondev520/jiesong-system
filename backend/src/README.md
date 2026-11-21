@@ -76,7 +76,6 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 |------|------|
 | authService.js | 登录验证、版本化Token、统一密码策略、邮箱验证码找回密码 |
 | fileService.js | 合同附件与生成文件受限归档；共用财务凭证访问边界；chmod/失败清理前校验可信上传根路径与本次文件身份，只清理本次新文件，保留其他版本 |
-| patrolService.js | 使用 SalesContract 与财务共享发运30天逾期规则；同管理员同标题未读或24小时内告警去重，保留真实汇率过期提醒 |
 | financeService.js | 付款幂等、应收应付聚合；收款分配逐行正数/合同校验，SQLite 写锁后检查未关联合同的到账来源和剩余金额，分配子行规范化为 USD；通用创建不得携来源 ID 绕过分配；已收货/已到港合同按真实款项自动结清，差异重新打开待结清 |
 | salesCargoLifecycle.js | 销售与旧货柜共用发运/出库证据检查；禁止已出库货物变更及合同删除 |
 | salesFinanceService.js | 按共享所有权判定查询自有采购合同，聚合单柜收入、成本、退税与现金流 |
@@ -114,8 +113,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | taxRefundWorkbenchService.js | 保留既有查询；按申报月份展示逐次出货准备与确认状态，不冒充正式申报 |
 | taxRefundExportService.js | 退税记录与采购合同、发票号码、征税率的导出前严格匹配 |
 | taxRefundDeclarationTableService.js | 已核验 cases 离线生成税局格式进货/出口明细申报表（官方样表版式 xlsx）、plan.json 与核对结果；精确十进制、受限输出、不连库不联网，由 `scripts/build_tax_refund_declaration_tables.js` 调用，生成物不代表已申报 |
-| exportReminderService.js | 次月5号内部退税材料准备提醒、已出货缺发票提醒（幂等通知） |
-| patrolService.js | 业务 / 系统巡检、管理员通知、系统操作日志 |
+| exportReminderService.js | 次月5号内部退税材料准备提醒（幂等通知；缺发票催办由首页 TodoBoard 承担） |
 
 ## 工具清单
 

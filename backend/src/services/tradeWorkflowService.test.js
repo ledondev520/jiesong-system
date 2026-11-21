@@ -104,7 +104,7 @@ test('未关联采购合同时明确阻塞而不是伪造完成线路', () => {
   assert.equal(workflow.stages[0].status, 'blocked');
   assert.match(workflow.stages[0].reason, /未关联购销合同/);
   assert.equal(workflow.nextAction.label, '关联购销合同');
-  assert.equal(workflow.nextAction.href, '/dashboard/sales/sc-1');
+  assert.equal(workflow.nextAction.href, '/dashboard/orders/sc-1');
 });
 
 test('商业利用率达标但存在未装箱时装柜阶段保持阻塞', () => {

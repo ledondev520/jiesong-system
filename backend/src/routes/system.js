@@ -189,10 +189,4 @@ router.get('/export/:type/pdf', roleAuth(ROLE_SETS.ALL), paymentsExportGuard, wi
 // GET /api/v1/system/event-ledger - 获取统一事件流（仅管理员）
 router.get('/event-ledger', roleAuth(ROLE_SETS.ADMIN), withPaginationValidation, systemController.getEventLedger);
 
-// GET /api/v1/system/patrol/status - 获取巡检状态（仅管理员）
-router.get('/patrol/status', roleAuth(ROLE_SETS.ADMIN), systemController.getPatrolStatus);
-
-// POST /api/v1/system/patrol/trigger - 手动触发巡检（仅管理员）
-router.post('/patrol/trigger', roleAuth(ROLE_SETS.ADMIN), systemController.triggerPatrol);
-
 module.exports = router;

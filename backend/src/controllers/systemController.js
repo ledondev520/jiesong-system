@@ -42,26 +42,6 @@ const {
   removeCustomsBroker,
 } = require('./system/customsBrokerController');
 const { getEventLedger } = require('./system/eventLedgerController');
-const { getPatrolStatus, executePatrol } = require('../jobs/patrolJob');
-const { success } = require('../utils/response');
-
-const getPatrolStatusCtrl = async (_req, res, next) => {
-  try {
-    const status = getPatrolStatus();
-    success(res, status);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const triggerPatrolCtrl = async (_req, res, next) => {
-  try {
-    const result = await executePatrol('manual');
-    success(res, result);
-  } catch (error) {
-    next(error);
-  }
-};
 
 module.exports = {
   getConfigs,
@@ -92,6 +72,4 @@ module.exports = {
   exportData,
   exportDataPdf,
   getEventLedger,
-  getPatrolStatus: getPatrolStatusCtrl,
-  triggerPatrol: triggerPatrolCtrl,
 };
