@@ -106,7 +106,6 @@ describe("navigation.config helpers", () => {
       "/dashboard/hs-codes": "hs-codes",
       "/dashboard/finance/statements": "finance",
       "/dashboard/payments": "finance",
-      "/dashboard/settings/ai-usage": "admin",
       "/dashboard/settings/users": "admin",
       "/dashboard/settings/logs": "admin",
     };

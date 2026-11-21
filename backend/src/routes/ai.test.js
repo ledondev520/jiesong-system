@@ -25,7 +25,3 @@ test('ai route includes agent runtime prompt endpoint', () => {
   assert.notEqual(index, -1, '缺少 POST /agents/prompt 路由');
 });
 
-test('ai route includes agent tool registry endpoint', () => {
-  const index = getRouteIndex(aiRouter, '/agents/tools', 'get');
-  assert.notEqual(index, -1, '缺少 GET /agents/tools 路由');
-});

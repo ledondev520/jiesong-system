@@ -50,9 +50,9 @@ const start = async (t) => {
 // OD-8: SALES is the only other live role; the retired roles must still be refused (assertActiveRole).
 const NON_ADMIN = ['SALES', 'PURCHASE', 'FINANCE', 'WAREHOUSE', 'BOSS'];
 
-test('A1：/ai/usage/* 与 /import/{history,stats}（routes/dataImport.js） 仅 ADMIN', async (t) => {
+test('A1：/import/{history,stats}（routes/dataImport.js） 仅 ADMIN', async (t) => {
   const call = await start(t);
-  for (const path of ['/ai/usage/trend', '/ai/usage/calls', '/ai/usage/summary', '/import/history', '/import/stats']) {
+  for (const path of ['/import/history', '/import/stats']) {
     for (const role of NON_ADMIN) assert.equal(await call('GET', path, role), 403, `${role} GET ${path}`);
     const admin = await call('GET', path, 'ADMIN');
     assert.ok(![401, 403].includes(admin), `ADMIN GET ${path} -> ${admin}`);

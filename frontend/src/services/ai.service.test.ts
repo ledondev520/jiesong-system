@@ -40,36 +40,12 @@ describe('aiService', () => {
     });
   });
 
-  it('deleteSession: 删除指定会话', async () => {
-    (api.delete as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-
-    await aiService.deleteSession('session_1');
-
-    expect(api.delete).toHaveBeenCalledWith('/ai/sessions/session_1');
-  });
-
-  it('getTokenStats: 传递统计天数参数', async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-
-    await aiService.getTokenStats(7);
-
-    expect(api.get).toHaveBeenCalledWith('/ai/token-stats', { params: { days: 7 } });
-  });
-
   it('getModels: 拉取模型列表', async () => {
     (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
 
     await aiService.getModels();
 
     expect(api.get).toHaveBeenCalledWith('/ai/models');
-  });
-
-  it('getAgentToolRegistry: 拉取 Agent 工具注册表', async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue('ok');
-
-    await aiService.getAgentToolRegistry();
-
-    expect(api.get).toHaveBeenCalledWith('/ai/agents/tools');
   });
 
   it('getDashboardAnalytics: 拉取数据看板指标', async () => {
