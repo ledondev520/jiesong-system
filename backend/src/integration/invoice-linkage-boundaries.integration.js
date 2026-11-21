@@ -50,6 +50,7 @@ test('HTTP/SQLite: invoice linkage preserves source facts and current match stat
     // Authentication must use the database role, not this misleading JWT claim.
     tokens[role] = jwt.sign({ userId: user.id, role: 'ADMIN' }, process.env.JWT_SECRET);
   }
+  const financeMatchService = require('../services/financeMatchService'); // /finance/unmatch HTTP route was removed (A110); undo is exercised at service level
   const app = require('../app');
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
@@ -127,25 +128,21 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
     assert.deepEqual(snapshot(), before, 'duplicate import must preserve the original batch and confirmed match');
     assert.deepEqual(await get(`/bank-flow/invoices/stats?batchId=${imported.batchId}`), { validTotal: 110, validTax: 10, validAmount: 100, validCount: 1, reversedCount: 1, totalCount: 3 });
     const undo = { entityType: 'INVOICE', entityId: normal.id };
-    for (const [role, expected] of [['BOSS', 403], ['INACTIVE', 401], ['ANONYMOUS', 401]]) {
-      assert.equal((await call('/finance/unmatch', undo, role)).status, expected);
-      assert.deepEqual(snapshot(), before);
-    }
     // Force an actual SQLite update failure, rather than mocking the service response.
     runSql(`CREATE TRIGGER synthetic_invoice_undo_failure BEFORE UPDATE ON invoice_records WHEN OLD.id='${normal.id}' AND NEW.matchStatus='PENDING' BEGIN SELECT RAISE(ABORT, 'synthetic undo failure'); END;`);
     try {
-      assert.equal((await call('/finance/unmatch', undo)).status, 500);
+      await assert.rejects(financeMatchService.unmatch(undo.entityType, undo.entityId));
       assert.deepEqual(snapshot(), before, 'failed undo must preserve every match/source/ledger field');
     } finally { runSql('DROP TRIGGER synthetic_invoice_undo_failure;'); }
-    const undone = await good('/finance/unmatch', undo);
+    const undone = await financeMatchService.unmatch(undo.entityType, undo.entityId);
     assert.equal(undone.matchStatus, 'PENDING');
     for (const field of ['matchedContractId', 'matchedContractType', 'matchScore', 'matchedAt']) assert.equal(undone[field], null);
     before = snapshot();
-    await good('/finance/unmatch', undo);
+    await financeMatchService.unmatch(undo.entityType, undo.entityId);
     assert.deepEqual(snapshot(), before, 'repeated undo does not recreate or change any source/ledger rows');
     for (const role of ['ADMIN', 'FINANCE']) {
       await good('/finance/match', matchBody, role);
-      await good('/finance/unmatch', undo, role);
+      await financeMatchService.unmatch(undo.entityType, undo.entityId);
     }
     assert.equal((await db.invoiceRecord.findUnique({ where: { id: normal.id } })).batchId, imported.batchId);
   });

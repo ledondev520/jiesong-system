@@ -22,9 +22,6 @@ const PDF_DOWNLOAD_ROLES = DOC_ROLES;
 
 router.use(authenticate);
 
-// GET /api/v1/contract-doc/template/check - 检查模板状态
-router.get('/template/check', contractDocController.checkTemplate);
-
 // GET /api/v1/contract-doc/templates - 获取模板列表（当前单模板）
 router.get('/templates', contractDocController.getTemplates);
 

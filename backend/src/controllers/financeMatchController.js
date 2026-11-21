@@ -72,28 +72,6 @@ const manualMatch = async (req, res, next) => {
 };
 
 /**
- * 职责：解除关联
- */
-const unmatch = async (req, res, next) => {
-  try {
-    const { entityType, entityId } = req.body;
-
-    if (!entityType || !entityId) {
-      return next(createError('entityType、entityId 均为必填', 400));
-    }
-
-    if (!['BANK', 'INVOICE'].includes(entityType)) {
-      return next(createError('entityType 必须是 BANK 或 INVOICE', 400));
-    }
-
-    const result = await financeMatchService.unmatch(entityType, entityId);
-    success(res, result, '已解除关联');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：忽略该项
  */
 const ignore = async (req, res, next) => {
@@ -142,7 +120,6 @@ module.exports = {
   autoMatch,
   getUnmatched,
   manualMatch,
-  unmatch,
   ignore,
   listContracts,
 };

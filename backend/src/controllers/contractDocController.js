@@ -102,18 +102,6 @@ const uploadTemplate = async (req, res, next) => {
 };
 
 /**
- * 职责：检查模板状态
- */
-const checkTemplate = async (req, res, next) => {
-  try {
-    const exists = await contractDocService.checkTemplateExists();
-    success(res, { exists }, exists ? '模板已配置' : '模板未配置');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：获取模板列表（当前仅支持单模板）
  */
 const getTemplates = async (req, res, next) => {
@@ -182,7 +170,6 @@ const getContractPdf = async (req, res, next) => {
 module.exports = {
   generateFromPurchase,
   uploadTemplate,
-  checkTemplate,
   getTemplates,
   deleteTemplate,
   getContractPdf,

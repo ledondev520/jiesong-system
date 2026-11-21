@@ -256,7 +256,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
   await t.test('intentional DataExport read auditing remains distinct from unchanged business rows', async () => {
     const before = snapshot();
     const requestId = 'synthetic-audit-read-export';
-    const result = await call('/system/export/products', 'ADMIN', { requestId });
+    const result = await call('/export/products', 'ADMIN', { requestId });
     assert.equal(result.status, 200);
     assert.deepEqual(Papa.parse(result.bytes.toString('utf8'), { skipEmptyLines: true }).data, [['ID', '报关名', '描述', '规格', '单位', '分类']]);
     let audit;

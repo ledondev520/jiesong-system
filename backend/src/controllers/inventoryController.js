@@ -12,9 +12,6 @@ const { createError } = require('../middleware/errorHandler');
 const { validateInventoryTransition } = require('../utils/inventoryStateMachine');
 const { normalizePagination } = require('../utils/pagination');
 const { parseListSort } = require('../utils/listSort');
-const { getInventorySnapshot } = require('../services/inventorySnapshot');
-const { listLowStockAlerts } = require('../services/inventoryAlertService');
-const { normalizeLocationField } = require('../utils/inventoryLocation');
 
 /**
  * 职责：获取库存列表并支持条件筛选。
@@ -132,22 +129,6 @@ const list = async (req, res, next) => {
 };
 
 /**
- * 职责：按商品汇总库存快照。
- */
-const getSnapshot = async (req, res, next) => {
-  try {
-    const { productId } = req.query;
-    const snapshot = await getInventorySnapshot(prisma, {
-      productId: productId || null,
-    });
-
-    success(res, snapshot);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：获取库存详情
  */
 const getById = async (req, res, next) => {
@@ -168,38 +149,6 @@ const getById = async (req, res, next) => {
     }
     
     success(res, inventory);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：更新单条库存状态并执行状态机校验。
- * 思路：
- * 1. 读取库存当前状态；
- * 2. 执行状态机规则校验；
- * 3. 校验通过后更新状态及状态时间戳。
- * @param {import('express').Request} req 请求对象
- * @param {import('express').Response} res 响应对象
- * @param {import('express').NextFunction} next 错误透传
- * @returns {Promise<void>}
- */
-/**
- * 职责：登记/修改库存的批次号与库位（A83）。省略字段保持原值，空串清空。
- * 不触碰状态、数量与来源，因此对验货来源库存同样允许。
- */
-const updateLocation = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const body = req.body || {};
-    const data = {};
-    if (body.lotNo !== undefined) data.lotNo = normalizeLocationField(body.lotNo, '批次号');
-    if (body.binLocation !== undefined) data.binLocation = normalizeLocationField(body.binLocation, '库位');
-    if (Object.keys(data).length === 0) throw createError('请提供批次号或库位', 400);
-    const existing = await prisma.inventory.findUnique({ where: { id }, select: { id: true } });
-    if (!existing) throw createError('库存记录不存在', 404);
-    const updated = await prisma.inventory.update({ where: { id }, data, select: { id: true, lotNo: true, binLocation: true } });
-    success(res, updated, '库位信息已更新');
   } catch (error) {
     next(error);
   }
@@ -340,111 +289,9 @@ const batchUpdateStatus = async (req, res, next) => {
   }
 };
 
-/**
- * 职责：按商品查询库存
- */
-const getByProduct = async (req, res, next) => {
-  try {
-    const { productId } = req.params;
-    
-    const inventories = await prisma.inventory.findMany({
-      where: { productId },
-      include: {
-        salesContract: { include: { port: true } },  // 原 container
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    
-    // 计算汇总
-    const summary = {
-      total: inventories.reduce((sum, inv) => sum + inv.quantity, 0),
-      byStatus: {},
-    };
-    
-    inventories.forEach(inv => {
-      if (!summary.byStatus[inv.status]) {
-        summary.byStatus[inv.status] = 0;
-      }
-      summary.byStatus[inv.status] += inv.quantity;
-    });
-    
-    success(res, { inventories, summary });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：按出口合同查询库存（原按货柜查询）
- */
-const getByContract = async (req, res, next) => {
-  try {
-    const { contractId } = req.params;
-    
-    const inventories = await prisma.inventory.findMany({
-      where: { salesContractId: contractId },
-      include: { product: true },
-    });
-    
-    success(res, inventories);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：获取库存统计
- */
-const getStats = async (req, res, next) => {
-  try {
-    const stats = await prisma.inventory.groupBy({
-      by: ['status'],
-      _count: true,
-      _sum: { quantity: true },
-    });
-    
-    const formatted = stats.reduce((acc, item) => {
-      acc[item.status] = {
-        count: item._count,
-        quantity: item._sum.quantity,
-      };
-      return acc;
-    }, {});
-    
-    success(res, formatted);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：获取低库存预警列表（按商品维度）。
- */
-const getAlerts = async (req, res, next) => {
-  try {
-    const { page, pageSize, skip } = normalizePagination(req.query, { pageSize: 20, maxPageSize: 100 });
-    const keyword = String(req.query.keyword || '').trim();
-
-    const { alerts, checkedAt } = await listLowStockAlerts(prisma, {
-      keyword,
-    });
-
-    const items = alerts.slice(skip, skip + pageSize);
-    paginated(res, items, alerts.length, page, pageSize, { checkedAt });
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   list,
   getById,
   updateStatus,
-  updateLocation,
   batchUpdateStatus,
-  getByProduct,
-  getByContract,  // 原 getByContainer
-  getSnapshot,
-  getStats,
-  getAlerts,
 };

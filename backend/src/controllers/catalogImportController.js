@@ -2,7 +2,6 @@ const service = require('../services/catalogImportService');
 const { success } = require('../utils/response');
 const { createError } = require('../middleware/errorHandler');
 
-const listTemplates = (req, res) => success(res, service.listTemplates());
 const downloadTemplate = async (req, res, next) => {
   try {
     const format = req.query.format || 'xlsx';
@@ -26,4 +25,4 @@ const execute = async (req, res, next) => {
     }));
   } catch (error) { next(error); }
 };
-module.exports = { listTemplates, downloadTemplate, preview, execute };
+module.exports = { downloadTemplate, preview, execute };

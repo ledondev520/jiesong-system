@@ -79,7 +79,7 @@ test('purchase imports use memory and all representative upload routes reject NU
   // Construct raw headers to ensure NUL bytes really reach Busboy unchanged.
   // files.js validates only the nonempty contract ID before contractUpload;
   // malformed headers therefore fail before any DB/controller/archive access.
-  for (const route of ['/api/v1/purchases/import', '/api/v1/import', '/api/v1/system/import', '/api/v1/contracts/synthetic-contract/files']) {
+  for (const route of ['/api/v1/purchases/import', '/api/v1/import/catalog/products/preview', '/api/v1/contracts/synthetic-contract/files']) {
     const boundary = 'synthetic-multipart-boundary';
     const body = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="evil\u0000.xlsx"\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\nsynthetic\r\n--${boundary}--\r\n`);
     const response = await fetch(`${base}${route}`, { method: 'POST', headers: { 'content-type': `multipart/form-data; boundary=${boundary}` }, body });

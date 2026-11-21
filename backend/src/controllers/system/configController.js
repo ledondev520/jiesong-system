@@ -8,7 +8,6 @@ const https = require('https');
 const prisma = require('../../utils/prisma');
 const { success } = require('../../utils/response');
 const { createError } = require('../../middleware/errorHandler');
-const { loadPricingSnapshot, updatePricingConfig } = require('../../services/pricingConfigService');
 const { currentRates } = require('../../services/exportPricing');
 const {
   normalizeConfigValueForResponse,
@@ -26,43 +25,6 @@ const EXCHANGE_RATE_SYNC_TIMEOUT_MS = parsePositiveIntEnv(
   1800,
 );
 const EXCHANGE_RATE_MAX_BODY_CHARS = 64 * 1024; // 公共汇率 API 的正常响应约 4KB
-// 同步值的合理区间与单次最大偏移；超出则拒绝自动写入（负责人决定无确认步骤，但异常值不能直接重定价）。
-const FX_SYNC_BAND = { min: 5, max: 10, maxJump: 0.05 };
-
-/**
- * 配置键到域的映射表（不改 schema，仅在应用层做域划分）
- * - 新增配置 key 时，须在此表补充对应域，否则归入 "其他" 域。
- */
-const CONFIG_DOMAIN_MAP = {
-  // 基础参数域：影响定价与汇率计算的全局数值
-  stampPlatformUrl: { domain: 'params', label: '基础参数', note: '线上盖章平台链接（购销合同生成后跳转盖章）' },
-  invoiceTitleInfo: { domain: 'company', label: '公司信息', note: '（旧，只读别名）我方开票抬头信息；已并入公司信息，请在「设置 > 公司信息」维护' },
-
-  // 公司信息域：报价/PI 导出的卖方块（负责人 2026-10-31）。银行信息为 Restricted，仅 ADMIN/FINANCE 可经 GET /configs 读取。
-  companyName:     { domain: 'company', label: '公司信息', note: '报价/PI 卖方公司名称' },
-  companyAddress:  { domain: 'company', label: '公司信息', note: '报价/PI 卖方地址' },
-  companyBankInfo: { domain: 'company', label: '公司信息', note: '报价/PI 收款银行信息（多行，Restricted）' },
-  companyPhone:    { domain: 'company', label: '公司信息', note: '卖方电话（报价/PI、开票抬头）' },
-  companyTaxId:    { domain: 'company', label: '公司信息', note: '纳税人识别号（开票抬头）' },
-
-  // 数据字典域：系统枚举值与下拉列表
-  units:        { domain: 'dictionary', label: '数据字典', note: '商品计量单位枚举' },
-  brokers:      { domain: 'dictionary', label: '数据字典', note: '报关公司枚举' },
-
-  // AI 集成域：外部 AI 服务鉴权与参数
-  apiKey:         { domain: 'ai', label: 'AI集成', note: 'Kimi API 密钥（脱敏存储）' },
-  deepseekApiKey: { domain: 'ai', label: 'AI集成', note: 'DeepSeek API 密钥（脱敏存储）' },
-  kimiModel:      { domain: 'ai', label: 'AI集成', note: 'Kimi 模型名称' },
-  aiChatModel:     { domain: 'ai', label: 'AI集成', note: 'AI 助手问答场景使用的模型' },
-  aiHsCodeModel:   { domain: 'ai', label: 'AI集成', note: 'HS Code 推荐与申报要素场景使用的模型' },
-  aiPrimaryModel:  { domain: 'ai', label: 'AI集成', note: '（旧）AI 首选模型（已迁移至场景化配置）' },
-  aiFallbackModel: { domain: 'ai', label: 'AI集成', note: '（旧）AI 备用模型（已迁移至场景化配置）' },
-  aiTemperature:  { domain: 'ai', label: 'AI集成', note: '采样温度 0–1' },
-  aiMaxTokens:    { domain: 'ai', label: 'AI集成', note: '最大输出 token 数' },
-
-  // HSCIQ 海关归类 API 集成
-  hsciqEnabled:   { domain: 'ai', label: 'AI集成', note: '是否启用 HSCIQ 海关归类 API（开启后 HS 编码推荐与申报要素将优先调用官方 API）' },
-};
 
 // 汇率/加价只来自报价配置（config/pricing.json，经 /system/pricing-config）；普通 SystemConfig 不能再保存这两项。
 const PRICING_CONFIG_KEYS = ['exchangeRate', 'profitRate'];
@@ -70,8 +32,6 @@ const PRICING_CONFIG_KEYS = ['exchangeRate', 'profitRate'];
 const BANK_CONFIG_READ_ROLES = ['ADMIN'];
 // 旧 invoiceTitleInfo 文本可能含开户行及账号，按同一受限口径处理。
 const RESTRICTED_CONFIG_KEYS = ['companyBankInfo', 'invoiceTitleInfo'];
-
-const getDomainMeta = (key) => CONFIG_DOMAIN_MAP[key] || { domain: 'other', label: '其他', note: '' };
 
 const buildConfigValue = (key, value) => {
   if (value === undefined || value === null) {
@@ -179,49 +139,6 @@ const getConfigs = async (req, res, next) => {
 };
 
 /**
- * 职责：获取按域分组的系统配置（分域格式，供新前端页面使用）
- * 思路：
- *   1. 从 DB 读取全量 KV
- *   2. 按 CONFIG_DOMAIN_MAP 归类为 params / dictionary / ai / other 四域
- *   3. 每个域返回 { domain, label, configs: [{key, value, note}] }
- *
- * @returns {Object[]} 域分组数组
- */
-const getConfigsByDomain = async (req, res, next) => {
-  try {
-    const configs = await prisma.systemConfig.findMany();
-
-    // 0. 按域收集
-    const domainBuckets = {};
-    for (const config of configs) {
-      const meta = getDomainMeta(config.key);
-      if (!domainBuckets[meta.domain]) {
-        domainBuckets[meta.domain] = {
-          domain: meta.domain,
-          label: meta.label,
-          configs: [],
-        };
-      }
-      domainBuckets[meta.domain].configs.push({
-        key: config.key,
-        value: buildConfigValue(config.key, config.value),
-        note: config.note || meta.note || '',
-      });
-    }
-
-    // 1. 保持域的展示顺序
-    const orderedDomains = ['params', 'dictionary', 'ai', 'other'];
-    const result = orderedDomains
-      .filter((d) => domainBuckets[d])
-      .map((d) => domainBuckets[d]);
-
-    success(res, result);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：更新单个系统配置（upsert）
  * @param req.params.key 配置键名
  * @param req.body.value 新值
@@ -270,43 +187,6 @@ const getExchangeRate = async (req, res, next) => {
   }
 };
 
-/**
- * 职责：从公共汇率 API 取现汇，并作为唯一报价配置的 exchangeRate 保存（带版本校验，ADMIN）
- * 思路：读取当前配置与版本 → 只替换 exchangeRate → 原子整份替换；不再写 SystemConfig。
- */
-const syncExchangeRate = async (req, res, next) => {
-  // 1. 上游取数失败（网络/超时/解析/过大）才降级为“返回当前汇率”；写入阶段的错误不能伪装成成功。
-  let rate;
-  try {
-    rate = await fetchUsdCnyRate();
-  } catch (error) {
-    try {
-      const currentRate = await resolveExchangeRateConfig();
-      return success(res, {
-        ...currentRate,
-        source: 'cached',
-        syncStatus: 'degraded',
-        error: error.message,
-      }, `汇率同步暂不可用，已返回当前系统汇率：${currentRate.rate}`);
-    } catch (fallbackError) {
-      return next(createError(`汇率同步失败: ${fallbackError.message}`, 503));
-    }
-  }
-  try {
-    const { config, revision } = loadPricingSnapshot();
-    const jump = Math.abs(rate - config.exchangeRate) / config.exchangeRate;
-    if (rate < FX_SYNC_BAND.min || rate > FX_SYNC_BAND.max || jump > FX_SYNC_BAND.maxJump) {
-      throw createError(`同步到的汇率 ${rate} 超出安全范围（区间 ${FX_SYNC_BAND.min}–${FX_SYNC_BAND.max}，与当前 ${config.exchangeRate} 偏差不得超过 ${FX_SYNC_BAND.maxJump * 100}%），未写入。请在 设置 > 报价配置 手动设置现汇`, 409);
-    }
-    updatePricingConfig({ ...config, exchangeRate: rate }, revision, req.user?.id);
-    const buffer = -config.exchangeAdjustment;
-    return success(res, { rate, buffer, effectiveRate: Math.round((rate - buffer) * 1e6) / 1e6 }, `汇率已同步：1 USD = ${rate} CNY`);
-  } catch (error) {
-    // 冲突/锁/校验/文件写入错误一律如实返回，不走“同步降级”成功路径。
-    return next(error);
-  }
-};
-
 /** 统一卖方信息（canonical 键 + 旧 invoiceTitleInfo 别名兜底）；银行资料仅 ADMIN/FINANCE 可得。 */
 const getSellerIdentity = async (req, res, next) => {
   try {
@@ -320,8 +200,6 @@ module.exports = {
   getSellerIdentity,
   fetchUsdCnyRate,
   getConfigs,
-  getConfigsByDomain,
   updateConfig,
   getExchangeRate,
-  syncExchangeRate,
 };

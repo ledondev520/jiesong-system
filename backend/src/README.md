@@ -100,7 +100,6 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | agentReplaySummaryService.js | Agent 回放摘要持久化，支持复用外层事务客户端 |
 | importService.js | 仅内存CSV/xlsx字节导入，拒绝字符串路径与磁盘上传对象，避免路径穿越/绝对路径/符号链接读取；导入记录文件名去控制字符并按 `/` 与 `\` 取末段，仅作展示 |
 | exportService.js | 多格式数据导出（CSV + 出口合同五 Sheet Excel 含商业发票/税务测算）；收付款 CSV 沿用财务现有 PAYABLE/PAYABLE_PAYMENT/EXPENSE 应付分组，只转换标签 |
-| pdfExportService.js | 销售合同 / 系统数据 PDF 导出 |
 | exportReadinessService.js | 全量出口装箱行、逐行确认优先的 HS/申报要素/货源地、出口价格与采购专票口径退税准备度 |
 | exportPacketService.js | 出口三单预检、现汇减 0.2 定价、历史报价筛选、逐行申报资料、三 Sheet 生成与受限归档 |
 | threeFormsService.js | 基于出口准备度预览/生成报关单、外汇核销单、出口退税单与三 Sheet Excel |
@@ -112,7 +111,6 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 | taxRefundPreparationService.js | 2026 退税材料清单；区分签署件/生成件、提运单/装箱单；导出出货关联与自动核验 |
 | taxRefundShipmentService.js | 按报关单归集出货资料、机器核验、版本确认归档与全量跨月准备汇总；技术时间戳不触发重新确认 |
 | taxRefundWorkbenchService.js | 保留既有查询；按申报月份展示逐次出货准备与确认状态，不冒充正式申报 |
-| taxRefundExportService.js | 退税记录与采购合同、发票号码、征税率的导出前严格匹配 |
 | taxRefundDeclarationTableService.js | 已核验 cases 离线生成税局格式进货/出口明细申报表（官方样表版式 xlsx）、plan.json 与核对结果；精确十进制、受限输出、不连库不联网，由 `scripts/build_tax_refund_declaration_tables.js` 调用，生成物不代表已申报 |
 | exportReminderService.js | 次月5号内部退税材料准备提醒、已出货缺发票提醒（幂等通知） |
 | patrolService.js | 业务 / 系统巡检、管理员通知、系统操作日志 |
@@ -137,7 +135,6 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 
 - WPS同步状态：`services/wpsSyncStatusService.js` 从受限本机回执提供汇总；认证后的 `GET /dashboard/wps-sync` 返回最近成功时间、失败/过期状态及待核对数量，不返回源文件、摘要或业务明细。超过90分钟未核对标记过期。
 
-- 采购模板：`routes/procurementTemplate.js` 的门店列表、通用模板、历史采购明细三个读取入口均先执行 `authenticate`，保持既有响应格式。
 
 - `inventorySnapshot.js`：库存行占用用条件更新（状态/未占用/数量），并发出货冲突 409；以自有装箱行扣减对应采购来源、单位的合格库存，旧销售明细兼容不双计；回滚保留验货来源；实际自有出库数量必须有限且为正，草稿零值、非自有拼柜与价格/单证补录不受影响。
 - `salesService.updateSalesStatus` 以规范化后的当前状态判断真实流转，历史 `OUT_STOCK` 重放 `SHIPPED` 只规范状态，不重新校验装载、改发运时间或扣库。
@@ -166,7 +163,6 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 - `integration/purchase-excel-import.integration.js` 以真实 multipart HTTP、合成工作簿和已提交迁移构建的私有 0700/0600 SQLite 验证六类当前采购 Excel 导入：有效值、缺必需表头/文件、逐行错误、非法非空金额/日期拒绝、显式编号与空编号重传、历史完成状态确认。独立只读 SQLite 比较原记录及关联表，不访问生产或宣称浏览器验收。
 - `integration/procurement-lifecycle.integration.js` 仅用临时合成 SQLite 和实际 PURCHASE/WAREHOUSE HTTP 请求验证签约、完工回滚/重复、到货与复验幂等、库存列表/详情、删除后编号及同时创建；还验证实际 Excel 导入的自定义编号、五位序列溢出、失败行无写入及四请求并发，由 `npm run test:db` 执行
 
-- `services/batchImportService.js` 的 JSON 采购导入先拒绝非对象行、空白/非文本供应商与商品名称，避免缺省查询条件误选首条目录记录；数量必须有限且大于零，单价必须有限且非负，只接受数字或非空数值字符串，保留零单价。每行事务提交合同与明细；自动编号冲突或事务写冲突最多尝试五次，不更改显式编号，不重试无关错误；失败行回滚且后续行继续
 - `integration/purchase-batch-import.integration.js` 通过真实认证 HTTP/30次迁移后的临时 SQLite 验证四请求并发、SQL 明细故障无孤立合同、部分成功、显式/溢出编号及原有 RBAC；补充非法行形状前后继续、缺省名称不误配、数量/单价范围与类型、跨请求显式编号重试，以及编号预览不保存/多明细创建失败全回滚和修正重试。拒绝操作对合同、明细、目录及来源库存使用完整落库快照校验，由 `npm run test:db` 执行；这不是采购页面 Excel 导入或浏览器预览验收
 
 - `integration/purchase-receipt-exceptions.integration.js` 使用实际 PURCHASE HTTP 认证、临时 SQLite 及第二个 HTTP 进程，补充并发同请求/内容冲突、合法到齐/竞争超订、累计复验、跨批引用、整批回滚、真实库存 SQL 故障后原请求重试和既有受限财务/管理 RBAC；不修改既有普通销售与付款权限，由 `npm run test:db` 执行

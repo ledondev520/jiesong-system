@@ -24,19 +24,6 @@ const list = async (req, res, next) => {
 };
 
 /**
- * 职责：获取单个合同模板详情
- */
-const getById = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const template = await contractTemplateService.getById(id);
-    success(res, template);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：创建合同模板
  */
 const create = async (req, res, next) => {
@@ -51,22 +38,7 @@ const create = async (req, res, next) => {
   }
 };
 
-/**
- * 职责：删除合同模板
- */
-const remove = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    await contractTemplateService.remove(id);
-    success(res, null, '合同模板删除成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   list,
-  getById,
   create,
-  remove,
 };

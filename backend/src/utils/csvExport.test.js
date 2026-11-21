@@ -24,11 +24,8 @@ test('csvSafeText prefixes formula triggers but keeps numbers and normal text', 
 
 test('all CSV writers neutralise formula cells', () => {
   const { toCSV } = require('../services/exportService');
-  const { buildCsv } = require('../services/taxRefundExportService');
   const { buildOperationLogCsv } = require('../controllers/system/notificationController');
   assert.match(toCSV(['h'], [['=1+1'], [-3]]), /"'=1\+1"\n"-3"$/);
-  assert.match(buildCsv([{ refund_no: '@x', note: '=HYPERLINK("u")' }]), /^refund_no,[^\n]*\n'@x,/);
-  assert.match(buildCsv([{ note: '=HYPERLINK("u")' }]), /"'=HYPERLINK/);
   const log = buildOperationLogCsv([{ id: 1, user: { username: '=cmd' }, action: '+a', entity: 'E', newValue: '-x' }]);
   assert.match(log, /"'=cmd"/);
   assert.match(log, /"'\+a"/);

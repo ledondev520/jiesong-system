@@ -20,22 +20,8 @@ const getRouteIndex = (router, path, method) => {
   });
 };
 
-test('system route includes CSV export endpoint', () => {
-  const index = getRouteIndex(systemRouter, '/export/:type', 'get');
-  assert.notEqual(index, -1, '缺少 GET /export/:type 路由');
-});
-
-test('system route includes PDF export endpoint', () => {
-  const index = getRouteIndex(systemRouter, '/export/:type/pdf', 'get');
-  assert.notEqual(index, -1, '缺少 GET /export/:type/pdf 路由');
-});
-
 test('system route includes operation logs CSV export endpoint', () => {
   const index = getRouteIndex(systemRouter, '/logs/export/csv', 'get');
   assert.notEqual(index, -1, '缺少 GET /logs/export/csv 路由');
 });
 
-test('system route includes event ledger endpoint', () => {
-  const index = getRouteIndex(systemRouter, '/event-ledger', 'get');
-  assert.notEqual(index, -1, '缺少 GET /event-ledger 路由');
-});

@@ -175,13 +175,6 @@ router.post(
   financeMatchController.manualMatch
 );
 
-// POST /api/v1/finance/unmatch - 解除关联
-router.post(
-  '/unmatch',
-  roleAuth(ROLE_SETS.ADMIN),
-  financeMatchController.unmatch
-);
-
 // POST /api/v1/finance/ignore - 忽略该项
 router.post(
   '/ignore',

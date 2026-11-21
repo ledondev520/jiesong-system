@@ -14,7 +14,6 @@ const openAgentService = require('../services/openAgentService');
 const anthropicCompatService = require('../services/anthropicCompatService');
 const { buildGovernanceReplayProfile } = require('../services/governanceReplayService');
 const { buildReplaySummaryProfileMap } = require('../services/agentReplaySummaryService');
-const { normalizeConfigValueForStorage } = require('../utils/secretCrypto');
 
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
@@ -263,57 +262,6 @@ const chat = async (req, res, next) => {
 };
 
 /**
- * 职责：流式智能问答（SSE，支持 thinking 展示）
- * 思路：
- * 1. 设置SSE响应头
- * 2. 调用aiService的流式聊天
- * 3. 分别发送 thinking 和 content 给前端
- */
-const chatStream = async (req, res) => {
-  try {
-    const message = parseMessage(req.body);
-    const { sessionId, imageUrl } = req.body;
-    const userId = req.user.id;
-    
-    // 生成会话ID
-    const currentSessionId = sessionId || `session_${Date.now()}`;
-    
-    setSseHeaders(res);
-    
-    // 发送sessionId
-    sendSseMessage(res, { type: 'session', sessionId: currentSessionId });
-    
-    // 发送开始处理消息
-    sendSseMessage(res, { type: 'start', message: '开始处理...' });
-    
-    // 流式调用AI服务（支持 thinking）
-    const result = await aiService.chatStream(
-      userId, 
-      currentSessionId, 
-      message, 
-      imageUrl,
-      // onChunk - 最终内容回调
-      (chunk) => {
-        sendSseMessage(res, { type: 'chunk', content: chunk });
-      },
-      // onThinking - 思考过程回调
-      (thinking) => {
-        sendSseMessage(res, { type: 'thinking', content: thinking });
-      },
-      req.user.role,
-    );
-    
-    // 发送完成消息
-    sendSseMessage(res, { type: 'done', tokenUsage: result.tokenUsage, model: result.model });
-    
-    res.end();
-  } catch (error) {
-    sendSseMessage(res, { type: 'error', message: error.message });
-    res.end();
-  }
-};
-
-/**
  * 职责：解析输入内容（辅助录入，支持图片）
  * 思路：
  * 1. 接收文本或图片
@@ -329,30 +277,6 @@ const parseInput = async (req, res, next) => {
     const parsed = await aiService.parseInput(content, type, imageUrl, userId);
     
     success(res, parsed);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：运行预置业务 Agent
- * 思路：
- * 1. 校验 agentType / message
- * 2. 调用 openAgentService 执行一次 in-process agent prompt
- * 3. 返回会话、回答、token 用量与 Agent 类型
- */
-const agentPrompt = async (req, res, next) => {
-  try {
-    const message = parseMessage(req.body);
-    const agentType = parseAgentType(req.body);
-    const result = await openAgentService.runAgentPrompt({
-      userId: req.user.id,
-      userRole: req.user.role,
-      agentType,
-      message,
-      sessionId: req.body?.sessionId,
-    });
-    success(res, result);
   } catch (error) {
     next(error);
   }
@@ -773,36 +697,6 @@ const deleteSession = async (req, res, next) => {
 };
 
 /**
- * 职责：配置AI设置（仅管理员）
- * 思路：
- * 1. 更新 Kimi / MiniMax API Key
- * 2. 更新模型优先级（primaryModel、fallbackModel）
- */
-const updateConfig = async (req, res, next) => {
-  try {
-    const { apiKey, baseUrl, minimaxApiKey, primaryModel, fallbackModel } = req.body;
-
-    const upsertConfig = async (key, value, note) => {
-      const stored = normalizeConfigValueForStorage(key, value);
-      await prisma.systemConfig.upsert({
-        where: { key },
-        update: { value: stored, note },
-        create: { key, value: stored, note },
-      });
-    };
-
-    if (apiKey) await upsertConfig('kimiApiKey', apiKey, 'Kimi API Key (加密存储)');
-    if (minimaxApiKey) await upsertConfig('minimaxApiKey', minimaxApiKey, 'MiniMax API Key (加密存储)');
-    if (primaryModel) await upsertConfig('aiPrimaryModel', primaryModel, 'AI 首选模型');
-    if (fallbackModel !== undefined) await upsertConfig('aiFallbackModel', fallbackModel, 'AI 备用模型');
-
-    success(res, null, 'AI配置更新成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：获取Token使用统计
  */
 const getTokenStats = async (req, res, next) => {
@@ -848,68 +742,9 @@ const getModels = async (req, res, next) => {
   }
 };
 
-/**
- * 职责：获取AI问候语（带五月天歌词）
- */
-const getGreeting = async (req, res, next) => {
-  try {
-    const result = await aiService.generateGreeting();
-    
-    success(res, {
-      greeting: result.greeting,
-      songName: result.songName,
-      lyrics: result.lyrics,
-      source: result.source,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：流式获取AI问候语（支持 thinking 展示）
- * 思路：
- * 1. 使用 SSE 流式返回
- * 2. 先返回 thinking 内容
- * 3. 再返回最终内容
- */
-const getGreetingStream = async (req, res) => {
-  // 设置 SSE 响应头
-  setSseHeaders(res);
-
-  try {
-    await aiService.generateGreetingStream(
-      // onThinking - 思考过程回调
-      (chunk) => {
-        sendSseMessage(res, { type: 'thinking', content: chunk });
-      },
-      // onContent - 最终内容回调
-      (chunk) => {
-        sendSseMessage(res, { type: 'content', content: chunk });
-      },
-      // onDone - 完成回调
-      (result) => {
-        sendSseMessage(res, {
-          type: 'done',
-          greeting: result.greeting,
-          songName: result.songName,
-          lyrics: result.lyrics,
-          source: result.source,
-        });
-        res.end();
-      }
-    );
-  } catch (error) {
-    sendSseMessage(res, { type: 'error', message: error.message });
-    res.end();
-  }
-};
-
 module.exports = {
   chat,
-  chatStream,
   parseInput,
-  agentPrompt,
   agentToolRegistry,
   agentPromptStream,
   executeAgentAction,
@@ -920,9 +755,6 @@ module.exports = {
   getSessions,
   getStandaloneTokenUsage,
   deleteSession,
-  updateConfig,
   getTokenStats,
   getModels,
-  getGreeting,
-  getGreetingStream,
 };

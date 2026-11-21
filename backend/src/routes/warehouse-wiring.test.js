@@ -18,9 +18,6 @@ let updateInput = null;
 const SECRET_PURCHASE = { id: 'pc-1', contractNo: 'PO-1', status: 'DRAFT', totalAmount: 9876, paidAmount: 5, invoiceNo: 'INV-SECRET-1', items: [{ id: 'i1', unitPrice: 7.5, totalPrice: 75 }] };
 purchaseCommands.updatePurchase = async ({ input }) => { updateInput = input; return SECRET_PURCHASE; };
 purchaseCommands.createPurchaseWithItems = async () => SECRET_PURCHASE;
-const queryCommands = require('../agent/commands/query');
-let searchArgs = null;
-queryCommands.searchEntities = async (args) => { searchArgs = args; return []; };
 
 const createRes = () => {
   const res = { headers: {}, payload: null, sent: null };
@@ -32,20 +29,17 @@ const createRes = () => {
 };
 const next = (e) => { if (e) throw e; };
 
-test('CSV/PDF 导出控制器：WAREHOUSE 传 includeMoney:false，其他角色 true', async (t) => {
+test('CSV 导出控制器：WAREHOUSE 传 includeMoney:false，其他角色 true', async (t) => {
   const exportService = require('../services/exportService');
-  const pdf = require('../services/pdfExportService');
   const ctrl = require('../controllers/system/importExportController');
   const seen = [];
-  const o1 = exportService.exportData; const o2 = pdf.exportSystemDataPdf;
+  const o1 = exportService.exportData;
   exportService.exportData = async (_t, _q, opts) => { seen.push(['csv', opts.includeMoney]); return { contentType: 'text/csv', filename: 'a.csv', data: Buffer.from('x') }; };
-  pdf.exportSystemDataPdf = async (_t, _q, opts) => { seen.push(['pdf', opts.includeMoney]); return { contentType: 'application/pdf', filename: 'a.pdf', data: Buffer.from('x') }; };
-  t.after(() => { exportService.exportData = o1; pdf.exportSystemDataPdf = o2; });
+  t.after(() => { exportService.exportData = o1; });
   for (const [role, expected] of [['SALES', false], ['ADMIN', true]]) {
     seen.length = 0;
     await ctrl.exportData({ params: { type: 'purchases' }, query: {}, user: { role } }, createRes(), next);
-    await ctrl.exportDataPdf({ params: { type: 'purchases' }, query: {}, user: { role } }, createRes(), next);
-    assert.deepEqual(seen, [['csv', expected], ['pdf', expected]], role);
+    assert.deepEqual(seen, [['csv', expected]], role);
   }
 });
 
@@ -60,14 +54,6 @@ test('采购 Excel 导出控制器：WAREHOUSE 传 includeMoney:false', async (t
   await ctrl.exportExcel({ query: {}, user: { role: 'SALES' } }, createRes(), next);
   await ctrl.exportExcel({ query: {}, user: { role: 'ADMIN' } }, createRes(), next);
   assert.deepEqual(seen, [false, true]);
-});
-
-test('GET /search：WAREHOUSE 传 includeAmounts:false', async () => {
-  const ctrl = require('../controllers/searchController');
-  for (const [role, expected] of [['SALES', false], ['ADMIN', true]]) {
-    await ctrl.search({ query: { q: 'x' }, user: { role } }, createRes(), next);
-    assert.equal(searchArgs.includeAmounts, expected, role);
-  }
 });
 
 test('PUT /purchases/:id：WAREHOUSE 的草稿更正沿用库内单价，其他角色按提交值', async (t) => {

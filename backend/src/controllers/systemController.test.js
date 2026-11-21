@@ -1,6 +1,6 @@
 /**
- * Input: systemController、prisma、importService
- * Output: 系统控制器关键行为测试（通知权限、导入记录筛选透传）
+ * Input: systemController、prisma
+ * Output: 系统控制器关键行为测试（通知权限、港口与分类）
  * Pos: 后端控制器测试
  */
 
@@ -8,8 +8,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const prisma = require('../utils/prisma');
 const systemController = require('./systemController');
-const importService = require('../services/importService');
-const eventLedgerService = require('../services/eventLedgerService');
 
 const createMockRes = () => {
   const res = {
@@ -78,92 +76,6 @@ test('markNotificationRead: 通知不存在或非本人时返回404', async () =
     assert.equal(capturedError.message, '通知不存在或无权限访问');
   } finally {
     prisma.notification.updateMany = original;
-  }
-});
-
-test('getImportRecords: 透传 status/keyword 筛选参数', async () => {
-  const original = importService.getImportRecords;
-  let capturedArgs = null;
-
-  importService.getImportRecords = async (...args) => {
-    capturedArgs = args;
-    return { records: [], total: 0 };
-  };
-
-  try {
-    const req = {
-      query: {
-        page: '2',
-        pageSize: '10',
-        status: ' FAILED ',
-        keyword: ' demo ',
-      },
-    };
-    const res = createMockRes();
-    let capturedError = null;
-    const next = (error) => {
-      capturedError = error;
-    };
-
-    await systemController.getImportRecords(req, res, next);
-
-    assert.equal(capturedError, null);
-    assert.equal(capturedArgs[0], 2);
-    assert.equal(capturedArgs[1], 10);
-    assert.deepEqual(capturedArgs[2], { status: 'FAILED', keyword: 'demo' });
-    assert.equal(res.payload.code, 200);
-    assert.deepEqual(res.payload.data.items, []);
-  } finally {
-    importService.getImportRecords = original;
-  }
-});
-
-test('getEventLedger: 透传 source/eventType/category 等筛选参数', async () => {
-  const original = eventLedgerService.listEventLedger;
-  let capturedArgs = null;
-
-  eventLedgerService.listEventLedger = async (...args) => {
-    capturedArgs = args;
-    return { events: [], total: 0, sources: ['OPERATION_LOG', 'IMPORT_RECORD'] };
-  };
-
-  try {
-    const req = {
-      query: {
-        page: '2',
-        pageSize: '15',
-        source: 'OPERATION_LOG, IMPORT_RECORD',
-        actorType: ' user ',
-        entityType: ' Store ',
-        eventType: ' audit_update ',
-        category: ' audit ',
-        keyword: ' demo ',
-      },
-    };
-    const res = createMockRes();
-    let capturedError = null;
-    const next = (error) => {
-      capturedError = error;
-    };
-
-    await systemController.getEventLedger(req, res, next);
-
-    assert.equal(capturedError, null);
-    assert.equal(capturedArgs[0], 2);
-    assert.equal(capturedArgs[1], 15);
-    assert.deepEqual(capturedArgs[2], {
-      source: ['OPERATION_LOG', 'IMPORT_RECORD'],
-      actorType: 'USER',
-      entityType: 'Store',
-      eventType: 'AUDIT_UPDATE',
-      category: 'AUDIT',
-      keyword: 'demo',
-    });
-    assert.equal(res.payload.code, 200);
-    assert.deepEqual(res.payload.data.items, []);
-    assert.deepEqual(res.payload.data.sources, ['OPERATION_LOG', 'IMPORT_RECORD']);
-  } finally {
-    eventLedgerService.listEventLedger = original;
   }
 });
 

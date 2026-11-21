@@ -21,7 +21,7 @@ const rolesOf = (router, method, path) => {
 
 test('finance: OD-8 every finance route is ADMIN only (SALES never sees finance)', () => {
   const finance = require('./finance');
-  for (const [m, p] of [['post', '/payments/auto-match'], ['post', '/payments/:id/allocate'], ['post', '/auto-match'], ['post', '/match'], ['post', '/unmatch'], ['post', '/ignore'], ['post', '/payments']]) {
+  for (const [m, p] of [['post', '/payments/auto-match'], ['post', '/payments/:id/allocate'], ['post', '/auto-match'], ['post', '/match'], ['post', '/ignore'], ['post', '/payments']]) {
     assert.deepEqual(rolesOf(finance, m, p), ['ADMIN'], p);
   }
   for (const p of ['/unmatched', '/payments', '/payables', '/receivables', '/stats', '/payment-trends', '/overdue-receivables', '/unallocated-payments', '/contracts-for-match', '/statements', '/statements/analytics', '/statements/:year/:month']) {

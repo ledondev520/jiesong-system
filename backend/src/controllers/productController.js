@@ -257,58 +257,6 @@ const remove = async (req, res, next) => {
 };
 
 /**
- * 职责：获取商品供应商列表
- */
-const getSuppliers = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const suppliers = await prisma.productSupplier.findMany({
-      where: { productId: id },
-      include: { supplier: true },
-    });
-    
-    success(res, redactNestedSuppliers(req.user?.role, suppliers));
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：关联供应商
- */
-const addSupplier = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { supplierId, price } = req.body;
-    
-    const relation = await prisma.productSupplier.upsert({
-      where: { productId_supplierId: { productId: id, supplierId } },
-      update: { price },
-      create: { productId: id, supplierId, price },
-    });
-    
-    success(res, relation, '供应商关联成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：获取商品分类
- */
-const getCategories = async (req, res, next) => {
-  try {
-    const categories = await prisma.productCategory.findMany({
-      orderBy: { name: 'asc' },
-    });
-    
-    success(res, categories);
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：获取商品历史价格
  * 思路：查询priceHistories表，按时间倒序返回
  */
@@ -374,55 +322,12 @@ const recordPrice = async (req, res, next) => {
   }
 };
 
-/**
- * 职责：获取价格趋势统计
- */
-const getPriceTrend = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const days = parsePositiveInt(req.query.days, 90, 1, 3650);
-    
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    
-    const history = await prisma.priceHistory.findMany({
-      where: {
-        productId: id,
-        recordedAt: { gte: startDate },
-      },
-      orderBy: { recordedAt: 'asc' },
-    });
-    
-    // 计算统计数据
-    const prices = history.map(h => h.price);
-    const stats = {
-      count: prices.length,
-      min: prices.length ? Math.min(...prices) : 0,
-      max: prices.length ? Math.max(...prices) : 0,
-      avg: prices.length ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2) : 0,
-      latest: prices.length ? prices[prices.length - 1] : 0,
-      trend: history.map(h => ({
-        date: h.recordedAt.toISOString().slice(0, 10),
-        price: h.price,
-      })),
-    };
-    
-    success(res, stats);
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   list,
   getById,
   create,
   update,
   remove,
-  getSuppliers,
-  addSupplier,
-  getCategories,
   getPriceHistory,
   recordPrice,
-  getPriceTrend,
 };
