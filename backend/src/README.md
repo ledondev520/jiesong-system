@@ -19,7 +19,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 
 `integration/tax-preparation-content.integration.js` 在已提交迁移构建的私有合成 SQLite 中，使用真实 Express HTTP 验证四类内部退税准备内容：当前出货与五 Sheet 工作簿一致；供应商税号/开票日期缺失时明确列出差异，拒绝确认且不改记录；重复预览/导出保持相同内容且不重复归档；多商品行的数量和人民币进货价税与美元出口报价保持独立来源。独立只读 SQLite 比较源行和时间戳；三单由既有生成器产生，船司核对仅用合成结构化夹具。不覆盖浏览器、真实文件、正式申报或收退款，由 `npm run test:db` 执行。
 
-`integration/carrier-pdf-edges.integration.js` 扩展既有 trade-lifecycle 的真实 PDF 正向链路，以内存 PDFKit、实际 Express/default pdfjs/原件归档和已提交迁移创建的私有 SQLite 验证四类边缘：两商品两页匹配与准备度、预期数字出现在片段外仍拒绝错误行数量、纯图片转人工复核、损坏 PDF 返回既有 422 且数据库/归档/准备度不变。保留现有数字存在性及商品身份分段比较，不提供通用表格解析或 OCR。独立 `npm run test:carrier-pdf` 已接入 `test:all`；本次验证既有 `test:db` 为 173 项、新 PDF 命令为 5 项（含四个子用例及外层测试）。详见 `../../docs/qa/carrier-pdf-edges-2026-10-06.md`。
+`integration/carrier-pdf-edges.integration.js` 扩展既有 trade-lifecycle 的真实 PDF 正向链路，以内存 PDFKit、实际 Express/default pdfjs/原件归档和已提交迁移创建的私有 SQLite 验证四类边缘：两商品两页匹配与准备度、预期数字出现在片段外仍拒绝错误行数量、纯图片转人工复核、损坏 PDF 返回既有 422 且数据库/归档/准备度不变。保留现有数字存在性及商品身份分段比较，不提供通用表格解析或 OCR。独立 `npm run test:carrier-pdf` 已接入 `test:all`；本次验证既有 `test:db` 为 173 项、新 PDF 命令为 5 项（含四个子用例及外层测试）。详见 `../../carrier-pdf-edges-2026-10-06.md（已删除，见 git 历史）`。
 
 `integration/financial-snapshot-readbacks.integration.js` 用已提交迁移和独立写入/只读回查的 0700/0600 合成 SQLite，通过真实认证 HTTP 验证四类财务读取：跨年账期的独立月度/YTD 报表快照；有序、可空/零/负值及汇总行证据与现有财务/老板边界；全历史人民币供应商差异和分组总计；当前名称搜索下钻的来源 ID、批次元数据、分类与重复读取不改已关联/忽略状态。名称搜索是发现链接，可能包含重叠名称；银行下钻默认 CNY，发票模型无币种字段。不访问真实文件、上传、正式申报或生产数据，不改变报表/对账口径。
 
@@ -119,7 +119,7 @@ CSV 下载通过 `utils/csvExport.js` 幂等添加 UTF-8 BOM：`services/exportS
 
 ## 工具清单
 
-- `testHelpers/hs-code-browser-server.js` / `.test.js`：独占0700目录/0600SQLite，通过已提交迁移初始化三条独立SQLite字面量HS记录与六种现有角色；真实登录/HTTP和独立只读回查验证本地组合查询及已有ADMIN/PURCHASE/FINANCE人工证据维护。组合查询用已召回候选ID限定既有Prisma名称contains查询，只收紧候选集合，保留原候选分数与组合截短回退；名称单独的模糊召回、数字检索及code-only截短回退保持原实现。所有来源链接为合成example.invalid，不访问外部来源或AI；随`npm test`执行，完整证据见`../../docs/quality/HS本地字典回归_20261006.md`。
+- `testHelpers/hs-code-browser-server.js` / `.test.js`：独占0700目录/0600SQLite，通过已提交迁移初始化三条独立SQLite字面量HS记录与六种现有角色；真实登录/HTTP和独立只读回查验证本地组合查询及已有ADMIN/PURCHASE/FINANCE人工证据维护。组合查询用已召回候选ID限定既有Prisma名称contains查询，只收紧候选集合，保留原候选分数与组合截短回退；名称单独的模糊召回、数字检索及code-only截短回退保持原实现。所有来源链接为合成example.invalid，不访问外部来源或AI；随`npm test`执行，完整证据见`../../HS本地字典回归_20261006.md（已删除，见 git 历史）`。
 
 - `controllers/system/portCategoryController.js` 和 `customsBrokerController.js` 沿用档案表单的必填名称/港口代码规则：显式空白或 null 更新在持久化前返回 400，省略字段仍保留；报关行选填字段显式 null 清空为数据库 null，避免保存字符串“null”。不新增唯一性或删除规则。
 - `integration/catalog-form-lifecycle.integration.js` 在迁移后的私有合成 SQLite 中，以真实 HTTP 验证港口、商品分类和报关行三类创建/编辑/列表回读。独立只读 SQLite 回读检查空白、现有重复键和缺失父级导致的失败不改变既有字段或时间戳；不覆盖浏览器、权限或生产数据。
