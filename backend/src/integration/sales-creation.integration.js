@@ -85,14 +85,6 @@ test('HTTP/SQLite：销售表头明细原子创建，同一请求重试不产生
 
   const header = await call('POST', '/sales', { exchangeRate: 7.2 });
   assert.equal(await db.salesItem.count({ where: { salesContractId: header.id } }), 0, '保留已有仅建表头的调用');
-  const template = await db.contractTemplate.create({ data: { name: '合成销售模板', type: 'SALES', createdBy: userIds[0], items: JSON.stringify([item, { ...item, productId: 'synthetic-missing' }]) } });
-  const beforeTemplate = await counts();
-  await call('POST', `/sales?templateId=${template.id}`, { exchangeRate: 7.2 }, { key: 'synthetic-template', expected: 400 });
-  assert.deepEqual(await counts(), beforeTemplate);
-  await db.contractTemplate.update({ where: { id: template.id }, data: { items: JSON.stringify([item]) } });
-  const fromTemplate = await call('POST', `/sales?templateId=${template.id}`, { exchangeRate: 7.2 }, { key: 'synthetic-template' });
-  assert.equal(fromTemplate.items.length, 1);
-  assert.equal((await db.salesContract.findUnique({ where: { id: fromTemplate.id } })).totalAmount, 6);
   for (const contractId of [created.id, concurrent[0].id]) {
     assert.equal(await db.operationLog.count({ where: { entity: 'SalesContract', entityId: contractId, action: 'CREATE' } }), 1,
       '相同请求的串行或并发重放不能重复记录业务新建成功');

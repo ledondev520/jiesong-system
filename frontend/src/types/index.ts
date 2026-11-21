@@ -605,29 +605,3 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
 }
-
-export interface ContractTemplate {
-  id: string;
-  name: string;
-  type: "PURCHASE" | "SALES";
-  supplierId?: string | null;
-  taxRate?: number | null;
-  note?: string | null;
-  items: ContractTemplateItem[];
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface ContractTemplateItem {
-  productId: string;
-  quantity: number;
-  unitPrice?: number;
-  unit?: string;
-  note?: string;
-  // sales-specific
-  storeId?: string;
-  costPrice?: number;
-  sellingPrice?: number;
-  exchangeRate?: number;
-}

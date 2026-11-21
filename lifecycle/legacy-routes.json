@@ -106,10 +106,6 @@
       "reason": "contractDoc存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
     },
     {
-      "key": "backend/src/routes/contractTemplates.js POST /",
-      "reason": "contractTemplates存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
       "key": "backend/src/routes/customsDeclarations.js POST /auto-drafts",
       "reason": "customsDeclarations存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
     },
@@ -243,10 +239,6 @@
     },
     {
       "key": "backend/src/routes/products.js POST /:id/suppliers",
-      "reason": "products存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
-    },
-    {
-      "key": "backend/src/routes/products.js POST /:id/price-history",
       "reason": "products存量入口，现有专项回归尚未接入通用生命周期矩阵，需先定义关联与失败边界"
     },
     {

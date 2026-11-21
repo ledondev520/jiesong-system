@@ -8,7 +8,6 @@ const { success, created, paginated } = require('../utils/response');
 const { normalizePagination } = require('../utils/pagination');
 const { createError } = require('../middleware/errorHandler');
 const salesService = require('../services/salesService');
-const contractTemplateService = require('../services/contractTemplateService');
 const auditLog = require('../utils/auditLog');
 const packingListCheckService = require('../services/packingListCheckService');
 const fileService = require('../services/fileService');
@@ -55,34 +54,7 @@ const getLoadingPlan = async (req, res, next) => {
 
 const create = async (req, res, next) => {
   try {
-    let data = req.body || {};
-    let template = null;
-
-    // 如果提供了 templateId，合并模板数据
-    if (req.query.templateId) {
-      template = await contractTemplateService.getById(req.query.templateId);
-      if (template.type !== 'SALES') {
-        throw createError('模板类型不匹配', 400);
-      }
-      data = {
-        exchangeRate: data.exchangeRate !== undefined ? data.exchangeRate : template.items?.[0]?.exchangeRate,
-        note: data.note || template.note,
-        ...data,
-      };
-    }
-
-    // 模板明细与表头一并创建；不能在表头提交后留下部分明细。
-    if (template && template.items && template.items.length > 0) {
-      data.items = data.items ?? template.items.map(item => ({
-        productId: item.productId,
-        storeId: item.storeId,
-        quantity: item.quantity,
-        unit: item.unit,
-        costPrice: item.costPrice,
-        sellingPrice: item.sellingPrice,
-        note: item.note,
-      }));
-    }
+    const data = req.body || {};
 
     const contract = await salesService.createSalesContract(data, {
       idempotencyKey: req.headers?.['x-idempotency-key'],

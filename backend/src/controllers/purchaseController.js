@@ -22,7 +22,6 @@ const auditLog = require('../utils/auditLog');
 const { createPurchaseWithItems, updatePurchase } = require('../agent/commands/purchase');
 const { assertPurchaseDraftEditable } = require('../agent/commands/purchase/updatePurchase');
 const { normalizeItem } = require('../agent/commands/purchase/createPurchaseWithItems');
-const contractTemplateService = require('../services/contractTemplateService');
 const { normalizePurchaseTaxRate } = require('../services/purchaseAmountService');
 const {
   assertPurchaseProductionReady,
@@ -248,26 +247,7 @@ const registerInvoiceNumbers = async (req, res, next) => {
  */
 const create = async (req, res, next) => {
   try {
-    let input = req.body || {};
-
-    // 如果提供了 templateId，合并模板数据
-    if (req.query.templateId) {
-      const template = await contractTemplateService.getById(req.query.templateId);
-      if (template.type !== 'PURCHASE') {
-        throw createError('模板类型不匹配', 400);
-      }
-      const mergedItems = Array.isArray(input.items) && input.items.length > 0
-        ? input.items
-        : (template.items || []);
-      input = {
-        supplierId: input.supplierId || template.supplierId,
-        taxRate: input.taxRate !== undefined ? input.taxRate : template.taxRate,
-        note: input.note || template.note,
-        items: mergedItems,
-        ...input,
-        items: mergedItems,
-      };
-    }
+    const input = req.body || {};
 
     const contract = await createPurchaseWithItems({
       input,

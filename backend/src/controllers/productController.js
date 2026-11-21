@@ -344,37 +344,6 @@ const getPriceHistory = async (req, res, next) => {
 };
 
 /**
- * 职责：记录商品价格
- */
-const recordPrice = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { price, supplierId } = req.body;
-    
-    const record = await prisma.priceHistory.create({
-      data: {
-        productId: id,
-        supplierId,
-        price,
-      },
-    });
-    
-    // 同时更新商品-供应商关联表的价格
-    if (supplierId) {
-      await prisma.productSupplier.upsert({
-        where: { productId_supplierId: { productId: id, supplierId } },
-        update: { price },
-        create: { productId: id, supplierId, price },
-      });
-    }
-    
-    success(res, record, '价格记录成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * 职责：获取价格趋势统计
  */
 const getPriceTrend = async (req, res, next) => {
@@ -423,6 +392,5 @@ module.exports = {
   addSupplier,
   getCategories,
   getPriceHistory,
-  recordPrice,
   getPriceTrend,
 };

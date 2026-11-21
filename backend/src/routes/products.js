@@ -56,15 +56,6 @@ router.get('/options/categories', productController.getCategories);
 // GET /api/v1/products/:id/price-history - 获取商品历史价格
 router.get('/:id/price-history', withIdValidation, productController.getPriceHistory);
 
-// POST /api/v1/products/:id/price-history - 记录商品价格
-router.post('/:id/price-history', [
-  withIdValidation,
-  body('price').isFloat({ min: 0 }).withMessage('价格必须为正数'),
-], roleAuth(ROLE_SETS.ALL), handleValidation, withAuditLog(
-  { entity: 'PriceHistory', action: 'CREATE', model: 'priceHistory' },
-  productController.recordPrice
-));
-
 // GET /api/v1/products/:id/price-trend - 获取价格趋势
 router.get('/:id/price-trend', withIdValidation, productController.getPriceTrend);
 

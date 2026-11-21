@@ -63,11 +63,6 @@ vi.mock("@/services/product.service", () => ({
     }),
   },
 }));
-vi.mock("@/services/contractTemplate.service", () => ({
-  contractTemplateService: {
-    getByType: vi.fn().mockResolvedValue({ data: [] }),
-  },
-}));
 vi.mock("@/components/purchase/PriceGuard", () => ({ PriceGuard: () => null }));
 vi.mock("@/lib/api-cache", () => ({ invalidateCache: vi.fn() }));
 vi.mock("sonner", () => ({
