@@ -40,8 +40,6 @@ describe("aiService", () => {
     });
   });
 
-  });
-
   it("parseImageTokenUsage: 调用 AI 图片识别接口", async () => {
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue("ok");
 
