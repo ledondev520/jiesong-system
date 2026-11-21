@@ -14,7 +14,7 @@
 - 📝 **采购管理** - 采购合同、AI辅助录入、在线盖章跳转、汇款信息复制、付款与多发票号码登记、选填发票原件
 - 💰 **出口管理** - 出口合同、合同头草稿取消复原/失败保留重试、智能定价、3D 排柜、双80%出柜判定、船司装箱单核对（真实隔离验收见 `frontend/e2e/real-sales-header.spec.ts` 与 `backend/src/testHelpers/role-browser-header.test.js`）
 - 📄 **出口单证** - 一键生成三张表、五 Sheet 出口 Excel（含商业发票）、HS 编码匹配与无退税警示
-- 🔎 **本地 HS 字典** - 商品名称与编码组合检索、详情、已有角色手工证据保存/回读的隔离验收见 `docs/quality/HS本地字典回归_20261006.md`；浏览器定义与实际执行结果分别记录
+- 🔎 **本地 HS 字典** - 商品名称与编码组合检索、详情、已有角色手工证据保存/回读
 - 📊 **库存管理** - 验货入库、出口出库、管理员期初导入及只读预览
 - 🚢 **货柜管理** - 自动编号、装箱管理、位置查询
 - 🔔 **流程提醒** - 次月5号内部退税材料准备提醒、已出货缺发票提醒（法定期限以主管税务机关和当期申报期为准）
@@ -38,10 +38,6 @@ jiesong_system/
 ├── .cursor/skills/           # 项目级 Cursor Skills（可复用工作流）
 ├── .github/workflows/       # CI工作流（单元测试+自动化验收+PR变更格式检查）
 ├── docs/                    # 项目文档
-├── PLAN.md                  # 前端美化路线图与里程碑
-├── TASKS.md                 # 前端美化任务清单与状态
-├── RISKS.md                 # 前端美化风险台账
-├── METRICS.md               # 前端美化质量与过程指标
 ├── frontend/                # 前端项目 (Next.js 16)
 │   ├── src/
 │   │   ├── app/             # App Router Pages
@@ -52,7 +48,6 @@ jiesong_system/
 │   │   └── types/           # TypeScript Interfaces
 │   └── README.md
 ├── backend/                 # 后端项目 (Express + Prisma)
-├── demo/                    # 旧版UI Demo (废弃)
 └── README.md                # 本文件
 ```
 
@@ -128,34 +123,14 @@ python3 -m unittest discover -s tests -p test_prepare_export_packet.py
 
 ## 文档导航
 
-- [需求总结](docs/需求总结_v2.0.md) - 完整需求规格
-- [PRD文档](docs/PRD.md) - 产品需求、功能清单
 - [技术方案](docs/技术方案.md) - 系统架构设计
 - [数据库设计](docs/数据库设计.md) - Schema 定义
-- [测试样例](docs/测试样例.md) - 测试先行样例与用例清单
-- [模拟数据汇总](docs/模拟数据汇总.md) - 模拟数据标记清单
-- [前端统一重构验收清单](docs/前端统一重构验收清单.md) - 前端样式统一改造验收台账
-- [系统架构落地执行方案](docs/系统架构落地执行方案.md) - 多 Agent 协同执行路线与 WU 落地清单
 - [可执行里程碑计划（V1）](docs/可执行里程碑计划.md) - 未来2周 6 个里程碑、角色、验证与回滚
-- [采购链路 API 契约](docs/api-contracts/采购链路契约.md) - 采购域接口契约与联调状态基线
-- [销售链路 API 契约](docs/api-contracts/销售链路契约.md) - 销售与装箱接口契约基线
-- [销售链路联调面板](docs/api-contracts/销售链路联调面板.md) - 销售链路 READY/BLOCKED/DONE 联调追踪
-- [库存链路 API 契约](docs/api-contracts/库存链路契约.md) - 库存查询、状态机流转与批量状态更新契约
-- [库存链路联调面板](docs/api-contracts/库存链路联调面板.md) - 库存链路 READY/BLOCKED/DONE 联调追踪
-- [发布结论（M5）](docs/quality/发布结论_M5_20260212.md) - 采购链路门禁执行证据与发布建议
-- [系统日志回归](docs/quality/application-audit-readback-2026-10-06.md) - 合成应用审计查询、完整记录、CSV及现有角色的真实HTTP/SQLite证据
-- [系统配置普通文本回归](docs/quality/ordinary-setting-text-20261006.md) - 第 30 行既有文本单键保存/失败/重试/回读与组件放弃编辑；整表混合保存及浏览器仍未验收
-- [周节奏指标看板](docs/周节奏指标看板.md) - 周度质量/效率/回归风险跟踪
 - [项目子代理说明](.cursor/agents/README.md) - 项目级 Cursor 子代理与用途
 - [项目技能说明](.cursor/skills/README.md) - 项目级 Cursor Skills 索引与用途
-- [前端美化路线图](PLAN.md) - 分阶段里程碑与风险对策
-- [前端美化任务清单](TASKS.md) - 执行状态与优先级
-- [前端美化风险台账](RISKS.md) - 风险触发与回滚点
-- [前端美化指标](METRICS.md) - 每轮质量与过程指标
 - [前端文档](frontend/README.md) - 前端开发指南
 - [后端测试](backend/README.md#5-运行测试) - test:db 包含真实只读概览来源验收、上海期间与收付趋势，以及合成邮箱注册 HTTP 成功/重放与未激活 SALES 安全字段回读
 - [前端浏览器验收](frontend/e2e/README.md) - 真实角色与合成资料验收约定，含出口3D绘制/控制/响应式返回和 Header 个人设置本地保存/重载/部分失败重试的 hosted CI 定义；定义检查不代表浏览器通过
-- [普通用户名称验收](docs/qa/account-name-lifecycle-2026-10-06.md) - 两个现有用户管理入口完整目录搜索与真实失败保留草稿重试；仅名称合成HTTP/React检查
 
 ## License
 

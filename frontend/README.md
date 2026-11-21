@@ -2,7 +2,7 @@
 
 > 若本文件夹结构或内容变化，请更新本文件。
 >
-> Input: docs/PRD.md, docs/技术方案.md
+> Input: PRD.md（已删除，见 git 历史）, docs/技术方案.md
 > Output: Web Application Interface
 > Pos: 用户交互层
 

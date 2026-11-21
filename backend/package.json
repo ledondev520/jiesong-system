@@ -68,7 +68,6 @@
     "ignore": [
       "**/*.test.js",
       "prisma/migrations/**",
-      "prisma/fix-*.js",
       "prisma/import-*.js",
       "prisma/seed_*.js",
       "scripts/*.js"
