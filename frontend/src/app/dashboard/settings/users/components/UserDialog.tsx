@@ -194,7 +194,7 @@ function UserDialogSession({
                       <SelectItem value={Role.ADMIN}>
                         管理员 (所有权限)
                       </SelectItem>
-                      <SelectItem value={Role.SALES}>销售人员</SelectItem>
+                      <SelectItem value={Role.SALES}>普通用户</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

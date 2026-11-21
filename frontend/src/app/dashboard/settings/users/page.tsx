@@ -112,7 +112,7 @@ export default function UsersPage() {
       case Role.ADMIN:
         return <SemanticBadge tone="danger">管理员</SemanticBadge>;
       case Role.SALES:
-        return <SemanticBadge tone="success">销售</SemanticBadge>;
+        return <SemanticBadge tone="success">普通用户</SemanticBadge>;
       default:
         // OD-8：停用角色（PURCHASE/FINANCE/WAREHOUSE/BOSS）无法登录，需管理员重新分配
         return <SemanticBadge tone="secondary">{role}（已停用）</SemanticBadge>;
