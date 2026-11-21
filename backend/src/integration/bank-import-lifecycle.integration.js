@@ -195,7 +195,7 @@ c.close()`, database], { encoding: 'utf8', timeout: 10000 }));
       assert.equal(result.batchId, null);
       assert.deepEqual(snapshot(), before, 'replay must retain original source, IDs, match metadata and no empty batch');
     }
-    for (const [route, body] of [['/finance/match', matchBody], ['/finance/unmatch', { entityType: 'BANK', entityId: linked.id }], ['/finance/ignore', { entityType: 'BANK', entityId: linked.id }]]) {
+    for (const [route, body] of [['/finance/match', matchBody], ['/finance/ignore', { entityType: 'BANK', entityId: linked.id }]]) {
       await call('POST', route, body, 'SALES', 403);
       assert.deepEqual(snapshot(), before);
     }

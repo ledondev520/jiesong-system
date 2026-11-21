@@ -10,7 +10,7 @@ const assert = require('node:assert/strict');
 test('inventoryController: 模块可正常加载并导出', () => {
   const mod = require('./inventoryController');
   assert.ok(mod !== undefined);
-  assert.equal(typeof mod.getAlerts, 'function');
+  assert.equal(typeof mod.list, 'function');
 });
 
 test('inventoryController.list: storeId 按采购明细送往门店只读筛选（不再用已退役的 PurchaseContract.storeName）', async () => {

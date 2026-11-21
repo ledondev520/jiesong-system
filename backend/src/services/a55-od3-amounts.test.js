@@ -32,17 +32,6 @@ test('OD-3：CSV 导出 WAREHOUSE 无金额列，其余角色保留', async (t) 
   assert.match(wh, /CONFIRMED/);
 });
 
-test('OD-3：PDF 导出行 WAREHOUSE 无 Total/Received/Outstanding', async (t) => {
-  stubPrisma(t, prisma.salesContract, 'findMany', async () => CONTRACTS);
-  const { exportSystemDataRows } = require('./pdfExportService');
-  const full = await exportSystemDataRows('sales', {}, { includeMoney: true });
-  assert.deepEqual(full.headers.slice(0, 4), ['Contract No.', 'Total', 'Received', 'Outstanding']);
-  const wh = await exportSystemDataRows('sales', {}, { includeMoney: false });
-  assert.deepEqual(wh.headers, ['Contract No.', 'Exchange Rate', 'Status', 'Signed At']);
-  assert.equal(wh.rows[0].length, wh.headers.length);
-  assert.ok(!JSON.stringify(wh.rows).includes('1,234') && !JSON.stringify(wh.rows).includes('1234'));
-});
-
 test('OD-3：GetExportOverview 仅对 WAREHOUSE 去掉 totalAmount/receivedAmount', async (t) => {
   stubPrisma(t, prisma.salesContract, 'findMany', async () => CONTRACTS.map((c) => ({ ...c, port: null, customer: null })));
   stubPrisma(t, prisma.salesContract, 'count', async () => 1);
@@ -150,13 +139,11 @@ test('A63：导出 includeMoney 缺省即无金额（fail closed）', async (t) 
   stubPrisma(t, prisma.salesContract, 'findMany', async () => CONTRACTS);
   stubPrisma(t, prisma.purchaseContract, 'findMany', async () => []);
   const { exportData } = require('./exportService');
-  const { exportSystemDataRows } = require('./pdfExportService');
   assert.doesNotMatch((await exportData('sales', {})).data, /总金额|1234/);
   assert.doesNotMatch((await exportData('purchases', {})).data, /总金额|已付金额/);
-  assert.deepEqual((await exportSystemDataRows('sales', {})).headers, ['Contract No.', 'Exchange Rate', 'Status', 'Signed At']);
 });
 
-test('A63：销售列表 CSV/PDF 对 DERIVED 合同扣除第三方装箱货值（B87 口径）', async (t) => {
+test('A63：销售列表 CSV 对 DERIVED 合同扣除第三方装箱货值（B87 口径）', async (t) => {
   const derived = {
     ...CONTRACTS[0], totalAmount: 1000, receivedAmount: 300, amountSource: 'DERIVED',
     packingItems: [
@@ -166,11 +153,8 @@ test('A63：销售列表 CSV/PDF 对 DERIVED 合同扣除第三方装箱货值�
   };
   stubPrisma(t, prisma.salesContract, 'findMany', async () => [derived]);
   const { exportData } = require('./exportService');
-  const { exportSystemDataRows } = require('./pdfExportService');
   const csv = (await exportData('sales', {}, { includeMoney: true })).data.split('\n')[1].replace(/"/g, '').split(',');
   assert.deepEqual(csv.slice(1, 4).map(Number), [700, 300, 400]);
-  const pdf = (await exportSystemDataRows('sales', {}, { includeMoney: true })).rows[0];
-  assert.deepEqual(pdf.slice(1, 4), ['700.00', '300.00', '400.00']);
 });
 
 test('A69/A63-F1：采购 Excel 导出 includeMoney 缺省即无总金额列（fail closed）', async (t) => {
@@ -191,7 +175,7 @@ test('A69/A63-F1：采购 Excel 导出 includeMoney 缺省即无总金额列（f
   assert.equal((await read({ includeMoney: true }))['总金额'], 98765);
 });
 
-test('A69/A63-F3：销售列表导出已收封顶到自有额（owned 600 / received 900），CSV 与 PDF 一致', async (t) => {
+test('A69/A63-F3：销售列表导出已收封顶到自有额（owned 600 / received 900），CSV 口径', async (t) => {
   const capped = {
     ...CONTRACTS[0], totalAmount: 1000, receivedAmount: 900, amountSource: 'DERIVED',
     packingItems: [
@@ -201,9 +185,6 @@ test('A69/A63-F3：销售列表导出已收封顶到自有额（owned 600 / rece
   };
   stubPrisma(t, prisma.salesContract, 'findMany', async () => [capped]);
   const { exportData } = require('./exportService');
-  const { exportSystemDataRows } = require('./pdfExportService');
   const csv = (await exportData('sales', {}, { includeMoney: true })).data.split('\n')[1].replace(/"/g, '').split(',');
   assert.deepEqual(csv.slice(1, 4).map(Number), [600, 600, 0]);
-  const pdf = (await exportSystemDataRows('sales', {}, { includeMoney: true })).rows[0];
-  assert.deepEqual(pdf.slice(1, 4), ['600.00', '600.00', '0.00']);
 });

@@ -82,7 +82,6 @@ test('HTTP/SQLite：分批收验货及分配出库后拒绝破坏性采购更正
       ['更换供应商', 'PUT', url, { supplierId: suppliers[1].id }],
       ['删除已到货采购行', 'PUT', url, { items: [items[1]] }],
       ['删除另一采购行', 'PUT', url, { items: [items[0]] }],
-      ['追加采购行', 'POST', `${url}/items`, { productId: products[2].id, quantity: 1, unitPrice: 1 }],
       ['删除整个合同', 'DELETE', url, undefined],
     ];
     for (const [description, method, endpoint, input] of edits) {

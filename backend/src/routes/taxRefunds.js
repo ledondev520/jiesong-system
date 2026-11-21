@@ -29,11 +29,6 @@ router.post(
   roleAuth(ROLE_SETS.ADMIN),
   taxRefundController.generateTaxRefundDrafts,
 );
-router.post(
-  '/export',
-  roleAuth(ROLE_SETS.ADMIN),
-  taxRefundController.exportTaxRefunds,
-);
 router.get('/:id', withIdValidation, taxRefundController.getById);
 const refundFieldGuard = settlementFieldGuard({
   safeStatuses: ['DRAFT', 'APPLIED'],

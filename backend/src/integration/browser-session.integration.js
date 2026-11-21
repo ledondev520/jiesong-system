@@ -145,7 +145,7 @@ test('fixed-expiry opt-in browser sessions and CSRF boundaries', async (t) => {
     await db.user.update({ where: { id: user.id }, data: { isActive: false } }); assert.equal((await request('/api/v1/auth/session', s)).status, 401);
     await db.user.update({ where: { id: user.id }, data: { isActive: true, sessionVersion: { increment: 1 } } }); assert.equal((await request('/api/v1/auth/session', s)).status, 401);
     s = await session(); const bearer = (await login()).body.data.token;
-    const changed = await request('/api/v1/auth/change-password', { method: 'POST', ...s, headers: { origin }, body: { oldPassword: password, newPassword: crypto.randomBytes(18).toString('hex') } }); assert.equal(changed.status, 200);
+    await db.user.update({ where: { id: user.id }, data: { sessionVersion: { increment: 1 } } }); // password change bumps this; the HTTP route was removed
     assert.equal((await request('/api/v1/auth/session', s)).status, 401); assert.equal((await request('/api/v1/auth/me', { headers: { authorization: `Bearer ${bearer}` } })).status, 401);
   });
   await t.test('database failures are sanitized and fail closed', async () => {

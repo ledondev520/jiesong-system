@@ -11,7 +11,6 @@ const {
   PURCHASE_STATUS,
   SALES_STATUS,
   INVENTORY_STATUS,
-  CONTAINER_STATUS,
   PAYMENT_TYPE,
   NOTIFICATION_TYPE,
   IMPORT_STATUS,
@@ -38,15 +37,6 @@ test('INVENTORY_STATUS: 与PRD状态机一致', () => {
   assert.deepStrictEqual(
     values,
     ['PRODUCING', 'PACKING', 'SHIPPING', 'INBOUND', 'OUTBOUND'].sort(),
-  );
-});
-
-test('CONTAINER_STATUS: 包含货柜主要状态', () => {
-  const values = getSortedValues(CONTAINER_STATUS);
-
-  assert.deepStrictEqual(
-    values,
-    ['PENDING', 'LOADING', 'SHIPPED', 'ARRIVED'].sort(),
   );
 });
 

@@ -159,30 +159,8 @@ test('dashboard HTTP/SQLite: actual workbench sources preserve current definitio
     assert.deepEqual(f.snapshot(), before);
   });
 
-  await t.test('trace merges real sales/packing relations with sales precedence, store filtering and missing-store fallback', async () => {
-    assert.equal(before.sales_items[0].quantity, 11);
-    assert.equal(before.packing_items.find(row => row.id === 'dashboard-dual-owned').quantity, 12);
-    const trace = await read('/dashboard/track-product?product=' + encodeURIComponent('角色验收'));
-    const facts = trace.map(row => [row.salesContractId, row.storeName, row.quantity]).sort();
-    assert.deepEqual(facts, [
-      ['dashboard-old-risk', '合成追踪门店甲', 11],
-      ['dashboard-packing-only', '合成追踪门店乙', 17],
-      ['dashboard-packing-only', '未知门店', 19],
-    ].sort());
-    assert.ok(trace.every(row => row.productName === '合成角色验收商品' && row.portName === '合成角色验收港口'));
-    assert.deepEqual(trace.map(row => row.contractNo),
-      ['EXP-SYNTHETIC-PACKING-ONLY', 'EXP-SYNTHETIC-PACKING-ONLY', 'EXP-SYNTHETIC-OLD-RISK']);
-    for (const [store, expected] of [['门店甲', [['dashboard-old-risk', 11]]], ['门店乙', [['dashboard-packing-only', 17]]], ['不存在门店', []]]) {
-      const filtered = await read('/dashboard/track-product?product=' + encodeURIComponent('角色验收') + '&store=' + encodeURIComponent(store));
-      assert.deepEqual(filtered.map(row => [row.salesContractId, row.quantity]), expected);
-    }
-    assert.deepEqual(await read('/dashboard/track-product'), []);
-    assert.deepEqual(await read('/dashboard/track-product?product=' + encodeURIComponent('不存在商品')), []);
-    assert.deepEqual(f.snapshot(), before);
-  });
-
   await t.test('authentication and real current roles permit task detail reads without changing sources', async () => {
-    for (const route of ['/dashboard/analytics', '/dashboard/trade-workflows', '/dashboard/track-product?product=synthetic']) {
+    for (const route of ['/dashboard/analytics', '/dashboard/trade-workflows']) {
       assert.equal((await f.call(route)).status, 401);
     }
     assert.equal((await f.call('/dashboard/trade-workflows?scope=unknown', f.tokens.PURCHASE)).status, 400);

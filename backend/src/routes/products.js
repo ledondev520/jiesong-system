@@ -41,18 +41,6 @@ router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   productController.remove
 ));
 
-// GET /api/v1/products/:id/suppliers - 获取商品供应商列表
-router.get('/:id/suppliers', withIdValidation, productController.getSuppliers);
-
-// POST /api/v1/products/:id/suppliers - 关联供应商
-router.post('/:id/suppliers', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
-  { entity: 'ProductSupplier', action: 'CREATE', model: 'productSupplier' },
-  productController.addSupplier
-));
-
-// GET /api/v1/products/categories - 获取商品分类
-router.get('/options/categories', productController.getCategories);
-
 // GET /api/v1/products/:id/price-history - 获取商品历史价格
 router.get('/:id/price-history', withIdValidation, productController.getPriceHistory);
 
@@ -64,8 +52,5 @@ router.post('/:id/price-history', [
   { entity: 'PriceHistory', action: 'CREATE', model: 'priceHistory' },
   productController.recordPrice
 ));
-
-// GET /api/v1/products/:id/price-trend - 获取价格趋势
-router.get('/:id/price-trend', withIdValidation, productController.getPriceTrend);
 
 module.exports = router;

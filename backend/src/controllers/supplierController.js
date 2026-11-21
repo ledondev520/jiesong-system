@@ -167,43 +167,6 @@ const hardDelete = async (req, res, next) => {
   }
 };
 
-/**
- * 职责：添加供应商昵称
- */
-const addAlias = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { alias } = req.body;
-    
-    const supplierAlias = await prisma.supplierAlias.create({
-      data: { supplierId: id, alias },
-    });
-    
-    created(res, supplierAlias, '昵称添加成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * 职责：标记质量问题
- */
-const markQualityIssue = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { hasQualityIssue, qualityNote } = req.body;
-    
-    const supplier = await prisma.supplier.update({
-      where: { id },
-      data: { hasQualityIssue, qualityNote },
-    });
-    
-    success(res, redactSupplierForRole(req.user?.role, supplier), '质量问题标记成功');
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   list,
   getById,
@@ -212,6 +175,4 @@ module.exports = {
   remove,
   hardDeletePreview,
   hardDelete,
-  addAlias,
-  markQualityIssue,
 };

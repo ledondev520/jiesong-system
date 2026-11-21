@@ -29,14 +29,8 @@ router.get('/invoices', withPaginationValidation, ctrl.listInvoices);
 // GET /api/v1/bank-flow/invoices/stats
 router.get('/invoices/stats', ctrl.getInvoiceStats);
 
-// GET /api/v1/bank-flow/invoices/by-seller
-router.get('/invoices/by-seller', ctrl.getInvoicesBySeller);
-
 // GET /api/v1/bank-flow/batches
 router.get('/batches', ctrl.listBatches);
-
-// GET /api/v1/bank-flow/reconciliation?counterpart=xxx
-router.get('/reconciliation', ctrl.getReconciliation);
 
 // GET /api/v1/bank-flow/reconciliation/full
 router.get('/reconciliation/full', ctrl.getFullReconciliation);

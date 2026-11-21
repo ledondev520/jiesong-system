@@ -6,7 +6,7 @@
 
 const { Router } = require('express');
 const authController = require('../controllers/authController');
-const { validateLogin, validateRegister, validateResetPassword, validateChangePassword, passwordRule, emailRule, handleValidation } = require('../utils/validators');
+const { validateLogin, validateRegister, validateResetPassword, passwordRule, emailRule, handleValidation } = require('../utils/validators');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withAuditLog } = require('../middleware/auditLog');
@@ -113,26 +113,6 @@ router.post('/logout', authController.logout);
 
 // GET /api/v1/auth/me - 获取当前用户信息
 router.get('/me', authenticate, authController.getCurrentUser);
-
-// POST /api/v1/auth/change-password - 修改密码
-router.post(
-  '/change-password',
-  authenticate,
-  validateChangePassword, handleValidation,
-  roleAuth(ROLE_SETS.ALL),
-  withAuditLog(
-    {
-      entity: 'User',
-      action: 'UPDATE',
-      model: 'user',
-      getEntityId: ({ req }) => req.user?.id || null,
-      beforeWhere: ({ req }) => (req.user?.id ? { id: req.user.id } : null),
-      afterWhere: ({ req }) => (req.user?.id ? { id: req.user.id } : null),
-      getNewValue: ({ defaultValue }) => defaultValue,
-    },
-    authController.changePassword
-  )
-);
 
 // GET /api/v1/auth/users - 获取用户列表（仅管理员）
 router.get('/users', authenticate, roleAuth(ROLE_SETS.ADMIN), authController.getUsers);

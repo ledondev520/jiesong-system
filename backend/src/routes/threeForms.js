@@ -72,46 +72,10 @@ router.post('/generate', roleAuth(...SETTLEMENT_DOC_ROLES), wrapAsync(async (req
  * POST /api/three-forms/customs-declaration
  * 单独生成报关单
  */
-router.post('/customs-declaration', roleAuth(...SETTLEMENT_DOC_ROLES), wrapAsync(async (req, res) => {
-  const { salesContractId, items, extraData } = req.body;
-
-  if (!salesContractId) {
-    throw createError('缺少出口合同 ID', 400);
-  }
-
-  const result = await threeFormsService.generateCustomsDeclaration({
-    salesContractId,
-    items: items || [],
-    extraData: extraData || {},
-  });
-
-  success(res, result, '报关单生成成功');
-}));
-
 /**
  * POST /api/three-forms/forex-verification
  * 单独生成外汇核销单
  */
-router.post('/forex-verification', roleAuth(...SETTLEMENT_DOC_ROLES), wrapAsync(async (req, res) => {
-  const { salesContractId, customsDeclarationId, extraData } = req.body;
-
-  if (!salesContractId) {
-    throw createError('缺少出口合同 ID', 400);
-  }
-
-  if (!customsDeclarationId) {
-    throw createError('缺少报关单 ID', 400);
-  }
-
-  const result = await threeFormsService.generateForexVerification({
-    salesContractId,
-    customsDeclarationId,
-    extraData: extraData || {},
-  });
-
-  success(res, result, '外汇核销单生成成功');
-}));
-
 /**
  * POST /api/three-forms/tax-refund
  * 单独生成出口退税单

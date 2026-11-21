@@ -18,21 +18,6 @@ router.use(authenticate);
 // GET /api/v1/inventory - 获取库存列表
 router.get('/', withPaginationValidation, inventoryController.list);
 
-// GET /api/v1/inventory/stats - 获取库存统计（放在/:id前面避免被匹配）
-router.get('/stats', inventoryController.getStats);
-
-// GET /api/v1/inventory/snapshot - 按商品聚合库存快照
-router.get('/snapshot', inventoryController.getSnapshot);
-
-// GET /api/v1/inventory/alerts - 低库存预警
-router.get('/alerts', withPaginationValidation, inventoryController.getAlerts);
-
-// GET /api/v1/inventory/product/:productId - 按商品查询库存
-router.get('/product/:productId', inventoryController.getByProduct);
-
-// GET /api/v1/inventory/contract/:contractId - 按出口合同查询库存
-router.get('/contract/:contractId', inventoryController.getByContract);
-
 // PUT /api/v1/inventory/batch-status - 批量更新库存状态（静态路由优先）
 router.put('/batch-status', roleAuth(ROLE_SETS.ALL), withAuditLog(
   {
@@ -56,12 +41,6 @@ router.get('/:id', withIdValidation, inventoryController.getById);
 router.put('/:id/status', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
   { entity: 'Inventory', action: 'UPDATE', model: 'inventory' },
   inventoryController.updateStatus
-));
-
-// POST /api/v1/inventory/:id/location - 登记/修改批次号与库位（A83；仅仓储相关角色）
-router.post('/:id/location', withIdValidation, roleAuth('ADMIN', 'SALES'), withAuditLog(
-  { entity: 'Inventory', action: 'UPDATE_LOCATION', model: 'inventory', captureBefore: true, captureAfter: true },
-  inventoryController.updateLocation
 ));
 
 module.exports = router;

@@ -17,7 +17,7 @@ test('A83 迁移仅增列/增索引：两个可空 TEXT 列与两个索引，不
   ]);
 });
 
-test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、列表筛选、位置编辑与角色', async t => {
+test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、列表筛选、角色', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'jiesong-warehouse-test-'));
   fs.chmodSync(directory, 0o700);
   const dbFile = path.join(directory, 'synthetic.db');
@@ -76,7 +76,7 @@ test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、
   };
 
 
-  await t.test('入库登记批次/库位、拆分保留、筛选、编辑、校验与角色', async () => {
+  await t.test('入库登记批次/库位、拆分保留、筛选、校验与角色', async () => {
     const contract = await purchase(products[0], 10);
     const first = await receive(contract, contract.items[0], 10);
     await inspect(contract, first, 10, 0, { lotNo: '  LOT-2026-11  ', binLocation: 'A-01-02' });
@@ -120,26 +120,5 @@ test('HTTP/SQLite：A83 验货入库登记批次与库位、FIFO 拆分保留、
     }
     const both = await call('GET', '/inventory?lotNo=LOT-2026-11&binLocation=Z-99', undefined, {});
     assert.equal(both.items.length, 0);
-
-    // 位置编辑（OD-8：SALES 负责收货）：可改；省略保持；空串清空；空请求 400；不存在 404。
-    assert.equal((await call('POST', `/inventory/${stock.id}/location`, { binLocation: 'B-02-03' })).binLocation, 'B-02-03');
-    assert.equal((await db.inventory.findUnique({ where: { id: stock.id } })).lotNo, 'LOT-2026-11');
-    assert.equal((await call('POST', `/inventory/${stock.id}/location`, { lotNo: '' })).lotNo, null);
-    await call('POST', `/inventory/${stock.id}/location`, {}, { expected: 400 });
-    await call('POST', `/inventory/${stock.id}/location`, { lotNo: 'X'.repeat(51) }, { expected: 400 });
-    await call('POST', '/inventory/missing-id/location', { lotNo: 'L' }, { expected: 404 });
-    assert.equal((await db.inventory.findUnique({ where: { id: stock.id } })).binLocation, 'B-02-03');
-
-    // 审计：每次成功的位置修改有一行 UPDATE_LOCATION，带修改前后的批次/库位（异步写入，轮询等待）。
-    let logs = [];
-    for (let attempt = 0; attempt < 50 && logs.length < 2; attempt += 1) {
-      logs = await db.operationLog.findMany({ where: { entity: 'Inventory', entityId: stock.id, action: 'UPDATE_LOCATION' }, orderBy: { createdAt: 'asc' } });
-      if (logs.length < 2) await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    assert.equal(logs.length, 2);
-    assert.equal(JSON.parse(logs[0].oldValue).lotNo, 'LOT-2026-11');
-    assert.equal(JSON.parse(logs[0].newValue).binLocation, 'B-02-03');
-    assert.equal(JSON.parse(logs[1].oldValue).lotNo, 'LOT-2026-11');
-    assert.equal(JSON.parse(logs[1].newValue).lotNo, null);
   });
 });

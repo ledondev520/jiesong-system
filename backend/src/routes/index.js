@@ -26,18 +26,14 @@ const aiRoutes = require('./ai');
 const userRoutes = require('./users');
 const dataImportRoutes = require('./dataImport');
 const dataExportRoutes = require('./dataExport');
-const batchImportRoutes = require('./batchImport.routes');
 const dashboardRoutes = require('./dashboard');
 const reportsRoutes = require('./reports');
-const searchRoutes = require('./search');
 const contractDocRoutes = require('./contractDoc');
 const customsDeclarationRoutes = require('./customsDeclarations');
 const forexVerificationRoutes = require('./forexVerifications');
 const taxRefundRoutes = require('./taxRefunds');
-const taxRateRoutes = require('./taxRates');
 const hsCodeRoutes = require('./hsCodes');
 const threeFormsRoutes = require('./threeForms');
-const procurementTemplateRoutes = require('./procurementTemplate');
 const contractTemplateRoutes = require('./contractTemplates');
 const bankFlowRoutes = require('./bankFlow');
 const notificationRoutes = require('./notifications');
@@ -73,17 +69,13 @@ router.use('/import', dataImportRoutes);
 router.use('/export', dataExportRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/reports', reportsRoutes);
-router.use('/search', searchRoutes);
 router.use('/contract-doc', contractDocRoutes);  // 合同文档生成
 router.use('/customs-declarations', customsDeclarationRoutes);
 router.use('/forex-verifications', forexVerificationRoutes);
 router.use('/tax-refunds', taxRefundRoutes);
-router.use('/tax-rates', taxRateRoutes);
 router.use('/hs-codes', hsCodeRoutes);
 router.use('/three-forms', threeFormsRoutes);
-router.use('/procurement-template', procurementTemplateRoutes);  // 开业采购模板（CSV分析）
 router.use('/contract-templates', contractTemplateRoutes);  // 合同配置模板
-router.use('/batch-import', batchImportRoutes);  // 批量导入
 router.use('/bank-flow', bankFlowRoutes);  // 银行流水与发票查询
 router.use('/notifications', notificationRoutes);  // 站内通知
 router.use('/', fileRoutes);  // 合同附件（/contracts/:id/files, /files/:id/download）

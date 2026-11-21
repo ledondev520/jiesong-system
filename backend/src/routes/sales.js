@@ -13,12 +13,11 @@ const { Router } = require('express');
 const salesController = require('../controllers/salesController');
 const purchaseDraftController = require('../controllers/purchaseDraftController');
 const { exportSalesContractExcel } = require('../services/exportService');
-const { exportSalesContractPdf } = require('../services/pdfExportService');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { ROLE_SETS } = require('../middleware/roleAuth');
 const { withIdValidation, withPaginationValidation, body, param, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
-const { upload, pdfCheckUpload } = require('../utils/upload');
+const { pdfCheckUpload } = require('../utils/upload');
 const multer = require('multer');
 const { createError } = require('../middleware/errorHandler');
 const exportPacketExcelController = require('../controllers/exportPacketExcelController');
@@ -84,12 +83,6 @@ router.delete('/:id', withIdValidation, roleAuth(...WRITE_ROLES), withAuditLog(
 
 // ==================== 销售明细 ====================
 
-// POST /api/v1/sales/:id/items - 添加销售明细
-router.post('/:id/items', withIdValidation, roleAuth(...WRITE_ROLES), withAuditLog(
-  { entity: 'SalesItem', action: 'CREATE', model: 'salesItem' },
-  salesController.addItem
-));
-
 // POST /api/v1/sales/:id/items/:itemId/reprice - 改单行数量/售价（A84；审计行在服务事务内写入）
 // ADMIN/SALES（OD-8：SALES 录入合同价格，但响应不回显合同总额，OD-7）。
 router.post('/:id/items/:itemId/reprice', withIdValidation, roleAuth(ROLE_SETS.ALL), salesController.updateItemLine);
@@ -147,20 +140,8 @@ router.post('/:id/export-packet/preview', withIdValidation, roleAuth(...EXPORT_P
 // POST /api/v1/sales/:id/export-packet/generate - 确认价格后生成、归档出口四单
 router.post('/:id/export-packet/generate', withIdValidation, roleAuth(...EXPORT_PACKET_ROLES), exportPacketValidation, salesController.generateExportPacket);
 
-// POST /api/v1/sales/:id/files - 上传出口合同附件
-router.post('/:id/files', withIdValidation, roleAuth(...WRITE_ROLES), upload.single('file'), withAuditLog(
-  { entity: 'SalesContractFile', action: 'CREATE', model: 'salesContractFile' },
-  salesController.uploadFile
-));
-
 // GET /api/v1/sales/:id/files - 获取出口合同附件列表
 router.get('/:id/files', withIdValidation, salesController.getFiles);
-
-// DELETE /api/v1/sales/files/:fileId - 删除出口合同附件
-router.delete('/files/:fileId', roleAuth(...WRITE_ROLES), withAuditLog(
-  { entity: 'SalesContractFile', action: 'DELETE', model: 'salesContractFile', idParam: 'fileId' },
-  salesController.deleteFile
-));
 
 // GET /api/v1/sales/files/:fileId/download - 下载出口合同附件
 router.get('/files/:fileId/download', salesController.downloadFile);
@@ -233,26 +214,11 @@ router.put('/:id/status', withIdValidation, roleAuth(...WRITE_ROLES), withAuditL
   salesController.updateStatus
 ));
 
-// POST /api/v1/sales/calculate-price - 计算销售价格
-router.post('/calculate-price', roleAuth(...WRITE_ROLES), salesController.calculatePrice);
-
 // GET /api/v1/sales/:id/export-excel - 导出单份合同标准出口 Excel（三 Sheet）
 router.get('/:id/export-excel', roleAuth(...EXPORT_DOC_ROLES), withIdValidation, async (req, res, next) => {
   try {
     const { buffer, filename } = await exportSalesContractExcel(req.params.id);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
-    res.send(buffer);
-  } catch (err) {
-    next(err);
-  }
-});
-
-// GET /api/v1/sales/:id/export-pdf - 导出单份合同 PDF
-router.get('/:id/export-pdf', roleAuth(...EXPORT_DOC_ROLES), withIdValidation, async (req, res, next) => {
-  try {
-    const { buffer, filename } = await exportSalesContractPdf(req.params.id);
-    res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.send(buffer);
   } catch (err) {

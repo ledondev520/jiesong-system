@@ -8,7 +8,7 @@ const { Router } = require('express');
 const contractTemplateController = require('../controllers/contractTemplateController');
 const { authenticate, roleAuth } = require('../middleware/auth');
 const { ROLE_SETS } = require('../middleware/roleAuth');
-const { withIdValidation, body, handleValidation } = require('../utils/validators');
+const { body, handleValidation } = require('../utils/validators');
 const { withAuditLog } = require('../middleware/auditLog');
 
 const router = Router();
@@ -25,15 +25,6 @@ router.post('/', [
 ], roleAuth(ROLE_SETS.ALL), handleValidation, withAuditLog(
   { entity: 'ContractTemplate', action: 'CREATE', model: 'contractTemplate' },
   contractTemplateController.create
-));
-
-// GET /api/v1/contract-templates/:id - 获取模板详情
-router.get('/:id', withIdValidation, contractTemplateController.getById);
-
-// DELETE /api/v1/contract-templates/:id - 删除模板
-router.delete('/:id', withIdValidation, roleAuth(ROLE_SETS.ALL), withAuditLog(
-  { entity: 'ContractTemplate', action: 'DELETE', model: 'contractTemplate' },
-  contractTemplateController.remove
 ));
 
 module.exports = router;
